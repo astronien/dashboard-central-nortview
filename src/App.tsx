@@ -596,7 +596,7 @@ export default function App() {
     setUploadError(null);
     setIsParsing(true);
     try {
-      const nextUploads: Record<UploadKind, RawRow[]> = { target: [], current: [], lastMonth: [], lastYear: [], categoryMaster: [] };
+      const nextUploads: Record<UploadKind, RawRow[]> = { ...uploadedFiles };
       for (const file of files) {
         const buffer = await file.arrayBuffer();
         const workbook = XLSX.read(buffer, { type: "array" });
@@ -1660,20 +1660,42 @@ export default function App() {
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
                 <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
-                  {(["target", "current", "lastMonth", "lastYear", "categoryMaster"] as UploadKind[]).map((kind) => (
-                    <label key={kind} className="group flex min-h-[110px] cursor-pointer flex-col justify-between rounded-2xl border border-dashed border-white/20 bg-white/5 p-4 hover:bg-white/10 transition-colors">
-                      <input type="file" multiple={kind === "current"} accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => handleFileUpload(e, kind)} />
-                      <div>
-                        <div className="text-sm font-semibold text-white capitalize">{kind.replace(/([A-Z])/g, " $1")}</div>
-                        <div className="mt-1 text-xs text-white/50">Drop or click to upload</div>
-                      </div>
-                      <div className="text-xs text-emerald-300">{uploadedFiles[kind].length} file(s)</div>
-                    </label>
-                  ))}
+                  {(["target", "current", "lastMonth", "lastYear", "categoryMaster"] as UploadKind[]).map((kind) => {
+                    const fileCount = uploadedFiles[kind].length;
+                    const kindLabel = kind.replace(/([A-Z])/g, " $1");
+                    return (
+                      <label key={kind} className={`group flex min-h-[120px] cursor-pointer flex-col justify-between rounded-2xl border border-dashed p-4 transition-colors ${fileCount > 0 ? "border-emerald-400/40 bg-emerald-400/10 hover:bg-emerald-400/15" : "border-white/20 bg-white/5 hover:bg-white/10"}`}>
+                        <input type="file" multiple={kind === "current"} accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => handleFileUpload(e, kind)} />
+                        <div>
+                          <div className="text-sm font-semibold text-white capitalize">{kindLabel}</div>
+                          <div className="mt-1 text-xs text-white/50">Drop or click to upload</div>
+                        </div>
+                        <div className="text-xs text-emerald-300">
+                          {fileCount} file(s)
+                          {fileCount > 0 && (
+                            <div className="mt-1 text-[11px] text-white/60 truncate max-w-full">
+                              {fileCount === 1 ? "Ready" : "Multiple files loaded"}
+                            </div>
+                          )}
+                        </div>
+                      </label>
+                    );
+                  })}
                 </div>
 
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/70">
                   Upload จุดเดียวอยู่ที่หน้า Reports แล้ว ส่วนไอคอนแว่นขยายด้านบนเป็นทางลัดไปหน้า Reports เท่านั้น
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/70">
+                  <div className="font-semibold text-white mb-2">Upload status</div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-2 text-xs">
+                    {(["target", "current", "lastMonth", "lastYear", "categoryMaster"] as UploadKind[]).map((kind) => (
+                      <div key={kind} className={`rounded-xl px-3 py-2 border ${uploadedFiles[kind].length ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200" : "border-white/10 bg-white/5 text-white/50"}`}>
+                        {kind.replace(/([A-Z])/g, " $1")}: {uploadedFiles[kind].length ? `${uploadedFiles[kind].length} loaded` : "missing"}
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
