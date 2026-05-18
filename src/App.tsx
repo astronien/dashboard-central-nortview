@@ -18,7 +18,7 @@ import {
   Settings,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import {
   PolarAngleAxis,
@@ -536,6 +536,8 @@ export default function App() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isParsing, setIsParsing] = useState(false);
 
+  const STORAGE_KEY = "dashboard-upload-state-v1";
+
   const toggleAttachFilter = (id: string) => {
     setAttachFilters((prev) =>
       prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id],
@@ -552,9 +554,28 @@ export default function App() {
     return { branches, categories, officers };
   }, [parsedReport]);
 
+  const persistUploads = (nextUploads: Record<UploadKind, RawRow[]>) => {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextUploads));
+    } catch {
+      // ignore storage errors
+    }
+  };
+
+  const loadPersistedUploads = (): Record<UploadKind, RawRow[]> | null => {
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw) as Record<UploadKind, RawRow[]>;
+    } catch {
+      return null;
+    }
+  };
+
   const rebuildReport = (nextUploads: Record<UploadKind, RawRow[]>) => {
     const report = buildReport(nextUploads.target, nextUploads.current, nextUploads.lastMonth, nextUploads.lastYear, nextUploads.categoryMaster, "uploaded-data");
     setParsedReport(report);
+    persistUploads(nextUploads);
   };
 
 
@@ -584,6 +605,14 @@ export default function App() {
     setUploadedFiles(nextUploads);
     rebuildReport(nextUploads);
   };
+
+  useEffect(() => {
+    const persisted = loadPersistedUploads();
+    if (persisted) {
+      setUploadedFiles(persisted);
+      rebuildReport(persisted);
+    }
+  }, []);
 
   const acceptDetected = (fileName: string, kind: UploadKind): UploadKind => {
     const n = fileName.toLowerCase();
