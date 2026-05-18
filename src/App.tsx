@@ -664,10 +664,13 @@ export default function App() {
               >
                 <PieChart className="w-5 h-5" />
               </button>
-              <label className="cursor-pointer p-2 rounded-full transition-colors text-white/60 hover:text-white" title="Upload Excel/CSV files">
-                <input type="file" multiple accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileUpload} />
+              <button
+                onClick={() => setCurrentView("reports")}
+                className="p-2 rounded-full transition-colors text-white/60 hover:text-white"
+                title="Go to Reports"
+              >
                 <Search className="w-5 h-5" />
-              </label>
+              </button>
               <button
                 onClick={() => setCurrentView("settings")}
                 className={`p-2 rounded-full transition-colors ${currentView === "settings" ? "bg-[#0f4430] shadow-inner text-white" : "text-white/60 hover:text-white"}`}
@@ -1670,7 +1673,7 @@ export default function App() {
                 </div>
 
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/70">
-                  Drag & drop ยังไม่ได้เปิดใช้งานเต็มรูปแบบ แต่ตอนนี้กดเลือกไฟล์แต่ละช่องได้แล้ว และระบบจะจำแนก/คำนวณให้ทันที
+                  Upload จุดเดียวอยู่ที่หน้า Reports แล้ว ส่วนไอคอนแว่นขยายด้านบนเป็นทางลัดไปหน้า Reports เท่านั้น
                 </div>
 
                 <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
