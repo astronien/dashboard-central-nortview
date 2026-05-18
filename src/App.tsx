@@ -572,30 +572,63 @@ export default function App() {
   }, [parsedReport.branches]);
 
   const attachRateData = useMemo<DerivedAttachRow[]>(() => {
-    const grouped = parsedReport.categories.reduce<Record<string, { actual: number; officers: string[] }>>((acc, category, index) => {
-      const key = categoryGroupKey(category.category);
-      acc[key] ??= { actual: 0, officers: [] };
-      acc[key].actual += category.actual;
-      const officer = parsedReport.officers[index % Math.max(parsedReport.officers.length, 1)]?.name;
-      if (officer) acc[key].officers.push(officer);
-      return acc;
-    }, {});
+    const currentRows = uploadedFiles.current;
+    const targetRows = uploadedFiles.target;
+    const categoryMasterRows = uploadedFiles.categoryMaster;
 
-    return parsedReport.officers.slice(0, 10).map((officer, index) => {
-      const base = Math.max(officer.target || 1, 1);
-      const appleCareRate = grouped.appleCare ? Math.round((grouped.appleCare.actual / base) * 100) : Math.min(Math.round(officer.rate * 0.25), 160);
-      const accessoriesRate = grouped.accessories ? Math.round((grouped.accessories.actual / base) * 100) : Math.min(Math.round(officer.rate * 0.55), 180);
-      const servicesRate = grouped.services ? Math.round((grouped.services.actual / base) * 100) : Math.min(Math.round(officer.rate * 0.18), 100);
+    const categoryLookup = new Map<string, string>();
+    categoryMasterRows.forEach((row) => {
+      const key = normalizeText(row["Cat & Sub Cat"] ?? row["Category (Name)"] ?? row.SubCategory);
+      const value = String(row["CAT Daily"] ?? row["Category (Name)"] ?? "Other").trim();
+      if (key) categoryLookup.set(key, value);
+    });
+
+    const officerBuckets = new Map<string, { actual: number; base: number; appleCare: number; accessories: number; services: number; branch: string; target: number }>();
+
+    currentRows.forEach((row) => {
+      const officerName = String(row["Officer (Name)"] ?? row.Officer ?? row.officer ?? row.NAME ?? "Unknown Officer").trim();
+      const branch = String(row["Branch (Name)"] ?? row.branch ?? "Unknown Branch").trim();
+      const categoryName = String(row["Category (Name)"] ?? row.category ?? row.cat ?? "Other").trim();
+      const subCategory = String(row["Sub Category"] ?? row.subcategory ?? "").trim();
+      const productName = String(row["Product (Name)"] ?? row.product ?? "").trim();
+      const mappedCategory = categoryLookup.get(normalizeText(`${categoryName}${subCategory}`)) ?? categoryLookup.get(normalizeText(productName)) ?? categoryName;
+      const categoryGroup = categoryGroupKey(mappedCategory);
+      const actualValue = categoryGroup === "appleCare" || categoryGroup === "services" ? 1 : Math.max(toNumber(row.Number ?? row.number ?? row.qty), 1);
+      const officerKey = cleanOfficerName(officerName);
+      const existing = officerBuckets.get(officerKey) ?? { actual: 0, base: 0, appleCare: 0, accessories: 0, services: 0, branch, target: 0 };
+      existing.branch = existing.branch || branch;
+      existing.actual += actualValue;
+      if (categoryGroup === "appleCare") existing.appleCare += actualValue;
+      if (categoryGroup === "services") existing.services += actualValue;
+      if (categoryGroup === "accessories") existing.accessories += actualValue;
+      if (categoryGroup === "accessories" && mappedCategory.toLowerCase().includes("sim")) existing.base += actualValue;
+      if (categoryGroup !== "services") existing.base += actualValue;
+      officerBuckets.set(officerKey, existing);
+    });
+
+    const targetLookup = new Map<string, RawRow>();
+    targetRows.forEach((row) => {
+      const officerKey = cleanOfficerName(`${row.NAME ?? ""} ${row.SURNAME ?? ""}`.trim());
+      targetLookup.set(officerKey, row);
+    });
+
+    return [...officerBuckets.entries()].slice(0, 10).map(([key, bucket], index) => {
+      const targetRow = targetLookup.get(key);
+      const target = toNumber(targetRow?.Total ?? targetRow?.total);
+      const base = Math.max(bucket.base || target || 1, 1);
+      const appleCareRate = Math.round((bucket.appleCare / base) * 100);
+      const accessoriesRate = Math.round((bucket.accessories / base) * 100);
+      const servicesRate = Math.round((bucket.services / base) * 100);
       return {
-        id: `${officer.name}-${index}`,
-        name: officer.name,
+        id: key,
+        name: key,
         appleCare: Math.min(appleCareRate, 160),
         accessories: Math.min(accessoriesRate, 180),
         services: Math.min(servicesRate, 100),
         avatar: index % 3 === 0 ? "/staff1.png" : index % 3 === 1 ? "/staff2.png" : "/staff3.png",
       };
     });
-  }, [parsedReport.officers, parsedReport.categories]);
+  }, [uploadedFiles.current, uploadedFiles.target, uploadedFiles.categoryMaster]);
 
   const persistUploads = (nextUploads: Record<UploadKind, RawRow[]>) => {
     try {
