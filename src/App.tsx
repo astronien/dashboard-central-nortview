@@ -1300,26 +1300,26 @@ export default function App() {
                     <div className="text-center lg:text-right mb-4">
                       <AnimatePresence mode="wait">
                         <motion.h1
-                          key={currentStaff.name}
+                          key={activeOfficer?.name ?? currentStaff.name}
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -10 }}
                           className="text-4xl lg:text-5xl font-bold mb-2 tracking-tight"
                         >
-                          {currentStaff.name.split(" ")[0]}
+                          {(activeOfficer?.name ?? currentStaff.name).split(" ")[0]}
                           <br className="hidden lg:block" />{" "}
-                          {currentStaff.name.split(" ")[1] || ""}
+                          {(activeOfficer?.name ?? currentStaff.name).split(" ")[1] || ""}
                         </motion.h1>
                       </AnimatePresence>
                       <AnimatePresence mode="wait">
                         <motion.div
-                          key={currentStaff.store}
+                          key={activeOfficer?.branch ?? currentStaff.store}
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           exit={{ opacity: 0 }}
                           className="flex items-center justify-center lg:justify-end gap-2 text-white/80 font-medium"
                         >
-                          <Apple className="w-4 h-4" /> {currentStaff.store}
+                          <Apple className="w-4 h-4" /> {activeOfficer?.branch ?? currentStaff.store}
                         </motion.div>
                       </AnimatePresence>
                     </div>
@@ -1338,13 +1338,13 @@ export default function App() {
                         </div>
                         <AnimatePresence mode="wait">
                           <motion.div
-                            key={currentStaff.stats.sales}
+                            key={activeOfficer?.actual ?? 0}
                             initial={{ opacity: 0, y: 5 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -5 }}
                             className="text-2xl font-bold"
                           >
-                            {currentStaff.stats.sales}
+                            {activeOfficer?.actual?.toLocaleString() ?? 0}
                           </motion.div>
                         </AnimatePresence>
                       </button>
@@ -1360,13 +1360,13 @@ export default function App() {
                         </div>
                         <AnimatePresence mode="wait">
                           <motion.div
-                            key={currentStaff.stats.csat}
+                            key={activeOfficer?.rate ?? 0}
                             initial={{ opacity: 0, y: 5 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -5 }}
                             className="text-2xl font-bold"
                           >
-                            {currentStaff.stats.csat}
+                            {activeOfficer?.rate ?? 0}%
                           </motion.div>
                         </AnimatePresence>
                       </button>
@@ -1385,13 +1385,13 @@ export default function App() {
                         </div>
                         <AnimatePresence mode="wait">
                           <motion.div
-                            key={currentStaff.stats.target}
+                            key={activeOfficer?.target ?? 0}
                             initial={{ opacity: 0, y: 5 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -5 }}
                             className="text-2xl font-bold text-white relative z-10"
                           >
-                            {currentStaff.stats.target}
+                            {activeOfficer?.target?.toLocaleString() ?? 0}
                           </motion.div>
                         </AnimatePresence>
                       </button>
@@ -1405,13 +1405,13 @@ export default function App() {
                         </div>
                         <AnimatePresence mode="wait">
                           <motion.div
-                            key={currentStaff.role}
+                            key={currentOfficer?.branch ?? currentStaff.role}
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             className="text-[10px] lg:text-xs font-semibold w-full truncate"
                           >
-                            {currentStaff.role}
+                            {currentOfficer?.branch ?? currentStaff.role}
                           </motion.div>
                         </AnimatePresence>
                       </div>
@@ -1421,13 +1421,13 @@ export default function App() {
                         </div>
                         <AnimatePresence mode="wait">
                           <motion.div
-                            key={currentStaff.experience}
+                            key={currentOfficer?.target ?? currentStaff.experience}
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             className="text-[10px] lg:text-xs font-semibold w-full truncate"
                           >
-                            {currentStaff.experience}
+                            {currentOfficer?.target ? `${currentOfficer.target.toLocaleString()} target` : currentStaff.experience}
                           </motion.div>
                         </AnimatePresence>
                       </div>
