@@ -1,41 +1,20 @@
--- Optional manual migration for Turso (tables are also created on first API request)
+-- Readable tables (browse these in Turso dashboard)
+-- data_sales, data_targets, data_categories
 
-CREATE TABLE IF NOT EXISTS upload_target (
-  id INTEGER PRIMARY KEY CHECK (id = 1),
-  file_name TEXT NOT NULL,
-  rows_json TEXT NOT NULL,
-  row_count INTEGER NOT NULL,
-  uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+-- Summary
+-- SELECT * FROM upload_meta;
 
-CREATE TABLE IF NOT EXISTS upload_current (
-  id INTEGER PRIMARY KEY CHECK (id = 1),
-  file_name TEXT NOT NULL,
-  rows_json TEXT NOT NULL,
-  row_count INTEGER NOT NULL,
-  uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+-- Sales (filter by period: current | lastMonth | lastYear)
+-- SELECT period, branch_name, product_name, category_name, total_price, doc_date
+-- FROM data_sales
+-- WHERE period = 'current'
+-- LIMIT 50;
 
-CREATE TABLE IF NOT EXISTS upload_last_month (
-  id INTEGER PRIMARY KEY CHECK (id = 1),
-  file_name TEXT NOT NULL,
-  rows_json TEXT NOT NULL,
-  row_count INTEGER NOT NULL,
-  uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+-- Targets
+-- SELECT * FROM data_targets LIMIT 50;
 
-CREATE TABLE IF NOT EXISTS upload_last_year (
-  id INTEGER PRIMARY KEY CHECK (id = 1),
-  file_name TEXT NOT NULL,
-  rows_json TEXT NOT NULL,
-  row_count INTEGER NOT NULL,
-  uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+-- Category mapping
+-- SELECT * FROM data_categories LIMIT 50;
 
-CREATE TABLE IF NOT EXISTS upload_category_master (
-  id INTEGER PRIMARY KEY CHECK (id = 1),
-  file_name TEXT NOT NULL,
-  rows_json TEXT NOT NULL,
-  row_count INTEGER NOT NULL,
-  uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+-- Raw compressed backup (not human-readable)
+-- upload_*_chunks

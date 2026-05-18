@@ -114,10 +114,12 @@ export const saveUploads = async (
   state: UploadState,
   kinds: UploadKind[] = UPLOAD_KINDS,
 ): Promise<boolean> => {
-  const results = await Promise.all(
-    kinds.map((kind) => saveUploadKind(kind, state[kind] ?? [])),
-  );
-  return results.every(Boolean);
+  let ok = true;
+  for (const kind of kinds) {
+    const saved = await saveUploadKind(kind, state[kind] ?? []);
+    if (!saved) ok = false;
+  }
+  return ok;
 };
 
 export const deleteUploadKind = async (kind: UploadKind): Promise<boolean> => {

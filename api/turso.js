@@ -1,4 +1,5 @@
 const { gunzipSync, gzipSync } = require("zlib");
+const { syncRelationalTables, clearRelationalKind } = require("./tables-sync");
 
 const UPLOAD_KINDS = [
   "target",
@@ -151,7 +152,20 @@ const listTables = async () => {
 };
 
 const ensureSchema = async () => {
-  const requests = [];
+  const requests = [
+    {
+      type: "execute",
+      stmt: {
+        sql: `CREATE TABLE IF NOT EXISTS upload_meta (
+          kind TEXT PRIMARY KEY,
+          row_count INTEGER NOT NULL DEFAULT 0,
+          chunk_count INTEGER NOT NULL DEFAULT 0,
+          updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )`,
+      },
+    },
+  ];
+
   for (const kind of UPLOAD_KINDS) {
     const legacy = KIND_TABLE[kind];
     const chunks = `${legacy}_chunks`;
@@ -190,6 +204,12 @@ const ensureSchema = async () => {
 
 const chunkTable = (kind) => `${KIND_TABLE[kind]}_chunks`;
 
+const dbDeps = () => ({
+  tursoExecute,
+  tursoPipeline,
+  getExecuteResult,
+});
+
 const splitRows = (rows) => {
   const chunks = [];
   for (let i = 0; i < rows.length; i += CHUNK_ROW_LIMIT) {
@@ -226,6 +246,18 @@ const loadUploadKind = async (kind) => {
   return rows;
 };
 
+const upsertUploadMeta = async (kind, rowCount, chunkCount) => {
+  await tursoExecute(
+    `INSERT INTO upload_meta (kind, row_count, chunk_count, updated_at)
+     VALUES (?, ?, ?, datetime('now'))
+     ON CONFLICT(kind) DO UPDATE SET
+       row_count = excluded.row_count,
+       chunk_count = excluded.chunk_count,
+       updated_at = excluded.updated_at`,
+    [kind, rowCount, chunkCount],
+  );
+};
+
 const saveUploadKind = async (kind, rows) => {
   await ensureSchema();
   const table = chunkTable(kind);
@@ -254,6 +286,9 @@ const saveUploadKind = async (kind, rows) => {
   for (let i = 0; i < requests.length; i += 1) {
     getExecuteResult(payload, i);
   }
+
+  await upsertUploadMeta(kind, rows.length, chunks.length);
+  await syncRelationalTables(kind, rows, dbDeps());
 };
 
 const saveUploadKindChunk = async (kind, chunkIndex, chunkCount, rows) => {
@@ -288,6 +323,16 @@ const saveUploadKindChunk = async (kind, chunkIndex, chunkCount, rows) => {
   for (let i = 0; i < requests.length; i += 1) {
     getExecuteResult(payload, i);
   }
+
+  if (chunkIndex === chunkCount - 1) {
+    const sumResult = await tursoExecute(
+      `SELECT COALESCE(SUM(row_count), 0) FROM ${table}`,
+    );
+    const totalRows = Number(rowValues(sumResult.rows?.[0] ?? [])[0]) || 0;
+    await upsertUploadMeta(kind, totalRows, chunkCount);
+    const allRows = await loadUploadKind(kind);
+    await syncRelationalTables(kind, allRows, dbDeps());
+  }
 };
 
 const clearUploadKind = async (kind) => {
@@ -296,6 +341,46 @@ const clearUploadKind = async (kind) => {
     { type: "execute", stmt: { sql: `DELETE FROM ${chunkTable(kind)}` } },
     { type: "execute", stmt: { sql: `DELETE FROM ${KIND_TABLE[kind]}` } },
   ]);
+  await upsertUploadMeta(kind, 0, 0);
+  await clearRelationalKind(kind, tursoExecute);
+};
+
+const syncAllRelationalTables = async () => {
+  const summary = {};
+  for (const kind of UPLOAD_KINDS) {
+    const rows = await loadUploadKind(kind);
+    await syncRelationalTables(kind, rows, dbDeps());
+    summary[kind] = rows.length;
+  }
+  return summary;
+};
+
+const getUploadStats = async () => {
+  await ensureSchema();
+  const result = await tursoExecute(
+    "SELECT kind, row_count, chunk_count, updated_at FROM upload_meta ORDER BY kind",
+  );
+  const stats = {};
+  for (const row of result.rows ?? []) {
+    const [kind, rowCount, chunkCount, updatedAt] = rowValues(row);
+    if (kind) stats[kind] = { rowCount, chunkCount, updatedAt };
+  }
+
+  for (const kind of UPLOAD_KINDS) {
+    if (stats[kind]) continue;
+    const table = chunkTable(kind);
+    const countResult = await tursoExecute(
+      `SELECT COUNT(*) AS chunks, COALESCE(SUM(row_count), 0) AS rows FROM ${table}`,
+    );
+    const [chunks, rows] = rowValues(countResult.rows?.[0] ?? []);
+    stats[kind] = {
+      rowCount: Number(rows) || 0,
+      chunkCount: Number(chunks) || 0,
+      updatedAt: null,
+    };
+  }
+
+  return stats;
 };
 
 const isUploadKind = (value) => UPLOAD_KINDS.includes(value);
@@ -305,9 +390,11 @@ module.exports = {
   clearUploadKind,
   decompressJson,
   getTursoConfig,
+  getUploadStats,
   isUploadKind,
   listTables,
   loadUploadKind,
   saveUploadKind,
   saveUploadKindChunk,
+  syncAllRelationalTables,
 };
