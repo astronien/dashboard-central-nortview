@@ -1,5 +1,11 @@
 const { gunzipSync, gzipSync } = require("zlib");
-const { syncRelationalTables, clearRelationalKind } = require("./tables-sync");
+const {
+  appendRowsToTurso,
+  clearRelationalKind,
+  countRowsInTurso,
+  loadRowsFromTurso,
+  saveRowsToTurso,
+} = require("./tables-sync");
 
 const UPLOAD_KINDS = [
   "target",
@@ -16,8 +22,6 @@ const KIND_TABLE = {
   lastYear: "upload_last_year",
   categoryMaster: "upload_category_master",
 };
-
-const CHUNK_ROW_LIMIT = 1500;
 
 const getTursoConfig = () => {
   const rawUrl =
@@ -37,11 +41,6 @@ const getTursoConfig = () => {
 
   const httpUrl = rawUrl.replace(/^libsql:/, "https:");
   return { httpUrl, authToken };
-};
-
-const compressJson = (value) => {
-  const json = JSON.stringify(value);
-  return gzipSync(Buffer.from(json, "utf8")).toString("base64");
 };
 
 const decompressJson = (encoded) => {
@@ -151,57 +150,6 @@ const listTables = async () => {
   return (result.rows ?? []).map((row) => rowValues(row)[0]).filter(Boolean);
 };
 
-const ensureSchema = async () => {
-  const requests = [
-    {
-      type: "execute",
-      stmt: {
-        sql: `CREATE TABLE IF NOT EXISTS upload_meta (
-          kind TEXT PRIMARY KEY,
-          row_count INTEGER NOT NULL DEFAULT 0,
-          chunk_count INTEGER NOT NULL DEFAULT 0,
-          updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )`,
-      },
-    },
-  ];
-
-  for (const kind of UPLOAD_KINDS) {
-    const legacy = KIND_TABLE[kind];
-    const chunks = `${legacy}_chunks`;
-
-    requests.push({
-      type: "execute",
-      stmt: {
-        sql: `CREATE TABLE IF NOT EXISTS ${legacy} (
-          id INTEGER PRIMARY KEY CHECK (id = 1),
-          file_name TEXT NOT NULL,
-          rows_json TEXT NOT NULL,
-          row_count INTEGER NOT NULL,
-          uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )`,
-      },
-    });
-
-    requests.push({
-      type: "execute",
-      stmt: {
-        sql: `CREATE TABLE IF NOT EXISTS ${chunks} (
-          chunk_index INTEGER PRIMARY KEY,
-          rows_json TEXT NOT NULL,
-          row_count INTEGER NOT NULL,
-          uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )`,
-      },
-    });
-  }
-
-  const payload = await tursoPipeline(requests);
-  for (let i = 0; i < requests.length; i += 1) {
-    getExecuteResult(payload, i);
-  }
-};
-
 const chunkTable = (kind) => `${KIND_TABLE[kind]}_chunks`;
 
 const dbDeps = () => ({
@@ -210,34 +158,14 @@ const dbDeps = () => ({
   getExecuteResult,
 });
 
-const splitRows = (rows) => {
-  const chunks = [];
-  for (let i = 0; i < rows.length; i += CHUNK_ROW_LIMIT) {
-    chunks.push(rows.slice(i, i + CHUNK_ROW_LIMIT));
-  }
-  return chunks;
-};
-
-const loadUploadKind = async (kind) => {
-  await ensureSchema();
+const loadLegacyChunks = async (kind) => {
   const table = chunkTable(kind);
   const result = await tursoExecute(
     `SELECT rows_json FROM ${table} ORDER BY chunk_index ASC`,
   );
 
   const entries = result.rows ?? [];
-  if (!entries.length) {
-    const legacy = await tursoExecute(
-      `SELECT rows_json FROM ${KIND_TABLE[kind]} WHERE id = 1`,
-    );
-    const legacyRows = legacy.rows ?? [];
-    if (!legacyRows.length) return [];
-
-    const encoded = rowValues(legacyRows[0])[0];
-    const rows = tryParseRows(encoded);
-    if (rows.length) await saveUploadKind(kind, rows);
-    return rows;
-  }
+  if (!entries.length) return [];
 
   const rows = [];
   for (const entry of entries) {
@@ -246,140 +174,78 @@ const loadUploadKind = async (kind) => {
   return rows;
 };
 
-const upsertUploadMeta = async (kind, rowCount, chunkCount) => {
+const loadUploadKind = async (kind) => {
+  const rows = await loadRowsFromTurso(kind, tursoExecute, rowValues);
+  if (rows.length) return rows;
+
+  const legacy = await loadLegacyChunks(kind);
+  if (legacy.length) {
+    await saveUploadKind(kind, legacy);
+    return legacy;
+  }
+
+  return [];
+};
+
+const upsertUploadMeta = async (kind, rowCount) => {
   await tursoExecute(
     `INSERT INTO upload_meta (kind, row_count, chunk_count, updated_at)
-     VALUES (?, ?, ?, datetime('now'))
+     VALUES (?, ?, 0, datetime('now'))
      ON CONFLICT(kind) DO UPDATE SET
        row_count = excluded.row_count,
-       chunk_count = excluded.chunk_count,
+       chunk_count = 0,
        updated_at = excluded.updated_at`,
-    [kind, rowCount, chunkCount],
+    [kind, rowCount],
   );
 };
 
+/** Upload → INSERT ตรงลงตาราง Turso (data_sales / data_targets / data_categories) */
 const saveUploadKind = async (kind, rows) => {
-  await ensureSchema();
-  const table = chunkTable(kind);
-  const chunks = splitRows(rows);
-  const requests = [
-    { type: "execute", stmt: { sql: `DELETE FROM ${table}` } },
-    { type: "execute", stmt: { sql: `DELETE FROM ${KIND_TABLE[kind]}` } },
-  ];
-
-  for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex += 1) {
-    const chunk = chunks[chunkIndex];
-    requests.push({
-      type: "execute",
-      stmt: {
-        sql: `INSERT INTO ${table} (chunk_index, rows_json, row_count) VALUES (?, ?, ?)`,
-        args: [
-          { type: "integer", value: String(chunkIndex) },
-          { type: "text", value: compressJson(chunk) },
-          { type: "integer", value: String(chunk.length) },
-        ],
-      },
-    });
-  }
-
-  const payload = await tursoPipeline(requests);
-  for (let i = 0; i < requests.length; i += 1) {
-    getExecuteResult(payload, i);
-  }
-
-  await upsertUploadMeta(kind, rows.length, chunks.length);
-  await syncRelationalTables(kind, rows, dbDeps());
+  await saveRowsToTurso(kind, rows, dbDeps());
+  await upsertUploadMeta(kind, rows.length);
 };
 
 const saveUploadKindChunk = async (kind, chunkIndex, chunkCount, rows) => {
-  await ensureSchema();
-  const table = chunkTable(kind);
-  const requests = [];
-
   if (chunkIndex === 0) {
-    requests.push({ type: "execute", stmt: { sql: `DELETE FROM ${table}` } });
+    await clearRelationalKind(kind, tursoExecute);
+    await upsertUploadMeta(kind, 0);
   }
 
-  requests.push({
-    type: "execute",
-    stmt: {
-      sql: `INSERT INTO ${table} (chunk_index, rows_json, row_count) VALUES (?, ?, ?)`,
-      args: [
-        { type: "integer", value: String(chunkIndex) },
-        { type: "text", value: compressJson(rows) },
-        { type: "integer", value: String(rows.length) },
-      ],
-    },
-  });
+  await appendRowsToTurso(kind, rows, dbDeps());
 
   if (chunkIndex === chunkCount - 1) {
-    requests.push({
-      type: "execute",
-      stmt: { sql: `DELETE FROM ${KIND_TABLE[kind]}` },
-    });
-  }
-
-  const payload = await tursoPipeline(requests);
-  for (let i = 0; i < requests.length; i += 1) {
-    getExecuteResult(payload, i);
-  }
-
-  if (chunkIndex === chunkCount - 1) {
-    const sumResult = await tursoExecute(
-      `SELECT COALESCE(SUM(row_count), 0) FROM ${table}`,
-    );
-    const totalRows = Number(rowValues(sumResult.rows?.[0] ?? [])[0]) || 0;
-    await upsertUploadMeta(kind, totalRows, chunkCount);
-    const allRows = await loadUploadKind(kind);
-    await syncRelationalTables(kind, allRows, dbDeps());
+    const totalRows = await countRowsInTurso(kind, tursoExecute, rowValues);
+    await upsertUploadMeta(kind, totalRows);
   }
 };
 
 const clearUploadKind = async (kind) => {
-  await ensureSchema();
-  await tursoPipeline([
-    { type: "execute", stmt: { sql: `DELETE FROM ${chunkTable(kind)}` } },
-    { type: "execute", stmt: { sql: `DELETE FROM ${KIND_TABLE[kind]}` } },
-  ]);
-  await upsertUploadMeta(kind, 0, 0);
   await clearRelationalKind(kind, tursoExecute);
+  await tursoExecute(`DELETE FROM ${chunkTable(kind)}`);
+  await tursoExecute(`DELETE FROM ${KIND_TABLE[kind]}`);
+  await upsertUploadMeta(kind, 0);
 };
 
 const syncAllRelationalTables = async () => {
   const summary = {};
   for (const kind of UPLOAD_KINDS) {
-    const rows = await loadUploadKind(kind);
-    await syncRelationalTables(kind, rows, dbDeps());
-    summary[kind] = rows.length;
+    const legacy = await loadLegacyChunks(kind);
+    if (!legacy.length) {
+      summary[kind] = await countRowsInTurso(kind, tursoExecute, rowValues);
+      continue;
+    }
+    await saveUploadKind(kind, legacy);
+    summary[kind] = legacy.length;
   }
   return summary;
 };
 
 const getUploadStats = async () => {
-  await ensureSchema();
-  const result = await tursoExecute(
-    "SELECT kind, row_count, chunk_count, updated_at FROM upload_meta ORDER BY kind",
-  );
   const stats = {};
-  for (const row of result.rows ?? []) {
-    const [kind, rowCount, chunkCount, updatedAt] = rowValues(row);
-    if (kind) stats[kind] = { rowCount, chunkCount, updatedAt };
-  }
-
   for (const kind of UPLOAD_KINDS) {
-    if (stats[kind]) continue;
-    const table = chunkTable(kind);
-    const countResult = await tursoExecute(
-      `SELECT COUNT(*) AS chunks, COALESCE(SUM(row_count), 0) AS rows FROM ${table}`,
-    );
-    const [chunks, rows] = rowValues(countResult.rows?.[0] ?? []);
-    stats[kind] = {
-      rowCount: Number(rows) || 0,
-      chunkCount: Number(chunks) || 0,
-      updatedAt: null,
-    };
+    const rowCount = await countRowsInTurso(kind, tursoExecute, rowValues);
+    stats[kind] = { rowCount, storage: "turso_tables" };
   }
-
   return stats;
 };
 

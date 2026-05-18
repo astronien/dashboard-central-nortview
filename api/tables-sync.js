@@ -21,6 +21,15 @@ const usedKeys = (row, keysUsed) => {
   return Object.keys(extra).length ? JSON.stringify(extra) : "";
 };
 
+const mergeExtra = (base, extraJson) => {
+  if (!extraJson) return base;
+  try {
+    return { ...JSON.parse(extraJson), ...base };
+  } catch {
+    return base;
+  }
+};
+
 const mapSalesRow = (row, period) => {
   const keysUsed = [
     ["Product (Code)"],
@@ -53,6 +62,43 @@ const mapSalesRow = (row, period) => {
     customer_name: pick(row, keysUsed[11]),
     extra_json: usedKeys(row, keysUsed),
   };
+};
+
+const toSalesRawRow = (cells) => {
+  const [
+    _period,
+    product_code,
+    product_name,
+    category_name,
+    sub_category,
+    branch_name,
+    officer_name,
+    doc_no,
+    doc_date,
+    total_price,
+    bill_amount,
+    quantity,
+    customer_name,
+    extra_json,
+  ] = cells;
+
+  return mergeExtra(
+    {
+      "Product (Code)": product_code ?? "",
+      "Product (Name)": product_name ?? "",
+      "Category (Name)": category_name ?? "",
+      "Sub Category": sub_category ?? "",
+      "Branch (Name)": branch_name ?? "",
+      "Officer (Name)": officer_name ?? "",
+      "Doc No": doc_no ?? "",
+      "Doc Date": doc_date ?? "",
+      "Total Price": total_price ?? "",
+      "ราคาขายตามบิล": bill_amount ?? "",
+      Number: quantity ?? "",
+      "Customer (Name)": customer_name ?? "",
+    },
+    extra_json,
+  );
 };
 
 const mapTargetRow = (row) => {
@@ -90,6 +136,44 @@ const mapTargetRow = (row) => {
   };
 };
 
+const toTargetRawRow = (cells) => {
+  const [
+    branch_name,
+    staff_id,
+    first_name,
+    last_name,
+    day,
+    total_target,
+    iphone,
+    mac,
+    ipad,
+    apple_watch,
+    sim,
+    btb,
+    smartphone,
+    extra_json,
+  ] = cells;
+
+  return mergeExtra(
+    {
+      "BRANCH NAME": branch_name ?? "",
+      "STAFF ID": staff_id ?? "",
+      NAME: first_name ?? "",
+      SURNAME: last_name ?? "",
+      DAY: day ?? "",
+      Total: total_target ?? "",
+      iPhone: iphone ?? "",
+      Mac: mac ?? "",
+      iPad: ipad ?? "",
+      "Apple Watch": apple_watch ?? "",
+      SIM: sim ?? "",
+      BTB: btb ?? "",
+      Smartphone: smartphone ?? "",
+    },
+    extra_json,
+  );
+};
+
 const mapCategoryRow = (row) => {
   const keysUsed = [["Cat & Sub Cat", "Category (Name)", "SubCategory"], ["CAT Daily", "Category (Name)"]];
   return {
@@ -99,7 +183,24 @@ const mapCategoryRow = (row) => {
   };
 };
 
+const toCategoryRawRow = (cells) => {
+  const [cat_sub_cat, cat_daily, extra_json] = cells;
+  return mergeExtra(
+    {
+      "Cat & Sub Cat": cat_sub_cat ?? "",
+      "CAT Daily": cat_daily ?? "",
+    },
+    extra_json,
+  );
+};
+
 const RELATIONAL_DDL = [
+  `CREATE TABLE IF NOT EXISTS upload_meta (
+    kind TEXT PRIMARY KEY,
+    row_count INTEGER NOT NULL DEFAULT 0,
+    chunk_count INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
   `CREATE TABLE IF NOT EXISTS data_sales (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     period TEXT NOT NULL,
@@ -142,6 +243,42 @@ const RELATIONAL_DDL = [
     extra_json TEXT
   )`,
 ];
+
+const SALES_COLUMNS = [
+  "period",
+  "product_code",
+  "product_name",
+  "category_name",
+  "sub_category",
+  "branch_name",
+  "officer_name",
+  "doc_no",
+  "doc_date",
+  "total_price",
+  "bill_amount",
+  "quantity",
+  "customer_name",
+  "extra_json",
+];
+
+const TARGET_COLUMNS = [
+  "branch_name",
+  "staff_id",
+  "first_name",
+  "last_name",
+  "day",
+  "total_target",
+  "iphone",
+  "mac",
+  "ipad",
+  "apple_watch",
+  "sim",
+  "btb",
+  "smartphone",
+  "extra_json",
+];
+
+const CATEGORY_COLUMNS = ["cat_sub_cat", "cat_daily", "extra_json"];
 
 const ensureRelationalSchema = async (tursoExecute) => {
   for (const sql of RELATIONAL_DDL) {
@@ -199,37 +336,94 @@ const clearRelationalKind = async (kind, tursoExecute) => {
   }
 };
 
-const syncRelationalTables = async (kind, rows, deps) => {
-  const { tursoExecute, tursoPipeline, getExecuteResult } = deps;
-  await ensureRelationalSchema(tursoExecute);
-  await clearRelationalKind(kind, tursoExecute);
-
+const insertMappedRows = async (kind, rows, deps) => {
+  const { tursoPipeline, getExecuteResult } = deps;
   if (!rows.length) return;
 
   if (SALES_KINDS.includes(kind)) {
     const mapped = rows.map((row) => mapSalesRow(row, kind));
-    const columns = Object.keys(mapped[0]);
-    await insertBatch(tursoPipeline, getExecuteResult, "data_sales", columns, mapped);
+    await insertBatch(tursoPipeline, getExecuteResult, "data_sales", SALES_COLUMNS, mapped);
     return;
   }
 
   if (kind === "target") {
     const mapped = rows.map(mapTargetRow);
-    const columns = Object.keys(mapped[0]);
-    await insertBatch(tursoPipeline, getExecuteResult, "data_targets", columns, mapped);
+    await insertBatch(tursoPipeline, getExecuteResult, "data_targets", TARGET_COLUMNS, mapped);
     return;
   }
 
   if (kind === "categoryMaster") {
     const mapped = rows.map(mapCategoryRow);
-    const columns = Object.keys(mapped[0]);
-    await insertBatch(tursoPipeline, getExecuteResult, "data_categories", columns, mapped);
+    await insertBatch(tursoPipeline, getExecuteResult, "data_categories", CATEGORY_COLUMNS, mapped);
   }
 };
 
+const saveRowsToTurso = async (kind, rows, deps) => {
+  const { tursoExecute } = deps;
+  await ensureRelationalSchema(tursoExecute);
+  await clearRelationalKind(kind, tursoExecute);
+  await insertMappedRows(kind, rows, deps);
+};
+
+const appendRowsToTurso = async (kind, rows, deps) => {
+  const { tursoExecute } = deps;
+  await ensureRelationalSchema(tursoExecute);
+  await insertMappedRows(kind, rows, deps);
+};
+
+const loadRowsFromTurso = async (kind, tursoExecute, rowValues) => {
+  await ensureRelationalSchema(tursoExecute);
+
+  if (SALES_KINDS.includes(kind)) {
+    const result = await tursoExecute(
+      `SELECT ${SALES_COLUMNS.join(", ")} FROM data_sales WHERE period = ? ORDER BY id ASC`,
+      [kind],
+    );
+    return (result.rows ?? []).map((row) => toSalesRawRow(rowValues(row)));
+  }
+
+  if (kind === "target") {
+    const result = await tursoExecute(
+      `SELECT ${TARGET_COLUMNS.join(", ")} FROM data_targets ORDER BY id ASC`,
+    );
+    return (result.rows ?? []).map((row) => toTargetRawRow(rowValues(row)));
+  }
+
+  if (kind === "categoryMaster") {
+    const result = await tursoExecute(
+      `SELECT ${CATEGORY_COLUMNS.join(", ")} FROM data_categories ORDER BY id ASC`,
+    );
+    return (result.rows ?? []).map((row) => toCategoryRawRow(rowValues(row)));
+  }
+
+  return [];
+};
+
+const countRowsInTurso = async (kind, tursoExecute, rowValues) => {
+  if (SALES_KINDS.includes(kind)) {
+    const result = await tursoExecute(
+      "SELECT COUNT(*) FROM data_sales WHERE period = ?",
+      [kind],
+    );
+    return Number(rowValues(result.rows?.[0] ?? [])[0]) || 0;
+  }
+  if (kind === "target") {
+    const result = await tursoExecute("SELECT COUNT(*) FROM data_targets");
+    return Number(rowValues(result.rows?.[0] ?? [])[0]) || 0;
+  }
+  if (kind === "categoryMaster") {
+    const result = await tursoExecute("SELECT COUNT(*) FROM data_categories");
+    return Number(rowValues(result.rows?.[0] ?? [])[0]) || 0;
+  }
+  return 0;
+};
+
 module.exports = {
-  ensureRelationalSchema,
-  clearRelationalKind,
-  syncRelationalTables,
   SALES_KINDS,
+  appendRowsToTurso,
+  clearRelationalKind,
+  countRowsInTurso,
+  ensureRelationalSchema,
+  loadRowsFromTurso,
+  saveRowsToTurso,
 };
