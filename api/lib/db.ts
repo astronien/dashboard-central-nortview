@@ -1,11 +1,12 @@
-import { createClient, type Client } from "@libsql/client";
+import { createClient, type Client } from "@libsql/client/web";
+import { getTursoConfig } from "./env";
 import {
   KIND_TABLE,
   UPLOAD_KINDS,
   ensureSchema,
   type UploadKind,
 } from "./schema";
-import { compressJson, decompressJson } from "./compress";
+import { compressJson, tryDecompressJson } from "./compress";
 
 export type RawRow = Record<string, string | number | undefined>;
 export type UploadPayload = Record<UploadKind, RawRow[]>;
@@ -23,19 +24,10 @@ const emptyPayload = (): UploadPayload => ({
 let client: Client | null = null;
 
 export const getDb = (): Client => {
-  const url = process.env.TURSO_DATABASE_URL;
-  const authToken = process.env.TURSO_AUTH_TOKEN;
-
-  if (!url || !authToken) {
-    throw new Error(
-      "Missing TURSO_DATABASE_URL or TURSO_AUTH_TOKEN environment variables.",
-    );
-  }
-
   if (!client) {
+    const { url, authToken } = getTursoConfig();
     client = createClient({ url, authToken });
   }
-
   return client;
 };
 
@@ -53,6 +45,18 @@ const splitRows = (rows: RawRow[]) => {
     chunks.push(rows.slice(i, i + CHUNK_ROW_LIMIT));
   }
   return chunks.length ? chunks : [];
+};
+
+const parseStoredRows = (encoded: string): RawRow[] => {
+  const decompressed = tryDecompressJson<RawRow[]>(encoded);
+  if (Array.isArray(decompressed)) return decompressed;
+
+  try {
+    const parsed = JSON.parse(encoded) as unknown;
+    return Array.isArray(parsed) ? (parsed as RawRow[]) : [];
+  } catch {
+    return [];
+  }
 };
 
 export const loadUploadKind = async (kind: UploadKind): Promise<RawRow[]> => {
@@ -73,23 +77,16 @@ export const loadUploadKind = async (kind: UploadKind): Promise<RawRow[]> => {
     const raw = legacy.rows[0].rows_json;
     if (typeof raw !== "string" || !raw) return [];
 
-    try {
-      const parsed = JSON.parse(raw) as unknown;
-      if (!Array.isArray(parsed)) return [];
-      const rows = parsed as RawRow[];
-      await saveUploadKind(kind, rows);
-      return rows;
-    } catch {
-      return [];
-    }
+    const rows = parseStoredRows(raw);
+    if (rows.length) await saveUploadKind(kind, rows);
+    return rows;
   }
 
   const rows: RawRow[] = [];
   for (const entry of result.rows) {
     const encoded = entry.rows_json;
     if (typeof encoded !== "string" || !encoded) continue;
-    const parsed = decompressJson<RawRow[]>(encoded);
-    if (Array.isArray(parsed)) rows.push(...parsed);
+    rows.push(...parseStoredRows(encoded));
   }
 
   return rows;
@@ -123,8 +120,7 @@ export const saveUploadKindChunk = async (
 
   if (chunkIndex !== chunkCount - 1) return;
 
-  const legacyTable = KIND_TABLE[kind];
-  await db.execute(`DELETE FROM ${legacyTable}`);
+  await db.execute(`DELETE FROM ${KIND_TABLE[kind]}`);
 };
 
 export const saveUploadKind = async (kind: UploadKind, rows: RawRow[]) => {
@@ -137,12 +133,13 @@ export const saveUploadKind = async (kind: UploadKind, rows: RawRow[]) => {
 
   if (!chunks.length) return;
 
-  const statements = chunks.map((chunk, chunkIndex) => ({
-    sql: `INSERT INTO ${table} (chunk_index, rows_json, row_count) VALUES (?, ?, ?)`,
-    args: [chunkIndex, compressJson(chunk), chunk.length],
-  }));
-
-  await db.batch(statements, "write");
+  for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex += 1) {
+    const chunk = chunks[chunkIndex];
+    await db.execute({
+      sql: `INSERT INTO ${table} (chunk_index, rows_json, row_count) VALUES (?, ?, ?)`,
+      args: [chunkIndex, compressJson(chunk), chunk.length],
+    });
+  }
 };
 
 export const saveAllUploads = async (payload: UploadPayload) => {

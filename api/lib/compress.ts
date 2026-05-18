@@ -1,4 +1,4 @@
-import { gunzipSync, gzipSync } from "node:zlib";
+import { gunzipSync, gzipSync } from "zlib";
 
 export const compressJson = (value: unknown): string => {
   const json = JSON.stringify(value);
@@ -8,4 +8,12 @@ export const compressJson = (value: unknown): string => {
 export const decompressJson = <T>(encoded: string): T => {
   const buffer = gunzipSync(Buffer.from(encoded, "base64"));
   return JSON.parse(buffer.toString("utf8")) as T;
+};
+
+export const tryDecompressJson = <T>(encoded: string): T | null => {
+  try {
+    return decompressJson<T>(encoded);
+  } catch {
+    return null;
+  }
 };

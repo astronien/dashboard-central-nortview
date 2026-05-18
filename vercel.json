@@ -2,16 +2,16 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "functions": {
-    "api/uploads/[kind].ts": {
-      "maxDuration": 60,
-      "memory": 1024
-    },
-    "api/uploads.ts": {
+    "api/**/*.ts": {
       "maxDuration": 60,
       "memory": 1024
     }
   },
   "rewrites": [
+    {
+      "source": "/api/uploads/:kind",
+      "destination": "/api/uploads?kind=:kind"
+    },
     {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
