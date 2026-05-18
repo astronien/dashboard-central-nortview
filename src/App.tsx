@@ -253,67 +253,6 @@ const salesTrendData = [
   { date: "7 Nov", sales: 780 },
 ];
 
-const homeStats = [
-  {
-    label: "Total Sales",
-    value: "฿12.4M",
-    trend: "+14.5%",
-    icon: DollarSign,
-    isUp: true,
-  },
-  {
-    label: "Store Target",
-    value: "112%",
-    trend: "+5.2%",
-    icon: Star,
-    isUp: true,
-  },
-  {
-    label: "Average CSAT",
-    value: "4.8",
-    trend: "+0.1",
-    icon: Smile,
-    isUp: true,
-  },
-  {
-    label: "Total Visits",
-    value: "8,429",
-    trend: "-2.4%",
-    icon: Users,
-    isUp: false,
-  },
-];
-
-const attachRateData = [
-  {
-    id: "1",
-    name: "Sarut",
-    appleCare: 82,
-    accessories: 145,
-    services: 40,
-    avatar:
-      "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=100&h=100",
-  },
-  {
-    id: "2",
-    name: "Nadech",
-    appleCare: 95,
-    accessories: 155,
-    services: 65,
-    avatar:
-      "https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=100&h=100",
-  },
-  {
-    id: "3",
-    name: "Yaya",
-    appleCare: 45,
-    accessories: 90,
-    services: 20,
-    avatar:
-      "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?auto=format&fit=crop&w=100&h=100",
-  },
-];
-
 const attachOptions = [
   { id: "appleCare", label: "AppleCare+", color: "#10b981" },
   { id: "accessories", label: "Accessories", color: "#3b82f6" },
@@ -373,6 +312,24 @@ const renderCustomTick = ({ payload, x, y, textAnchor }: any) => {
 };
 
 type RawRow = Record<string, string | number | undefined>;
+
+type DerivedHomeStat = {
+  label: string;
+  value: string;
+  trend: string;
+  icon: typeof DollarSign;
+  isUp: boolean;
+};
+
+type DerivedAttachRow = {
+  id: string;
+  name: string;
+  appleCare: number;
+  accessories: number;
+  services: number;
+  avatar: string;
+};
+
 type ParsedReport = {
   branches: Array<{ label: string; target: number; actual: number; lastMonth: number; lastYear: number; achPercent?: number; forecast?: number; forecastPercent?: number; momPercent?: number; yoyPercent?: number; targetPerDay?: number; diffPerDay?: number }>;
   categories: Array<{ category: string; actual: number; target: number; share: number }>;
@@ -546,6 +503,7 @@ export default function App() {
 
   const currentStaff =
     staffData.find((s) => s.id === activeStaffId) || staffData[0];
+  const currentOfficer = parsedReport.officers[Number(activeStaffId) - 1] ?? parsedReport.officers[0];
 
   const uploadStats = useMemo(() => {
     const branches = parsedReport.branches.length;
@@ -553,6 +511,74 @@ export default function App() {
     const officers = parsedReport.officers.length;
     return { branches, categories, officers };
   }, [parsedReport]);
+
+  const derivedHomeStats = useMemo<DerivedHomeStat[]>(() => {
+    const totalSales = parsedReport.branches.reduce((sum, branch) => sum + branch.actual, 0);
+    const totalTarget = parsedReport.branches.reduce((sum, branch) => sum + branch.target, 0);
+    const avgAch = totalTarget ? (totalSales / totalTarget) * 100 : 0;
+    const avgRate = parsedReport.officers.length
+      ? parsedReport.officers.reduce((sum, officer) => sum + officer.rate, 0) / parsedReport.officers.length
+      : 0;
+    const totalOfficers = parsedReport.officers.length;
+    const totalBranches = parsedReport.branches.length;
+    const lastMonthTotal = parsedReport.branches.reduce((sum, branch) => sum + branch.lastMonth, 0);
+    const trendPercent = lastMonthTotal ? ((totalSales - lastMonthTotal) / lastMonthTotal) * 100 : 0;
+
+    return [
+      {
+        label: "Total Sales",
+        value: `฿${totalSales.toLocaleString()}`,
+        trend: `${trendPercent >= 0 ? "+" : ""}${trendPercent.toFixed(1)}%`,
+        icon: DollarSign,
+        isUp: trendPercent >= 0,
+      },
+      {
+        label: "Store Target",
+        value: `${avgAch.toFixed(1)}%`,
+        trend: `${avgAch >= 100 ? "+" : ""}${(avgAch - 100).toFixed(1)}%`,
+        icon: Star,
+        isUp: avgAch >= 100,
+      },
+      {
+        label: "Average CSAT",
+        value: `${avgRate.toFixed(1)}`,
+        trend: `${avgRate >= 100 ? "+" : ""}${avgRate.toFixed(1)}`,
+        icon: Smile,
+        isUp: true,
+      },
+      {
+        label: "Total Visits",
+        value: `${totalOfficers.toLocaleString()}`,
+        trend: `${totalBranches.toLocaleString()} branches`,
+        icon: Users,
+        isUp: true,
+      },
+    ];
+  }, [parsedReport]);
+
+  const salesTrendData = useMemo(() => {
+    const sorted = [...parsedReport.branches].sort((a, b) => a.label.localeCompare(b.label));
+    return sorted.slice(0, 7).map((branch, index) => ({
+      date: branch.label.length > 12 ? branch.label.slice(0, 12) : branch.label,
+      sales: Math.round(branch.actual / 1000),
+      index,
+    }));
+  }, [parsedReport.branches]);
+
+  const attachRateData = useMemo<DerivedAttachRow[]>(() => {
+    return parsedReport.officers.slice(0, 3).map((officer, index) => ({
+      id: `${officer.name}-${index}`,
+      name: officer.name,
+      appleCare: Math.min(Math.round(officer.rate * 0.82), 160),
+      accessories: Math.min(Math.round(officer.rate * 1.15), 180),
+      services: Math.min(Math.round(officer.rate * 0.42), 100),
+      avatar: index === 0
+        ? "/staff1.png"
+        : index === 1
+          ? "/staff2.png"
+          : "/staff3.png",
+    }));
+  }, [parsedReport.officers]);
 
   const persistUploads = (nextUploads: Record<UploadKind, RawRow[]>) => {
     try {
@@ -782,7 +808,7 @@ export default function App() {
               >
                 {/* Dashboard Top Stats */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  {homeStats.map((stat, idx) => (
+                  {derivedHomeStats.map((stat, idx) => (
                     <div
                       key={idx}
                       className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 p-5 shadow-[0_8px_32px_rgba(0,0,0,0.12)] flex flex-col justify-between hover:bg-white/[0.15] transition-colors cursor-pointer"
