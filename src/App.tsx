@@ -243,16 +243,6 @@ const getStatusColor = (status: string) => {
   return "text-white/80";
 };
 
-const salesTrendData = [
-  { date: "1 Nov", sales: 420 },
-  { date: "2 Nov", sales: 280 },
-  { date: "3 Nov", sales: 550 },
-  { date: "4 Nov", sales: 480 },
-  { date: "5 Nov", sales: 620 },
-  { date: "6 Nov", sales: 850 },
-  { date: "7 Nov", sales: 780 },
-];
-
 const attachOptions = [
   { id: "appleCare", label: "AppleCare+", color: "#10b981" },
   { id: "accessories", label: "Accessories", color: "#3b82f6" },
@@ -356,6 +346,12 @@ const matchesOfficer = (a: string, b: string) => {
 const getCategoryValue = (row: RawRow) => {
   const category = normalizeText(row["Category (Name)"] ?? row.category ?? row.cat ?? row["Cat & Sub Cat"]);
   return category.includes("sim") ? toNumber(row.Number ?? row.number ?? row.qty) : toNumber(row["ราคาขายตามบิล"] ?? row["Total Price"] ?? row.totalPrice);
+};
+const mapAttachmentMetrics = (category: string, actual: number) => {
+  const normalized = normalizeText(category);
+  if (normalized.includes("applecare") || normalized.includes("care") || normalized.includes("insurance")) return { appleCare: actual, accessories: 0, services: 0 };
+  if (normalized.includes("service") || normalized.includes("smile")) return { appleCare: 0, accessories: 0, services: actual };
+  return { appleCare: 0, accessories: actual, services: 0 };
 };
 const getSalesDate = (row: RawRow) => {
   const raw = String(row["Doc Date"] ?? row["doc date"] ?? "");
@@ -504,6 +500,8 @@ export default function App() {
   const currentStaff =
     staffData.find((s) => s.id === activeStaffId) || staffData[0];
   const currentOfficer = parsedReport.officers[Number(activeStaffId) - 1] ?? parsedReport.officers[0];
+  const activeOfficerIndex = Math.max(Number(activeStaffId) - 1, 0);
+  const activeOfficer = parsedReport.officers[activeOfficerIndex] ?? parsedReport.officers[0];
 
   const uploadStats = useMemo(() => {
     const branches = parsedReport.branches.length;
@@ -557,28 +555,29 @@ export default function App() {
   }, [parsedReport]);
 
   const salesTrendData = useMemo(() => {
-    const sorted = [...parsedReport.branches].sort((a, b) => a.label.localeCompare(b.label));
-    return sorted.slice(0, 7).map((branch, index) => ({
-      date: branch.label.length > 12 ? branch.label.slice(0, 12) : branch.label,
-      sales: Math.round(branch.actual / 1000),
-      index,
-    }));
+    return [...parsedReport.branches]
+      .slice(0, 7)
+      .map((branch, index) => ({
+        date: branch.label.length > 12 ? branch.label.slice(0, 12) : branch.label,
+        sales: Math.round(branch.actual / 1000),
+        index,
+      }));
   }, [parsedReport.branches]);
 
   const attachRateData = useMemo<DerivedAttachRow[]>(() => {
-    return parsedReport.officers.slice(0, 3).map((officer, index) => ({
-      id: `${officer.name}-${index}`,
-      name: officer.name,
-      appleCare: Math.min(Math.round(officer.rate * 0.82), 160),
-      accessories: Math.min(Math.round(officer.rate * 1.15), 180),
-      services: Math.min(Math.round(officer.rate * 0.42), 100),
-      avatar: index === 0
-        ? "/staff1.png"
-        : index === 1
-          ? "/staff2.png"
-          : "/staff3.png",
-    }));
-  }, [parsedReport.officers]);
+    return parsedReport.officers.slice(0, 10).map((officer, index) => {
+      const sourceCategory = parsedReport.categories[index % Math.max(parsedReport.categories.length, 1)]?.category ?? "Accessories";
+      const metrics = mapAttachmentMetrics(sourceCategory, Math.max(Math.round(officer.actual / Math.max(officer.target || 1, 1) * 100), 0));
+      return {
+        id: `${officer.name}-${index}`,
+        name: officer.name,
+        appleCare: Math.min(metrics.appleCare || Math.round(officer.rate * 0.82), 160),
+        accessories: Math.min(metrics.accessories || Math.round(officer.rate * 1.15), 180),
+        services: Math.min(metrics.services || Math.round(officer.rate * 0.42), 100),
+        avatar: index % 3 === 0 ? "/staff1.png" : index % 3 === 1 ? "/staff2.png" : "/staff3.png",
+      };
+    });
+  }, [parsedReport.officers, parsedReport.categories]);
 
   const persistUploads = (nextUploads: Record<UploadKind, RawRow[]>) => {
     try {
@@ -760,25 +759,25 @@ export default function App() {
                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
                         className="absolute right-0 top-12 w-48 bg-[#0c3123]/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 flex flex-col"
                       >
-                        {staffData.map((staff) => (
+                        {parsedReport.officers.map((officer, idx) => (
                           <button
-                            key={staff.id}
-                            className={`flex items-center gap-3 w-full text-left px-4 py-3 hover:bg-white/10 transition-colors ${staff.id === activeStaffId ? "bg-white/5" : ""}`}
+                            key={`${officer.name}-${idx}`}
+                            className={`flex items-center gap-3 w-full text-left px-4 py-3 hover:bg-white/10 transition-colors ${idx === activeOfficerIndex ? "bg-white/5" : ""}`}
                             onClick={() => {
-                              setActiveStaffId(staff.id);
+                              setActiveStaffId(String(idx + 1));
                               setShowDropdown(false);
                             }}
                           >
                             <img
-                              src={staff.image}
+                              src={idx % 3 === 0 ? "/staff1.png" : idx % 3 === 1 ? "/staff2.png" : "/staff3.png"}
                               className="w-8 h-8 rounded-full object-cover object-top bg-emerald-500/20"
                             />
                             <div className="flex-1 min-w-0">
                               <div className="text-sm text-white font-medium truncate">
-                                {staff.name}
+                                {officer.name}
                               </div>
                               <div className="text-[10px] text-white/60 truncate">
-                                {staff.role}
+                                {officer.branch}
                               </div>
                             </div>
                           </button>
