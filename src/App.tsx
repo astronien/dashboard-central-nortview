@@ -256,6 +256,15 @@ const deviceOptions = [
   { id: "Apple Watch", label: "Apple Watch" },
 ];
 
+const getAttachCategoryOptions = (rows: RawRow[]) => {
+  const keys = new Set<string>();
+  rows.forEach((row) => {
+    const category = String(row["CAT Daily"] ?? row["Category (Name)"] ?? row.category ?? "").trim();
+    if (category) keys.add(category);
+  });
+  return ["all", ...Array.from(keys).sort((a, b) => a.localeCompare(b))];
+};
+
 const renderCustomTick = ({ payload, x, y, textAnchor }: any) => {
   const [name, val] = payload.value.split("|");
   const words = name.split(" ");
@@ -314,6 +323,7 @@ type DerivedHomeStat = {
 type DerivedAttachRow = {
   id: string;
   name: string;
+  branch: string;
   appleCare: number;
   accessories: number;
   services: number;
@@ -492,6 +502,8 @@ export default function App() {
     "accessories",
   ]);
   const [selectedDevice, setSelectedDevice] = useState("iPhone");
+  const [selectedAttachCategory, setSelectedAttachCategory] = useState("all");
+  const [selectedAttachOfficer, setSelectedAttachOfficer] = useState("all");
   const [isAttachDropdownOpen, setIsAttachDropdownOpen] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isParsing, setIsParsing] = useState(false);
@@ -571,11 +583,12 @@ export default function App() {
       }));
   }, [parsedReport.branches]);
 
+  const attachCategoryOptions = useMemo(() => getAttachCategoryOptions(uploadedFiles.categoryMaster), [uploadedFiles.categoryMaster]);
+
   const attachRateData = useMemo<DerivedAttachRow[]>(() => {
     const currentRows = uploadedFiles.current;
     const targetRows = uploadedFiles.target;
     const categoryMasterRows = uploadedFiles.categoryMaster;
-
     const categoryLookup = new Map<string, string>();
     categoryMasterRows.forEach((row) => {
       const key = normalizeText(row["Cat & Sub Cat"] ?? row["Category (Name)"] ?? row.SubCategory);
@@ -583,8 +596,7 @@ export default function App() {
       if (key) categoryLookup.set(key, value);
     });
 
-    const officerBuckets = new Map<string, { actual: number; base: number; appleCare: number; accessories: number; services: number; branch: string; target: number }>();
-
+    const officerBuckets = new Map<string, { branch: string; baseUnits: number; appleCare: number; accessories: number; services: number }>();
     currentRows.forEach((row) => {
       const officerName = String(row["Officer (Name)"] ?? row.Officer ?? row.officer ?? row.NAME ?? "Unknown Officer").trim();
       const branch = String(row["Branch (Name)"] ?? row.branch ?? "Unknown Branch").trim();
@@ -593,16 +605,14 @@ export default function App() {
       const productName = String(row["Product (Name)"] ?? row.product ?? "").trim();
       const mappedCategory = categoryLookup.get(normalizeText(`${categoryName}${subCategory}`)) ?? categoryLookup.get(normalizeText(productName)) ?? categoryName;
       const categoryGroup = categoryGroupKey(mappedCategory);
-      const actualValue = categoryGroup === "appleCare" || categoryGroup === "services" ? 1 : Math.max(toNumber(row.Number ?? row.number ?? row.qty), 1);
+      const quantity = Math.max(toNumber(row.Number ?? row.number ?? row.qty), 1);
       const officerKey = cleanOfficerName(officerName);
-      const existing = officerBuckets.get(officerKey) ?? { actual: 0, base: 0, appleCare: 0, accessories: 0, services: 0, branch, target: 0 };
+      const existing = officerBuckets.get(officerKey) ?? { branch, baseUnits: 0, appleCare: 0, accessories: 0, services: 0 };
       existing.branch = existing.branch || branch;
-      existing.actual += actualValue;
-      if (categoryGroup === "appleCare") existing.appleCare += actualValue;
-      if (categoryGroup === "services") existing.services += actualValue;
-      if (categoryGroup === "accessories") existing.accessories += actualValue;
-      if (categoryGroup === "accessories" && mappedCategory.toLowerCase().includes("sim")) existing.base += actualValue;
-      if (categoryGroup !== "services") existing.base += actualValue;
+      existing.baseUnits += quantity;
+      if (categoryGroup === "appleCare") existing.appleCare += quantity;
+      else if (categoryGroup === "services") existing.services += quantity;
+      else existing.accessories += quantity;
       officerBuckets.set(officerKey, existing);
     });
 
@@ -612,23 +622,33 @@ export default function App() {
       targetLookup.set(officerKey, row);
     });
 
-    return [...officerBuckets.entries()].slice(0, 10).map(([key, bucket], index) => {
-      const targetRow = targetLookup.get(key);
-      const target = toNumber(targetRow?.Total ?? targetRow?.total);
-      const base = Math.max(bucket.base || target || 1, 1);
-      const appleCareRate = Math.round((bucket.appleCare / base) * 100);
-      const accessoriesRate = Math.round((bucket.accessories / base) * 100);
-      const servicesRate = Math.round((bucket.services / base) * 100);
-      return {
-        id: key,
-        name: key,
-        appleCare: Math.min(appleCareRate, 160),
-        accessories: Math.min(accessoriesRate, 180),
-        services: Math.min(servicesRate, 100),
-        avatar: index % 3 === 0 ? "/staff1.png" : index % 3 === 1 ? "/staff2.png" : "/staff3.png",
-      };
-    });
-  }, [uploadedFiles.current, uploadedFiles.target, uploadedFiles.categoryMaster]);
+    const selectedCategory = selectedAttachCategory;
+    const categoryFilter = selectedCategory === "all" ? null : normalizeText(selectedCategory);
+    const selectedOfficer = selectedAttachOfficer === "all" ? null : cleanOfficerName(selectedAttachOfficer);
+    const officerList = parsedReport.officers.length ? parsedReport.officers : [...officerBuckets.keys()].map((name) => ({ name, branch: officerBuckets.get(name)?.branch ?? "", actual: 0, target: 0, rate: 0 }));
+
+    return officerList
+      .filter((officer) => !selectedOfficer || cleanOfficerName(officer.name) === selectedOfficer)
+      .map((officer, index) => {
+        const key = cleanOfficerName(officer.name);
+        const bucket = officerBuckets.get(key) ?? { branch: officer.branch, baseUnits: 0, appleCare: 0, accessories: 0, services: 0 };
+        const targetRow = targetLookup.get(key);
+        const target = toNumber(targetRow?.Total ?? targetRow?.total ?? officer.target);
+        const base = Math.max(bucket.baseUnits || target || 1, 1);
+        const appleCareRate = Math.round((bucket.appleCare / base) * 100);
+        const accessoriesRate = Math.round((bucket.accessories / base) * 100);
+        const servicesRate = Math.round((bucket.services / base) * 100);
+        return {
+          id: key,
+          name: officer.name,
+          branch: bucket.branch || officer.branch,
+          appleCare: categoryFilter && categoryFilter !== normalizeText("appleCare") && categoryFilter !== normalizeText("all") ? 0 : Math.min(appleCareRate, 160),
+          accessories: categoryFilter && categoryFilter !== normalizeText("accessories") && categoryFilter !== normalizeText("all") ? 0 : Math.min(accessoriesRate, 180),
+          services: categoryFilter && categoryFilter !== normalizeText("services") && categoryFilter !== normalizeText("all") ? 0 : Math.min(servicesRate, 100),
+          avatar: index % 3 === 0 ? "/staff1.png" : index % 3 === 1 ? "/staff2.png" : "/staff3.png",
+        };
+      });
+  }, [uploadedFiles.current, uploadedFiles.target, uploadedFiles.categoryMaster, parsedReport.officers, selectedAttachCategory, selectedAttachOfficer]);
 
   const persistUploads = (nextUploads: Record<UploadKind, RawRow[]>) => {
     try {
@@ -1038,7 +1058,6 @@ export default function App() {
                   </div>
 
                   <div className="flex flex-wrap gap-4 items-center">
-                    {/* Device Dropdown */}
                     <div className="relative z-30">
                       <select
                         value={selectedDevice}
@@ -1046,11 +1065,7 @@ export default function App() {
                         className="appearance-none bg-white/10 border border-white/20 text-white rounded-xl px-4 py-2 pr-10 outline-none focus:border-emerald-500 cursor-pointer text-sm font-medium"
                       >
                         {deviceOptions.map((d) => (
-                          <option
-                            key={d.id}
-                            value={d.id}
-                            className="text-gray-900"
-                          >
+                          <option key={d.id} value={d.id} className="text-gray-900">
                             {d.label}
                           </option>
                         ))}
@@ -1058,51 +1073,53 @@ export default function App() {
                       <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-white/60 pointer-events-none" />
                     </div>
 
-                    {/* Attachments Checkbox Dropdown */}
                     <div className="relative z-30">
                       <button
-                        onClick={() =>
-                          setIsAttachDropdownOpen(!isAttachDropdownOpen)
-                        }
+                        onClick={() => setIsAttachDropdownOpen(!isAttachDropdownOpen)}
                         className="bg-white/10 border border-white/20 text-white rounded-xl px-4 py-2 flex items-center gap-2 outline-none focus:border-emerald-500 cursor-pointer text-sm font-medium"
                       >
-                        Attachments ({attachFilters.length})
-                        <ChevronDown
-                          className={`w-4 h-4 text-white/60 transition-transform ${isAttachDropdownOpen ? "rotate-180" : ""}`}
-                        />
+                        Category Master ({selectedAttachCategory === "all" ? "All" : selectedAttachCategory})
+                        <ChevronDown className={`w-4 h-4 text-white/60 transition-transform ${isAttachDropdownOpen ? "rotate-180" : ""}`} />
                       </button>
 
                       {isAttachDropdownOpen && (
-                        <div className="absolute right-0 top-full mt-2 w-56 bg-[#1a4431] border border-white/20 rounded-xl shadow-xl z-50 p-2 flex flex-col gap-1">
-                          {attachOptions.map((opt) => (
-                            <label
-                              key={opt.id}
-                              className="flex items-center gap-3 p-2 hover:bg-white/10 rounded-lg cursor-pointer transition-colors"
-                            >
-                              <input
-                                type="checkbox"
-                                className="hidden"
-                                checked={attachFilters.includes(opt.id)}
-                                onChange={() => toggleAttachFilter(opt.id)}
-                              />
-                              <div
-                                className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${attachFilters.includes(opt.id) ? "bg-emerald-500 border-emerald-500" : "border-white/40"}`}
-                              >
-                                {attachFilters.includes(opt.id) && (
-                                  <Check className="w-3.5 h-3.5 text-white" />
-                                )}
+                        <div className="absolute right-0 top-full mt-2 w-64 bg-[#1a4431] border border-white/20 rounded-xl shadow-xl z-50 p-3 flex flex-col gap-2 max-h-72 overflow-auto">
+                          <div className="text-[11px] uppercase tracking-wider text-white/50 px-2">Category Master</div>
+                          <label className="flex items-center gap-3 p-2 hover:bg-white/10 rounded-lg cursor-pointer transition-colors">
+                            <input type="radio" name="attachCategory" className="hidden" checked={selectedAttachCategory === "all"} onChange={() => setSelectedAttachCategory("all")} />
+                            <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${selectedAttachCategory === "all" ? "bg-emerald-500 border-emerald-500" : "border-white/40"}`}>
+                              {selectedAttachCategory === "all" && <Check className="w-3.5 h-3.5 text-white" />}
+                            </div>
+                            <span className="text-sm text-white/90">All Categories</span>
+                          </label>
+                          {attachCategoryOptions.filter((c) => c !== "all").map((cat) => (
+                            <label key={cat} className="flex items-center gap-3 p-2 hover:bg-white/10 rounded-lg cursor-pointer transition-colors">
+                              <input type="radio" name="attachCategory" className="hidden" checked={selectedAttachCategory === cat} onChange={() => setSelectedAttachCategory(cat)} />
+                              <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${selectedAttachCategory === cat ? "bg-emerald-500 border-emerald-500" : "border-white/40"}`}>
+                                {selectedAttachCategory === cat && <Check className="w-3.5 h-3.5 text-white" />}
                               </div>
-                              <div className="flex items-center gap-2">
-                                <div
-                                  className="w-2 h-2 rounded-full"
-                                  style={{ backgroundColor: opt.color }}
-                                />
-                                <span className="text-sm text-white/90">
-                                  {opt.label}
-                                </span>
-                              </div>
+                              <span className="text-sm text-white/90 truncate">{cat}</span>
                             </label>
                           ))}
+                          <div className="border-t border-white/10 mt-2 pt-2">
+                            <div className="text-[11px] uppercase tracking-wider text-white/50 px-2 mb-1">Officer</div>
+                            <label className="flex items-center gap-3 p-2 hover:bg-white/10 rounded-lg cursor-pointer transition-colors">
+                              <input type="radio" name="attachOfficer" className="hidden" checked={selectedAttachOfficer === "all"} onChange={() => setSelectedAttachOfficer("all")} />
+                              <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${selectedAttachOfficer === "all" ? "bg-emerald-500 border-emerald-500" : "border-white/40"}`}>
+                                {selectedAttachOfficer === "all" && <Check className="w-3.5 h-3.5 text-white" />}
+                              </div>
+                              <span className="text-sm text-white/90">All Officers</span>
+                            </label>
+                            {parsedReport.officers.map((officer, idx) => (
+                              <label key={`${officer.name}-${idx}`} className="flex items-center gap-3 p-2 hover:bg-white/10 rounded-lg cursor-pointer transition-colors">
+                                <input type="radio" name="attachOfficer" className="hidden" checked={selectedAttachOfficer === officer.name} onChange={() => setSelectedAttachOfficer(officer.name)} />
+                                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${selectedAttachOfficer === officer.name ? "bg-emerald-500 border-emerald-500" : "border-white/40"}`}>
+                                  {selectedAttachOfficer === officer.name && <Check className="w-3.5 h-3.5 text-white" />}
+                                </div>
+                                <span className="text-sm text-white/90 truncate">{officer.name}</span>
+                              </label>
+                            ))}
+                          </div>
                         </div>
                       )}
                     </div>
