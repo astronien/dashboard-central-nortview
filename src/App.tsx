@@ -371,6 +371,49 @@ const renderCustomTick = ({ payload, x, y, textAnchor }: any) => {
   );
 };
 
+type ReportRow = {
+  label: string;
+  target: number;
+  actual: number;
+  lastMonth: number;
+  lastYear: number;
+};
+
+const reportRows: ReportRow[] = [
+  { label: "Mega Bangna", target: 1200000, actual: 1324000, lastMonth: 1188000, lastYear: 1095000 },
+  { label: "Central World", target: 1500000, actual: 1432000, lastMonth: 1394000, lastYear: 1287000 },
+  { label: "Iconsiam", target: 980000, actual: 1013000, lastMonth: 960000, lastYear: 885000 },
+  { label: "Siam Paragon", target: 2100000, actual: 2245000, lastMonth: 1987000, lastYear: 2050000 },
+];
+
+const reportMetrics = reportRows.map((row) => {
+  const achPercent = row.target ? (row.actual / row.target) * 100 : 0;
+  const momPercent = row.lastMonth ? ((row.actual - row.lastMonth) / row.lastMonth) * 100 : 0;
+  const yoyPercent = row.lastYear ? ((row.actual - row.lastYear) / row.lastYear) * 100 : 0;
+
+  return {
+    ...row,
+    achPercent,
+    momPercent,
+    yoyPercent,
+  };
+});
+
+const categorySummary = [
+  { category: "iPhone", actual: 3520000, target: 3100000, share: 34 },
+  { category: "Mac", actual: 2260000, target: 2050000, share: 22 },
+  { category: "iPad", actual: 1410000, target: 1300000, share: 14 },
+  { category: "Apple Watch", actual: 980000, target: 870000, share: 10 },
+  { category: "SIM", actual: 610000, target: 540000, share: 6 },
+  { category: "BTB", actual: 1320000, target: 1250000, share: 14 },
+];
+
+const officerSummary = [
+  { name: "Sarut Jitranon", branch: "Mega Bangna", actual: 142, target: 123, rate: 115 },
+  { name: "Nadech Kugimiya", branch: "Central World", actual: 256, target: 205, rate: 125 },
+  { name: "Yaya Urassaya", branch: "Iconsiam", actual: 118, target: 112, rate: 105 },
+];
+
 export default function App() {
   const [currentView, setCurrentView] = useState<
     "home" | "staff" | "staff_overview" | "settings" | "reports"
@@ -1427,25 +1470,126 @@ export default function App() {
                     </div>
                     <div>
                       <h2 className="text-xl font-bold tracking-tight">
-                        Reports & Analytics (Placeholder)
+                        Backend Report Logic Preview
                       </h2>
                       <p className="text-sm text-white/60 mt-1">
-                        Deep dive into store performance and metrics.
+                        Summary of branch, category, and officer calculations from the backend logic doc.
                       </p>
+                    </div>
+                  </div>
+                  <button className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/80 hover:bg-white/10 transition-colors">
+                    Export CSV
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="lg:col-span-2 bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+                    <div className="flex items-center justify-between mb-5">
+                      <h3 className="text-lg font-semibold tracking-tight">Branch Summary</h3>
+                      <span className="text-xs text-white/50">Target, actual, achievement, MoM, YoY</span>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-sm border-collapse">
+                        <thead>
+                          <tr className="border-b border-white/10 text-white/50">
+                            <th className="py-3 pr-4 font-medium">Branch</th>
+                            <th className="py-3 px-3 font-medium">Target</th>
+                            <th className="py-3 px-3 font-medium">Actual</th>
+                            <th className="py-3 px-3 font-medium">Ach %</th>
+                            <th className="py-3 px-3 font-medium">MoM %</th>
+                            <th className="py-3 px-3 font-medium">YoY %</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {reportMetrics.map((row) => (
+                            <tr key={row.label} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                              <td className="py-3 pr-4 font-medium text-white/90">{row.label}</td>
+                              <td className="py-3 px-3 text-white/80">฿{row.target.toLocaleString()}</td>
+                              <td className="py-3 px-3 text-white/80">฿{row.actual.toLocaleString()}</td>
+                              <td className={`py-3 px-3 font-semibold ${row.achPercent >= 100 ? "text-emerald-400" : "text-yellow-400"}`}>{row.achPercent.toFixed(1)}%</td>
+                              <td className={`py-3 px-3 font-semibold ${row.momPercent >= 0 ? "text-emerald-400" : "text-red-400"}`}>{row.momPercent.toFixed(1)}%</td>
+                              <td className={`py-3 px-3 font-semibold ${row.yoyPercent >= 0 ? "text-emerald-400" : "text-red-400"}`}>{row.yoyPercent.toFixed(1)}%</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+                    <h3 className="text-lg font-semibold tracking-tight mb-5">Report Logic Rules</h3>
+                    <div className="space-y-4 text-sm text-white/80">
+                      <div className="rounded-2xl bg-white/5 border border-white/5 p-4">
+                        <div className="font-semibold text-white mb-1">File flow</div>
+                        <p>Upload Excel → detect file type → normalize rows → calculate reports.</p>
+                      </div>
+                      <div className="rounded-2xl bg-white/5 border border-white/5 p-4">
+                        <div className="font-semibold text-white mb-1">Category rule</div>
+                        <p>SIM uses quantity/number, while other categories use total price.</p>
+                      </div>
+                      <div className="rounded-2xl bg-white/5 border border-white/5 p-4">
+                        <div className="font-semibold text-white mb-1">Matching rule</div>
+                        <p>Officer names should be normalized before matching target and sales records.</p>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="flex-1 bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-8 flex flex-col items-center justify-center text-center shadow-[0_8px_32px_rgba(0,0,0,0.12)] relative z-10 w-full min-h-[400px]">
-                  <PieChart className="w-16 h-16 text-white/20 mb-4" />
-                  <h3 className="text-2xl font-semibold mb-2">
-                    Reports Coming Soon
-                  </h3>
-                  <p className="text-white/60 max-w-md">
-                    This is a placeholder for the reports page. In the future,
-                    this section will contain detailed charts, sales breakdowns,
-                    and exportable data.
-                  </p>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+                    <div className="flex items-center justify-between mb-5">
+                      <h3 className="text-lg font-semibold tracking-tight">Category Summary</h3>
+                      <span className="text-xs text-white/50">Main category totals</span>
+                    </div>
+                    <div className="space-y-3">
+                      {categorySummary.map((item) => (
+                        <div key={item.category} className="rounded-2xl bg-white/5 border border-white/5 p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="font-medium text-white/90">{item.category}</div>
+                            <div className="text-sm text-white/60">{item.share}% share</div>
+                          </div>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-white/70">Actual ฿{item.actual.toLocaleString()}</span>
+                            <span className="text-white/70">Target ฿{item.target.toLocaleString()}</span>
+                          </div>
+                          <div className="mt-3 h-2 rounded-full bg-white/10 overflow-hidden">
+                            <div className="h-full rounded-full bg-emerald-400" style={{ width: `${Math.min((item.actual / item.target) * 100, 140)}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+                    <div className="flex items-center justify-between mb-5">
+                      <h3 className="text-lg font-semibold tracking-tight">Officer Summary</h3>
+                      <span className="text-xs text-white/50">Name matching + target alignment</span>
+                    </div>
+                    <div className="overflow-hidden rounded-2xl border border-white/5">
+                      <table className="w-full text-left text-sm">
+                        <thead className="bg-white/5">
+                          <tr className="text-white/50">
+                            <th className="py-3 px-4 font-medium">Officer</th>
+                            <th className="py-3 px-4 font-medium">Branch</th>
+                            <th className="py-3 px-4 font-medium">Actual</th>
+                            <th className="py-3 px-4 font-medium">Target</th>
+                            <th className="py-3 px-4 font-medium">Rate</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {officerSummary.map((item) => (
+                            <tr key={item.name} className="border-t border-white/5 hover:bg-white/5 transition-colors">
+                              <td className="py-3 px-4 text-white/90 font-medium">{item.name}</td>
+                              <td className="py-3 px-4 text-white/70">{item.branch}</td>
+                              <td className="py-3 px-4 text-white/70">{item.actual}</td>
+                              <td className="py-3 px-4 text-white/70">{item.target}</td>
+                              <td className="py-3 px-4 font-semibold text-emerald-400">{item.rate}%</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 </div>
               </motion.div>
             )}
