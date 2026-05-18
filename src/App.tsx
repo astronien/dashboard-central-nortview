@@ -1672,15 +1672,6 @@ export default function App() {
                               </tr>
                             );
                           })}
-                            <tr key={row.label} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                              <td className="py-3 pr-4 font-medium text-white/90">{row.label}</td>
-                              <td className="py-3 px-3 text-white/80">฿{row.target.toLocaleString()}</td>
-                              <td className="py-3 px-3 text-white/80">฿{row.actual.toLocaleString()}</td>
-                              <td className={`py-3 px-3 font-semibold ${row.achPercent >= 100 ? "text-emerald-400" : "text-yellow-400"}`}>{row.achPercent.toFixed(1)}%</td>
-                              <td className={`py-3 px-3 font-semibold ${row.momPercent >= 0 ? "text-emerald-400" : "text-red-400"}`}>{row.momPercent.toFixed(1)}%</td>
-                              <td className={`py-3 px-3 font-semibold ${row.yoyPercent >= 0 ? "text-emerald-400" : "text-red-400"}`}>{row.yoyPercent.toFixed(1)}%</td>
-                            </tr>
-                          ))}
                         </tbody>
                       </table>
                     </div>
