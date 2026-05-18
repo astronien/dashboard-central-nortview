@@ -689,8 +689,11 @@ export default function App() {
     }
   };
 
-  const persistUploads = async (nextUploads: UploadState) => {
-    const saved = await saveUploads(nextUploads);
+  const persistUploads = async (
+    nextUploads: UploadState,
+    kinds?: UploadKind[],
+  ) => {
+    const saved = await saveUploads(nextUploads, kinds);
     if (!saved) persistUploadsLocal(nextUploads);
   };
 
@@ -709,7 +712,7 @@ export default function App() {
 
   const rebuildReport = (
     nextUploads: UploadState,
-    options?: { skipPersist?: boolean },
+    options?: { skipPersist?: boolean; changedKinds?: UploadKind[] },
   ) => {
     const report = buildReport(
       nextUploads.target,
@@ -720,7 +723,9 @@ export default function App() {
       "uploaded-data",
     );
     setParsedReport(report);
-    if (!options?.skipPersist) void persistUploads(nextUploads);
+    if (!options?.skipPersist) {
+      void persistUploads(nextUploads, options?.changedKinds);
+    }
   };
 
 
@@ -748,7 +753,7 @@ export default function App() {
   const removeUploadedFile = (kind: UploadKind) => {
     const nextUploads = { ...uploadedFiles, [kind]: [] };
     setUploadedFiles(nextUploads);
-    rebuildReport(nextUploads);
+    rebuildReport(nextUploads, { changedKinds: [kind] });
   };
 
   useEffect(() => {
@@ -777,6 +782,7 @@ export default function App() {
     setIsParsing(true);
     try {
       const nextUploads: Record<UploadKind, RawRow[]> = { ...uploadedFiles };
+      const changedKinds = new Set<UploadKind>();
       for (const file of files) {
         const buffer = await file.arrayBuffer();
         const workbook = XLSX.read(buffer, { type: "array" });
@@ -785,9 +791,12 @@ export default function App() {
         const rows = XLSX.utils.sheet_to_json<RawRow>(sheet, { defval: "", raw: false });
         const detectedKind = forcedKind ?? acceptDetected(file.name, getUploadKind(Object.keys(rows[0] ?? {})));
         nextUploads[detectedKind] = rows;
+        changedKinds.add(detectedKind);
       }
       setUploadedFiles(nextUploads);
-      rebuildReport(nextUploads);
+      rebuildReport(nextUploads, {
+        changedKinds: [...changedKinds],
+      });
       setCurrentView("reports");
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : "อ่านไฟล์ไม่สำเร็จ");
@@ -966,8 +975,8 @@ export default function App() {
                         Sales Trend (Last 7 Days)
                       </h2>
                     </div>
-                    <div className="flex-1 w-full min-h-[220px]">
-                      <ResponsiveContainer width="100%" height="100%">
+                    <div className="flex-1 w-full min-h-[220px] min-w-0">
+                      <ResponsiveContainer width="100%" height={220} minWidth={0}>
                         <AreaChart
                           data={salesTrendData}
                           margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
@@ -1176,8 +1185,8 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 flex flex-col shadow-[0_8px_32px_rgba(0,0,0,0.12)] h-[450px] relative z-10 w-full shrink-0">
-                  <ResponsiveContainer width="100%" height="100%">
+                <div className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 flex flex-col shadow-[0_8px_32px_rgba(0,0,0,0.12)] h-[450px] min-h-[450px] relative z-10 w-full shrink-0 min-w-0">
+                  <ResponsiveContainer width="100%" height={380} minWidth={0}>
                     <BarChart
                       data={attachRateData.filter((row) => {
                         const hasCategory = selectedAttachCategories.length === 0 || selectedAttachCategories.some((cat) => {
@@ -1367,8 +1376,8 @@ export default function App() {
 
                   {/* Center Column - Radar Chart */}
                   <div className="lg:w-[30%] relative flex items-center justify-center py-4 lg:py-0 z-40">
-                    <div className="w-full max-w-[260px] aspect-square relative text-xs">
-                      <ResponsiveContainer width="100%" height="100%">
+                    <div className="w-full max-w-[260px] h-[260px] min-h-[260px] relative text-xs">
+                      <ResponsiveContainer width="100%" height={260} minWidth={0}>
                         <RadarChart
                           cx="50%"
                           cy="50%"

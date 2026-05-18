@@ -1,40 +1,19 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import {
-  UPLOAD_KINDS,
-  isUploadKind,
-  type UploadKind,
-} from "./lib/schema";
-import {
-  loadAllUploads,
-  saveAllUploads,
-  type UploadPayload,
-} from "./lib/db";
+import { UPLOAD_KINDS } from "./lib/schema";
+import { loadAllUploads } from "./lib/db";
+
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: "1mb",
+    },
+  },
+};
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, PUT, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
-};
-
-const emptyPayload = (): UploadPayload => ({
-  target: [],
-  current: [],
-  lastMonth: [],
-  lastYear: [],
-  categoryMaster: [],
-});
-
-const parsePayload = (body: unknown): UploadPayload | null => {
-  if (!body || typeof body !== "object") return null;
-
-  const payload = emptyPayload();
-  for (const kind of UPLOAD_KINDS) {
-    const value = (body as Record<string, unknown>)[kind];
-    if (value === undefined) continue;
-    if (!Array.isArray(value)) return null;
-    payload[kind] = value as UploadPayload[UploadKind];
-  }
-  return payload;
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -53,13 +32,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === "PUT") {
-      const payload = parsePayload(req.body);
-      if (!payload) {
-        return res.status(400).json({ error: "Invalid upload payload." });
-      }
-
-      await saveAllUploads(payload);
-      return res.status(200).json({ ok: true });
+      return res.status(410).json({
+        error:
+          "Bulk upload disabled. Use PUT /api/uploads/:kind for each file type.",
+        kinds: UPLOAD_KINDS,
+      });
     }
 
     return res.status(405).json({ error: "Method not allowed." });

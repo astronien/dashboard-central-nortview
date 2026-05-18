@@ -19,47 +19,24 @@ export const KIND_TABLE: Record<UploadKind, string> = {
 export const isUploadKind = (value: string): value is UploadKind =>
   (UPLOAD_KINDS as readonly string[]).includes(value);
 
-const TABLE_DDL: Record<UploadKind, string> = {
-  target: `
-    CREATE TABLE IF NOT EXISTS upload_target (
-      id INTEGER PRIMARY KEY CHECK (id = 1),
-      file_name TEXT NOT NULL,
+const legacyTableDdl = (table: string) => `
+  CREATE TABLE IF NOT EXISTS ${table} (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    file_name TEXT NOT NULL,
+    rows_json TEXT NOT NULL,
+    row_count INTEGER NOT NULL,
+    uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`;
+
+const chunkTableDdl = (kind: UploadKind) => {
+  const table = `${KIND_TABLE[kind]}_chunks`;
+  return `
+    CREATE TABLE IF NOT EXISTS ${table} (
+      chunk_index INTEGER PRIMARY KEY,
       rows_json TEXT NOT NULL,
       row_count INTEGER NOT NULL,
       uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
-    )`,
-  current: `
-    CREATE TABLE IF NOT EXISTS upload_current (
-      id INTEGER PRIMARY KEY CHECK (id = 1),
-      file_name TEXT NOT NULL,
-      rows_json TEXT NOT NULL,
-      row_count INTEGER NOT NULL,
-      uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
-    )`,
-  lastMonth: `
-    CREATE TABLE IF NOT EXISTS upload_last_month (
-      id INTEGER PRIMARY KEY CHECK (id = 1),
-      file_name TEXT NOT NULL,
-      rows_json TEXT NOT NULL,
-      row_count INTEGER NOT NULL,
-      uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
-    )`,
-  lastYear: `
-    CREATE TABLE IF NOT EXISTS upload_last_year (
-      id INTEGER PRIMARY KEY CHECK (id = 1),
-      file_name TEXT NOT NULL,
-      rows_json TEXT NOT NULL,
-      row_count INTEGER NOT NULL,
-      uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
-    )`,
-  categoryMaster: `
-    CREATE TABLE IF NOT EXISTS upload_category_master (
-      id INTEGER PRIMARY KEY CHECK (id = 1),
-      file_name TEXT NOT NULL,
-      rows_json TEXT NOT NULL,
-      row_count INTEGER NOT NULL,
-      uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
-    )`,
+    )`;
 };
 
 let schemaReady: Promise<void> | null = null;
@@ -70,7 +47,8 @@ export const ensureSchema = async (
   if (!schemaReady) {
     schemaReady = (async () => {
       for (const kind of UPLOAD_KINDS) {
-        await execute(TABLE_DDL[kind]);
+        await execute(legacyTableDdl(KIND_TABLE[kind]));
+        await execute(chunkTableDdl(kind));
       }
     })();
   }
