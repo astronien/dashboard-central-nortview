@@ -391,6 +391,11 @@ const cleanOfficerName = (name: string) => {
   });
   return cleaned;
 };
+const matchesOfficer = (a: string, b: string) => {
+  const left = cleanOfficerName(a);
+  const right = cleanOfficerName(b);
+  return left === right || left.includes(right) || right.includes(left);
+};
 const getCategoryValue = (row: RawRow) => {
   const category = normalizeText(row["Category (Name)"] ?? row.category ?? row.cat ?? row["Cat & Sub Cat"]);
   return category.includes("sim") ? toNumber(row.Number ?? row.number ?? row.qty) : toNumber(row["ราคาขายตามบิล"] ?? row["Total Price"] ?? row.totalPrice);
