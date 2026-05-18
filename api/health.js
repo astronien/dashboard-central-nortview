@@ -1,8 +1,19 @@
-const { getTursoConfig } = require("./turso");
+const { getTursoConfig, listTables } = require("./turso");
 
-module.exports = function handler(_req, res) {
+module.exports = async function handler(req, res) {
   try {
     const { httpUrl } = getTursoConfig();
+    const showTables = req.query?.tables === "1";
+
+    if (showTables) {
+      const tables = await listTables();
+      return res.status(200).json({
+        ok: true,
+        hasTursoUrl: Boolean(httpUrl),
+        tables,
+      });
+    }
+
     return res.status(200).json({
       ok: true,
       hasTursoUrl: Boolean(httpUrl),

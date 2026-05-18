@@ -63,6 +63,36 @@ const tryParseRows = (encoded) => {
   }
 };
 
+const cellValue = (cell) => {
+  if (cell == null) return null;
+  if (typeof cell === "object" && "value" in cell) return cell.value;
+  return cell;
+};
+
+const rowValues = (row) => {
+  if (!Array.isArray(row)) return [];
+  return row.map(cellValue);
+};
+
+const getExecuteResult = (payload, index = 0) => {
+  const item = payload?.results?.[index];
+  if (!item) return {};
+
+  if (item.type === "error") {
+    throw new Error(item.error?.message || "Turso query failed.");
+  }
+
+  if (item.type === "ok" && item.response?.type === "execute") {
+    return item.response.result ?? {};
+  }
+
+  if (item.type === "execute") {
+    return item.result ?? {};
+  }
+
+  return {};
+};
+
 const tursoPipeline = async (requests) => {
   const { httpUrl, authToken } = getTursoConfig();
   const response = await fetch(`${httpUrl}/v2/pipeline`, {
@@ -71,7 +101,10 @@ const tursoPipeline = async (requests) => {
       Authorization: `Bearer ${authToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ requests }),
+    body: JSON.stringify({
+      baton: null,
+      requests: [...requests, { type: "close" }],
+    }),
   });
 
   const payload = await response.json().catch(() => ({}));
@@ -84,10 +117,10 @@ const tursoPipeline = async (requests) => {
     throw new Error(message);
   }
 
-  if (payload?.results) {
+  if (Array.isArray(payload?.results)) {
     for (const result of payload.results) {
-      if (result?.error) {
-        throw new Error(result.error.message || "Turso query failed.");
+      if (result?.type === "error") {
+        throw new Error(result.error?.message || "Turso query failed.");
       }
     }
   }
@@ -106,36 +139,52 @@ const tursoExecute = async (sql, args = []) => {
     });
   }
 
-  const payload = await tursoPipeline([
-    { type: "execute", stmt },
-  ]);
+  const payload = await tursoPipeline([{ type: "execute", stmt }]);
+  return getExecuteResult(payload, 0);
+};
 
-  return payload?.results?.[0]?.result ?? {};
+const listTables = async () => {
+  const result = await tursoExecute(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+  );
+  return (result.rows ?? []).map((row) => rowValues(row)[0]).filter(Boolean);
 };
 
 const ensureSchema = async () => {
+  const requests = [];
   for (const kind of UPLOAD_KINDS) {
     const legacy = KIND_TABLE[kind];
     const chunks = `${legacy}_chunks`;
 
-    await tursoExecute(
-      `CREATE TABLE IF NOT EXISTS ${legacy} (
-        id INTEGER PRIMARY KEY CHECK (id = 1),
-        file_name TEXT NOT NULL,
-        rows_json TEXT NOT NULL,
-        row_count INTEGER NOT NULL,
-        uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
-      )`,
-    );
+    requests.push({
+      type: "execute",
+      stmt: {
+        sql: `CREATE TABLE IF NOT EXISTS ${legacy} (
+          id INTEGER PRIMARY KEY CHECK (id = 1),
+          file_name TEXT NOT NULL,
+          rows_json TEXT NOT NULL,
+          row_count INTEGER NOT NULL,
+          uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )`,
+      },
+    });
 
-    await tursoExecute(
-      `CREATE TABLE IF NOT EXISTS ${chunks} (
-        chunk_index INTEGER PRIMARY KEY,
-        rows_json TEXT NOT NULL,
-        row_count INTEGER NOT NULL,
-        uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
-      )`,
-    );
+    requests.push({
+      type: "execute",
+      stmt: {
+        sql: `CREATE TABLE IF NOT EXISTS ${chunks} (
+          chunk_index INTEGER PRIMARY KEY,
+          rows_json TEXT NOT NULL,
+          row_count INTEGER NOT NULL,
+          uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )`,
+      },
+    });
+  }
+
+  const payload = await tursoPipeline(requests);
+  for (let i = 0; i < requests.length; i += 1) {
+    getExecuteResult(payload, i);
   }
 };
 
@@ -156,15 +205,15 @@ const loadUploadKind = async (kind) => {
     `SELECT rows_json FROM ${table} ORDER BY chunk_index ASC`,
   );
 
-  const entries = result?.rows ?? [];
+  const entries = result.rows ?? [];
   if (!entries.length) {
     const legacy = await tursoExecute(
       `SELECT rows_json FROM ${KIND_TABLE[kind]} WHERE id = 1`,
     );
-    const legacyRows = legacy?.rows ?? [];
+    const legacyRows = legacy.rows ?? [];
     if (!legacyRows.length) return [];
 
-    const encoded = legacyRows[0]?.[0];
+    const encoded = rowValues(legacyRows[0])[0];
     const rows = tryParseRows(encoded);
     if (rows.length) await saveUploadKind(kind, rows);
     return rows;
@@ -172,7 +221,7 @@ const loadUploadKind = async (kind) => {
 
   const rows = [];
   for (const entry of entries) {
-    rows.push(...tryParseRows(entry?.[0]));
+    rows.push(...tryParseRows(rowValues(entry)[0]));
   }
   return rows;
 };
@@ -181,41 +230,72 @@ const saveUploadKind = async (kind, rows) => {
   await ensureSchema();
   const table = chunkTable(kind);
   const chunks = splitRows(rows);
-
-  await tursoExecute(`DELETE FROM ${table}`);
-  await tursoExecute(`DELETE FROM ${KIND_TABLE[kind]}`);
+  const requests = [
+    { type: "execute", stmt: { sql: `DELETE FROM ${table}` } },
+    { type: "execute", stmt: { sql: `DELETE FROM ${KIND_TABLE[kind]}` } },
+  ];
 
   for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex += 1) {
     const chunk = chunks[chunkIndex];
-    await tursoExecute(
-      `INSERT INTO ${table} (chunk_index, rows_json, row_count) VALUES (?, ?, ?)`,
-      [chunkIndex, compressJson(chunk), chunk.length],
-    );
+    requests.push({
+      type: "execute",
+      stmt: {
+        sql: `INSERT INTO ${table} (chunk_index, rows_json, row_count) VALUES (?, ?, ?)`,
+        args: [
+          { type: "integer", value: String(chunkIndex) },
+          { type: "text", value: compressJson(chunk) },
+          { type: "integer", value: String(chunk.length) },
+        ],
+      },
+    });
+  }
+
+  const payload = await tursoPipeline(requests);
+  for (let i = 0; i < requests.length; i += 1) {
+    getExecuteResult(payload, i);
   }
 };
 
 const saveUploadKindChunk = async (kind, chunkIndex, chunkCount, rows) => {
   await ensureSchema();
   const table = chunkTable(kind);
+  const requests = [];
 
   if (chunkIndex === 0) {
-    await tursoExecute(`DELETE FROM ${table}`);
+    requests.push({ type: "execute", stmt: { sql: `DELETE FROM ${table}` } });
   }
 
-  await tursoExecute(
-    `INSERT INTO ${table} (chunk_index, rows_json, row_count) VALUES (?, ?, ?)`,
-    [chunkIndex, compressJson(rows), rows.length],
-  );
+  requests.push({
+    type: "execute",
+    stmt: {
+      sql: `INSERT INTO ${table} (chunk_index, rows_json, row_count) VALUES (?, ?, ?)`,
+      args: [
+        { type: "integer", value: String(chunkIndex) },
+        { type: "text", value: compressJson(rows) },
+        { type: "integer", value: String(rows.length) },
+      ],
+    },
+  });
 
   if (chunkIndex === chunkCount - 1) {
-    await tursoExecute(`DELETE FROM ${KIND_TABLE[kind]}`);
+    requests.push({
+      type: "execute",
+      stmt: { sql: `DELETE FROM ${KIND_TABLE[kind]}` },
+    });
+  }
+
+  const payload = await tursoPipeline(requests);
+  for (let i = 0; i < requests.length; i += 1) {
+    getExecuteResult(payload, i);
   }
 };
 
 const clearUploadKind = async (kind) => {
   await ensureSchema();
-  await tursoExecute(`DELETE FROM ${chunkTable(kind)}`);
-  await tursoExecute(`DELETE FROM ${KIND_TABLE[kind]}`);
+  await tursoPipeline([
+    { type: "execute", stmt: { sql: `DELETE FROM ${chunkTable(kind)}` } },
+    { type: "execute", stmt: { sql: `DELETE FROM ${KIND_TABLE[kind]}` } },
+  ]);
 };
 
 const isUploadKind = (value) => UPLOAD_KINDS.includes(value);
@@ -226,6 +306,7 @@ module.exports = {
   decompressJson,
   getTursoConfig,
   isUploadKind,
+  listTables,
   loadUploadKind,
   saveUploadKind,
   saveUploadKindChunk,

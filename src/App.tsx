@@ -694,7 +694,12 @@ export default function App() {
     kinds?: UploadKind[],
   ) => {
     const saved = await saveUploads(nextUploads, kinds);
-    if (!saved) persistUploadsLocal(nextUploads);
+    if (!saved) {
+      persistUploadsLocal(nextUploads);
+      setUploadError("บันทึกลง Turso ไม่สำเร็จ — เก็บชั่วคราวในเบราว์เซอร์แล้ว ลองอัปโหลดใหม่หลัง deploy");
+      return;
+    }
+    setUploadError(null);
   };
 
   const loadPersistedUploads = async (): Promise<UploadState | null> => {
