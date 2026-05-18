@@ -21,6 +21,12 @@ import { AnimatePresence, motion } from "motion/react";
 import React, { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import {
+  fetchUploads,
+  hasUploadData,
+  saveUploads,
+  type UploadState,
+} from "./lib/uploadsApi";
+import {
   PolarAngleAxis,
   PolarGrid,
   PolarRadiusAxis,
@@ -664,7 +670,7 @@ export default function App() {
       });
   }, [uploadedFiles.current, uploadedFiles.target, uploadedFiles.categoryMaster, parsedReport.officers, selectedAttachCategories, selectedAttachOfficers]);
 
-  const persistUploads = (nextUploads: Record<UploadKind, RawRow[]>) => {
+  const persistUploadsLocal = (nextUploads: UploadState) => {
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextUploads));
     } catch {
@@ -672,20 +678,49 @@ export default function App() {
     }
   };
 
-  const loadPersistedUploads = (): Record<UploadKind, RawRow[]> | null => {
+  const loadPersistedUploadsLocal = (): UploadState | null => {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (!raw) return null;
-      return JSON.parse(raw) as Record<UploadKind, RawRow[]>;
+      const parsed = JSON.parse(raw) as UploadState;
+      return hasUploadData(parsed) ? parsed : null;
     } catch {
       return null;
     }
   };
 
-  const rebuildReport = (nextUploads: Record<UploadKind, RawRow[]>) => {
-    const report = buildReport(nextUploads.target, nextUploads.current, nextUploads.lastMonth, nextUploads.lastYear, nextUploads.categoryMaster, "uploaded-data");
+  const persistUploads = async (nextUploads: UploadState) => {
+    const saved = await saveUploads(nextUploads);
+    if (!saved) persistUploadsLocal(nextUploads);
+  };
+
+  const loadPersistedUploads = async (): Promise<UploadState | null> => {
+    try {
+      const remote = await fetchUploads();
+      if (remote && hasUploadData(remote)) {
+        persistUploadsLocal(remote);
+        return remote;
+      }
+    } catch {
+      // fall back to local storage
+    }
+    return loadPersistedUploadsLocal();
+  };
+
+  const rebuildReport = (
+    nextUploads: UploadState,
+    options?: { skipPersist?: boolean },
+  ) => {
+    const report = buildReport(
+      nextUploads.target,
+      nextUploads.current,
+      nextUploads.lastMonth,
+      nextUploads.lastYear,
+      nextUploads.categoryMaster,
+      "uploaded-data",
+    );
     setParsedReport(report);
-    persistUploads(nextUploads);
+    if (!options?.skipPersist) void persistUploads(nextUploads);
   };
 
 
@@ -717,11 +752,12 @@ export default function App() {
   };
 
   useEffect(() => {
-    const persisted = loadPersistedUploads();
-    if (persisted) {
+    void (async () => {
+      const persisted = await loadPersistedUploads();
+      if (!persisted) return;
       setUploadedFiles(persisted);
-      rebuildReport(persisted);
-    }
+      rebuildReport(persisted, { skipPersist: true });
+    })();
   }, []);
 
   const acceptDetected = (fileName: string, kind: UploadKind): UploadKind => {
