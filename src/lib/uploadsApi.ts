@@ -126,3 +126,8 @@ export const deleteUploadKind = async (kind: UploadKind): Promise<boolean> => {
   const response = await fetch(kindUrl(kind), { method: "DELETE" });
   return response.ok;
 };
+
+export const clearAllUploads = async (): Promise<boolean> => {
+  const response = await fetch(UPLOADS_URL, { method: "DELETE" });
+  return response.ok;
+};

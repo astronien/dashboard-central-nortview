@@ -21,6 +21,7 @@ import { AnimatePresence, motion } from "motion/react";
 import React, { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import {
+  clearAllUploads,
   fetchUploads,
   hasUploadData,
   saveUploads,
@@ -759,6 +760,27 @@ export default function App() {
     const nextUploads = { ...uploadedFiles, [kind]: [] };
     setUploadedFiles(nextUploads);
     rebuildReport(nextUploads, { changedKinds: [kind] });
+  };
+
+  const emptyUploadState = (): UploadState => ({
+    target: [],
+    current: [],
+    lastMonth: [],
+    lastYear: [],
+    categoryMaster: [],
+  });
+
+  const clearAllUploadData = async () => {
+    const cleared = await clearAllUploads();
+    try {
+      window.localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // ignore
+    }
+    const empty = emptyUploadState();
+    setUploadedFiles(empty);
+    setParsedReport(fallbackReport);
+    setUploadError(cleared ? null : "ลบบน Turso ไม่สำเร็จ — ลบในเบราว์เซอร์แล้ว ลองกดอีกครั้งหลัง deploy");
   };
 
   useEffect(() => {
@@ -1912,9 +1934,18 @@ export default function App() {
                     </div>
                   </div>
                   <div className="flex flex-col items-start lg:items-end gap-2">
-                    <button onClick={exportCsv} className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/80 hover:bg-white/10 transition-colors">
-                      Export CSV
-                    </button>
+                    <motion.div className="flex flex-wrap items-center gap-2 justify-end">
+                      <button onClick={exportCsv} className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/80 hover:bg-white/10 transition-colors">
+                        Export CSV
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void clearAllUploadData()}
+                        className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-100 hover:bg-red-500/20 transition-colors"
+                      >
+                        ลบข้อมูลทั้งหมด
+                      </button>
+                    </motion.div>
                     <div className="text-xs text-white/50">
                       {isParsing ? "Parsing Excel file..." : `Loaded ${uploadStats.branches} branches • ${uploadStats.categories} categories • ${uploadStats.officers} officers`}
                       <div className="mt-1 text-[11px] text-white/40">Files: Target {uploadedFiles.target.length} • Current {uploadedFiles.current.length} • Last Month {uploadedFiles.lastMonth.length} • Last Year {uploadedFiles.lastYear.length} • Category Master {uploadedFiles.categoryMaster.length}</div>

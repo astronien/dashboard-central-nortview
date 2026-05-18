@@ -226,6 +226,24 @@ const clearUploadKind = async (kind) => {
   await upsertUploadMeta(kind, 0);
 };
 
+const clearAllUploads = async () => {
+  await tursoExecute("DELETE FROM data_sales");
+  await tursoExecute("DELETE FROM data_targets");
+  await tursoExecute("DELETE FROM data_categories");
+  await tursoExecute("DELETE FROM upload_meta");
+
+  for (const kind of UPLOAD_KINDS) {
+    await tursoExecute(`DELETE FROM ${chunkTable(kind)}`);
+    await tursoExecute(`DELETE FROM ${KIND_TABLE[kind]}`);
+  }
+
+  const stats = {};
+  for (const kind of UPLOAD_KINDS) {
+    stats[kind] = 0;
+  }
+  return stats;
+};
+
 const syncAllRelationalTables = async () => {
   const summary = {};
   for (const kind of UPLOAD_KINDS) {
@@ -253,6 +271,7 @@ const isUploadKind = (value) => UPLOAD_KINDS.includes(value);
 
 module.exports = {
   UPLOAD_KINDS,
+  clearAllUploads,
   clearUploadKind,
   decompressJson,
   getTursoConfig,

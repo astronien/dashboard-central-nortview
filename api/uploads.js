@@ -1,5 +1,6 @@
 const {
   UPLOAD_KINDS,
+  clearAllUploads,
   clearUploadKind,
   decompressJson,
   isUploadKind,
@@ -129,12 +130,21 @@ async function handler(req, res) {
     }
 
     if (req.method === "DELETE") {
-      if (!kindValue || !isUploadKind(kindValue)) {
-        return res.status(400).json({ error: "Missing or invalid ?kind= query parameter." });
+      if (!kindValue) {
+        const cleared = await clearAllUploads();
+        return res.status(200).json({
+          ok: true,
+          message: "All upload data removed from Turso.",
+          cleared,
+        });
+      }
+
+      if (!isUploadKind(kindValue)) {
+        return res.status(400).json({ error: "Invalid upload kind." });
       }
 
       await clearUploadKind(kindValue);
-      return res.status(200).json({ ok: true });
+      return res.status(200).json({ ok: true, kind: kindValue });
     }
 
     return res.status(405).json({ error: "Method not allowed." });
