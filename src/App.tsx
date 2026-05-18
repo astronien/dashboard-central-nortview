@@ -351,7 +351,14 @@ const mapAttachmentMetrics = (category: string, actual: number) => {
   const normalized = normalizeText(category);
   if (normalized.includes("applecare") || normalized.includes("care") || normalized.includes("insurance")) return { appleCare: actual, accessories: 0, services: 0 };
   if (normalized.includes("service") || normalized.includes("smile")) return { appleCare: 0, accessories: 0, services: actual };
+  if (normalized.includes("adapter") || normalized.includes("film") || normalized.includes("case") || normalized.includes("accessory") || normalized.includes("btb")) return { appleCare: 0, accessories: actual, services: 0 };
   return { appleCare: 0, accessories: actual, services: 0 };
+};
+const categoryGroupKey = (category: string) => {
+  const normalized = normalizeText(category);
+  if (normalized.includes("applecare") || normalized.includes("care") || normalized.includes("insurance")) return "appleCare";
+  if (normalized.includes("service") || normalized.includes("smile")) return "services";
+  return "accessories";
 };
 const getSalesDate = (row: RawRow) => {
   const raw = String(row["Doc Date"] ?? row["doc date"] ?? "");
@@ -565,15 +572,26 @@ export default function App() {
   }, [parsedReport.branches]);
 
   const attachRateData = useMemo<DerivedAttachRow[]>(() => {
+    const grouped = parsedReport.categories.reduce<Record<string, { actual: number; officers: string[] }>>((acc, category, index) => {
+      const key = categoryGroupKey(category.category);
+      acc[key] ??= { actual: 0, officers: [] };
+      acc[key].actual += category.actual;
+      const officer = parsedReport.officers[index % Math.max(parsedReport.officers.length, 1)]?.name;
+      if (officer) acc[key].officers.push(officer);
+      return acc;
+    }, {});
+
     return parsedReport.officers.slice(0, 10).map((officer, index) => {
-      const sourceCategory = parsedReport.categories[index % Math.max(parsedReport.categories.length, 1)]?.category ?? "Accessories";
-      const metrics = mapAttachmentMetrics(sourceCategory, Math.max(Math.round(officer.actual / Math.max(officer.target || 1, 1) * 100), 0));
+      const base = Math.max(officer.target || 1, 1);
+      const appleCareRate = grouped.appleCare ? Math.round((grouped.appleCare.actual / base) * 100) : Math.min(Math.round(officer.rate * 0.25), 160);
+      const accessoriesRate = grouped.accessories ? Math.round((grouped.accessories.actual / base) * 100) : Math.min(Math.round(officer.rate * 0.55), 180);
+      const servicesRate = grouped.services ? Math.round((grouped.services.actual / base) * 100) : Math.min(Math.round(officer.rate * 0.18), 100);
       return {
         id: `${officer.name}-${index}`,
         name: officer.name,
-        appleCare: Math.min(metrics.appleCare || Math.round(officer.rate * 0.82), 160),
-        accessories: Math.min(metrics.accessories || Math.round(officer.rate * 1.15), 180),
-        services: Math.min(metrics.services || Math.round(officer.rate * 0.42), 100),
+        appleCare: Math.min(appleCareRate, 160),
+        accessories: Math.min(accessoriesRate, 180),
+        services: Math.min(servicesRate, 100),
         avatar: index % 3 === 0 ? "/staff1.png" : index % 3 === 1 ? "/staff2.png" : "/staff3.png",
       };
     });
