@@ -373,127 +373,123 @@ const renderCustomTick = ({ payload, x, y, textAnchor }: any) => {
 };
 
 type RawRow = Record<string, string | number | undefined>;
-
-type ReportRow = {
-  label: string;
-  target: number;
-  actual: number;
-  lastMonth: number;
-  lastYear: number;
-};
-
-type CategoryRow = {
-  category: string;
-  actual: number;
-  target: number;
-  share: number;
-};
-
-type OfficerRow = {
-  name: string;
-  branch: string;
-  actual: number;
-  target: number;
-  rate: number;
-};
-
 type ParsedReport = {
-  branches: ReportRow[];
-  categories: CategoryRow[];
-  officers: OfficerRow[];
+  branches: Array<{ label: string; target: number; actual: number; lastMonth: number; lastYear: number; achPercent?: number; forecast?: number; forecastPercent?: number; momPercent?: number; yoyPercent?: number; targetPerDay?: number; diffPerDay?: number }>;
+  categories: Array<{ category: string; actual: number; target: number; share: number }>;
+  officers: Array<{ name: string; branch: string; actual: number; target: number; rate: number }>;
   fileName: string;
 };
+type UploadKind = "target" | "current" | "lastMonth" | "lastYear" | "categoryMaster";
 
-const normalizeText = (value: unknown) =>
-  String(value ?? "")
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .replace(/[^a-z0-9ก-๙ ]/gi, "")
-    .trim();
-
-const toNumber = (value: unknown) => {
-  if (typeof value === "number") return value;
-  const parsed = Number(String(value ?? "").replace(/[^\d.-]/g, ""));
+const normalizeText = (value: unknown) => String(value ?? "").toLowerCase().replace(/\s+/g, " ").replace(/[^a-z0-9ก-๙ ]/gi, "").trim();
+const toNumber = (value: unknown) => Number(String(value ?? "").replace(/[^\d.-]/g, "")) || 0;
+const cleanOfficerName = (name: string) => {
+  const aliases: Record<string, string> = { "แพวนภา": "แพรวนภา" };
+  let cleaned = normalizeText(name).replace(/^(mr|mrs|ms|นาย|นางสาว|นาง|น\.ส\.|ด\.ช\.|ด\.ญ\.)\s*/i, "").replace(/\s+/g, "");
+  Object.entries(aliases).forEach(([from, to]) => {
+    if (cleaned.includes(normalizeText(from))) cleaned = cleaned.replace(normalizeText(from), normalizeText(to));
+  });
+  return cleaned;
+};
+const getCategoryValue = (row: RawRow) => {
+  const category = normalizeText(row["Category (Name)"] ?? row.category ?? row.cat ?? row["Cat & Sub Cat"]);
+  return category.includes("sim") ? toNumber(row.Number ?? row.number ?? row.qty) : toNumber(row["ราคาขายตามบิล"] ?? row["Total Price"] ?? row.totalPrice);
+};
+const getSalesDate = (row: RawRow) => {
+  const raw = String(row["Doc Date"] ?? row["doc date"] ?? "");
+  const parsed = Date.parse(raw.replace(/^\S+\.\s*/, ""));
   return Number.isFinite(parsed) ? parsed : 0;
 };
-
-const getCategoryValue = (row: RawRow) => {
-  const category = normalizeText(row.category ?? row.cat ?? row["cat & sub cat"]);
-  if (category.includes("sim")) {
-    return toNumber(row.number ?? row.qty ?? row.quantity);
-  }
-  return toNumber(row.totalprice ?? row["total price"] ?? row.amount ?? row.sales);
+const getUploadKind = (headers: string[]): UploadKind => {
+  const normalized = headers.map(normalizeText);
+  if (normalized.some((h) => h.includes("cat & sub cat") || h.includes("cat daily"))) return "categoryMaster";
+  if (normalized.some((h) => h.includes("staff id") || h.includes("branch name"))) return "target";
+  return "current";
 };
-
-const calculateFromRows = (rows: RawRow[], fileName: string): ParsedReport => {
-  const branchMap = new Map<string, ReportRow>();
-  const categoryMap = new Map<string, { actual: number; target: number }>();
-  const officerMap = new Map<string, OfficerRow>();
-
-  rows.forEach((row, index) => {
-    const branch = String(row.branch ?? row["branch name"] ?? row.store ?? `Branch ${index + 1}`).trim();
-    const officer = String(row.officer ?? row.name ?? row["staff name"] ?? "Unknown Officer").trim();
-    const category = String(row.category ?? row.cat ?? row["cat & sub cat"] ?? row.group ?? "Other").trim();
-
-    const actual = getCategoryValue(row);
-    const target = toNumber(row.target ?? row.goal ?? row["target sales"]);
-    const lastMonth = toNumber(row.lastmonth ?? row["last month"]);
-    const lastYear = toNumber(row.lastyear ?? row["last year"]);
-
-    const branchKey = normalizeText(branch);
-    const currentBranch = branchMap.get(branchKey) ?? {
-      label: branch,
-      target: 0,
-      actual: 0,
-      lastMonth: 0,
-      lastYear: 0,
-    };
-    currentBranch.target += target;
-    currentBranch.actual += actual;
-    currentBranch.lastMonth += lastMonth;
-    currentBranch.lastYear += lastYear;
-    branchMap.set(branchKey, currentBranch);
-
-    const categoryKey = normalizeText(category || "Other");
-    const currentCategory = categoryMap.get(categoryKey) ?? { actual: 0, target: 0 };
-    currentCategory.actual += actual;
-    currentCategory.target += target;
-    categoryMap.set(categoryKey, currentCategory);
-
-    const officerKey = normalizeText(officer);
-    const currentOfficer = officerMap.get(officerKey) ?? {
-      name: officer,
-      branch,
-      actual: 0,
-      target: 0,
-      rate: 0,
-    };
-    currentOfficer.actual += actual;
-    currentOfficer.target += target;
-    currentOfficer.rate = currentOfficer.target ? Math.round((currentOfficer.actual / currentOfficer.target) * 100) : 0;
-    officerMap.set(officerKey, currentOfficer);
+const calculateMetrics = (target: number, actual: number, currentDay: number, totalDays: number, lastMonth: number, lastYear: number) => {
+  const achPercent = target ? (actual / target) * 100 : 0;
+  const forecast = currentDay ? (actual / currentDay) * totalDays : 0;
+  const forecastPercent = target ? (forecast / target) * 100 : 0;
+  const momPercent = lastMonth ? ((actual - lastMonth) / lastMonth) * 100 : 0;
+  const yoyPercent = lastYear ? ((actual - lastYear) / lastYear) * 100 : 0;
+  const targetPerDay = totalDays ? (target / totalDays) * currentDay : 0;
+  const diffPerDay = actual - targetPerDay;
+  return { achPercent, forecast, forecastPercent, momPercent, yoyPercent, targetPerDay, diffPerDay };
+};
+const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows: RawRow[], lastYearRows: RawRow[], categoryRows: RawRow[], fileName: string): ParsedReport => {
+  const categoryMap = new Map<string, string>();
+  categoryRows.forEach((row) => {
+    const key = normalizeText(row["Cat & Sub Cat"] ?? row["Category (Name)"] ?? row.SubCategory);
+    const value = String(row["CAT Daily"] ?? row["Category (Name)"] ?? "Other").trim();
+    if (key) categoryMap.set(key, value);
   });
-
-  const branches = [...branchMap.values()].map((row) => ({
-    ...row,
-    lastMonth: row.lastMonth,
-    lastYear: row.lastYear,
-  }));
-
-  const categories = [...categoryMap.entries()].map(([category, value]) => ({
-    category: category || "Other",
-    actual: value.actual,
-    target: value.target || Math.max(value.actual, 1),
-    share: 0,
-  }));
-  const totalCategoryActual = categories.reduce((sum, row) => sum + row.actual, 0) || 1;
-  categories.forEach((item) => {
-    item.share = Math.round((item.actual / totalCategoryActual) * 100);
+  const targetByBranch = new Map<string, RawRow>();
+  const targetByOfficer = new Map<string, RawRow[]>();
+  targetRows.forEach((row) => {
+    const branchKey = normalizeText(row["BRANCH NAME"]);
+    const officerKey = cleanOfficerName(`${row.NAME ?? ""} ${row.SURNAME ?? ""}`.trim());
+    targetByBranch.set(branchKey, row);
+    targetByOfficer.set(officerKey, [...(targetByOfficer.get(officerKey) ?? []), row]);
   });
-
-  const officers = [...officerMap.values()];
-
-  return { branches, categories, officers, fileName };
+  const branchSummary = new Map<string, { label: string; target: number; actual: number; lastMonth: number; lastYear: number; currentDay: number; totalDays: number }>();
+  const officerSummary = new Map<string, { name: string; branch: string; actual: number; target: number; rate: number }>();
+  const categorySummary = new Map<string, { actual: number; target: number }>();
+  const mergeSales = (rows: RawRow[], period: "current" | "lastMonth" | "lastYear") => {
+    [...rows].sort((a, b) => getSalesDate(b) - getSalesDate(a)).forEach((row) => {
+      const branch = String(row["Branch (Name)"] ?? "Unknown Branch").trim();
+      const officer = String(row["Officer (Name)"] ?? "Unknown Officer").trim();
+      const categoryName = String(row["Category (Name)"] ?? "Other").trim();
+      const sub = String(row["Sub Category"] ?? "").trim();
+      const mapped = categoryMap.get(normalizeText(`${categoryName}${sub}`)) ?? categoryMap.get(normalizeText(categoryName)) ?? categoryName;
+      const branchKey = normalizeText(branch);
+      const targetRow = targetByBranch.get(branchKey);
+      const totalDays = toNumber(targetRow?.DAY) || 1;
+      const currentDay = Math.min(totalDays, new Date().getDate());
+      const actual = getCategoryValue(row);
+      const branchItem = branchSummary.get(branchKey) ?? { label: branch, target: 0, actual: 0, lastMonth: 0, lastYear: 0, currentDay, totalDays };
+      branchItem.target = targetRow ? toNumber(targetRow.Total) : branchItem.target;
+      if (period === "current") branchItem.actual += actual; else if (period === "lastMonth") branchItem.lastMonth += actual; else branchItem.lastYear += actual;
+      branchSummary.set(branchKey, branchItem);
+      const catItem = categorySummary.get(normalizeText(mapped)) ?? { actual: 0, target: 0 };
+      catItem.actual += actual;
+      catItem.target += period === "current" ? actual : 0;
+      categorySummary.set(normalizeText(mapped), catItem);
+      const officerKey = cleanOfficerName(officer);
+      const officerTargetRow = (targetByOfficer.get(officerKey) ?? [])[0];
+      const officerItem = officerSummary.get(officerKey) ?? { name: officer, branch, actual: 0, target: 0, rate: 0 };
+      officerItem.target = toNumber(officerTargetRow?.Total ?? 0);
+      if (period === "current") officerItem.actual += actual;
+      officerItem.rate = officerItem.target ? Math.round((officerItem.actual / officerItem.target) * 100) : 0;
+      officerSummary.set(officerKey, officerItem);
+    });
+  };
+  mergeSales(currentRows, "current"); mergeSales(lastMonthRows, "lastMonth"); mergeSales(lastYearRows, "lastYear");
+  const branches = [...branchSummary.values()].map((r) => ({ ...r, ...calculateMetrics(r.target, r.actual, r.currentDay, r.totalDays, r.lastMonth, r.lastYear) }));
+  const categories = [...categorySummary.entries()].map(([category, value]) => ({ category, actual: value.actual, target: value.target || Math.max(value.actual, 1), share: 0 }));
+  const totalActual = categories.reduce((s, r) => s + r.actual, 0) || 1; categories.forEach((c) => { c.share = Math.round((c.actual / totalActual) * 100); });
+  return { branches, categories, officers: [...officerSummary.values()], fileName };
+};
+const fallbackReport: ParsedReport = {
+  fileName: "demo-data",
+  branches: [
+    { label: "Mega Bangna", target: 1200000, actual: 1324000, lastMonth: 1188000, lastYear: 1095000 },
+    { label: "Central World", target: 1500000, actual: 1432000, lastMonth: 1394000, lastYear: 1287000 },
+    { label: "Iconsiam", target: 980000, actual: 1013000, lastMonth: 960000, lastYear: 885000 },
+    { label: "Siam Paragon", target: 2100000, actual: 2245000, lastMonth: 1987000, lastYear: 2050000 },
+  ],
+  categories: [
+    { category: "iPhone", actual: 3520000, target: 3100000, share: 34 },
+    { category: "Mac", actual: 2260000, target: 2050000, share: 22 },
+    { category: "iPad", actual: 1410000, target: 1300000, share: 14 },
+    { category: "Apple Watch", actual: 980000, target: 870000, share: 10 },
+    { category: "SIM", actual: 610000, target: 540000, share: 6 },
+    { category: "BTB", actual: 1320000, target: 1250000, share: 14 },
+  ],
+  officers: [
+    { name: "Sarut Jitranon", branch: "Mega Bangna", actual: 142, target: 123, rate: 115 },
+    { name: "Nadech Kugimiya", branch: "Central World", actual: 256, target: 205, rate: 125 },
+    { name: "Yaya Urassaya", branch: "Iconsiam", actual: 118, target: 112, rate: 105 },
+  ],
 };
 
 const fallbackReport: ParsedReport = {
@@ -524,6 +520,7 @@ export default function App() {
     "home" | "staff" | "staff_overview" | "settings" | "reports"
   >("home");
   const [parsedReport, setParsedReport] = useState<ParsedReport>(fallbackReport);
+  const [uploadedFiles, setUploadedFiles] = useState<Record<UploadKind, RawRow[]>>({ target: [], current: [], lastMonth: [], lastYear: [], categoryMaster: [] });
   const [activeTab, setActiveTab] = useState("Store");
   const [activeStat, setActiveStat] = useState<"sales" | "csat" | "target">(
     "sales",
@@ -555,27 +552,62 @@ export default function App() {
     return { branches, categories, officers };
   }, [parsedReport]);
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const rebuildReport = (nextUploads: Record<UploadKind, RawRow[]>) => {
+    const report = buildReport(nextUploads.target, nextUploads.current, nextUploads.lastMonth, nextUploads.lastYear, nextUploads.categoryMaster, "uploaded-data");
+    setParsedReport(report);
+  };
 
+  const exportCsv = () => {
+    const branchRows = parsedReport.branches
+      .map((row) => [row.label, row.target, row.actual, row.achPercent?.toFixed(1) ?? "0.0", row.forecast?.toFixed(0) ?? "0", row.forecastPercent?.toFixed(1) ?? "0.0", row.momPercent?.toFixed(1) ?? "0.0", row.yoyPercent?.toFixed(1) ?? "0.0", row.targetPerDay?.toFixed(0) ?? "0", row.diffPerDay?.toFixed(0) ?? "0"].join(","))
+      .join("\n");
+    const csv = [
+      "Branch,Target,Actual,Ach%,Forecast,Forecast%,MoM%,YoY%,Target/Day,Diff/Day",
+      branchRows,
+    ].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `report-${parsedReport.fileName}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const removeUploadedFile = (kind: UploadKind) => {
+    const nextUploads = { ...uploadedFiles, [kind]: [] };
+    setUploadedFiles(nextUploads);
+    rebuildReport(nextUploads);
+  };
+
+  const acceptDetected = (fileName: string, kind: UploadKind): UploadKind => {
+    const n = fileName.toLowerCase();
+    if (n.includes("staff")) return "target";
+    if (n.includes("current")) return "current";
+    if (n.includes("last mom")) return "lastMonth";
+    if (n.includes("last yoy") || n.includes("yoy")) return "lastYear";
+    if (n.includes("category")) return "categoryMaster";
+    return kind;
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    if (!files.length) return;
     setUploadError(null);
     setIsParsing(true);
-
     try {
-      const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: "array" });
-      const sheetName = workbook.SheetNames[0];
-      if (!sheetName) throw new Error("ไม่พบ sheet ในไฟล์ Excel");
-
-      const sheet = workbook.Sheets[sheetName];
-      const rows = XLSX.utils.sheet_to_json<RawRow>(sheet, {
-        defval: "",
-        raw: false,
-      });
-
-      const parsed = calculateFromRows(rows, file.name);
-      setParsedReport(parsed);
+      const nextUploads: Record<UploadKind, RawRow[]> = { target: [], current: [], lastMonth: [], lastYear: [], categoryMaster: [] };
+      for (const file of files) {
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: "array" });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        if (!sheet) continue;
+        const rows = XLSX.utils.sheet_to_json<RawRow>(sheet, { defval: "", raw: false });
+        const detectedKind = acceptDetected(file.name, getUploadKind(Object.keys(rows[0] ?? {})));
+        nextUploads[detectedKind] = rows;
+      }
+      setUploadedFiles(nextUploads);
+      rebuildReport(nextUploads);
       setCurrentView("reports");
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : "อ่านไฟล์ไม่สำเร็จ");
@@ -632,8 +664,8 @@ export default function App() {
               >
                 <PieChart className="w-5 h-5" />
               </button>
-              <label className="cursor-pointer p-2 rounded-full transition-colors text-white/60 hover:text-white">
-                <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileUpload} />
+              <label className="cursor-pointer p-2 rounded-full transition-colors text-white/60 hover:text-white" title="Upload Excel/CSV files">
+                <input type="file" multiple accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileUpload} />
                 <Search className="w-5 h-5" />
               </label>
               <button
@@ -1575,6 +1607,17 @@ export default function App() {
                 transition={{ duration: 0.4, ease: "easeOut" }}
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
+                <div className="rounded-2xl border border-dashed border-white/20 bg-white/5 p-5">
+                  <div className="flex flex-wrap items-center gap-3 text-sm text-white/80">
+                    <span className="font-semibold text-white">Upload files:</span>
+                    <label className="cursor-pointer rounded-xl bg-white/10 px-4 py-2 hover:bg-white/15 transition-colors">
+                      <input type="file" multiple accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileUpload} />
+                      Choose Excel/CSV files
+                    </label>
+                    <span className="text-white/50">or use the search icon in the top bar.</span>
+                  </div>
+                </div>
+
                 <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
                   <div className="flex items-center gap-4">
                     <div className="p-3 bg-emerald-500/20 rounded-xl text-emerald-400">
@@ -1613,6 +1656,23 @@ export default function App() {
                 transition={{ duration: 0.4, ease: "easeOut" }}
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
+                <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
+                  {(["target", "current", "lastMonth", "lastYear", "categoryMaster"] as UploadKind[]).map((kind) => (
+                    <label key={kind} className="group flex min-h-[110px] cursor-pointer flex-col justify-between rounded-2xl border border-dashed border-white/20 bg-white/5 p-4 hover:bg-white/10 transition-colors">
+                      <input type="file" multiple={kind === "current"} accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileUpload} />
+                      <div>
+                        <div className="text-sm font-semibold text-white capitalize">{kind.replace(/([A-Z])/g, " $1")}</div>
+                        <div className="mt-1 text-xs text-white/50">Drop or click to upload</div>
+                      </div>
+                      <div className="text-xs text-emerald-300">{uploadedFiles[kind].length} file(s)</div>
+                    </label>
+                  ))}
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/70">
+                  Drag & drop ยังไม่ได้เปิดใช้งานเต็มรูปแบบ แต่ตอนนี้กดเลือกไฟล์แต่ละช่องได้แล้ว และระบบจะจำแนก/คำนวณให้ทันที
+                </div>
+
                 <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
                   <div className="flex items-center gap-4">
                     <div className="p-3 bg-emerald-500/20 rounded-xl text-emerald-400">
@@ -1628,11 +1688,19 @@ export default function App() {
                     </div>
                   </div>
                   <div className="flex flex-col items-start lg:items-end gap-2">
-                    <button className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/80 hover:bg-white/10 transition-colors">
+                    <button onClick={exportCsv} className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/80 hover:bg-white/10 transition-colors">
                       Export CSV
                     </button>
                     <div className="text-xs text-white/50">
                       {isParsing ? "Parsing Excel file..." : `Loaded ${uploadStats.branches} branches • ${uploadStats.categories} categories • ${uploadStats.officers} officers`}
+                      <div className="mt-1 text-[11px] text-white/40">Files: Target {uploadedFiles.target.length} • Current {uploadedFiles.current.length} • Last Month {uploadedFiles.lastMonth.length} • Last Year {uploadedFiles.lastYear.length} • Category Master {uploadedFiles.categoryMaster.length}</div>
+                    </div>
+                    <div className="flex gap-2 flex-wrap justify-end">
+                      {Object.entries(uploadedFiles).map(([kind, rows]) => (
+                        <button key={kind} onClick={() => removeUploadedFile(kind as UploadKind)} className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-white/70 hover:bg-white/10">
+                          Clear {kind} ({rows.length})
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -1682,15 +1750,15 @@ export default function App() {
                     <div className="space-y-4 text-sm text-white/80">
                       <div className="rounded-2xl bg-white/5 border border-white/5 p-4">
                         <div className="font-semibold text-white mb-1">File flow</div>
-                        <p>Upload Excel → detect file type → normalize rows → calculate reports.</p>
+                        <p>Upload 4–5 files → detect type → map headers → compute target/current/last month/last year.</p>
                       </div>
                       <div className="rounded-2xl bg-white/5 border border-white/5 p-4">
                         <div className="font-semibold text-white mb-1">Category rule</div>
-                        <p>SIM uses quantity/number, while other categories use total price.</p>
+                        <p>SIM uses Number; other categories use total price, with category master fallback mapping.</p>
                       </div>
                       <div className="rounded-2xl bg-white/5 border border-white/5 p-4">
                         <div className="font-semibold text-white mb-1">Matching rule</div>
-                        <p>Officer names should be normalized before matching target and sales records.</p>
+                        <p>Officer names are cleaned, normalized, alias-matched, and compared bidirectionally.</p>
                       </div>
                     </div>
                   </div>
