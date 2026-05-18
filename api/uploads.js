@@ -1,22 +1,12 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { isUploadKind, UPLOAD_KINDS } from "./lib/schema";
-import {
+const {
+  UPLOAD_KINDS,
   clearUploadKind,
-  loadAllUploads,
+  decompressJson,
+  isUploadKind,
   loadUploadKind,
   saveUploadKind,
   saveUploadKindChunk,
-  type RawRow,
-} from "./lib/db";
-import { decompressJson } from "./lib/compress";
-
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: "8mb",
-    },
-  },
-};
+} = require("./turso");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -24,27 +14,32 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
-type ParsedUploadBody =
-  | { mode: "rows"; rows: RawRow[] }
-  | { mode: "chunk"; chunkIndex: number; chunkCount: number; rows: RawRow[] };
+const applyCors = (res) => {
+  Object.entries(corsHeaders).forEach(([key, value]) => {
+    res.setHeader(key, value);
+  });
+};
 
-const parseUploadBody = (body: unknown): ParsedUploadBody | null => {
+const readKind = (req) => {
+  const kindParam = req.query?.kind;
+  return Array.isArray(kindParam) ? kindParam[0] : kindParam;
+};
+
+const parseUploadBody = (body) => {
   if (!body || typeof body !== "object") return null;
 
-  const record = body as Record<string, unknown>;
-
-  if (record.format === "gzip-base64" && typeof record.data === "string") {
-    let parsed: unknown;
+  if (body.format === "gzip-base64" && typeof body.data === "string") {
+    let parsed;
     try {
-      parsed = decompressJson<unknown>(record.data);
+      parsed = decompressJson(body.data);
     } catch {
       return null;
     }
     if (!Array.isArray(parsed)) return null;
 
-    const rows = parsed as RawRow[];
-    const chunkIndex = Number(record.chunkIndex);
-    const chunkCount = Number(record.chunkCount);
+    const rows = parsed;
+    const chunkIndex = Number(body.chunkIndex);
+    const chunkCount = Number(body.chunkCount);
 
     if (
       Number.isInteger(chunkIndex) &&
@@ -59,26 +54,19 @@ const parseUploadBody = (body: unknown): ParsedUploadBody | null => {
     return { mode: "rows", rows };
   }
 
-  if (Array.isArray(record.rows)) {
-    return { mode: "rows", rows: record.rows as RawRow[] };
+  if (Array.isArray(body.rows)) {
+    return { mode: "rows", rows: body.rows };
   }
 
   if (Array.isArray(body)) {
-    return { mode: "rows", rows: body as RawRow[] };
+    return { mode: "rows", rows: body };
   }
 
   return null;
 };
 
-const readKind = (req: VercelRequest) => {
-  const kindParam = req.query.kind;
-  return Array.isArray(kindParam) ? kindParam[0] : kindParam;
-};
-
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  Object.entries(corsHeaders).forEach(([key, value]) => {
-    res.setHeader(key, value);
-  });
+async function handler(req, res) {
+  applyCors(res);
 
   if (req.method === "OPTIONS") {
     return res.status(204).end();
@@ -96,7 +84,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ kind: kindValue, rows });
       }
 
-      const payload = await loadAllUploads();
+      const payload = {};
+      for (const kind of UPLOAD_KINDS) {
+        payload[kind] = await loadUploadKind(kind);
+      }
       return res.status(200).json(payload);
     }
 
@@ -153,8 +144,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const missingCreds =
       message.includes("Turso credentials") ||
       message.includes("TURSO_DATABASE_URL");
-    const status = missingCreds ? 503 : 500;
-    console.error("[api/uploads]", kindValue ?? "all", message, error);
-    return res.status(status).json({ error: message });
+    console.error("[api/uploads]", kindValue || "all", message);
+    return res.status(missingCreds ? 503 : 500).json({ error: message });
   }
 }
+
+module.exports = handler;
+module.exports.config = {
+  api: {
+    bodyParser: {
+      sizeLimit: "8mb",
+    },
+  },
+};
