@@ -18,7 +18,8 @@ import {
   Settings,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
+import * as XLSX from "xlsx";
 import {
   PolarAngleAxis,
   PolarGrid,
@@ -371,6 +372,8 @@ const renderCustomTick = ({ payload, x, y, textAnchor }: any) => {
   );
 };
 
+type RawRow = Record<string, string | number | undefined>;
+
 type ReportRow = {
   label: string;
   target: number;
@@ -379,45 +382,148 @@ type ReportRow = {
   lastYear: number;
 };
 
-const reportRows: ReportRow[] = [
-  { label: "Mega Bangna", target: 1200000, actual: 1324000, lastMonth: 1188000, lastYear: 1095000 },
-  { label: "Central World", target: 1500000, actual: 1432000, lastMonth: 1394000, lastYear: 1287000 },
-  { label: "Iconsiam", target: 980000, actual: 1013000, lastMonth: 960000, lastYear: 885000 },
-  { label: "Siam Paragon", target: 2100000, actual: 2245000, lastMonth: 1987000, lastYear: 2050000 },
-];
+type CategoryRow = {
+  category: string;
+  actual: number;
+  target: number;
+  share: number;
+};
 
-const reportMetrics = reportRows.map((row) => {
-  const achPercent = row.target ? (row.actual / row.target) * 100 : 0;
-  const momPercent = row.lastMonth ? ((row.actual - row.lastMonth) / row.lastMonth) * 100 : 0;
-  const yoyPercent = row.lastYear ? ((row.actual - row.lastYear) / row.lastYear) * 100 : 0;
+type OfficerRow = {
+  name: string;
+  branch: string;
+  actual: number;
+  target: number;
+  rate: number;
+};
 
-  return {
+type ParsedReport = {
+  branches: ReportRow[];
+  categories: CategoryRow[];
+  officers: OfficerRow[];
+  fileName: string;
+};
+
+const normalizeText = (value: unknown) =>
+  String(value ?? "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/[^a-z0-9ก-๙ ]/gi, "")
+    .trim();
+
+const toNumber = (value: unknown) => {
+  if (typeof value === "number") return value;
+  const parsed = Number(String(value ?? "").replace(/[^\d.-]/g, ""));
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const getCategoryValue = (row: RawRow) => {
+  const category = normalizeText(row.category ?? row.cat ?? row["cat & sub cat"]);
+  if (category.includes("sim")) {
+    return toNumber(row.number ?? row.qty ?? row.quantity);
+  }
+  return toNumber(row.totalprice ?? row["total price"] ?? row.amount ?? row.sales);
+};
+
+const calculateFromRows = (rows: RawRow[], fileName: string): ParsedReport => {
+  const branchMap = new Map<string, ReportRow>();
+  const categoryMap = new Map<string, { actual: number; target: number }>();
+  const officerMap = new Map<string, OfficerRow>();
+
+  rows.forEach((row, index) => {
+    const branch = String(row.branch ?? row["branch name"] ?? row.store ?? `Branch ${index + 1}`).trim();
+    const officer = String(row.officer ?? row.name ?? row["staff name"] ?? "Unknown Officer").trim();
+    const category = String(row.category ?? row.cat ?? row["cat & sub cat"] ?? row.group ?? "Other").trim();
+
+    const actual = getCategoryValue(row);
+    const target = toNumber(row.target ?? row.goal ?? row["target sales"]);
+    const lastMonth = toNumber(row.lastmonth ?? row["last month"]);
+    const lastYear = toNumber(row.lastyear ?? row["last year"]);
+
+    const branchKey = normalizeText(branch);
+    const currentBranch = branchMap.get(branchKey) ?? {
+      label: branch,
+      target: 0,
+      actual: 0,
+      lastMonth: 0,
+      lastYear: 0,
+    };
+    currentBranch.target += target;
+    currentBranch.actual += actual;
+    currentBranch.lastMonth += lastMonth;
+    currentBranch.lastYear += lastYear;
+    branchMap.set(branchKey, currentBranch);
+
+    const categoryKey = normalizeText(category || "Other");
+    const currentCategory = categoryMap.get(categoryKey) ?? { actual: 0, target: 0 };
+    currentCategory.actual += actual;
+    currentCategory.target += target;
+    categoryMap.set(categoryKey, currentCategory);
+
+    const officerKey = normalizeText(officer);
+    const currentOfficer = officerMap.get(officerKey) ?? {
+      name: officer,
+      branch,
+      actual: 0,
+      target: 0,
+      rate: 0,
+    };
+    currentOfficer.actual += actual;
+    currentOfficer.target += target;
+    currentOfficer.rate = currentOfficer.target ? Math.round((currentOfficer.actual / currentOfficer.target) * 100) : 0;
+    officerMap.set(officerKey, currentOfficer);
+  });
+
+  const branches = [...branchMap.values()].map((row) => ({
     ...row,
-    achPercent,
-    momPercent,
-    yoyPercent,
-  };
-});
+    lastMonth: row.lastMonth,
+    lastYear: row.lastYear,
+  }));
 
-const categorySummary = [
-  { category: "iPhone", actual: 3520000, target: 3100000, share: 34 },
-  { category: "Mac", actual: 2260000, target: 2050000, share: 22 },
-  { category: "iPad", actual: 1410000, target: 1300000, share: 14 },
-  { category: "Apple Watch", actual: 980000, target: 870000, share: 10 },
-  { category: "SIM", actual: 610000, target: 540000, share: 6 },
-  { category: "BTB", actual: 1320000, target: 1250000, share: 14 },
-];
+  const categories = [...categoryMap.entries()].map(([category, value]) => ({
+    category: category || "Other",
+    actual: value.actual,
+    target: value.target || Math.max(value.actual, 1),
+    share: 0,
+  }));
+  const totalCategoryActual = categories.reduce((sum, row) => sum + row.actual, 0) || 1;
+  categories.forEach((item) => {
+    item.share = Math.round((item.actual / totalCategoryActual) * 100);
+  });
 
-const officerSummary = [
-  { name: "Sarut Jitranon", branch: "Mega Bangna", actual: 142, target: 123, rate: 115 },
-  { name: "Nadech Kugimiya", branch: "Central World", actual: 256, target: 205, rate: 125 },
-  { name: "Yaya Urassaya", branch: "Iconsiam", actual: 118, target: 112, rate: 105 },
-];
+  const officers = [...officerMap.values()];
+
+  return { branches, categories, officers, fileName };
+};
+
+const fallbackReport: ParsedReport = {
+  fileName: "demo-data",
+  branches: [
+    { label: "Mega Bangna", target: 1200000, actual: 1324000, lastMonth: 1188000, lastYear: 1095000 },
+    { label: "Central World", target: 1500000, actual: 1432000, lastMonth: 1394000, lastYear: 1287000 },
+    { label: "Iconsiam", target: 980000, actual: 1013000, lastMonth: 960000, lastYear: 885000 },
+    { label: "Siam Paragon", target: 2100000, actual: 2245000, lastMonth: 1987000, lastYear: 2050000 },
+  ],
+  categories: [
+    { category: "iPhone", actual: 3520000, target: 3100000, share: 34 },
+    { category: "Mac", actual: 2260000, target: 2050000, share: 22 },
+    { category: "iPad", actual: 1410000, target: 1300000, share: 14 },
+    { category: "Apple Watch", actual: 980000, target: 870000, share: 10 },
+    { category: "SIM", actual: 610000, target: 540000, share: 6 },
+    { category: "BTB", actual: 1320000, target: 1250000, share: 14 },
+  ],
+  officers: [
+    { name: "Sarut Jitranon", branch: "Mega Bangna", actual: 142, target: 123, rate: 115 },
+    { name: "Nadech Kugimiya", branch: "Central World", actual: 256, target: 205, rate: 125 },
+    { name: "Yaya Urassaya", branch: "Iconsiam", actual: 118, target: 112, rate: 105 },
+  ],
+};
 
 export default function App() {
   const [currentView, setCurrentView] = useState<
     "home" | "staff" | "staff_overview" | "settings" | "reports"
   >("home");
+  const [parsedReport, setParsedReport] = useState<ParsedReport>(fallbackReport);
   const [activeTab, setActiveTab] = useState("Store");
   const [activeStat, setActiveStat] = useState<"sales" | "csat" | "target">(
     "sales",
@@ -430,6 +536,8 @@ export default function App() {
   ]);
   const [selectedDevice, setSelectedDevice] = useState("iPhone");
   const [isAttachDropdownOpen, setIsAttachDropdownOpen] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isParsing, setIsParsing] = useState(false);
 
   const toggleAttachFilter = (id: string) => {
     setAttachFilters((prev) =>
@@ -439,6 +547,44 @@ export default function App() {
 
   const currentStaff =
     staffData.find((s) => s.id === activeStaffId) || staffData[0];
+
+  const uploadStats = useMemo(() => {
+    const branches = parsedReport.branches.length;
+    const categories = parsedReport.categories.length;
+    const officers = parsedReport.officers.length;
+    return { branches, categories, officers };
+  }, [parsedReport]);
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploadError(null);
+    setIsParsing(true);
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
+      const sheetName = workbook.SheetNames[0];
+      if (!sheetName) throw new Error("ไม่พบ sheet ในไฟล์ Excel");
+
+      const sheet = workbook.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json<RawRow>(sheet, {
+        defval: "",
+        raw: false,
+      });
+
+      const parsed = calculateFromRows(rows, file.name);
+      setParsedReport(parsed);
+      setCurrentView("reports");
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : "อ่านไฟล์ไม่สำเร็จ");
+      setParsedReport(fallbackReport);
+    } finally {
+      setIsParsing(false);
+      event.target.value = "";
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#1c2722] p-4 font-sans text-white md:p-8 flex flex-col items-center">
@@ -486,6 +632,10 @@ export default function App() {
               >
                 <PieChart className="w-5 h-5" />
               </button>
+              <label className="cursor-pointer p-2 rounded-full transition-colors text-white/60 hover:text-white">
+                <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileUpload} />
+                <Search className="w-5 h-5" />
+              </label>
               <button
                 onClick={() => setCurrentView("settings")}
                 className={`p-2 rounded-full transition-colors ${currentView === "settings" ? "bg-[#0f4430] shadow-inner text-white" : "text-white/60 hover:text-white"}`}
@@ -1477,10 +1627,16 @@ export default function App() {
                       </p>
                     </div>
                   </div>
-                  <button className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/80 hover:bg-white/10 transition-colors">
-                    Export CSV
-                  </button>
+                  <div className="flex flex-col items-start lg:items-end gap-2">
+                    <button className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/80 hover:bg-white/10 transition-colors">
+                      Export CSV
+                    </button>
+                    <div className="text-xs text-white/50">
+                      {isParsing ? "Parsing Excel file..." : `Loaded ${uploadStats.branches} branches • ${uploadStats.categories} categories • ${uploadStats.officers} officers`}
+                    </div>
+                  </div>
                 </div>
+                {uploadError && <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">{uploadError}</div>}
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   <div className="lg:col-span-2 bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
@@ -1501,7 +1657,21 @@ export default function App() {
                           </tr>
                         </thead>
                         <tbody>
-                          {reportMetrics.map((row) => (
+                          {parsedReport.branches.map((row) => {
+                            const achPercent = row.target ? (row.actual / row.target) * 100 : 0;
+                            const momPercent = row.lastMonth ? ((row.actual - row.lastMonth) / row.lastMonth) * 100 : 0;
+                            const yoyPercent = row.lastYear ? ((row.actual - row.lastYear) / row.lastYear) * 100 : 0;
+                            return (
+                              <tr key={row.label} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                                <td className="py-3 pr-4 font-medium text-white/90">{row.label}</td>
+                                <td className="py-3 px-3 text-white/80">฿{row.target.toLocaleString()}</td>
+                                <td className="py-3 px-3 text-white/80">฿{row.actual.toLocaleString()}</td>
+                                <td className={`py-3 px-3 font-semibold ${achPercent >= 100 ? "text-emerald-400" : "text-yellow-400"}`}>{achPercent.toFixed(1)}%</td>
+                                <td className={`py-3 px-3 font-semibold ${momPercent >= 0 ? "text-emerald-400" : "text-red-400"}`}>{momPercent.toFixed(1)}%</td>
+                                <td className={`py-3 px-3 font-semibold ${yoyPercent >= 0 ? "text-emerald-400" : "text-red-400"}`}>{yoyPercent.toFixed(1)}%</td>
+                              </tr>
+                            );
+                          })}
                             <tr key={row.label} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                               <td className="py-3 pr-4 font-medium text-white/90">{row.label}</td>
                               <td className="py-3 px-3 text-white/80">฿{row.target.toLocaleString()}</td>
@@ -1542,7 +1712,7 @@ export default function App() {
                       <span className="text-xs text-white/50">Main category totals</span>
                     </div>
                     <div className="space-y-3">
-                      {categorySummary.map((item) => (
+                      {parsedReport.categories.map((item) => (
                         <div key={item.category} className="rounded-2xl bg-white/5 border border-white/5 p-4">
                           <div className="flex items-center justify-between mb-2">
                             <div className="font-medium text-white/90">{item.category}</div>
@@ -1577,7 +1747,7 @@ export default function App() {
                           </tr>
                         </thead>
                         <tbody>
-                          {officerSummary.map((item) => (
+                          {parsedReport.officers.map((item) => (
                             <tr key={item.name} className="border-t border-white/5 hover:bg-white/5 transition-colors">
                               <td className="py-3 px-4 text-white/90 font-medium">{item.name}</td>
                               <td className="py-3 px-4 text-white/70">{item.branch}</td>
