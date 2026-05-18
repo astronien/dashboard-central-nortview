@@ -406,6 +406,17 @@ const getUploadKind = (headers: string[]): UploadKind => {
   if (normalized.some((h) => h.includes("staff id") || h.includes("branch name"))) return "target";
   return "current";
 };
+const mapTargetCategoryKey = (category: string, subCategory = "", productName = "") => {
+  const text = normalizeText(`${category} ${subCategory} ${productName}`);
+  if (text.includes("iphone") || text.includes("iphone")) return "iPhone";
+  if (text.includes("mac") || text.includes("macbook") || text.includes("imac") || text.includes("desktop") || text.includes("notebook")) return "Mac";
+  if (text.includes("ipad")) return "iPad";
+  if (text.includes("watch")) return "Apple Watch";
+  if (text.includes("sim")) return "SIM";
+  if (text.includes("btb") || text.includes("business") || text.includes("accessory") || text.includes("apple acc") || text.includes("care") || text.includes("service") || text.includes("insurance") || text.includes("smile")) return "BTB";
+  if (text.includes("smartphone")) return "Smartphone";
+  return category || "Other";
+};
 const calculateMetrics = (target: number, actual: number, currentDay: number, totalDays: number, lastMonth: number, lastYear: number) => {
   const achPercent = target ? (actual / target) * 100 : 0;
   const forecast = currentDay ? (actual / currentDay) * totalDays : 0;
@@ -440,7 +451,8 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
       const officer = String(row["Officer (Name)"] ?? "Unknown Officer").trim();
       const categoryName = String(row["Category (Name)"] ?? "Other").trim();
       const sub = String(row["Sub Category"] ?? "").trim();
-      const mapped = categoryMap.get(normalizeText(`${categoryName}${sub}`)) ?? categoryMap.get(normalizeText(categoryName)) ?? categoryName;
+      const product = String(row["Product (Name)"] ?? "").trim();
+      const mapped = categoryMap.get(normalizeText(`${categoryName}${sub}`)) ?? categoryMap.get(normalizeText(categoryName)) ?? categoryMap.get(normalizeText(product)) ?? mapTargetCategoryKey(categoryName, sub, product);
       const branchKey = normalizeText(branch);
       const targetRow = targetByBranch.get(branchKey);
       const totalDays = toNumber(targetRow?.DAY) || 1;
@@ -450,17 +462,23 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
       branchItem.target = targetRow ? toNumber(targetRow.Total) : branchItem.target;
       if (period === "current") branchItem.actual += actual; else if (period === "lastMonth") branchItem.lastMonth += actual; else branchItem.lastYear += actual;
       branchSummary.set(branchKey, branchItem);
-      const catItem = categorySummary.get(normalizeText(mapped)) ?? { actual: 0, target: 0 };
+      const catKey = normalizeText(mapped);
+      const catItem = categorySummary.get(catKey) ?? { actual: 0, target: 0 };
       catItem.actual += actual;
-      catItem.target += period === "current" ? actual : 0;
-      categorySummary.set(normalizeText(mapped), catItem);
+      if (period === "current") {
+        const targetLabel = mapTargetCategoryKey(categoryName, sub, product);
+        const targetFromBranch = toNumber(targetRow?.[targetLabel] ?? targetRow?.Total);
+        catItem.target += targetFromBranch || actual;
+      }
+      categorySummary.set(catKey, catItem);
+      const officerItem = [...targetByOfficer.entries()].find(([name]) => matchesOfficer(name, officer))?.[1]?.[0];
       const officerKey = cleanOfficerName(officer);
-      const officerTargetRow = (targetByOfficer.get(officerKey) ?? [])[0];
-      const officerItem = officerSummary.get(officerKey) ?? { name: officer, branch, actual: 0, target: 0, rate: 0 };
-      officerItem.target = toNumber(officerTargetRow?.Total ?? 0);
-      if (period === "current") officerItem.actual += actual;
-      officerItem.rate = officerItem.target ? Math.round((officerItem.actual / officerItem.target) * 100) : 0;
-      officerSummary.set(officerKey, officerItem);
+      const officerTargetRow = officerItem;
+      const officerState = officerSummary.get(officerKey) ?? { name: officer, branch, actual: 0, target: 0, rate: 0 };
+      officerState.target = toNumber(officerTargetRow?.Total ?? 0);
+      if (period === "current") officerState.actual += actual;
+      officerState.rate = officerState.target ? Math.round((officerState.actual / officerState.target) * 100) : 0;
+      officerSummary.set(officerKey, officerState);
     });
   };
   mergeSales(currentRows, "current"); mergeSales(lastMonthRows, "lastMonth"); mergeSales(lastYearRows, "lastYear");
@@ -472,33 +490,10 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
 const fallbackReport: ParsedReport = {
   fileName: "demo-data",
   branches: [
-    { label: "Mega Bangna", target: 1200000, actual: 1324000, lastMonth: 1188000, lastYear: 1095000 },
-    { label: "Central World", target: 1500000, actual: 1432000, lastMonth: 1394000, lastYear: 1287000 },
-    { label: "Iconsiam", target: 980000, actual: 1013000, lastMonth: 960000, lastYear: 885000 },
-    { label: "Siam Paragon", target: 2100000, actual: 2245000, lastMonth: 1987000, lastYear: 2050000 },
-  ],
-  categories: [
-    { category: "iPhone", actual: 3520000, target: 3100000, share: 34 },
-    { category: "Mac", actual: 2260000, target: 2050000, share: 22 },
-    { category: "iPad", actual: 1410000, target: 1300000, share: 14 },
-    { category: "Apple Watch", actual: 980000, target: 870000, share: 10 },
-    { category: "SIM", actual: 610000, target: 540000, share: 6 },
-    { category: "BTB", actual: 1320000, target: 1250000, share: 14 },
-  ],
-  officers: [
-    { name: "Sarut Jitranon", branch: "Mega Bangna", actual: 142, target: 123, rate: 115 },
-    { name: "Nadech Kugimiya", branch: "Central World", actual: 256, target: 205, rate: 125 },
-    { name: "Yaya Urassaya", branch: "Iconsiam", actual: 118, target: 112, rate: 105 },
-  ],
-};
-
-const fallbackReport: ParsedReport = {
-  fileName: "demo-data",
-  branches: [
-    { label: "Mega Bangna", target: 1200000, actual: 1324000, lastMonth: 1188000, lastYear: 1095000 },
-    { label: "Central World", target: 1500000, actual: 1432000, lastMonth: 1394000, lastYear: 1287000 },
-    { label: "Iconsiam", target: 980000, actual: 1013000, lastMonth: 960000, lastYear: 885000 },
-    { label: "Siam Paragon", target: 2100000, actual: 2245000, lastMonth: 1987000, lastYear: 2050000 },
+    { label: "Mega Bangna", target: 1200000, actual: 1324000, lastMonth: 1188000, lastYear: 1095000, achPercent: 110.3, forecast: 1324000, forecastPercent: 110.3, momPercent: 11.4, yoyPercent: 20.9, targetPerDay: 1200000, diffPerDay: 124000 },
+    { label: "Central World", target: 1500000, actual: 1432000, lastMonth: 1394000, lastYear: 1287000, achPercent: 95.5, forecast: 1432000, forecastPercent: 95.5, momPercent: 2.7, yoyPercent: 11.2, targetPerDay: 1500000, diffPerDay: -68000 },
+    { label: "Iconsiam", target: 980000, actual: 1013000, lastMonth: 960000, lastYear: 885000, achPercent: 103.4, forecast: 1013000, forecastPercent: 103.4, momPercent: 5.5, yoyPercent: 14.5, targetPerDay: 980000, diffPerDay: 33000 },
+    { label: "Siam Paragon", target: 2100000, actual: 2245000, lastMonth: 1987000, lastYear: 2050000, achPercent: 106.9, forecast: 2245000, forecastPercent: 106.9, momPercent: 13.0, yoyPercent: 9.5, targetPerDay: 2100000, diffPerDay: 145000 },
   ],
   categories: [
     { category: "iPhone", actual: 3520000, target: 3100000, share: 34 },
@@ -557,14 +552,19 @@ export default function App() {
     setParsedReport(report);
   };
 
+
   const exportCsv = () => {
-    const branchRows = parsedReport.branches
-      .map((row) => [row.label, row.target, row.actual, row.achPercent?.toFixed(1) ?? "0.0", row.forecast?.toFixed(0) ?? "0", row.forecastPercent?.toFixed(1) ?? "0.0", row.momPercent?.toFixed(1) ?? "0.0", row.yoyPercent?.toFixed(1) ?? "0.0", row.targetPerDay?.toFixed(0) ?? "0", row.diffPerDay?.toFixed(0) ?? "0"].join(","))
-      .join("\n");
-    const csv = [
-      "Branch,Target,Actual,Ach%,Forecast,Forecast%,MoM%,YoY%,Target/Day,Diff/Day",
-      branchRows,
-    ].join("\n");
+    const rows = [
+      ["Branch Summary", "Target", "Actual", "Ach%", "Forecast", "Forecast%", "MoM%", "YoY%", "Target/Day", "Diff/Day"],
+      ...parsedReport.branches.map((row) => [row.label, row.target, row.actual, row.achPercent?.toFixed(1) ?? "0.0", row.forecast?.toFixed(0) ?? "0", row.forecastPercent?.toFixed(1) ?? "0.0", row.momPercent?.toFixed(1) ?? "0.0", row.yoyPercent?.toFixed(1) ?? "0.0", row.targetPerDay?.toFixed(0) ?? "0", row.diffPerDay?.toFixed(0) ?? "0"]),
+      [],
+      ["Category Summary", "Actual", "Target", "Share"],
+      ...parsedReport.categories.map((row) => [row.category, row.actual, row.target, `${row.share}%`]),
+      [],
+      ["Officer Summary", "Branch", "Actual", "Target", "Rate"],
+      ...parsedReport.officers.map((row) => [row.name, row.branch, row.actual, row.target, `${row.rate}%`]),
+    ];
+    const csv = rows.map((row) => row.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -590,7 +590,7 @@ export default function App() {
     return kind;
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, forcedKind?: UploadKind) => {
     const files = Array.from(event.target.files ?? []);
     if (!files.length) return;
     setUploadError(null);
@@ -603,7 +603,7 @@ export default function App() {
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         if (!sheet) continue;
         const rows = XLSX.utils.sheet_to_json<RawRow>(sheet, { defval: "", raw: false });
-        const detectedKind = acceptDetected(file.name, getUploadKind(Object.keys(rows[0] ?? {})));
+        const detectedKind = forcedKind ?? acceptDetected(file.name, getUploadKind(Object.keys(rows[0] ?? {})));
         nextUploads[detectedKind] = rows;
       }
       setUploadedFiles(nextUploads);
@@ -1659,7 +1659,7 @@ export default function App() {
                 <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
                   {(["target", "current", "lastMonth", "lastYear", "categoryMaster"] as UploadKind[]).map((kind) => (
                     <label key={kind} className="group flex min-h-[110px] cursor-pointer flex-col justify-between rounded-2xl border border-dashed border-white/20 bg-white/5 p-4 hover:bg-white/10 transition-colors">
-                      <input type="file" multiple={kind === "current"} accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileUpload} />
+                      <input type="file" multiple={kind === "current"} accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => handleFileUpload(e, kind)} />
                       <div>
                         <div className="text-sm font-semibold text-white capitalize">{kind.replace(/([A-Z])/g, " $1")}</div>
                         <div className="mt-1 text-xs text-white/50">Drop or click to upload</div>
