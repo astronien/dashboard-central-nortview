@@ -3,6 +3,7 @@ const {
   appendRowsToTurso,
   clearRelationalKind,
   countRowsInTurso,
+  ensureRelationalSchema,
   loadRowsFromTurso,
   saveRowsToTurso,
 } = require("./tables-sync");
@@ -143,6 +144,21 @@ const tursoExecute = async (sql, args = []) => {
   return getExecuteResult(payload, 0);
 };
 
+const isMissingTableError = (error) => {
+  const message = error instanceof Error ? error.message : String(error);
+  return /no such table/i.test(message);
+};
+
+/** Legacy chunk/meta tables may not exist on newer DBs — treat as empty/no-op */
+const tursoExecuteOptional = async (sql, args = []) => {
+  try {
+    return await tursoExecute(sql, args);
+  } catch (error) {
+    if (isMissingTableError(error)) return { rows: [] };
+    throw error;
+  }
+};
+
 const listTables = async () => {
   const result = await tursoExecute(
     "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
@@ -160,7 +176,7 @@ const dbDeps = () => ({
 
 const loadLegacyChunks = async (kind) => {
   const table = chunkTable(kind);
-  const result = await tursoExecute(
+  const result = await tursoExecuteOptional(
     `SELECT rows_json FROM ${table} ORDER BY chunk_index ASC`,
   );
 
@@ -221,8 +237,8 @@ const saveUploadKindChunk = async (kind, chunkIndex, chunkCount, rows) => {
 
 const clearUploadKind = async (kind) => {
   await clearRelationalKind(kind, tursoExecute);
-  await tursoExecute(`DELETE FROM ${chunkTable(kind)}`);
-  await tursoExecute(`DELETE FROM ${KIND_TABLE[kind]}`);
+  await tursoExecuteOptional(`DELETE FROM ${chunkTable(kind)}`);
+  await tursoExecuteOptional(`DELETE FROM ${KIND_TABLE[kind]}`);
   await upsertUploadMeta(kind, 0);
 };
 
@@ -233,8 +249,8 @@ const clearAllUploads = async () => {
   await tursoExecute("DELETE FROM upload_meta");
 
   for (const kind of UPLOAD_KINDS) {
-    await tursoExecute(`DELETE FROM ${chunkTable(kind)}`);
-    await tursoExecute(`DELETE FROM ${KIND_TABLE[kind]}`);
+    await tursoExecuteOptional(`DELETE FROM ${chunkTable(kind)}`);
+    await tursoExecuteOptional(`DELETE FROM ${KIND_TABLE[kind]}`);
   }
 
   const stats = {};
@@ -269,6 +285,19 @@ const getUploadStats = async () => {
 
 const isUploadKind = (value) => UPLOAD_KINDS.includes(value);
 
+const initDatabase = async () => {
+  await ensureRelationalSchema(tursoExecute);
+  const tables = await listTables();
+  const { httpUrl } = getTursoConfig();
+  let database = httpUrl;
+  try {
+    database = new URL(httpUrl).hostname;
+  } catch {
+    // keep raw url
+  }
+  return { database, tables };
+};
+
 module.exports = {
   UPLOAD_KINDS,
   clearAllUploads,
@@ -276,6 +305,7 @@ module.exports = {
   decompressJson,
   getTursoConfig,
   getUploadStats,
+  initDatabase,
   isUploadKind,
   listTables,
   loadUploadKind,
