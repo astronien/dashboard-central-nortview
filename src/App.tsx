@@ -22,9 +22,11 @@ import React, { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import {
   clearAllUploads,
+  fetchTursoStats,
   fetchUploads,
   hasUploadData,
   saveUploads,
+  type TursoHealthStats,
   type UploadState,
 } from "./lib/uploadsApi";
 import {
@@ -514,6 +516,9 @@ export default function App() {
   const [isAttachDropdownOpen, setIsAttachDropdownOpen] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isParsing, setIsParsing] = useState(false);
+  const [isSavingTurso, setIsSavingTurso] = useState(false);
+  const [tursoDatabase, setTursoDatabase] = useState<string | null>(null);
+  const [tursoStats, setTursoStats] = useState<TursoHealthStats | null>(null);
 
   const STORAGE_KEY = "dashboard-upload-state-v1";
 
@@ -690,17 +695,33 @@ export default function App() {
     }
   };
 
+  const refreshTursoStats = async () => {
+    const health = await fetchTursoStats();
+    if (!health) return;
+    setTursoDatabase(health.database);
+    setTursoStats(health.stats);
+  };
+
   const persistUploads = async (
     nextUploads: UploadState,
     kinds?: UploadKind[],
   ) => {
-    const saved = await saveUploads(nextUploads, kinds);
-    if (!saved) {
+    setIsSavingTurso(true);
+    try {
+      const saved = await saveUploads(nextUploads, kinds);
+      await refreshTursoStats();
+      if (!saved) {
+        persistUploadsLocal(nextUploads);
+        setUploadError(
+          "บันทึกลง Turso ไม่สำเร็จ — เก็บชั่วคราวในเบราว์เซอร์แล้ว เปิด Console (F12) ดู error",
+        );
+        return;
+      }
       persistUploadsLocal(nextUploads);
-      setUploadError("บันทึกลง Turso ไม่สำเร็จ — เก็บชั่วคราวในเบราว์เซอร์แล้ว ลองอัปโหลดใหม่หลัง deploy");
-      return;
+      setUploadError(null);
+    } finally {
+      setIsSavingTurso(false);
     }
-    setUploadError(null);
   };
 
   const loadPersistedUploads = async (): Promise<UploadState | null> => {
@@ -780,11 +801,14 @@ export default function App() {
     const empty = emptyUploadState();
     setUploadedFiles(empty);
     setParsedReport(fallbackReport);
+    setTursoStats(null);
+    await refreshTursoStats();
     setUploadError(cleared ? null : "ลบบน Turso ไม่สำเร็จ — ลบในเบราว์เซอร์แล้ว ลองกดอีกครั้งหลัง deploy");
   };
 
   useEffect(() => {
     void (async () => {
+      await refreshTursoStats();
       const persisted = await loadPersistedUploads();
       if (!persisted) return;
       setUploadedFiles(persisted);
@@ -820,10 +844,17 @@ export default function App() {
         nextUploads[detectedKind] = rows;
         changedKinds.add(detectedKind);
       }
+      const report = buildReport(
+        nextUploads.target,
+        nextUploads.current,
+        nextUploads.lastMonth,
+        nextUploads.lastYear,
+        nextUploads.categoryMaster,
+        "uploaded-data",
+      );
       setUploadedFiles(nextUploads);
-      rebuildReport(nextUploads, {
-        changedKinds: [...changedKinds],
-      });
+      setParsedReport(report);
+      await persistUploads(nextUploads, [...changedKinds]);
       setCurrentView("reports");
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : "อ่านไฟล์ไม่สำเร็จ");
@@ -1946,9 +1977,30 @@ export default function App() {
                         ลบข้อมูลทั้งหมด
                       </button>
                     </motion.div>
-                    <div className="text-xs text-white/50">
-                      {isParsing ? "Parsing Excel file..." : `Loaded ${uploadStats.branches} branches • ${uploadStats.categories} categories • ${uploadStats.officers} officers`}
+                    <div className="text-xs text-white/50 text-right max-w-md">
+                      {isParsing
+                        ? "กำลังอ่านไฟล์ Excel..."
+                        : isSavingTurso
+                          ? "กำลังบันทึกลง Turso..."
+                          : `Loaded ${uploadStats.branches} branches • ${uploadStats.categories} categories • ${uploadStats.officers} officers`}
                       <div className="mt-1 text-[11px] text-white/40">Files: Target {uploadedFiles.target.length} • Current {uploadedFiles.current.length} • Last Month {uploadedFiles.lastMonth.length} • Last Year {uploadedFiles.lastYear.length} • Category Master {uploadedFiles.categoryMaster.length}</div>
+                      {tursoDatabase ? (
+                        <motion.div className="mt-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-[11px] text-left text-emerald-100">
+                          <div className="font-medium text-emerald-200">Turso DB: {tursoDatabase}</div>
+                          <div className="text-white/70">
+                            ดูใน Turso Dashboard: <span className="font-mono">data_sales</span>,{" "}
+                            <span className="font-mono">data_targets</span>,{" "}
+                            <span className="font-mono">data_categories</span> (ไม่ใช่ upload_*_chunks)
+                          </div>
+                          {tursoStats ? (
+                            <div className="font-mono text-[10px] text-white/60 mt-1">
+                              rows — target {tursoStats.target?.rowCount ?? 0} • current {tursoStats.current?.rowCount ?? 0} •
+                              lastMonth {tursoStats.lastMonth?.rowCount ?? 0} • lastYear {tursoStats.lastYear?.rowCount ?? 0} •
+                              category {tursoStats.categoryMaster?.rowCount ?? 0}
+                            </div>
+                          ) : null}
+                        </motion.div>
+                      ) : null}
                     </div>
                     <div className="flex gap-2 flex-wrap justify-end">
                       {Object.entries(uploadedFiles).map(([kind, rows]) => (

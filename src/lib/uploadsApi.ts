@@ -131,3 +131,27 @@ export const clearAllUploads = async (): Promise<boolean> => {
   const response = await fetch(UPLOADS_URL, { method: "DELETE" });
   return response.ok;
 };
+
+export type TursoHealthStats = Record<
+  UploadKind,
+  { rowCount: number; storage?: string }
+>;
+
+export const fetchTursoStats = async (): Promise<{
+  database: string;
+  stats: TursoHealthStats;
+} | null> => {
+  const response = await fetch("/api/health?stats=1");
+  if (!response.ok) return null;
+
+  const payload = (await response.json()) as {
+    database?: string;
+    stats?: TursoHealthStats;
+  };
+
+  if (!payload.stats) return null;
+  return {
+    database: payload.database ?? "turso",
+    stats: payload.stats,
+  };
+};

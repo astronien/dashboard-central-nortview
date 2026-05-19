@@ -8,9 +8,17 @@ module.exports = async function handler(req, res) {
 
     if (showStats) {
       const stats = await getUploadStats();
+      let database = httpUrl;
+      try {
+        database = new URL(httpUrl).hostname;
+      } catch {
+        // keep raw url
+      }
       return res.status(200).json({
         ok: true,
         hasTursoUrl: Boolean(httpUrl),
+        database,
+        tablesToBrowse: ["data_sales", "data_targets", "data_categories", "upload_meta"],
         stats,
       });
     }
