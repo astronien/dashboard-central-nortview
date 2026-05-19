@@ -1689,7 +1689,7 @@ export default function App() {
                             <th key={cat} className="pb-3 font-medium px-4 text-right whitespace-nowrap">
                               <span className="block">{cat}</span>
                               <span className="text-[10px] font-normal text-white/40">
-                                KPI ≥{staffKpiTargets[cat] ?? 20}%
+                                Rate · U · KPI ≥{staffKpiTargets[cat] ?? 20}%
                               </span>
                             </th>
                           ))}
@@ -1734,17 +1734,21 @@ export default function App() {
                                 : DEFAULT_ATTACH_CATEGORIES
                               ).map((cat, catIndex) => {
                                 const rate = Math.round(staff.rates[cat] ?? 0);
+                                const attachUnits = staff.units[cat] ?? 0;
                                 const color =
                                   ATTACH_CHART_COLORS[catIndex % ATTACH_CHART_COLORS.length];
                                 return (
                                   <td key={cat} className="py-3 px-4 text-white/80">
                                     <div className="flex items-center justify-end gap-2">
+                                      <span className="text-[11px] text-white/45 tabular-nums w-10 text-right shrink-0">
+                                        {attachUnits.toLocaleString()} U
+                                      </span>
                                       <span
-                                        className={`w-14 text-sm text-right tabular-nums ${staff.isHit[cat] ? "text-emerald-400 font-semibold" : ""}`}
+                                        className={`w-14 text-sm text-right tabular-nums shrink-0 ${staff.isHit[cat] ? "text-emerald-400 font-semibold" : ""}`}
                                       >
                                         {rate}%
                                       </span>
-                                      <div className="w-20 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                                      <div className="w-20 h-1.5 bg-white/10 rounded-full overflow-hidden shrink-0">
                                         <div
                                           className="h-full rounded-full transition-all"
                                           style={{
