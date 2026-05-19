@@ -632,20 +632,18 @@ export default function App() {
   };
 
   const attachBaseCategories = useMemo(() => {
-    if (currentView === "staff") return staffBaseCategories;
-    if (currentView === "staff_overview" && selectedDevice) return [selectedDevice];
+    if (currentView === "staff_overview") return staffBaseCategories;
     return DEFAULT_BASE_CATEGORIES;
-  }, [currentView, selectedDevice, staffBaseCategories]);
+  }, [currentView, staffBaseCategories]);
 
   const attachTargetCategories = useMemo(() => {
-    if (currentView === "staff") return staffAttachCategories;
-    if (selectedAttachCategories.length) return selectedAttachCategories;
+    if (currentView === "staff_overview") return staffAttachCategories;
     return DEFAULT_ATTACH_CATEGORIES;
-  }, [currentView, staffAttachCategories, selectedAttachCategories]);
+  }, [currentView, staffAttachCategories]);
 
-  const attachKpiTarget = currentView === "staff" ? staffKpiTarget : 20;
+  const attachKpiTarget = currentView === "staff_overview" ? staffKpiTarget : 20;
   const attachFilterBranch =
-    currentView === "staff" ? staffFilterBranch : "All Branches";
+    currentView === "staff_overview" ? staffFilterBranch : "All Branches";
 
   const attachOfficerRows = useMemo<AttachOfficerRow[]>(() => {
     if (!uploadedFiles.current.length) return [];
@@ -704,16 +702,6 @@ export default function App() {
     }
   };
 
-  const activeStaffAttachRow = useMemo(() => {
-    const officerName = activeOfficer?.name ?? currentStaff.name;
-    const key = cleanOfficerName(officerName);
-    return (
-      attachOfficerRows.find((row) => row.id === key) ??
-      attachOfficerRows.find((row) => attachMatchesOfficer(row.name, officerName)) ??
-      null
-    );
-  }, [attachOfficerRows, activeOfficer?.name, currentStaff.name]);
-
   const attachRateData = useMemo<DerivedAttachRow[]>(() => {
     const selectedOfficerSet = selectedAttachOfficers.length
       ? new Set(selectedAttachOfficers.map(cleanOfficerName))
@@ -745,21 +733,21 @@ export default function App() {
       .filter((row) => row.baseUnits > 0 || row.totalAttachUnitsForSorting > 0)
       .map((row, index) => {
         const legacy = toLegacyAttachRates(row);
-        const selectedCategorySet = selectedAttachCategories.length
-          ? new Set(selectedAttachCategories.map(normalizeText))
-          : null;
-        const selectedApple =
-          !selectedCategorySet ||
-          selectedCategorySet.has(normalizeText("appleCare")) ||
-          [...selectedCategorySet].some((cat) => normalizeText(cat).includes("apple"));
-        const selectedAccessories =
-          !selectedCategorySet ||
-          selectedCategorySet.has(normalizeText("accessories")) ||
-          [...selectedCategorySet].some((cat) => normalizeText(cat).includes("access"));
-        const selectedServices =
-          !selectedCategorySet ||
-          selectedCategorySet.has(normalizeText("services")) ||
-          [...selectedCategorySet].some((cat) => normalizeText(cat).includes("service"));
+        const selectedApple = attachTargetCategories.some(
+          (cat) =>
+            normalizeText(cat).includes("apple") ||
+            normalizeText(cat).includes("care") ||
+            normalizeText(cat).includes("cover"),
+        );
+        const selectedAccessories = attachTargetCategories.some(
+          (cat) =>
+            normalizeText(cat).includes("diy") ||
+            normalizeText(cat).includes("btb") ||
+            normalizeText(cat).includes("access"),
+        );
+        const selectedServices = attachTargetCategories.some((cat) =>
+          normalizeText(cat).includes("sim"),
+        );
         return {
           id: row.id,
           name: row.name,
@@ -775,7 +763,7 @@ export default function App() {
                 : "/staff3.png",
         };
       });
-  }, [attachOfficerRows, parsedReport.officers, selectedAttachCategories, selectedAttachOfficers]);
+  }, [attachOfficerRows, parsedReport.officers, attachTargetCategories, selectedAttachOfficers]);
 
   const staffLeaderboard = useMemo(() => {
     const ranked = attachOfficerRows.filter(
@@ -842,7 +830,7 @@ export default function App() {
               : "user",
           product: String(row["Product (Name)"] ?? row.product ?? "-").trim(),
           status:
-            staffAttachCategories.some(
+            DEFAULT_ATTACH_CATEGORIES.some(
               (cat) =>
                 normalizeText(category).includes(normalizeText(cat)) ||
                 normalizeText(subCategory).includes(normalizeText(cat)),
@@ -859,7 +847,7 @@ export default function App() {
       csat: rows,
       target: rows,
     };
-  }, [uploadedFiles.current, activeOfficer?.name, currentStaff.name, staffAttachCategories]);
+  }, [uploadedFiles.current, activeOfficer?.name, currentStaff.name]);
 
   const persistUploadsLocal = (nextUploads: UploadState) => {
     try {
@@ -1348,98 +1336,165 @@ export default function App() {
                 transition={{ duration: 0.4, ease: "easeOut" }}
                 className="flex flex-col gap-6 w-full h-full"
               >
-                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white/10 backdrop-blur-md rounded-2xl p-5 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)] relative z-20">
-                  <div>
-                    <h2 className="text-xl font-bold tracking-tight">
-                      Staff Attach Rate Performance
-                    </h2>
-                    <p className="text-sm text-white/60 mt-1">
-                      Compare how well the team is attaching secondary products
-                      to main units
-                    </p>
-                  </div>
+                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-5 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)] relative z-20">
+                  <h2 className="text-xl font-bold tracking-tight">
+                    Staff Attach Rate Performance
+                  </h2>
+                  <p className="text-sm text-white/60 mt-1">
+                    Compare how well the team is attaching secondary products to
+                    main units
+                  </p>
+                </div>
 
-                  <div className="flex flex-wrap gap-4 items-center">
-                    <div className="relative z-30">
-                      <select
-                        value={selectedDevice}
-                        onChange={(e) => setSelectedDevice(e.target.value)}
-                        className="appearance-none bg-white/10 border border-white/20 text-white rounded-xl px-4 py-2 pr-10 outline-none focus:border-emerald-500 cursor-pointer text-sm font-medium"
+                {/* Custom Attach Builder */}
+                <div className="relative z-40">
+                  <button
+                    type="button"
+                    onClick={() => setStaffBuilderOpen((v) => !v)}
+                    className="w-full flex items-center justify-between gap-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 px-5 py-3.5 hover:bg-white/[0.14] transition-colors shadow-[0_8px_32px_rgba(0,0,0,0.12)]"
+                  >
+                    <span className="flex items-center gap-2 text-sm font-semibold">
+                      <Target className="w-4 h-4 text-emerald-400" />
+                      Custom Attach Builder
+                    </span>
+                    <span className="flex items-center gap-3 text-xs text-white/60">
+                      {staffBaseCategories.length} base · {staffAttachCategories.length} attach · KPI {staffKpiTarget}%
+                      <ChevronDown
+                        className={`w-4 h-4 transition-transform ${staffBuilderOpen ? "rotate-180" : ""}`}
+                      />
+                    </span>
+                  </button>
+                  <AnimatePresence>
+                    {staffBuilderOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="overflow-hidden"
                       >
-                        {deviceOptions.map((d) => (
-                          <option key={d.id} value={d.id} className="text-gray-900">
-                            {d.label}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-white/60 pointer-events-none" />
-                    </div>
-
-                    <div className="relative z-30">
-                      <button
-                        onClick={() => setIsAttachDropdownOpen(!isAttachDropdownOpen)}
-                        className="bg-white/10 border border-white/20 text-white rounded-xl px-4 py-2 flex items-center gap-2 outline-none focus:border-emerald-500 cursor-pointer text-sm font-medium"
-                      >
-                        Category Master ({selectedAttachCategories.length ? selectedAttachCategories.length : "All"})
-                        <ChevronDown className={`w-4 h-4 text-white/60 transition-transform ${isAttachDropdownOpen ? "rotate-180" : ""}`} />
-                      </button>
-
-                      {isAttachDropdownOpen && (
-                        <div className="absolute right-0 top-full mt-2 w-64 bg-[#1a4431] border border-white/20 rounded-xl shadow-xl z-50 p-3 flex flex-col gap-2 max-h-72 overflow-auto">
-                          <div className="text-[11px] uppercase tracking-wider text-white/50 px-2">Category Master</div>
-                          <label className="flex items-center gap-3 p-2 hover:bg-white/10 rounded-lg cursor-pointer transition-colors">
-                            <input type="checkbox" name="attachCategory" className="hidden" checked={selectedAttachCategories.length === 0} onChange={() => setSelectedAttachCategories([])} />
-                            <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${selectedAttachCategories.length === 0 ? "bg-emerald-500 border-emerald-500" : "border-white/40"}`}>
-                              {selectedAttachCategories.length === 0 && <Check className="w-3.5 h-3.5 text-white" />}
+                        <div className="mt-3 bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-5 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+                          <div className="flex flex-col xl:flex-row gap-5">
+                            <div className="flex-1 grid md:grid-cols-2 gap-4">
+                              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                                <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest block mb-3">
+                                  1. Base Target (ตัวหาร)
+                                </span>
+                                <CategoryTreePicker
+                                  treeMap={staffCategoryTree}
+                                  selected={staffBaseCategories}
+                                  toggle={(cat) => toggleStaffCategory(cat, true)}
+                                  variant="base"
+                                />
+                              </div>
+                              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                                <span className="text-[10px] font-bold text-teal-400 uppercase tracking-widest block mb-3">
+                                  2. Attach Target (ตัวแนบ)
+                                </span>
+                                <CategoryTreePicker
+                                  treeMap={staffCategoryTree}
+                                  selected={staffAttachCategories}
+                                  toggle={(cat) => toggleStaffCategory(cat, false)}
+                                  variant="attach"
+                                />
+                              </div>
                             </div>
-                            <span className="text-sm text-white/90">All Categories</span>
-                          </label>
-                          {attachCategoryOptions.filter((c) => c !== "all").map((cat) => (
-                            <label key={cat} className="flex items-center gap-3 p-2 hover:bg-white/10 rounded-lg cursor-pointer transition-colors">
-                              <input type="checkbox" name="attachCategory" className="hidden" checked={selectedAttachCategories.includes(cat)} onChange={() => toggleAttachCategory(cat)} />
-                              <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${selectedAttachCategories.includes(cat) ? "bg-emerald-500 border-emerald-500" : "border-white/40"}`}>
-                                {selectedAttachCategories.includes(cat) && <Check className="w-3.5 h-3.5 text-white" />}
+                            <div className="xl:w-56 flex flex-col gap-4 shrink-0">
+                              <div>
+                                <label className="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-1.5 block">
+                                  Branch
+                                </label>
+                                <select
+                                  value={staffFilterBranch}
+                                  onChange={(e) => setStaffFilterBranch(e.target.value)}
+                                  className="w-full text-sm bg-white/10 border border-white/20 text-white rounded-xl px-3 py-2 outline-none focus:border-emerald-500"
+                                >
+                                  {staffBranchesList.map((b) => (
+                                    <option key={b} value={b} className="text-gray-900">
+                                      {b.replace(/^ID\d+ : /, "")}
+                                    </option>
+                                  ))}
+                                </select>
                               </div>
-                              <span className="text-sm text-white/90 truncate">{cat}</span>
-                            </label>
-                          ))}
-                          <div className="border-t border-white/10 mt-2 pt-2">
-                            <div className="text-[11px] uppercase tracking-wider text-white/50 px-2 mb-1">Officer</div>
-                            <label className="flex items-center gap-3 p-2 hover:bg-white/10 rounded-lg cursor-pointer transition-colors">
-                              <input type="checkbox" name="attachOfficer" className="hidden" checked={selectedAttachOfficers.length === 0} onChange={() => setSelectedAttachOfficers([])} />
-                              <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${selectedAttachOfficers.length === 0 ? "bg-emerald-500 border-emerald-500" : "border-white/40"}`}>
-                                {selectedAttachOfficers.length === 0 && <Check className="w-3.5 h-3.5 text-white" />}
+                              <div>
+                                <label className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-1.5 flex items-center justify-between">
+                                  <span className="flex items-center gap-1">
+                                    <SlidersHorizontal className="w-3 h-3" /> Target KPI
+                                  </span>
+                                  <span className="bg-emerald-500/20 text-emerald-300 px-1.5 rounded">
+                                    {staffKpiTarget}%
+                                  </span>
+                                </label>
+                                <input
+                                  type="range"
+                                  min={0}
+                                  max={100}
+                                  step={1}
+                                  value={staffKpiTarget}
+                                  onChange={(e) => setStaffKpiTarget(Number(e.target.value))}
+                                  className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                                />
                               </div>
-                              <span className="text-sm text-white/90">All Officers</span>
-                            </label>
-                            {parsedReport.officers.map((officer, idx) => (
-                              <label key={`${officer.name}-${idx}`} className="flex items-center gap-3 p-2 hover:bg-white/10 rounded-lg cursor-pointer transition-colors">
-                                <input type="checkbox" name="attachOfficer" className="hidden" checked={selectedAttachOfficers.includes(officer.name)} onChange={() => toggleAttachOfficer(officer.name)} />
-                                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${selectedAttachOfficers.includes(officer.name) ? "bg-emerald-500 border-emerald-500" : "border-white/40"}`}>
-                                  {selectedAttachOfficers.includes(officer.name) && <Check className="w-3.5 h-3.5 text-white" />}
+                              <div>
+                                <div className="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-2">
+                                  Officer
                                 </div>
-                                <span className="text-sm text-white/90 truncate">{officer.name}</span>
-                              </label>
-                            ))}
+                                <div className="max-h-28 overflow-y-auto flex flex-col gap-1 pr-1">
+                                  <label className="flex items-center gap-2 p-1.5 hover:bg-white/10 rounded-lg cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      className="hidden"
+                                      checked={selectedAttachOfficers.length === 0}
+                                      onChange={() => setSelectedAttachOfficers([])}
+                                    />
+                                    <div
+                                      className={`w-4 h-4 rounded border flex items-center justify-center ${selectedAttachOfficers.length === 0 ? "bg-emerald-500 border-emerald-500" : "border-white/40"}`}
+                                    >
+                                      {selectedAttachOfficers.length === 0 && (
+                                        <Check className="w-3 h-3 text-white" />
+                                      )}
+                                    </div>
+                                    <span className="text-xs text-white/90">All Officers</span>
+                                  </label>
+                                  {parsedReport.officers.map((officer, idx) => (
+                                    <label
+                                      key={`${officer.name}-${idx}`}
+                                      className="flex items-center gap-2 p-1.5 hover:bg-white/10 rounded-lg cursor-pointer"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        className="hidden"
+                                        checked={selectedAttachOfficers.includes(officer.name)}
+                                        onChange={() => toggleAttachOfficer(officer.name)}
+                                      />
+                                      <div
+                                        className={`w-4 h-4 rounded border flex items-center justify-center ${selectedAttachOfficers.includes(officer.name) ? "bg-emerald-500 border-emerald-500" : "border-white/40"}`}
+                                      >
+                                        {selectedAttachOfficers.includes(officer.name) && (
+                                          <Check className="w-3 h-3 text-white" />
+                                        )}
+                                      </div>
+                                      <span className="text-xs text-white/90 truncate">
+                                        {officer.name}
+                                      </span>
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                      )}
-                    </div>
-                  </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
 
                 <div className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 flex flex-col shadow-[0_8px_32px_rgba(0,0,0,0.12)] h-[450px] min-h-[450px] relative z-10 w-full shrink-0 min-w-0">
                   <ResponsiveContainer width="100%" height={380} minWidth={0}>
                     <BarChart
-                      data={attachRateData.filter((row) => {
-                        const hasCategory = selectedAttachCategories.length === 0 || selectedAttachCategories.some((cat) => {
-                          const normalized = normalizeText(cat);
-                          const rowText = normalizeText(`${row.name} ${row.branch}`);
-                          return rowText.includes(normalized) || normalized === "all";
-                        });
-                        const hasOfficer = selectedAttachOfficers.length === 0 || selectedAttachOfficers.includes(row.name);
-                        return hasCategory && hasOfficer;
-                      })}
+                      data={attachRateData.filter((row) =>
+                        selectedAttachOfficers.length === 0 ||
+                        selectedAttachOfficers.includes(row.name),
+                      )}
                       margin={{ top: 20, right: 30, left: 0, bottom: 20 }}
                       barGap={6}
                     >
@@ -1855,135 +1910,6 @@ export default function App() {
                 </div>
 
 
-                {/* Custom Attach Builder */}
-                <div className="relative z-40">
-                  <button
-                    type="button"
-                    onClick={() => setStaffBuilderOpen((v) => !v)}
-                    className="w-full flex items-center justify-between gap-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 px-5 py-3.5 hover:bg-white/[0.14] transition-colors shadow-[0_8px_32px_rgba(0,0,0,0.12)]"
-                  >
-                    <span className="flex items-center gap-2 text-sm font-semibold">
-                      <Target className="w-4 h-4 text-emerald-400" />
-                      Custom Attach Builder
-                    </span>
-                    <span className="flex items-center gap-3 text-xs text-white/60">
-                      {staffBaseCategories.length} base · {staffAttachCategories.length} attach · KPI {staffKpiTarget}%
-                      <ChevronDown
-                        className={`w-4 h-4 transition-transform ${staffBuilderOpen ? "rotate-180" : ""}`}
-                      />
-                    </span>
-                  </button>
-                  <AnimatePresence>
-                    {staffBuilderOpen && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="mt-3 bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-5 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
-                          <div className="flex flex-col xl:flex-row gap-5">
-                            <div className="flex-1 grid md:grid-cols-2 gap-4">
-                              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                                <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest block mb-3">
-                                  1. Base Target (ตัวหาร)
-                                </span>
-                                <CategoryTreePicker
-                                  treeMap={staffCategoryTree}
-                                  selected={staffBaseCategories}
-                                  toggle={(cat) => toggleStaffCategory(cat, true)}
-                                  variant="base"
-                                />
-                              </div>
-                              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                                <span className="text-[10px] font-bold text-teal-400 uppercase tracking-widest block mb-3">
-                                  2. Attach Target (ตัวแนบ)
-                                </span>
-                                <CategoryTreePicker
-                                  treeMap={staffCategoryTree}
-                                  selected={staffAttachCategories}
-                                  toggle={(cat) => toggleStaffCategory(cat, false)}
-                                  variant="attach"
-                                />
-                              </div>
-                            </div>
-                            <div className="xl:w-56 flex flex-col gap-4 shrink-0">
-                              <div>
-                                <label className="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-1.5 block">
-                                  Branch
-                                </label>
-                                <select
-                                  value={staffFilterBranch}
-                                  onChange={(e) => setStaffFilterBranch(e.target.value)}
-                                  className="w-full text-sm bg-white/10 border border-white/20 text-white rounded-xl px-3 py-2 outline-none focus:border-emerald-500"
-                                >
-                                  {staffBranchesList.map((b) => (
-                                    <option key={b} value={b} className="text-gray-900">
-                                      {b.replace(/^ID\d+ : /, "")}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div>
-                                <label className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-1.5 flex items-center justify-between">
-                                  <span className="flex items-center gap-1">
-                                    <SlidersHorizontal className="w-3 h-3" /> Target KPI
-                                  </span>
-                                  <span className="bg-emerald-500/20 text-emerald-300 px-1.5 rounded">
-                                    {staffKpiTarget}%
-                                  </span>
-                                </label>
-                                <input
-                                  type="range"
-                                  min={0}
-                                  max={100}
-                                  step={1}
-                                  value={staffKpiTarget}
-                                  onChange={(e) => setStaffKpiTarget(Number(e.target.value))}
-                                  className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                                />
-                              </div>
-                              {activeStaffAttachRow && (
-                                <div className="rounded-xl border border-white/10 bg-emerald-500/10 p-3 text-xs space-y-1.5">
-                                  <div className="font-semibold text-white/90 truncate">
-                                    {activeStaffAttachRow.name}
-                                  </div>
-                                  <div className="text-white/60">
-                                    Base:{" "}
-                                    <span className="text-white font-bold tabular-nums">
-                                      {activeStaffAttachRow.baseUnits}
-                                    </span>{" "}
-                                    U
-                                  </div>
-                                  {staffAttachCategories.map((cat) => {
-                                    const entry = activeStaffAttachRow.attachMap[cat];
-                                    if (!entry) return null;
-                                    return (
-                                      <div
-                                        key={cat}
-                                        className="flex justify-between gap-2"
-                                      >
-                                        <span className="text-white/50 truncate">{cat}</span>
-                                        <span
-                                          className={`font-bold tabular-nums shrink-0 ${
-                                            entry.isHit ? "text-emerald-400" : "text-white/80"
-                                          }`}
-                                        >
-                                          {entry.rate.toFixed(1)}%
-                                        </span>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-
                 {/* BOTTOM HALF: Tables */}
                 <div className="relative z-40 flex flex-col lg:flex-row gap-6 min-h-[260px]">
                   {/* Recent Customer Interactions */}
@@ -2139,7 +2065,7 @@ export default function App() {
                               </div>
                               {!isLast && (
                                 <div
-                                  className={`${attachRate >= staffKpiTarget ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/20" : "bg-white/5 text-white/60 border-white/10"} text-[9px] font-bold px-1.5 py-0.5 rounded border mt-1 leading-none`}
+                                  className={`${attachRate >= 20 ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/20" : "bg-white/5 text-white/60 border-white/10"} text-[9px] font-bold px-1.5 py-0.5 rounded border mt-1 leading-none`}
                                 >
                                   {attachRate}%
                                 </div>
