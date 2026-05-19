@@ -542,7 +542,9 @@ export default function App() {
   const [staffAttachCategories, setStaffAttachCategories] = useState<string[]>([
     ...DEFAULT_ATTACH_CATEGORIES,
   ]);
-  const [staffKpiTarget, setStaffKpiTarget] = useState(20);
+  const [staffKpiTargets, setStaffKpiTargets] = useState<Record<string, number>>(() =>
+    Object.fromEntries(DEFAULT_ATTACH_CATEGORIES.map((cat) => [cat, 20])),
+  );
   const [staffFilterBranch, setStaffFilterBranch] = useState("All Branches");
   const [staffBuilderOpen, setStaffBuilderOpen] = useState(false);
 
@@ -645,30 +647,8 @@ export default function App() {
     return DEFAULT_ATTACH_CATEGORIES;
   }, [currentView, staffAttachCategories]);
 
-  const attachKpiTarget = currentView === "staff_overview" ? staffKpiTarget : 20;
   const attachFilterBranch =
     currentView === "staff_overview" ? staffFilterBranch : "All Branches";
-
-  const attachOfficerRows = useMemo<AttachOfficerRow[]>(() => {
-    if (!uploadedFiles.current.length) return [];
-    return computeAttachRateRows({
-      currentRows: uploadedFiles.current,
-      targetRows: uploadedFiles.target,
-      categoryMaster: uploadedFiles.categoryMaster,
-      baseCategories: attachBaseCategories,
-      attachCategories: attachTargetCategories,
-      kpiTarget: attachKpiTarget,
-      filterBranch: attachFilterBranch,
-    });
-  }, [
-    uploadedFiles.current,
-    uploadedFiles.target,
-    uploadedFiles.categoryMaster,
-    attachBaseCategories,
-    attachTargetCategories,
-    attachKpiTarget,
-    attachFilterBranch,
-  ]);
 
   const staffBranchesList = useMemo(() => {
     if (!uploadedFiles.target.length) {
@@ -694,17 +674,55 @@ export default function App() {
     [uploadedFiles.current, uploadedFiles.categoryMaster],
   );
 
+  const setStaffKpiForCategory = (cat: string, value: number) => {
+    setStaffKpiTargets((prev) => ({ ...prev, [cat]: value }));
+  };
+
   const toggleStaffCategory = (cat: string, isBase: boolean) => {
     if (isBase) {
       setStaffBaseCategories((prev) =>
         prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat],
       );
     } else {
-      setStaffAttachCategories((prev) =>
-        prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat],
-      );
+      setStaffAttachCategories((prev) => {
+        if (prev.includes(cat)) return prev.filter((c) => c !== cat);
+        setStaffKpiTargets((kpi) => ({ ...kpi, [cat]: kpi[cat] ?? 20 }));
+        return [...prev, cat];
+      });
     }
   };
+
+  const attachKpiTargetsByCategory = useMemo(() => {
+    const map: Record<string, number> = {};
+    staffAttachCategories.forEach((cat) => {
+      map[cat] = staffKpiTargets[cat] ?? 20;
+    });
+    return map;
+  }, [staffAttachCategories, staffKpiTargets]);
+
+  const attachOfficerRows = useMemo<AttachOfficerRow[]>(() => {
+    if (!uploadedFiles.current.length) return [];
+    return computeAttachRateRows({
+      currentRows: uploadedFiles.current,
+      targetRows: uploadedFiles.target,
+      categoryMaster: uploadedFiles.categoryMaster,
+      baseCategories: attachBaseCategories,
+      attachCategories: attachTargetCategories,
+      kpiTargetsByCategory:
+        currentView === "staff_overview" ? attachKpiTargetsByCategory : undefined,
+      kpiTarget: 20,
+      filterBranch: attachFilterBranch,
+    });
+  }, [
+    uploadedFiles.current,
+    uploadedFiles.target,
+    uploadedFiles.categoryMaster,
+    attachBaseCategories,
+    attachTargetCategories,
+    attachKpiTargetsByCategory,
+    attachFilterBranch,
+    currentView,
+  ]);
 
   const attachOverviewRows = useMemo<AttachMatrixDisplayRow[]>(() => {
     const selectedOfficerSet = selectedAttachOfficers.length
@@ -755,7 +773,10 @@ export default function App() {
         ),
         units: Object.fromEntries(categories.map((cat) => [cat, 0])),
         isHit: Object.fromEntries(
-          categories.map((cat) => [cat, officer.rate >= staffKpiTarget]),
+          categories.map((cat) => [
+            cat,
+            officer.rate >= (staffKpiTargets[cat] ?? 20),
+          ]),
         ),
       }));
   }, [
@@ -763,7 +784,7 @@ export default function App() {
     attachTargetCategories,
     selectedAttachOfficers,
     parsedReport.officers,
-    staffKpiTarget,
+    staffKpiTargets,
   ]);
 
   const attachOverviewChartData = useMemo(() => {
@@ -1375,7 +1396,10 @@ export default function App() {
                       Custom Attach Builder
                     </span>
                     <span className="flex items-center gap-3 text-xs text-white/60">
-                      {staffBaseCategories.length} base · {staffAttachCategories.length} attach · KPI {staffKpiTarget}%
+                      {staffBaseCategories.length} base · {staffAttachCategories.length} attach
+                      {staffAttachCategories.length > 0
+                        ? ` · KPI ${staffAttachCategories.map((c) => `${staffKpiTargets[c] ?? 20}%`).join(" / ")}`
+                        : ""}
                       <ChevronDown
                         className={`w-4 h-4 transition-transform ${staffBuilderOpen ? "rotate-180" : ""}`}
                       />
@@ -1433,23 +1457,45 @@ export default function App() {
                                 </select>
                               </div>
                               <div>
-                                <label className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-1.5 flex items-center justify-between">
-                                  <span className="flex items-center gap-1">
-                                    <SlidersHorizontal className="w-3 h-3" /> Target KPI
-                                  </span>
-                                  <span className="bg-emerald-500/20 text-emerald-300 px-1.5 rounded">
-                                    {staffKpiTarget}%
-                                  </span>
-                                </label>
-                                <input
-                                  type="range"
-                                  min={0}
-                                  max={100}
-                                  step={1}
-                                  value={staffKpiTarget}
-                                  onChange={(e) => setStaffKpiTarget(Number(e.target.value))}
-                                  className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                                />
+                                <div className="text-[10px] font-bold text-teal-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                  <SlidersHorizontal className="w-3 h-3" />
+                                  Target KPI ต่อหมวด Attach
+                                </div>
+                                {staffAttachCategories.length === 0 ? (
+                                  <p className="text-xs text-white/50">
+                                    เลือกหมวดใน Attach Target ก่อน
+                                  </p>
+                                ) : (
+                                  <div className="space-y-3 max-h-40 overflow-y-auto pr-1">
+                                    {staffAttachCategories.map((cat) => {
+                                      const kpi = staffKpiTargets[cat] ?? 20;
+                                      return (
+                                        <div key={cat}>
+                                          <label className="flex items-center justify-between gap-2 text-xs mb-1">
+                                            <span className="text-white/80 truncate">{cat}</span>
+                                            <span className="bg-teal-500/20 text-teal-200 px-1.5 rounded tabular-nums shrink-0">
+                                              {kpi}%
+                                            </span>
+                                          </label>
+                                          <input
+                                            type="range"
+                                            min={0}
+                                            max={100}
+                                            step={1}
+                                            value={kpi}
+                                            onChange={(e) =>
+                                              setStaffKpiForCategory(
+                                                cat,
+                                                Number(e.target.value),
+                                              )
+                                            }
+                                            className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-teal-500"
+                                          />
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
                               </div>
                               <div>
                                 <div className="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-2">
@@ -1624,7 +1670,10 @@ export default function App() {
                             : DEFAULT_ATTACH_CATEGORIES
                           ).map((cat) => (
                             <th key={cat} className="pb-3 font-medium px-4 text-right whitespace-nowrap">
-                              {cat} %
+                              <span className="block">{cat}</span>
+                              <span className="text-[10px] font-normal text-white/40">
+                                KPI ≥{staffKpiTargets[cat] ?? 20}%
+                              </span>
                             </th>
                           ))}
                         </tr>

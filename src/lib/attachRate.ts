@@ -262,7 +262,9 @@ export function computeAttachRateRows(params: {
   categoryMaster: SpreadsheetRow[];
   baseCategories: string[];
   attachCategories: string[];
+  /** @deprecated use kpiTargetsByCategory — fallback when a category has no entry */
   kpiTarget?: number;
+  kpiTargetsByCategory?: Record<string, number>;
   filterBranch?: string;
 }): AttachOfficerRow[] {
   const {
@@ -272,8 +274,12 @@ export function computeAttachRateRows(params: {
     baseCategories,
     attachCategories,
     kpiTarget = 20,
+    kpiTargetsByCategory = {},
     filterBranch = "All Branches",
   } = params;
+
+  const kpiForCategory = (cat: string) =>
+    kpiTargetsByCategory[cat] ?? kpiTarget;
 
   if (!currentRows.length) return [];
 
@@ -360,7 +366,7 @@ export function computeAttachRateRows(params: {
         const rate = o.baseUnits > 0 ? (units / o.baseUnits) * 100 : 0;
         if (o.attachMap[cat]) {
           o.attachMap[cat].rate = rate;
-          o.attachMap[cat].isHit = rate >= kpiTarget;
+          o.attachMap[cat].isHit = rate >= kpiForCategory(cat);
         }
         totalAttachUnitsForSorting += units;
       });
