@@ -7,6 +7,24 @@ export const DEFAULT_BASE_CATEGORIES = [
 
 export const DEFAULT_ATTACH_CATEGORIES = ["Apple Care", "Cover+", "SIM"];
 
+export const DEFAULT_CATEGORY_TREE_KEYS = [
+  "iPhone",
+  "Mac",
+  "iPad",
+  "Apple Watch",
+  "Smartphone",
+  "Desktop",
+  "Notebook",
+  "Tablet",
+  "Apple Care",
+  "Cover+",
+  "SIM",
+  "DIY",
+  "BTB(Apple)",
+  "BTB",
+  "Other",
+];
+
 export type SpreadsheetRow = Record<string, string | number | undefined>;
 
 export type AttachMapEntry = { units: number; rate: number; isHit: boolean };
@@ -144,6 +162,39 @@ function findOfficerRow<T extends { name: string; staffId: number }>(
     rows.find((o) => matchesOfficer(o.name, officerName)) ??
     null
   );
+}
+
+export function buildCategoryTree(
+  currentRows: SpreadsheetRow[],
+  categoryMaster: SpreadsheetRow[],
+) {
+  const tree = new Map<string, Set<string>>();
+  DEFAULT_CATEGORY_TREE_KEYS.forEach((c) => tree.set(c, new Set()));
+  const categoryLookup = buildCategoryLookup(categoryMaster);
+
+  currentRows.forEach((row) => {
+    const categoryName = String(row["Category (Name)"] ?? row.category ?? "").trim();
+    const subCategory = String(row["Sub Category"] ?? row.subcategory ?? "").trim();
+    const productName = String(row["Product (Name)"] ?? row.product ?? "").trim();
+    let gc = getGroupCategory(categoryName, subCategory, categoryLookup, productName);
+    if (productName.toUpperCase().includes("COVER+")) gc = "Cover+";
+    if (!tree.has(gc)) tree.set(gc, new Set());
+    if (subCategory) tree.get(gc)!.add(subCategory);
+  });
+
+  const sortedTree = new Map<string, Set<string>>();
+  Array.from(tree.keys())
+    .sort((a, b) => {
+      const aDef = DEFAULT_CATEGORY_TREE_KEYS.includes(a);
+      const bDef = DEFAULT_CATEGORY_TREE_KEYS.includes(b);
+      if (aDef && !bDef) return -1;
+      if (!aDef && bDef) return 1;
+      return a.localeCompare(b);
+    })
+    .forEach((k) => {
+      sortedTree.set(k, new Set(Array.from(tree.get(k)!).sort()));
+    });
+  return sortedTree;
 }
 
 export function computeAttachRateRows(params: {

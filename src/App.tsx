@@ -16,7 +16,10 @@ import {
   Users,
   Check,
   Settings,
+  Target,
+  SlidersHorizontal,
 } from "lucide-react";
+import CategoryTreePicker from "./components/CategoryTreePicker";
 import { AnimatePresence, motion } from "motion/react";
 import React, { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
@@ -30,6 +33,7 @@ import {
   type UploadState,
 } from "./lib/uploadsApi";
 import {
+  buildCategoryTree,
   computeAttachRateRows,
   DEFAULT_ATTACH_CATEGORIES,
   DEFAULT_BASE_CATEGORIES,
@@ -528,6 +532,15 @@ export default function App() {
   const [isSavingTurso, setIsSavingTurso] = useState(false);
   const [tursoDatabase, setTursoDatabase] = useState<string | null>(null);
   const [tursoStats, setTursoStats] = useState<TursoHealthStats | null>(null);
+  const [staffBaseCategories, setStaffBaseCategories] = useState<string[]>([
+    ...DEFAULT_BASE_CATEGORIES,
+  ]);
+  const [staffAttachCategories, setStaffAttachCategories] = useState<string[]>([
+    ...DEFAULT_ATTACH_CATEGORIES,
+  ]);
+  const [staffKpiTarget, setStaffKpiTarget] = useState(20);
+  const [staffFilterBranch, setStaffFilterBranch] = useState("All Branches");
+  const [staffBuilderOpen, setStaffBuilderOpen] = useState(false);
 
   const STORAGE_KEY = "dashboard-upload-state-v1";
 
@@ -618,15 +631,21 @@ export default function App() {
     );
   };
 
-  const attachBaseCategories = useMemo(
-    () => (currentView === "staff_overview" && selectedDevice ? [selectedDevice] : DEFAULT_BASE_CATEGORIES),
-    [currentView, selectedDevice],
-  );
+  const attachBaseCategories = useMemo(() => {
+    if (currentView === "staff") return staffBaseCategories;
+    if (currentView === "staff_overview" && selectedDevice) return [selectedDevice];
+    return DEFAULT_BASE_CATEGORIES;
+  }, [currentView, selectedDevice, staffBaseCategories]);
 
-  const attachTargetCategories = useMemo(
-    () => (selectedAttachCategories.length ? selectedAttachCategories : DEFAULT_ATTACH_CATEGORIES),
-    [selectedAttachCategories],
-  );
+  const attachTargetCategories = useMemo(() => {
+    if (currentView === "staff") return staffAttachCategories;
+    if (selectedAttachCategories.length) return selectedAttachCategories;
+    return DEFAULT_ATTACH_CATEGORIES;
+  }, [currentView, staffAttachCategories, selectedAttachCategories]);
+
+  const attachKpiTarget = currentView === "staff" ? staffKpiTarget : 20;
+  const attachFilterBranch =
+    currentView === "staff" ? staffFilterBranch : "All Branches";
 
   const attachOfficerRows = useMemo<AttachOfficerRow[]>(() => {
     if (!uploadedFiles.current.length) return [];
@@ -636,7 +655,8 @@ export default function App() {
       categoryMaster: uploadedFiles.categoryMaster,
       baseCategories: attachBaseCategories,
       attachCategories: attachTargetCategories,
-      kpiTarget: 20,
+      kpiTarget: attachKpiTarget,
+      filterBranch: attachFilterBranch,
     });
   }, [
     uploadedFiles.current,
@@ -644,7 +664,55 @@ export default function App() {
     uploadedFiles.categoryMaster,
     attachBaseCategories,
     attachTargetCategories,
+    attachKpiTarget,
+    attachFilterBranch,
   ]);
+
+  const staffBranchesList = useMemo(() => {
+    if (!uploadedFiles.target.length) {
+      const fromReport = [
+        ...new Set(parsedReport.officers.map((o) => o.branch).filter(Boolean)),
+      ].sort();
+      return ["All Branches", ...fromReport];
+    }
+    const branches = new Set(
+      uploadedFiles.target
+        .map((t) => String(t["BRANCH NAME"] ?? "").trim())
+        .filter(Boolean),
+    );
+    return ["All Branches", ...Array.from(branches).sort()];
+  }, [uploadedFiles.target, parsedReport.officers]);
+
+  const staffCategoryTree = useMemo(
+    () =>
+      buildCategoryTree(
+        uploadedFiles.current,
+        uploadedFiles.categoryMaster,
+      ),
+    [uploadedFiles.current, uploadedFiles.categoryMaster],
+  );
+
+  const toggleStaffCategory = (cat: string, isBase: boolean) => {
+    if (isBase) {
+      setStaffBaseCategories((prev) =>
+        prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat],
+      );
+    } else {
+      setStaffAttachCategories((prev) =>
+        prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat],
+      );
+    }
+  };
+
+  const activeStaffAttachRow = useMemo(() => {
+    const officerName = activeOfficer?.name ?? currentStaff.name;
+    const key = cleanOfficerName(officerName);
+    return (
+      attachOfficerRows.find((row) => row.id === key) ??
+      attachOfficerRows.find((row) => attachMatchesOfficer(row.name, officerName)) ??
+      null
+    );
+  }, [attachOfficerRows, activeOfficer?.name, currentStaff.name]);
 
   const attachRateData = useMemo<DerivedAttachRow[]>(() => {
     const selectedOfficerSet = selectedAttachOfficers.length
@@ -774,7 +842,7 @@ export default function App() {
               : "user",
           product: String(row["Product (Name)"] ?? row.product ?? "-").trim(),
           status:
-            DEFAULT_ATTACH_CATEGORIES.some(
+            staffAttachCategories.some(
               (cat) =>
                 normalizeText(category).includes(normalizeText(cat)) ||
                 normalizeText(subCategory).includes(normalizeText(cat)),
@@ -791,7 +859,7 @@ export default function App() {
       csat: rows,
       target: rows,
     };
-  }, [uploadedFiles.current, activeOfficer?.name, currentStaff.name]);
+  }, [uploadedFiles.current, activeOfficer?.name, currentStaff.name, staffAttachCategories]);
 
   const persistUploadsLocal = (nextUploads: UploadState) => {
     try {
@@ -1786,6 +1854,136 @@ export default function App() {
                   </div>
                 </div>
 
+
+                {/* Custom Attach Builder */}
+                <div className="relative z-40">
+                  <button
+                    type="button"
+                    onClick={() => setStaffBuilderOpen((v) => !v)}
+                    className="w-full flex items-center justify-between gap-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 px-5 py-3.5 hover:bg-white/[0.14] transition-colors shadow-[0_8px_32px_rgba(0,0,0,0.12)]"
+                  >
+                    <span className="flex items-center gap-2 text-sm font-semibold">
+                      <Target className="w-4 h-4 text-emerald-400" />
+                      Custom Attach Builder
+                    </span>
+                    <span className="flex items-center gap-3 text-xs text-white/60">
+                      {staffBaseCategories.length} base · {staffAttachCategories.length} attach · KPI {staffKpiTarget}%
+                      <ChevronDown
+                        className={`w-4 h-4 transition-transform ${staffBuilderOpen ? "rotate-180" : ""}`}
+                      />
+                    </span>
+                  </button>
+                  <AnimatePresence>
+                    {staffBuilderOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="mt-3 bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-5 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+                          <div className="flex flex-col xl:flex-row gap-5">
+                            <div className="flex-1 grid md:grid-cols-2 gap-4">
+                              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                                <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest block mb-3">
+                                  1. Base Target (ตัวหาร)
+                                </span>
+                                <CategoryTreePicker
+                                  treeMap={staffCategoryTree}
+                                  selected={staffBaseCategories}
+                                  toggle={(cat) => toggleStaffCategory(cat, true)}
+                                  variant="base"
+                                />
+                              </div>
+                              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                                <span className="text-[10px] font-bold text-teal-400 uppercase tracking-widest block mb-3">
+                                  2. Attach Target (ตัวแนบ)
+                                </span>
+                                <CategoryTreePicker
+                                  treeMap={staffCategoryTree}
+                                  selected={staffAttachCategories}
+                                  toggle={(cat) => toggleStaffCategory(cat, false)}
+                                  variant="attach"
+                                />
+                              </div>
+                            </div>
+                            <div className="xl:w-56 flex flex-col gap-4 shrink-0">
+                              <div>
+                                <label className="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-1.5 block">
+                                  Branch
+                                </label>
+                                <select
+                                  value={staffFilterBranch}
+                                  onChange={(e) => setStaffFilterBranch(e.target.value)}
+                                  className="w-full text-sm bg-white/10 border border-white/20 text-white rounded-xl px-3 py-2 outline-none focus:border-emerald-500"
+                                >
+                                  {staffBranchesList.map((b) => (
+                                    <option key={b} value={b} className="text-gray-900">
+                                      {b.replace(/^ID\d+ : /, "")}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div>
+                                <label className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-1.5 flex items-center justify-between">
+                                  <span className="flex items-center gap-1">
+                                    <SlidersHorizontal className="w-3 h-3" /> Target KPI
+                                  </span>
+                                  <span className="bg-emerald-500/20 text-emerald-300 px-1.5 rounded">
+                                    {staffKpiTarget}%
+                                  </span>
+                                </label>
+                                <input
+                                  type="range"
+                                  min={0}
+                                  max={100}
+                                  step={1}
+                                  value={staffKpiTarget}
+                                  onChange={(e) => setStaffKpiTarget(Number(e.target.value))}
+                                  className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                                />
+                              </div>
+                              {activeStaffAttachRow && (
+                                <div className="rounded-xl border border-white/10 bg-emerald-500/10 p-3 text-xs space-y-1.5">
+                                  <div className="font-semibold text-white/90 truncate">
+                                    {activeStaffAttachRow.name}
+                                  </div>
+                                  <div className="text-white/60">
+                                    Base:{" "}
+                                    <span className="text-white font-bold tabular-nums">
+                                      {activeStaffAttachRow.baseUnits}
+                                    </span>{" "}
+                                    U
+                                  </div>
+                                  {staffAttachCategories.map((cat) => {
+                                    const entry = activeStaffAttachRow.attachMap[cat];
+                                    if (!entry) return null;
+                                    return (
+                                      <div
+                                        key={cat}
+                                        className="flex justify-between gap-2"
+                                      >
+                                        <span className="text-white/50 truncate">{cat}</span>
+                                        <span
+                                          className={`font-bold tabular-nums shrink-0 ${
+                                            entry.isHit ? "text-emerald-400" : "text-white/80"
+                                          }`}
+                                        >
+                                          {entry.rate.toFixed(1)}%
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
                 {/* BOTTOM HALF: Tables */}
                 <div className="relative z-40 flex flex-col lg:flex-row gap-6 min-h-[260px]">
                   {/* Recent Customer Interactions */}
@@ -1941,7 +2139,7 @@ export default function App() {
                               </div>
                               {!isLast && (
                                 <div
-                                  className={`${attachRate >= 20 ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/20" : "bg-white/5 text-white/60 border-white/10"} text-[9px] font-bold px-1.5 py-0.5 rounded border mt-1 leading-none`}
+                                  className={`${attachRate >= staffKpiTarget ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/20" : "bg-white/5 text-white/60 border-white/10"} text-[9px] font-bold px-1.5 py-0.5 rounded border mt-1 leading-none`}
                                 >
                                   {attachRate}%
                                 </div>
