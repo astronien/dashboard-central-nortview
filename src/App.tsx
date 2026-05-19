@@ -654,6 +654,56 @@ export default function App() {
   const activeOfficerIndex = Math.max(Number(activeStaffId) - 1, 0);
   const activeOfficer = parsedReport.officers[activeOfficerIndex] ?? parsedReport.officers[0];
 
+  const attachBaseCategories = useMemo(() => {
+    if (currentView === "staff_overview") return staffBaseCategories;
+    return DEFAULT_BASE_CATEGORIES;
+  }, [currentView, staffBaseCategories]);
+
+  const attachTargetCategories = useMemo(() => {
+    if (currentView === "staff_overview") {
+      return staffAttachGroups.map((g) => g.label);
+    }
+    return DEFAULT_ATTACH_CATEGORIES;
+  }, [currentView, staffAttachGroups]);
+
+  const attachFilterBranch =
+    currentView === "staff_overview" ? staffFilterBranch : "All Branches";
+
+  const attachKpiTargetsByCategory = useMemo(() => {
+    const map: Record<string, number> = {};
+    staffAttachGroups.forEach((g) => {
+      map[g.label] = staffKpiTargets[g.label] ?? 20;
+    });
+    return map;
+  }, [staffAttachGroups, staffKpiTargets]);
+
+  const attachOfficerRows = useMemo<AttachOfficerRow[]>(() => {
+    if (!uploadedFiles.current.length) return [];
+    return computeAttachRateRows({
+      currentRows: uploadedFiles.current,
+      targetRows: uploadedFiles.target,
+      categoryMaster: uploadedFiles.categoryMaster,
+      baseCategories: attachBaseCategories,
+      attachCategories: attachTargetCategories,
+      attachGroups:
+        currentView === "staff_overview" ? staffAttachGroups : undefined,
+      kpiTargetsByCategory:
+        currentView === "staff_overview" ? attachKpiTargetsByCategory : undefined,
+      kpiTarget: 20,
+      filterBranch: attachFilterBranch,
+    });
+  }, [
+    uploadedFiles.current,
+    uploadedFiles.target,
+    uploadedFiles.categoryMaster,
+    attachBaseCategories,
+    attachTargetCategories,
+    staffAttachGroups,
+    attachKpiTargetsByCategory,
+    attachFilterBranch,
+    currentView,
+  ]);
+
   const dynamicRadarData = useMemo(() => {
     if (!uploadedFiles.current.length && Number(activeStaffId) <= 3) {
       return currentStaff.radar;
@@ -907,21 +957,6 @@ export default function App() {
     );
   };
 
-  const attachBaseCategories = useMemo(() => {
-    if (currentView === "staff_overview") return staffBaseCategories;
-    return DEFAULT_BASE_CATEGORIES;
-  }, [currentView, staffBaseCategories]);
-
-  const attachTargetCategories = useMemo(() => {
-    if (currentView === "staff_overview") {
-      return staffAttachGroups.map((g) => g.label);
-    }
-    return DEFAULT_ATTACH_CATEGORIES;
-  }, [currentView, staffAttachGroups]);
-
-  const attachFilterBranch =
-    currentView === "staff_overview" ? staffFilterBranch : "All Branches";
-
   const staffBranchesList = useMemo(() => {
     if (!uploadedFiles.target.length) {
       const fromReport = [
@@ -970,41 +1005,6 @@ export default function App() {
     setStaffAttachGroups(groups);
     syncKpiForGroups(groups);
   };
-
-  const attachKpiTargetsByCategory = useMemo(() => {
-    const map: Record<string, number> = {};
-    staffAttachGroups.forEach((g) => {
-      map[g.label] = staffKpiTargets[g.label] ?? 20;
-    });
-    return map;
-  }, [staffAttachGroups, staffKpiTargets]);
-
-  const attachOfficerRows = useMemo<AttachOfficerRow[]>(() => {
-    if (!uploadedFiles.current.length) return [];
-    return computeAttachRateRows({
-      currentRows: uploadedFiles.current,
-      targetRows: uploadedFiles.target,
-      categoryMaster: uploadedFiles.categoryMaster,
-      baseCategories: attachBaseCategories,
-      attachCategories: attachTargetCategories,
-      attachGroups:
-        currentView === "staff_overview" ? staffAttachGroups : undefined,
-      kpiTargetsByCategory:
-        currentView === "staff_overview" ? attachKpiTargetsByCategory : undefined,
-      kpiTarget: 20,
-      filterBranch: attachFilterBranch,
-    });
-  }, [
-    uploadedFiles.current,
-    uploadedFiles.target,
-    uploadedFiles.categoryMaster,
-    attachBaseCategories,
-    attachTargetCategories,
-    staffAttachGroups,
-    attachKpiTargetsByCategory,
-    attachFilterBranch,
-    currentView,
-  ]);
 
   const displayStaffAvatar = useMemo(() => {
     if (!activeOfficer) return currentStaff.image;
