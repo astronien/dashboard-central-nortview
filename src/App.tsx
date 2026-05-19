@@ -2359,7 +2359,7 @@ export default function App() {
                   ) : (
                     <div className="overflow-y-auto flex-1 -mx-2 px-2">
                       <p className="text-xs text-white/50 mb-3">
-                        共 {staffRoster.length} 人 · 支持 JPG / PNG / WebP · 自动压缩
+                        共 {staffRoster.length} 人 · PNG/WebP 保留透明底 · JPG 自动压缩
                       </p>
                       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                         {staffRoster.map((entry, index) => {

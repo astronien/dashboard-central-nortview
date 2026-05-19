@@ -84,6 +84,12 @@ export const getStaffAvatar = (
   return DEFAULT_AVATARS[idx % DEFAULT_AVATARS.length];
 };
 
+const preservesTransparency = (file: File) =>
+  file.type === "image/png" ||
+  file.type === "image/webp" ||
+  file.type === "image/gif";
+
+/** PNG/WebP เก็บ alpha — JPEG บีบอัดไฟล์เล็กลง (พื้นหลังขาว) */
 export const resizeImageFile = (file: File, maxSize = 320): Promise<string> =>
   new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
@@ -96,13 +102,24 @@ export const resizeImageFile = (file: File, maxSize = 320): Promise<string> =>
       const canvas = document.createElement("canvas");
       canvas.width = w;
       canvas.height = h;
-      const ctx = canvas.getContext("2d");
+      const ctx = canvas.getContext("2d", { alpha: true });
       if (!ctx) {
         reject(new Error("ไม่สามารถประมวลผลรูปได้"));
         return;
       }
+
+      const keepAlpha = preservesTransparency(file);
+      if (!keepAlpha) {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, w, h);
+      }
+
       ctx.drawImage(img, 0, 0, w, h);
-      resolve(canvas.toDataURL("image/jpeg", 0.85));
+      resolve(
+        keepAlpha
+          ? canvas.toDataURL("image/png")
+          : canvas.toDataURL("image/jpeg", 0.85),
+      );
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);

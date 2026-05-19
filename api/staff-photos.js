@@ -61,7 +61,7 @@ async function handler(req, res) {
           error: "Invalid payload. Expect staffId and data:image/* photoUrl.",
         });
       }
-      if (record.photoUrl.length > 600_000) {
+      if (record.photoUrl.length > 900_000) {
         return res.status(400).json({ error: "Photo too large after encoding." });
       }
       await saveStaffPhoto(tursoExecute, record);
