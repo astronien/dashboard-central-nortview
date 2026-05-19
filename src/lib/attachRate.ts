@@ -197,6 +197,65 @@ export function buildCategoryTree(
   return sortedTree;
 }
 
+export const ATTACH_CHART_COLORS = [
+  "#10b981",
+  "#3b82f6",
+  "#8b5cf6",
+  "#f59e0b",
+  "#ec4899",
+  "#06b6d4",
+  "#a78bfa",
+];
+
+export function categoryToChartKey(category: string) {
+  return `r_${normalizeText(category).replace(/\s+/g, "_")}`;
+}
+
+export function formatOfficerShortName(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length <= 1) return name.length > 14 ? `${name.slice(0, 12)}…` : name;
+  return `${parts[0]} ${parts[parts.length - 1].charAt(0)}.`;
+}
+
+export type AttachMatrixDisplayRow = {
+  id: string;
+  name: string;
+  shortName: string;
+  branch: string;
+  baseUnits: number;
+  avatar: string;
+  rates: Record<string, number>;
+  units: Record<string, number>;
+  isHit: Record<string, boolean>;
+};
+
+export function buildAttachMatrixDisplay(
+  rows: AttachOfficerRow[],
+  attachCategories: string[],
+): AttachMatrixDisplayRow[] {
+  return rows.map((row) => {
+    const rates: Record<string, number> = {};
+    const units: Record<string, number> = {};
+    const isHit: Record<string, boolean> = {};
+    attachCategories.forEach((cat) => {
+      rates[cat] = row.attachMap[cat]?.rate ?? 0;
+      units[cat] = row.attachMap[cat]?.units ?? 0;
+      isHit[cat] = row.attachMap[cat]?.isHit ?? false;
+    });
+    return {
+      id: row.id,
+      name: row.name,
+      shortName: formatOfficerShortName(row.name),
+      branch: row.branch,
+      baseUnits: row.baseUnits,
+      avatar: "",
+      rates,
+      units,
+      isHit,
+    };
+  });
+}
+
 export function computeAttachRateRows(params: {
   currentRows: SpreadsheetRow[];
   targetRows: SpreadsheetRow[];
@@ -242,19 +301,18 @@ export function computeAttachRateRows(params: {
     const name = `${String(t.NAME ?? "").trim()} ${String(t.SURNAME ?? "").trim()}`.trim();
     if (!name) return;
     const key = cleanOfficerName(name);
-    if (!officersMap.has(key)) {
-      const attachMap: Record<string, AttachMapEntry> = {};
-      attachCategories.forEach((cat) => {
-        attachMap[cat] = { units: 0, rate: 0, isHit: false };
-      });
-      officersMap.set(key, {
-        name,
-        branch: String(t["BRANCH NAME"] ?? "").trim(),
-        staffId: toNumber(t["STAFF ID"] ?? t.staffId),
-        baseUnits: 0,
-        attachMap,
-      });
-    }
+    if (officersMap.has(key)) return;
+    const attachMap: Record<string, AttachMapEntry> = {};
+    attachCategories.forEach((cat) => {
+      attachMap[cat] = { units: 0, rate: 0, isHit: false };
+    });
+    officersMap.set(key, {
+      name,
+      branch: String(t["BRANCH NAME"] ?? "").trim(),
+      staffId: toNumber(t["STAFF ID"] ?? t.staffId),
+      baseUnits: 0,
+      attachMap,
+    });
   });
 
   const officerRows = Array.from(officersMap.values());

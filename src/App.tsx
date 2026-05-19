@@ -33,13 +33,17 @@ import {
   type UploadState,
 } from "./lib/uploadsApi";
 import {
+  ATTACH_CHART_COLORS,
+  buildAttachMatrixDisplay,
   buildCategoryTree,
+  categoryToChartKey,
   computeAttachRateRows,
   DEFAULT_ATTACH_CATEGORIES,
   DEFAULT_BASE_CATEGORIES,
+  formatOfficerShortName,
   matchesOfficer as attachMatchesOfficer,
   overallAttachRate,
-  toLegacyAttachRates,
+  type AttachMatrixDisplayRow,
   type AttachOfficerRow,
 } from "./lib/attachRate";
 import {
@@ -702,68 +706,81 @@ export default function App() {
     }
   };
 
-  const attachRateData = useMemo<DerivedAttachRow[]>(() => {
+  const attachOverviewRows = useMemo<AttachMatrixDisplayRow[]>(() => {
     const selectedOfficerSet = selectedAttachOfficers.length
       ? new Set(selectedAttachOfficers.map(cleanOfficerName))
       : null;
+    const categories =
+      attachTargetCategories.length > 0
+        ? attachTargetCategories
+        : DEFAULT_ATTACH_CATEGORIES;
 
-    const rows: AttachOfficerRow[] = attachOfficerRows;
+    const filtered = attachOfficerRows
+      .filter((row) => !selectedOfficerSet || selectedOfficerSet.has(row.id))
+      .filter((row) => row.baseUnits > 0 || row.totalAttachUnitsForSorting > 0);
 
-    if (!rows.length && parsedReport.officers.length) {
-      return parsedReport.officers
-        .filter((officer) => !selectedOfficerSet || selectedOfficerSet.has(cleanOfficerName(officer.name)))
-        .map((officer, index) => ({
-          id: cleanOfficerName(officer.name),
-          name: officer.name,
-          branch: officer.branch,
-          appleCare: Math.min(officer.rate, 160),
-          accessories: Math.min(Math.round(officer.rate * 0.85), 180),
-          services: Math.min(Math.round(officer.rate * 0.55), 100),
-          avatar:
-            index % 3 === 0
-              ? "/staff1.png"
-              : index % 3 === 1
-                ? "/staff2.png"
-                : "/staff3.png",
-        }));
+    if (filtered.length) {
+      return buildAttachMatrixDisplay(filtered, categories).map((row, index) => ({
+        ...row,
+        avatar:
+          index % 3 === 0
+            ? "/staff1.png"
+            : index % 3 === 1
+              ? "/staff2.png"
+              : "/staff3.png",
+      }));
     }
 
-    return rows
-      .filter((row) => !selectedOfficerSet || selectedOfficerSet.has(row.id))
-      .filter((row) => row.baseUnits > 0 || row.totalAttachUnitsForSorting > 0)
-      .map((row, index) => {
-        const legacy = toLegacyAttachRates(row);
-        const selectedApple = attachTargetCategories.some(
-          (cat) =>
-            normalizeText(cat).includes("apple") ||
-            normalizeText(cat).includes("care") ||
-            normalizeText(cat).includes("cover"),
-        );
-        const selectedAccessories = attachTargetCategories.some(
-          (cat) =>
-            normalizeText(cat).includes("diy") ||
-            normalizeText(cat).includes("btb") ||
-            normalizeText(cat).includes("access"),
-        );
-        const selectedServices = attachTargetCategories.some((cat) =>
-          normalizeText(cat).includes("sim"),
-        );
-        return {
-          id: row.id,
-          name: row.name,
-          branch: row.branch,
-          appleCare: selectedApple ? legacy.appleCare : 0,
-          accessories: selectedAccessories ? legacy.accessories : 0,
-          services: selectedServices ? legacy.services : 0,
-          avatar:
-            index % 3 === 0
-              ? "/staff1.png"
-              : index % 3 === 1
-                ? "/staff2.png"
-                : "/staff3.png",
-        };
-      });
-  }, [attachOfficerRows, parsedReport.officers, attachTargetCategories, selectedAttachOfficers]);
+    if (!parsedReport.officers.length) return [];
+
+    return parsedReport.officers
+      .filter(
+        (officer) =>
+          !selectedOfficerSet || selectedOfficerSet.has(cleanOfficerName(officer.name)),
+      )
+      .map((officer, index) => ({
+        id: cleanOfficerName(officer.name),
+        name: officer.name,
+        shortName: formatOfficerShortName(officer.name),
+        branch: officer.branch,
+        baseUnits: officer.actual,
+        avatar:
+          index % 3 === 0
+            ? "/staff1.png"
+            : index % 3 === 1
+              ? "/staff2.png"
+              : "/staff3.png",
+        rates: Object.fromEntries(
+          categories.map((cat) => [cat, Math.min(officer.rate, 160)]),
+        ),
+        units: Object.fromEntries(categories.map((cat) => [cat, 0])),
+        isHit: Object.fromEntries(
+          categories.map((cat) => [cat, officer.rate >= staffKpiTarget]),
+        ),
+      }));
+  }, [
+    attachOfficerRows,
+    attachTargetCategories,
+    selectedAttachOfficers,
+    parsedReport.officers,
+    staffKpiTarget,
+  ]);
+
+  const attachOverviewChartData = useMemo(() => {
+    const categories =
+      attachTargetCategories.length > 0
+        ? attachTargetCategories
+        : DEFAULT_ATTACH_CATEGORIES;
+    return attachOverviewRows.map((row) => ({
+      ...row,
+      ...Object.fromEntries(
+        categories.map((cat) => [
+          categoryToChartKey(cat),
+          Math.round(row.rates[cat] ?? 0),
+        ]),
+      ),
+    }));
+  }, [attachOverviewRows, attachTargetCategories]);
 
   const staffLeaderboard = useMemo(() => {
     const ranked = attachOfficerRows.filter(
@@ -1488,80 +1505,106 @@ export default function App() {
                   </AnimatePresence>
                 </div>
 
-                <div className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 flex flex-col shadow-[0_8px_32px_rgba(0,0,0,0.12)] h-[450px] min-h-[450px] relative z-10 w-full shrink-0 min-w-0">
-                  <ResponsiveContainer width="100%" height={380} minWidth={0}>
-                    <BarChart
-                      data={attachRateData.filter((row) =>
-                        selectedAttachOfficers.length === 0 ||
-                        selectedAttachOfficers.includes(row.name),
-                      )}
-                      margin={{ top: 20, right: 30, left: 0, bottom: 20 }}
-                      barGap={6}
-                    >
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        stroke="rgba(255,255,255,0.05)"
-                        vertical={false}
-                      />
-                      <XAxis
-                        dataKey="name"
-                        stroke="rgba(255,255,255,0.3)"
-                        tick={{
-                          fill: "rgba(255,255,255,0.6)",
-                          fontSize: 13,
-                          fontWeight: 500,
-                        }}
-                        axisLine={false}
-                        tickLine={false}
-                        dy={10}
-                      />
-                      <YAxis
-                        stroke="rgba(255,255,255,0.3)"
-                        tick={{ fill: "rgba(255,255,255,0.6)", fontSize: 12 }}
-                        axisLine={false}
-                        tickLine={false}
-                        dx={-10}
-                        tickFormatter={(value) => `${value}%`}
-                      />
-                      <RechartsTooltip
-                        cursor={{ fill: "rgba(255,255,255,0.05)" }}
-                        contentStyle={{
-                          backgroundColor: "rgba(12, 49, 35, 0.95)",
-                          borderColor: "rgba(255,255,255,0.1)",
-                          borderRadius: "12px",
-                          color: "#fff",
-                        }}
-                      />
-                      <Legend wrapperStyle={{ paddingTop: "20px" }} />
-                      {attachFilters.includes("appleCare") && (
-                        <Bar
-                          dataKey="appleCare"
-                          name="AppleCare+"
-                          fill="#10b981"
-                          radius={[6, 6, 0, 0]}
-                          maxBarSize={60}
+                <div className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 flex flex-col shadow-[0_8px_32px_rgba(0,0,0,0.12)] min-h-[450px] relative z-10 w-full shrink-0 min-w-0">
+                  {attachTargetCategories.length === 0 || staffBaseCategories.length === 0 ? (
+                    <p className="text-sm text-white/60 py-8 text-center">
+                      เลือกอย่างน้อย 1 หมวดใน Base และ Attach จาก Custom Attach Builder
+                    </p>
+                  ) : attachOverviewChartData.length === 0 ? (
+                    <p className="text-sm text-white/60 py-8 text-center">
+                      ไม่มีข้อมูลตามเงื่อนไขที่เลือก — ลองอัปโหลดไฟล์หรือเปลี่ยน Branch / Officer
+                    </p>
+                  ) : (
+                    <div className="overflow-x-auto pb-2 -mx-1 px-1">
+                      <BarChart
+                        width={Math.max(attachOverviewChartData.length * 88, 640)}
+                        height={400}
+                        data={attachOverviewChartData}
+                        margin={{ top: 16, right: 24, left: 8, bottom: 88 }}
+                        barGap={4}
+                        barCategoryGap="18%"
+                      >
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke="rgba(255,255,255,0.05)"
+                          vertical={false}
                         />
-                      )}
-                      {attachFilters.includes("accessories") && (
-                        <Bar
-                          dataKey="accessories"
-                          name="Accessories"
-                          fill="#3b82f6"
-                          radius={[6, 6, 0, 0]}
-                          maxBarSize={60}
+                        <XAxis
+                          dataKey="shortName"
+                          stroke="rgba(255,255,255,0.3)"
+                          interval={0}
+                          angle={-42}
+                          textAnchor="end"
+                          height={88}
+                          tick={{
+                            fill: "rgba(255,255,255,0.75)",
+                            fontSize: 11,
+                            fontWeight: 500,
+                          }}
+                          axisLine={false}
+                          tickLine={false}
                         />
-                      )}
-                      {attachFilters.includes("services") && (
-                        <Bar
-                          dataKey="services"
-                          name="Services"
-                          fill="#8b5cf6"
-                          radius={[6, 6, 0, 0]}
-                          maxBarSize={60}
+                        <YAxis
+                          stroke="rgba(255,255,255,0.3)"
+                          tick={{ fill: "rgba(255,255,255,0.6)", fontSize: 12 }}
+                          axisLine={false}
+                          tickLine={false}
+                          dx={-8}
+                          tickFormatter={(value) => `${value}%`}
                         />
-                      )}
-                    </BarChart>
-                  </ResponsiveContainer>
+                        <RechartsTooltip
+                          cursor={{ fill: "rgba(255,255,255,0.05)" }}
+                          content={({ active, payload }) => {
+                            if (!active || !payload?.length) return null;
+                            const row = payload[0].payload as AttachMatrixDisplayRow;
+                            const cats =
+                              attachTargetCategories.length > 0
+                                ? attachTargetCategories
+                                : DEFAULT_ATTACH_CATEGORIES;
+                            return (
+                              <div className="rounded-xl border border-white/10 bg-[#0c3123]/95 px-3 py-2 text-xs shadow-xl max-w-[260px]">
+                                <p className="font-semibold text-white mb-1">{row.name}</p>
+                                <p className="text-white/60 mb-2">
+                                  Base: {row.baseUnits.toLocaleString()} U
+                                  {row.branch ? ` · ${row.branch}` : ""}
+                                </p>
+                                {cats.map((cat) => (
+                                  <div
+                                    key={cat}
+                                    className="flex justify-between gap-3 text-white/80"
+                                  >
+                                    <span>{cat}</span>
+                                    <span
+                                      className={
+                                        row.isHit[cat] ? "text-emerald-400 font-bold" : ""
+                                      }
+                                    >
+                                      {(row.rates[cat] ?? 0).toFixed(1)}% (
+                                      {row.units[cat] ?? 0} U)
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          }}
+                        />
+                        <Legend wrapperStyle={{ paddingTop: "8px" }} />
+                        {(attachTargetCategories.length > 0
+                          ? attachTargetCategories
+                          : DEFAULT_ATTACH_CATEGORIES
+                        ).map((cat, index) => (
+                          <Bar
+                            key={cat}
+                            dataKey={categoryToChartKey(cat)}
+                            name={cat}
+                            fill={ATTACH_CHART_COLORS[index % ATTACH_CHART_COLORS.length]}
+                            radius={[5, 5, 0, 0]}
+                            maxBarSize={48}
+                          />
+                        ))}
+                      </BarChart>
+                    </div>
+                  )}
                 </div>
 
                 <div className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
@@ -1569,56 +1612,88 @@ export default function App() {
                     Staff Performance Details
                   </h3>
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
+                    <table className="w-full text-left border-collapse min-w-[640px]">
                       <thead>
                         <tr className="border-b border-white/10 text-white/50 text-sm">
-                          <th className="pb-3 font-medium px-4">Staff Name</th>
-                          {attachOptions.map((opt) => (
-                            <th key={opt.id} className="pb-3 font-medium px-4">
-                              {opt.label} Rate
+                          <th className="pb-3 font-medium px-4 sticky left-0 bg-[#1a4431]/95">
+                            Staff Name
+                          </th>
+                          <th className="pb-3 font-medium px-4 text-right">Base (U)</th>
+                          {(attachTargetCategories.length > 0
+                            ? attachTargetCategories
+                            : DEFAULT_ATTACH_CATEGORIES
+                          ).map((cat) => (
+                            <th key={cat} className="pb-3 font-medium px-4 text-right whitespace-nowrap">
+                              {cat} %
                             </th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
-                        {attachRateData.map((staff) => (
-                          <tr
-                            key={staff.id}
-                            className="border-b border-white/5 hover:bg-white/5 transition-colors"
-                          >
-                            <td className="py-3 px-4 flex items-center gap-3">
-                              <img
-                                src={staff.avatar}
-                                alt={staff.name}
-                                className="w-8 h-8 rounded-full bg-white/20 object-cover"
-                              />
-                              <span className="font-medium text-white/90">
-                                {staff.name}
-                              </span>
+                        {attachOverviewRows.length === 0 ? (
+                          <tr>
+                            <td
+                              colSpan={
+                                2 +
+                                (attachTargetCategories.length > 0
+                                  ? attachTargetCategories.length
+                                  : DEFAULT_ATTACH_CATEGORIES.length)
+                              }
+                              className="py-8 text-center text-white/50 text-sm"
+                            >
+                              ไม่มีข้อมูล — ปรับ Custom Attach Builder หรืออัปโหลดไฟล์
                             </td>
-                            {attachOptions.map((opt) => (
-                              <td
-                                key={opt.id}
-                                className="py-3 px-4 text-white/80"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <span className="w-12 text-sm">
-                                    {staff[opt.id as keyof typeof staff]}%
-                                  </span>
-                                  <div className="w-24 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                                    <div
-                                      className="h-full rounded-full transition-all"
-                                      style={{
-                                        width: `${staff[opt.id as keyof typeof staff]}%`,
-                                        backgroundColor: opt.color,
-                                      }}
-                                    ></div>
-                                  </div>
-                                </div>
-                              </td>
-                            ))}
                           </tr>
-                        ))}
+                        ) : (
+                          attachOverviewRows.map((staff, staffIndex) => (
+                            <tr
+                              key={staff.id}
+                              className="border-b border-white/5 hover:bg-white/5 transition-colors"
+                            >
+                              <td className="py-3 px-4 flex items-center gap-3 sticky left-0 bg-[#123627]/95">
+                                <img
+                                  src={staff.avatar}
+                                  alt={staff.name}
+                                  className="w-8 h-8 rounded-full bg-white/20 object-cover"
+                                />
+                                <span className="font-medium text-white/90 whitespace-nowrap">
+                                  {staff.name}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-right text-white/70 tabular-nums">
+                                {staff.baseUnits.toLocaleString()}
+                              </td>
+                              {(attachTargetCategories.length > 0
+                                ? attachTargetCategories
+                                : DEFAULT_ATTACH_CATEGORIES
+                              ).map((cat, catIndex) => {
+                                const rate = Math.round(staff.rates[cat] ?? 0);
+                                const color =
+                                  ATTACH_CHART_COLORS[catIndex % ATTACH_CHART_COLORS.length];
+                                return (
+                                  <td key={cat} className="py-3 px-4 text-white/80">
+                                    <div className="flex items-center justify-end gap-2">
+                                      <span
+                                        className={`w-14 text-sm text-right tabular-nums ${staff.isHit[cat] ? "text-emerald-400 font-semibold" : ""}`}
+                                      >
+                                        {rate}%
+                                      </span>
+                                      <div className="w-20 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                                        <div
+                                          className="h-full rounded-full transition-all"
+                                          style={{
+                                            width: `${Math.min(rate, 100)}%`,
+                                            backgroundColor: color,
+                                          }}
+                                        />
+                                      </div>
+                                    </div>
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))
+                        )}
                       </tbody>
                     </table>
                   </div>
