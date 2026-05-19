@@ -1884,35 +1884,21 @@ export default function App() {
                 {/* TOP HALF: Person | Radar | Stats */}
                 <div className="flex-1 flex flex-col lg:flex-row min-h-[280px] shrink-0 gap-6 lg:gap-0">
                   {/* Left Column - Image */}
-                  <div className="lg:w-[35%] relative flex items-end justify-center rounded-[2rem] lg:rounded-none z-30 min-h-[250px] lg:min-h-0 pointer-events-none">
-                    {/* Dimensional Glow Behind Image */}
-                    <div className="absolute bottom-10 lg:bottom-1/4 -left-[20%] lg:-left-[50%] w-[120%] lg:w-[200%] h-[50%] lg:h-[80%] bg-emerald-500/10 blur-[80px] lg:blur-[120px] rounded-full pointer-events-none -z-10 mix-blend-screen" />
+                  <div className="lg:w-[35%] relative flex items-end justify-center overflow-hidden rounded-[2rem] lg:rounded-none z-30 min-h-[200px] max-h-[280px] lg:min-h-0 lg:max-h-[min(420px,52vh)] lg:h-full pointer-events-none px-2">
+                    <div className="absolute bottom-1/4 left-1/2 -translate-x-1/2 w-[65%] max-w-[200px] h-[45%] bg-emerald-500/10 blur-[50px] lg:blur-[70px] rounded-full pointer-events-none -z-10 mix-blend-screen" />
                     <AnimatePresence mode="wait">
                       <motion.img
-                        key={currentStaff.id}
-                        initial={{ opacity: 0, y: 30, scale: 0.95 }}
+                        key={displayStaffAvatar}
+                        initial={{ opacity: 0, y: 16, scale: 0.97 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{
-                          opacity: 0,
-                          y: 10,
-                          scale: 0.95,
-                          filter: "blur(10px)",
-                        }}
-                        transition={{
-                          duration: 0.5,
-                          type: "spring",
-                          bounce: 0.4,
-                        }}
+                        exit={{ opacity: 0, y: 6, scale: 0.97, filter: "blur(6px)" }}
+                        transition={{ duration: 0.45, type: "spring", bounce: 0.3 }}
                         src={displayStaffAvatar}
                         alt={activeOfficer?.name ?? currentStaff.name}
-                        className="absolute -bottom-8 lg:-bottom-16 -left-[30%] lg:-left-[100%] z-20 w-[160%] lg:w-[300%] max-w-none h-auto object-contain object-bottom drop-shadow-[0_25px_35px_rgba(0,0,0,0.6)] origin-bottom pointer-events-none"
+                        className="relative z-20 mx-auto w-auto max-w-[220px] sm:max-w-[240px] lg:max-w-[260px] h-auto max-h-[240px] sm:max-h-[260px] lg:max-h-[min(48vh,340px)] object-contain object-bottom drop-shadow-[0_16px_24px_rgba(0,0,0,0.45)] pointer-events-none"
                         style={{
-                          minHeight: "calc(100% + 240px)",
-                          maxHeight: "none",
-                          WebkitMaskImage:
-                            "linear-gradient(to bottom, rgba(0,0,0,1) 85%, rgba(0,0,0,0) 100%)",
-                          maskImage:
-                            "linear-gradient(to bottom, rgba(0,0,0,1) 85%, rgba(0,0,0,0) 100%)",
+                          WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,1) 90%, rgba(0,0,0,0) 100%)",
+                          maskImage: "linear-gradient(to bottom, rgba(0,0,0,1) 90%, rgba(0,0,0,0) 100%)",
                         }}
                       />
                     </AnimatePresence>
