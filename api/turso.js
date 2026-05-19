@@ -285,6 +285,49 @@ const getUploadStats = async () => {
 
 const isUploadKind = (value) => UPLOAD_KINDS.includes(value);
 
+const loadStaffPhotos = async (execute = tursoExecute) => {
+  const result = await execute(
+    `SELECT staff_id, officer_key, display_name, branch_name, photo_url, updated_at
+     FROM staff_photos ORDER BY display_name ASC`,
+  );
+  return (result.rows ?? []).map((row) => {
+    const [staffId, officerKey, displayName, branch, photoUrl, updatedAt] =
+      rowValues(row);
+    return {
+      staffId: staffId ?? "",
+      officerKey: officerKey ?? "",
+      displayName: displayName ?? "",
+      branch: branch ?? "",
+      photoUrl: photoUrl ?? "",
+      updatedAt: updatedAt ?? "",
+    };
+  });
+};
+
+const saveStaffPhoto = async (execute, record) => {
+  await execute(
+    `INSERT INTO staff_photos (staff_id, officer_key, display_name, branch_name, photo_url, updated_at)
+     VALUES (?, ?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(staff_id) DO UPDATE SET
+       officer_key = excluded.officer_key,
+       display_name = excluded.display_name,
+       branch_name = excluded.branch_name,
+       photo_url = excluded.photo_url,
+       updated_at = excluded.updated_at`,
+    [
+      record.staffId,
+      record.officerKey,
+      record.displayName,
+      record.branch,
+      record.photoUrl,
+    ],
+  );
+};
+
+const deleteStaffPhoto = async (execute, staffId) => {
+  await execute("DELETE FROM staff_photos WHERE staff_id = ?", [staffId]);
+};
+
 const initDatabase = async () => {
   await ensureRelationalSchema(tursoExecute);
   const tables = await listTables();
@@ -303,13 +346,17 @@ module.exports = {
   clearAllUploads,
   clearUploadKind,
   decompressJson,
+  deleteStaffPhoto,
   getTursoConfig,
   getUploadStats,
   initDatabase,
   isUploadKind,
   listTables,
+  loadStaffPhotos,
   loadUploadKind,
+  saveStaffPhoto,
   saveUploadKind,
   saveUploadKindChunk,
   syncAllRelationalTables,
+  tursoExecute,
 };

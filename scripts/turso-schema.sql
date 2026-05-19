@@ -51,3 +51,14 @@ CREATE TABLE IF NOT EXISTS data_categories (
   cat_daily TEXT,
   extra_json TEXT
 );
+
+CREATE TABLE IF NOT EXISTS staff_photos (
+  staff_id TEXT PRIMARY KEY,
+  officer_key TEXT,
+  display_name TEXT,
+  branch_name TEXT,
+  photo_url TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_staff_photos_officer_key ON staff_photos(officer_key);

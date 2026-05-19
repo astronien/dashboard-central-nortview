@@ -18,6 +18,8 @@ import {
   Settings,
   Target,
   SlidersHorizontal,
+  ImagePlus,
+  Trash2,
 } from "lucide-react";
 import CategoryTreePicker from "./components/CategoryTreePicker";
 import AttachTargetGroupEditor from "./components/AttachTargetGroupEditor";
@@ -33,6 +35,17 @@ import {
   type TursoHealthStats,
   type UploadState,
 } from "./lib/uploadsApi";
+import {
+  buildStaffRoster,
+  getStaffAvatar,
+  resizeImageFile,
+  type StaffPhotosMap,
+} from "./lib/staffAvatar";
+import {
+  deleteStaffPhoto,
+  fetchStaffPhotos,
+  saveStaffPhoto,
+} from "./lib/staffPhotosApi";
 import {
   ATTACH_CHART_COLORS,
   buildAttachMatrixDisplay,
@@ -553,6 +566,9 @@ export default function App() {
   );
   const [staffFilterBranch, setStaffFilterBranch] = useState("All Branches");
   const [staffBuilderOpen, setStaffBuilderOpen] = useState(false);
+  const [staffPhotos, setStaffPhotos] = useState<StaffPhotosMap>({});
+  const [staffPhotoError, setStaffPhotoError] = useState<string | null>(null);
+  const [uploadingPhotoId, setUploadingPhotoId] = useState<string | null>(null);
 
   const STORAGE_KEY = "dashboard-upload-state-v1";
 
@@ -567,6 +583,11 @@ export default function App() {
   const currentOfficer = parsedReport.officers[Number(activeStaffId) - 1] ?? parsedReport.officers[0];
   const activeOfficerIndex = Math.max(Number(activeStaffId) - 1, 0);
   const activeOfficer = parsedReport.officers[activeOfficerIndex] ?? parsedReport.officers[0];
+
+  const staffRoster = useMemo(
+    () => buildStaffRoster(uploadedFiles.target, parsedReport.officers, cleanOfficerName),
+    [uploadedFiles.target, parsedReport.officers],
+  );
 
   const uploadStats = useMemo(() => {
     const branches = parsedReport.branches.length;
@@ -742,6 +763,24 @@ export default function App() {
     currentView,
   ]);
 
+  const displayStaffAvatar = useMemo(() => {
+    if (!activeOfficer) return currentStaff.image;
+    const attachRow = attachOfficerRows.find((row) =>
+      attachMatchesOfficer(row.name, activeOfficer.name),
+    );
+    return getStaffAvatar(staffPhotos, {
+      staffId: attachRow?.staffId,
+      officerKey: cleanOfficerName(activeOfficer.name),
+      fallbackIndex: activeOfficerIndex,
+    });
+  }, [
+    activeOfficer,
+    attachOfficerRows,
+    staffPhotos,
+    activeOfficerIndex,
+    currentStaff.image,
+  ]);
+
   const attachOverviewRows = useMemo<AttachMatrixDisplayRow[]>(() => {
     const selectedOfficerSet = selectedAttachOfficers.length
       ? new Set(selectedAttachOfficers.map(cleanOfficerName))
@@ -758,12 +797,11 @@ export default function App() {
     if (filtered.length) {
       return buildAttachMatrixDisplay(filtered, categories).map((row, index) => ({
         ...row,
-        avatar:
-          index % 3 === 0
-            ? "/staff1.png"
-            : index % 3 === 1
-              ? "/staff2.png"
-              : "/staff3.png",
+        avatar: getStaffAvatar(staffPhotos, {
+          staffId: filtered[index]?.staffId,
+          officerKey: row.id,
+          fallbackIndex: index,
+        }),
       }));
     }
 
@@ -780,12 +818,10 @@ export default function App() {
         shortName: formatOfficerShortName(officer.name),
         branch: officer.branch,
         baseUnits: officer.actual,
-        avatar:
-          index % 3 === 0
-            ? "/staff1.png"
-            : index % 3 === 1
-              ? "/staff2.png"
-              : "/staff3.png",
+        avatar: getStaffAvatar(staffPhotos, {
+          officerKey: cleanOfficerName(officer.name),
+          fallbackIndex: index,
+        }),
         rates: Object.fromEntries(
           categories.map((cat) => [cat, Math.min(officer.rate, 160)]),
         ),
@@ -803,6 +839,7 @@ export default function App() {
     selectedAttachOfficers,
     parsedReport.officers,
     staffKpiTargets,
+    staffPhotos,
   ]);
 
   const attachOverviewChartData = useMemo(() => {
@@ -1038,12 +1075,73 @@ export default function App() {
   useEffect(() => {
     void (async () => {
       await refreshTursoStats();
-      const persisted = await loadPersistedUploads();
+      const [persisted, photos] = await Promise.all([
+        loadPersistedUploads(),
+        fetchStaffPhotos(),
+      ]);
+      if (photos) setStaffPhotos(photos);
       if (!persisted) return;
       setUploadedFiles(persisted);
       rebuildReport(persisted, { skipPersist: true });
     })();
   }, []);
+
+  const handleStaffPhotoUpload = async (
+    entry: { staffId: string; officerKey: string; name: string; branch: string },
+    file: File,
+  ) => {
+    if (!file.type.startsWith("image/")) {
+      setStaffPhotoError("请选择图片文件");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setStaffPhotoError("图片不能超过 5MB");
+      return;
+    }
+
+    setUploadingPhotoId(entry.staffId);
+    setStaffPhotoError(null);
+    try {
+      const photoUrl = await resizeImageFile(file);
+      const record = {
+        staffId: entry.staffId,
+        officerKey: entry.officerKey,
+        displayName: entry.name,
+        branch: entry.branch,
+        photoUrl,
+      };
+      const saved = await saveStaffPhoto(record);
+      setStaffPhotos((prev) => ({ ...prev, [entry.staffId]: record }));
+      if (!saved) {
+        setStaffPhotoError("服务器保存失败，已暂存到浏览器");
+      }
+    } catch (error) {
+      setStaffPhotoError(
+        error instanceof Error ? error.message : "上传失败",
+      );
+    } finally {
+      setUploadingPhotoId(null);
+    }
+  };
+
+  const handleStaffPhotoRemove = async (staffId: string) => {
+    setUploadingPhotoId(staffId);
+    setStaffPhotoError(null);
+    try {
+      await deleteStaffPhoto(staffId);
+      setStaffPhotos((prev) => {
+        const next = { ...prev };
+        delete next[staffId];
+        return next;
+      });
+    } catch (error) {
+      setStaffPhotoError(
+        error instanceof Error ? error.message : "删除失败",
+      );
+    } finally {
+      setUploadingPhotoId(null);
+    }
+  };
 
   const acceptDetected = (fileName: string, kind: UploadKind): UploadKind => {
     const n = fileName.toLowerCase();
@@ -1163,7 +1261,7 @@ export default function App() {
                     onClick={() => setShowDropdown(!showDropdown)}
                   >
                     <img
-                      src={currentStaff.image}
+                      src={displayStaffAvatar}
                       alt={currentStaff.name}
                       className="w-full h-full object-cover object-top"
                     />
@@ -1186,7 +1284,10 @@ export default function App() {
                             }}
                           >
                             <img
-                              src={idx % 3 === 0 ? "/staff1.png" : idx % 3 === 1 ? "/staff2.png" : "/staff3.png"}
+                              src={getStaffAvatar(staffPhotos, {
+                                officerKey: cleanOfficerName(officer.name),
+                                fallbackIndex: idx,
+                              })}
                               className="w-8 h-8 rounded-full object-cover object-top bg-emerald-500/20"
                             />
                             <div className="flex-1 min-w-0">
@@ -1802,8 +1903,8 @@ export default function App() {
                           type: "spring",
                           bounce: 0.4,
                         }}
-                        src={currentStaff.image}
-                        alt={currentStaff.name}
+                        src={displayStaffAvatar}
+                        alt={activeOfficer?.name ?? currentStaff.name}
                         className="absolute -bottom-8 lg:-bottom-16 -left-[30%] lg:-left-[100%] z-20 w-[160%] lg:w-[300%] max-w-none h-auto object-contain object-bottom drop-shadow-[0_25px_35px_rgba(0,0,0,0.6)] origin-bottom pointer-events-none"
                         style={{
                           minHeight: "calc(100% + 240px)",
@@ -2237,45 +2338,114 @@ export default function App() {
                 transition={{ duration: 0.4, ease: "easeOut" }}
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
-                <div className="rounded-2xl border border-dashed border-white/20 bg-white/5 p-5">
-                  <div className="flex flex-wrap items-center gap-3 text-sm text-white/80">
-                    <span className="font-semibold text-white">Upload files:</span>
-                    <label className="cursor-pointer rounded-xl bg-white/10 px-4 py-2 hover:bg-white/15 transition-colors">
-                      <input type="file" multiple accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileUpload} />
-                      Choose Excel/CSV files
-                    </label>
-                    <span className="text-white/50">or use the search icon in the top bar.</span>
-                  </div>
-                </div>
-
                 <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
                   <div className="flex items-center gap-4">
                     <div className="p-3 bg-emerald-500/20 rounded-xl text-emerald-400">
-                      <Settings className="w-6 h-6" />
+                      <ImagePlus className="w-6 h-6" />
                     </div>
                     <div>
-                      <h2 className="text-xl font-bold tracking-tight">
-                        Admin Settings (Placeholder)
-                      </h2>
+                      <h2 className="text-xl font-bold tracking-tight">员工头像</h2>
                       <p className="text-sm text-white/60 mt-1">
-                        Configure options and roles later.
+                        上传后会在员工页、排行榜和 Attach 表格中显示。需先上传 Target Excel 才会出现员工列表。
                       </p>
                     </div>
                   </div>
+                  {staffPhotoError && (
+                    <p className="text-sm text-amber-300 lg:max-w-xs">{staffPhotoError}</p>
+                  )}
                 </div>
+                <div className="flex-1 bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)] relative z-10 w-full min-h-[400px] overflow-hidden flex flex-col">
+                  {staffRoster.length === 0 ? (
+                    <div className="flex-1 flex flex-col items-center justify-center text-center py-12">
+                      <Users className="w-14 h-14 text-white/20 mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">暂无员工数据</h3>
+                      <p className="text-white/60 text-sm max-w-md mb-4">
+                        请先在 Reports 页面上传 Target（员工目标）Excel，或上传包含员工姓名的报表。
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setCurrentView("reports")}
+                        className="rounded-xl bg-emerald-500/20 border border-emerald-400/30 px-4 py-2 text-sm text-emerald-300 hover:bg-emerald-500/30 transition-colors"
+                      >
+                        前往 Reports 上传
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="overflow-y-auto flex-1 -mx-2 px-2">
+                      <p className="text-xs text-white/50 mb-3">
+                        共 {staffRoster.length} 人 · 支持 JPG / PNG / WebP · 自动压缩
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                        {staffRoster.map((entry, index) => {
+                          const avatar = getStaffAvatar(staffPhotos, {
+                            staffId: entry.staffId,
+                            officerKey: entry.officerKey,
+                            fallbackIndex: index,
+                          });
+                          const hasCustom = Boolean(staffPhotos[entry.staffId]);
+                          const isUploading = uploadingPhotoId === entry.staffId;
 
-                <div className="flex-1 bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-8 flex flex-col items-center justify-center text-center shadow-[0_8px_32px_rgba(0,0,0,0.12)] relative z-10 w-full min-h-[400px]">
-                  <Settings className="w-16 h-16 text-white/20 mb-4 animate-[spin_4s_linear_infinite]" />
-                  <h3 className="text-2xl font-semibold mb-2">
-                    Settings Coming Soon
-                  </h3>
-                  <p className="text-white/60 max-w-md">
-                    This is a placeholder for the settings page where admins can
-                    manage staff roles, access permissions, and store
-                    configurations.
-                  </p>
+                          return (
+                            <div
+                              key={entry.staffId}
+                              className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 p-4 hover:bg-white/[0.07] transition-colors"
+                            >
+                              <img
+                                src={avatar}
+                                alt={entry.name}
+                                className="w-14 h-14 rounded-full object-cover object-top bg-emerald-500/20 shrink-0 border border-white/10"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-white truncate">{entry.name}</p>
+                                <p className="text-xs text-white/50 truncate">
+                                  {entry.branch || "—"}
+                                  {entry.staffId && entry.staffId !== entry.officerKey
+                                    ? ` · ID ${entry.staffId}`
+                                    : ""}
+                                </p>
+                              </div>
+                              <div className="flex flex-col gap-1.5 shrink-0">
+                                <label
+                                  className={`cursor-pointer inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-medium transition-colors ${
+                                    isUploading
+                                      ? "bg-white/5 text-white/40 pointer-events-none"
+                                      : "bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-400/20"
+                                  }`}
+                                >
+                                  <input
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/webp"
+                                    className="hidden"
+                                    disabled={isUploading}
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) void handleStaffPhotoUpload(entry, file);
+                                      e.target.value = "";
+                                    }}
+                                  />
+                                  <ImagePlus className="w-3.5 h-3.5" />
+                                  {isUploading ? "上传中…" : hasCustom ? "更换" : "上传"}
+                                </label>
+                                {hasCustom && (
+                                  <button
+                                    type="button"
+                                    disabled={isUploading}
+                                    onClick={() => void handleStaffPhotoRemove(entry.staffId)}
+                                    className="inline-flex items-center justify-center gap-1 rounded-xl px-3 py-1.5 text-xs text-white/50 hover:text-red-300 hover:bg-red-500/10 transition-colors disabled:opacity-40"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    删除
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </motion.div>
+                </motion.div>
             )}
             {currentView === "reports" && (
               <motion.div
