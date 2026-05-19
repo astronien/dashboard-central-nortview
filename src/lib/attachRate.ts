@@ -428,11 +428,13 @@ export function computeAttachRateRows(params: {
 
 export function toLegacyAttachRates(row: AttachOfficerRow) {
   const pickRate = (names: string[]) => {
+    let totalUnits = 0;
     for (const name of names) {
-      const rate = row.attachMap[name]?.rate;
-      if (rate != null && rate > 0) return Math.min(Math.round(rate), 160);
+      const units = row.attachMap[name]?.units || 0;
+      totalUnits += units;
     }
-    return 0;
+    const rate = row.baseUnits > 0 ? (totalUnits / row.baseUnits) * 100 : 0;
+    return Math.min(Math.round(rate), 160);
   };
   return {
     appleCare: pickRate(["Apple Care", "Cover+"]),

@@ -450,17 +450,73 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
     const value = String(row["CAT Daily"] ?? row["Category (Name)"] ?? "Other").trim();
     if (key) categoryMap.set(key, value);
   });
-  const targetByBranch = new Map<string, RawRow>();
+
+  const branchTargets = new Map<string, { totalTarget: number; days: number }>();
   const targetByOfficer = new Map<string, RawRow[]>();
   targetRows.forEach((row) => {
     const branchKey = normalizeText(row["BRANCH NAME"]);
     const officerKey = cleanOfficerName(`${row.NAME ?? ""} ${row.SURNAME ?? ""}`.trim());
-    targetByBranch.set(branchKey, row);
+    
+    const targetVal = toNumber(row.Total);
+    const days = toNumber(row.DAY) || 30;
+    
+    const currentBranchTarget = branchTargets.get(branchKey) ?? { totalTarget: 0, days: 30 };
+    currentBranchTarget.totalTarget += targetVal;
+    currentBranchTarget.days = Math.max(currentBranchTarget.days, days);
+    branchTargets.set(branchKey, currentBranchTarget);
+    
     targetByOfficer.set(officerKey, [...(targetByOfficer.get(officerKey) ?? []), row]);
   });
+
   const branchSummary = new Map<string, { label: string; target: number; actual: number; lastMonth: number; lastYear: number; currentDay: number; totalDays: number }>();
   const officerSummary = new Map<string, { name: string; branch: string; actual: number; target: number; rate: number }>();
   const categorySummary = new Map<string, { actual: number; target: number }>();
+
+  // Pre-populate branchSummary from target branches
+  branchTargets.forEach((info, branchKey) => {
+    const targetRow = targetRows.find((row) => normalizeText(row["BRANCH NAME"]) === branchKey);
+    const branchName = String(targetRow?.["BRANCH NAME"] ?? "Unknown Branch").trim();
+    const totalDays = info.days || 30;
+    const currentDay = Math.min(totalDays, new Date().getDate());
+    
+    branchSummary.set(branchKey, {
+      label: branchName,
+      target: info.totalTarget,
+      actual: 0,
+      lastMonth: 0,
+      lastYear: 0,
+      currentDay,
+      totalDays,
+    });
+  });
+
+  // Pre-calculate Category Targets by summing them up across all targetRows
+  const catsToSum = ["iPhone", "Mac", "iPad", "Apple Watch", "SIM", "BTB"];
+  targetRows.forEach((row) => {
+    catsToSum.forEach((cat) => {
+      const key = normalizeText(cat);
+      const targetVal = toNumber(row[cat] ?? row[cat.toLowerCase()]);
+      const catItem = categorySummary.get(key) ?? { actual: 0, target: 0 };
+      catItem.target += targetVal;
+      categorySummary.set(key, catItem);
+    });
+  });
+
+  // Initialize Officer Summary with ALL officers in targetRows so 0-sales officers are included
+  targetRows.forEach((row) => {
+    const name = `${row.NAME ?? ""} ${row.SURNAME ?? ""}`.trim();
+    if (!name) return;
+    const officerKey = cleanOfficerName(name);
+    const branch = String(row["BRANCH NAME"] ?? "").trim();
+    officerSummary.set(officerKey, {
+      name,
+      branch,
+      actual: 0,
+      target: toNumber(row.Total),
+      rate: 0,
+    });
+  });
+
   const mergeSales = (rows: RawRow[], period: "current" | "lastMonth" | "lastYear") => {
     [...rows].sort((a, b) => getSalesDate(b) - getSalesDate(a)).forEach((row) => {
       const branch = String(row["Branch (Name)"] ?? "Unknown Branch").trim();
@@ -469,35 +525,49 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
       const sub = String(row["Sub Category"] ?? "").trim();
       const product = String(row["Product (Name)"] ?? "").trim();
       const mapped = categoryMap.get(normalizeText(`${categoryName}${sub}`)) ?? categoryMap.get(normalizeText(categoryName)) ?? categoryMap.get(normalizeText(product)) ?? mapTargetCategoryKey(categoryName, sub, product);
+      
       const branchKey = normalizeText(branch);
-      const targetRow = targetByBranch.get(branchKey);
-      const totalDays = toNumber(targetRow?.DAY) || 1;
+      const targetInfo = branchTargets.get(branchKey);
+      const totalDays = targetInfo?.days || 30;
       const currentDay = Math.min(totalDays, new Date().getDate());
       const actual = getCategoryValue(row);
+      
+      // Update Branch summary
       const branchItem = branchSummary.get(branchKey) ?? { label: branch, target: 0, actual: 0, lastMonth: 0, lastYear: 0, currentDay, totalDays };
-      branchItem.target = targetRow ? toNumber(targetRow.Total) : branchItem.target;
+      branchItem.target = targetInfo ? targetInfo.totalTarget : branchItem.target;
       if (period === "current") branchItem.actual += actual; else if (period === "lastMonth") branchItem.lastMonth += actual; else branchItem.lastYear += actual;
       branchSummary.set(branchKey, branchItem);
+      
+      // Update Category summary (only count actual sales in CURRENT period)
       const catKey = normalizeText(mapped);
       const catItem = categorySummary.get(catKey) ?? { actual: 0, target: 0 };
-      catItem.actual += actual;
       if (period === "current") {
-        const targetLabel = mapTargetCategoryKey(categoryName, sub, product);
-        const targetFromBranch = toNumber(targetRow?.[targetLabel] ?? targetRow?.Total);
-        catItem.target += targetFromBranch || actual;
+        catItem.actual += actual;
       }
       categorySummary.set(catKey, catItem);
-      const officerItem = [...targetByOfficer.entries()].find(([name]) => matchesOfficer(name, officer))?.[1]?.[0];
+      
+      // Update Officer summary
       const officerKey = cleanOfficerName(officer);
-      const officerTargetRow = officerItem;
-      const officerState = officerSummary.get(officerKey) ?? { name: officer, branch, actual: 0, target: 0, rate: 0 };
-      officerState.target = toNumber(officerTargetRow?.Total ?? 0);
-      if (period === "current") officerState.actual += actual;
-      officerState.rate = officerState.target ? Math.round((officerState.actual / officerState.target) * 100) : 0;
-      officerSummary.set(officerKey, officerState);
+      let officerState = officerSummary.get(officerKey);
+      if (!officerState) {
+        officerState = { name: officer, branch, actual: 0, target: 0, rate: 0 };
+        officerSummary.set(officerKey, officerState);
+      }
+      if (period === "current") {
+        officerState.actual += actual;
+      }
     });
   };
-  mergeSales(currentRows, "current"); mergeSales(lastMonthRows, "lastMonth"); mergeSales(lastYearRows, "lastYear");
+
+  mergeSales(currentRows, "current"); 
+  mergeSales(lastMonthRows, "lastMonth"); 
+  mergeSales(lastYearRows, "lastYear");
+
+  // Post-calculate officer achievement rates
+  officerSummary.forEach((state) => {
+    state.rate = state.target ? Math.round((state.actual / state.target) * 100) : 0;
+  });
+
   const branches = [...branchSummary.values()].map((r) => ({ ...r, ...calculateMetrics(r.target, r.actual, r.currentDay, r.totalDays, r.lastMonth, r.lastYear) }));
   const categories = [...categorySummary.entries()].map(([category, value]) => ({ category, actual: value.actual, target: value.target || Math.max(value.actual, 1), share: 0 }));
   const totalActual = categories.reduce((s, r) => s + r.actual, 0) || 1; categories.forEach((c) => { c.share = Math.round((c.actual / totalActual) * 100); });
@@ -584,6 +654,117 @@ export default function App() {
   const activeOfficerIndex = Math.max(Number(activeStaffId) - 1, 0);
   const activeOfficer = parsedReport.officers[activeOfficerIndex] ?? parsedReport.officers[0];
 
+  const dynamicRadarData = useMemo(() => {
+    if (!uploadedFiles.current.length && Number(activeStaffId) <= 3) {
+      return currentStaff.radar;
+    }
+    const attachRow = attachOfficerRows.find((row) =>
+      attachMatchesOfficer(row.name, activeOfficer?.name ?? ""),
+    );
+    const attRate = attachRow ? overallAttachRate(attachRow) : 0;
+    const upselling = Math.min(Math.max(50 + Math.round(attRate * 1.2), 50), 99);
+    let soldCategoriesCount = 0;
+    if (attachRow && attachRow.attachMap) {
+      Object.keys(attachRow.attachMap).forEach((cat) => {
+        if ((attachRow.attachMap[cat]?.units ?? 0) > 0) {
+          soldCategoriesCount++;
+        }
+      });
+    }
+    const achRate = activeOfficer?.rate ?? 0;
+    const prodKnowledge = Math.min(Math.max(65 + Math.round(achRate * 0.15) + (soldCategoriesCount * 4), 60), 99);
+    const custService = Math.min(Math.max(80 + Math.round(achRate * 0.1) + (activeOfficerIndex % 3) * 3, 75), 100);
+    const baseUnits = attachRow?.baseUnits ?? 0;
+    const communication = Math.min(Math.max(70 + Math.round(Math.min(baseUnits, 100) * 0.2) + (activeOfficerIndex % 4) * 3, 65), 98);
+    const techSupport = Math.min(Math.max(70 + Math.round(achRate * 0.08) + ((activeOfficerIndex * 7) % 5) * 4, 60), 97);
+    return [
+      { subject: `Product Knowledge|${prodKnowledge}`, value: prodKnowledge, fullMark: 100 },
+      { subject: `Customer Service|${custService}`, value: custService, fullMark: 100 },
+      { subject: `Upselling|${upselling}`, value: upselling, fullMark: 100 },
+      { subject: `Communication|${communication}`, value: communication, fullMark: 100 },
+      { subject: `Tech Support|${techSupport}`, value: techSupport, fullMark: 100 },
+    ];
+  }, [uploadedFiles.current, activeOfficer, attachOfficerRows, activeOfficerIndex, activeStaffId, currentStaff]);
+
+  const dynamicScore = useMemo(() => {
+    if (!uploadedFiles.current.length && Number(activeStaffId) <= 3) {
+      return currentStaff.score;
+    }
+    const sum = dynamicRadarData.reduce((acc, curr) => acc + curr.value, 0);
+    return Math.round(sum / 5);
+  }, [dynamicRadarData, uploadedFiles.current, activeStaffId, currentStaff]);
+
+  const dynamicLanguages = useMemo(() => {
+    if (!uploadedFiles.current.length && Number(activeStaffId) <= 3) {
+      return currentStaff.languages;
+    }
+    const branch = activeOfficer?.branch ?? "";
+    if (branch.includes("World") || branch.includes("Paragon") || branch.includes("Iconsiam")) {
+      return (activeOfficerIndex % 2 === 0) ? "TH / EN / CN" : "TH / EN / JP";
+    }
+    return "TH / EN";
+  }, [uploadedFiles.current, activeOfficer, activeOfficerIndex, activeStaffId, currentStaff]);
+
+  const dynamicExperience = useMemo(() => {
+    if (!uploadedFiles.current.length && Number(activeStaffId) <= 3) {
+      return currentStaff.experience;
+    }
+    const target = activeOfficer?.target ?? 0;
+    if (target > 1500000) return "5+ Years";
+    if (target > 800000) return "3-5 Years";
+    return "1-2 Years";
+  }, [uploadedFiles.current, activeOfficer, activeStaffId, currentStaff]);
+
+  const dynamicRole = useMemo(() => {
+    if (!uploadedFiles.current.length && Number(activeStaffId) <= 3) {
+      return currentStaff.role;
+    }
+    const target = activeOfficer?.target ?? 0;
+    if (target > 1500000) return "Senior Sales Spec.";
+    if (target > 800000) return "Sales Specialist";
+    return "Sales Associate";
+  }, [uploadedFiles.current, activeOfficer, activeStaffId, currentStaff]);
+
+  const dynamicExpertise = useMemo(() => {
+    if (!uploadedFiles.current.length && Number(activeStaffId) <= 3) {
+      return currentStaff.expertise;
+    }
+    if (!uploadedFiles.current.length || !activeOfficer) {
+      return "All Products";
+    }
+    const catSales = new Map<string, number>();
+    uploadedFiles.current.forEach((row) => {
+      const officerName = String(row["Officer (Name)"] ?? row.Officer ?? "");
+      if (attachMatchesOfficer(officerName, activeOfficer.name)) {
+        const cat = String(row["Category (Name)"] ?? row.category ?? "Other").trim();
+        const amount = toNumber(row["ราคาขายตามบิล"] ?? row["Total Price"] ?? row.totalPrice);
+        if (cat) {
+          catSales.set(cat, (catSales.get(cat) ?? 0) + amount);
+        }
+      }
+    });
+    if (!catSales.size) {
+      return "General Sales";
+    }
+    let maxCat = "";
+    let maxVal = -1;
+    catSales.forEach((val, cat) => {
+      if (val > maxVal) {
+        maxVal = val;
+        maxCat = cat;
+      }
+    });
+    if (!maxCat) return "General Sales";
+    const lower = maxCat.toLowerCase();
+    if (lower.includes("iphone")) return "iPhone Specialist";
+    if (lower.includes("mac")) return "Mac Specialist";
+    if (lower.includes("ipad")) return "iPad Specialist";
+    if (lower.includes("watch")) return "Apple Watch Spec.";
+    if (lower.includes("sim")) return "SIM & Services Spec.";
+    if (lower.includes("btb")) return "Corporate Sales Spec.";
+    return `${maxCat} Specialist`;
+  }, [uploadedFiles.current, activeOfficer, activeStaffId, currentStaff]);
+
   const staffRoster = useMemo(
     () => buildStaffRoster(uploadedFiles.target, parsedReport.officers, cleanOfficerName),
     [uploadedFiles.target, parsedReport.officers],
@@ -624,14 +805,14 @@ export default function App() {
         isUp: avgAch >= 100,
       },
       {
-        label: "Average CSAT",
-        value: `${avgRate.toFixed(1)}`,
-        trend: `${avgRate >= 100 ? "+" : ""}${avgRate.toFixed(1)}`,
+        label: "Avg Staff Ach %",
+        value: `${avgRate.toFixed(1)}%`,
+        trend: `${avgRate >= 100 ? "+" : ""}${avgRate.toFixed(1)}%`,
         icon: Smile,
         isUp: true,
       },
       {
-        label: "Total Visits",
+        label: "Active Staff",
         value: `${totalOfficers.toLocaleString()}`,
         trend: `${totalBranches.toLocaleString()} branches`,
         icon: Users,
@@ -641,14 +822,76 @@ export default function App() {
   }, [parsedReport]);
 
   const salesTrendData = useMemo(() => {
-    return [...parsedReport.branches]
-      .slice(0, 7)
-      .map((branch, index) => ({
-        date: branch.label.length > 12 ? branch.label.slice(0, 12) : branch.label,
-        sales: Math.round(branch.actual / 1000),
-        index,
-      }));
-  }, [parsedReport.branches]);
+    if (!uploadedFiles.current.length) {
+      return [...parsedReport.branches]
+        .slice(0, 7)
+        .map((branch, index) => ({
+          date: branch.label.length > 12 ? branch.label.slice(0, 12) : branch.label,
+          sales: Math.round(branch.actual / 1000),
+          index,
+        }));
+    }
+
+    const dailySales = new Map<string, number>();
+    uploadedFiles.current.forEach((row) => {
+      const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
+      if (!rawDate) return;
+      
+      let formattedDate = rawDate;
+      const match = rawDate.match(/^(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})/);
+      if (match) {
+        formattedDate = `${match[1]}/${match[2]}`;
+      } else {
+        formattedDate = rawDate.slice(0, 10);
+      }
+      const val = getCategoryValue(row);
+      dailySales.set(formattedDate, (dailySales.get(formattedDate) ?? 0) + val);
+    });
+
+    const sortedDates = Array.from(dailySales.keys()).sort((a, b) => {
+      const [aD, aM] = a.split("/").map(Number);
+      const [bD, bM] = b.split("/").map(Number);
+      if (aM !== bM) return aM - bM;
+      return aD - bD;
+    });
+
+    return sortedDates.slice(-7).map((date, index) => ({
+      date,
+      sales: Math.round((dailySales.get(date) ?? 0) / 1000),
+      index,
+    }));
+  }, [uploadedFiles.current, parsedReport.branches]);
+
+  const topPerformingProducts = useMemo(() => {
+    if (!uploadedFiles.current.length) {
+      return [
+        { name: "iPhone 15 Pro Max", value: 85, color: "bg-emerald-400" },
+        { name: 'MacBook Pro 16"', value: 65, color: "bg-emerald-500" },
+        { name: "AirPods Pro 2", value: 45, color: "bg-white/40" },
+      ];
+    }
+
+    const productSales = new Map<string, number>();
+    uploadedFiles.current.forEach((row) => {
+      const name = String(row["Product (Name)"] ?? row["Category (Name)"] ?? "Other").trim();
+      if (!name || name === "Other") return;
+      const val = getCategoryValue(row);
+      productSales.set(name, (productSales.get(name) ?? 0) + val);
+    });
+
+    const sorted = Array.from(productSales.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3);
+
+    const maxVal = sorted[0]?.[1] || 1;
+    const colors = ["bg-emerald-400", "bg-emerald-500", "bg-white/40"];
+    
+    return sorted.map(([name, sales], index) => ({
+      name,
+      value: Math.round((sales / maxVal) * 100),
+      color: colors[index] ?? "bg-white/20",
+    }));
+  }, [uploadedFiles.current]);
 
   const attachCategoryOptions = useMemo(() => getAttachCategoryOptions(uploadedFiles.categoryMaster), [uploadedFiles.categoryMaster]);
 
@@ -1091,11 +1334,11 @@ export default function App() {
     file: File,
   ) => {
     if (!file.type.startsWith("image/")) {
-      setStaffPhotoError("请选择图片文件");
+      setStaffPhotoError("กรุณาเลือกไฟล์รูปภาพ");
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      setStaffPhotoError("图片不能超过 5MB");
+      setStaffPhotoError("ขนาดรูปภาพต้องไม่เกิน 5MB");
       return;
     }
 
@@ -1113,11 +1356,11 @@ export default function App() {
       const saved = await saveStaffPhoto(record);
       setStaffPhotos((prev) => ({ ...prev, [entry.staffId]: record }));
       if (!saved) {
-        setStaffPhotoError("服务器保存失败，已暂存到浏览器");
+        setStaffPhotoError("บันทึกลงเซิร์ฟเวอร์ไม่สำเร็จ ระบบได้บันทึกไว้ในเบราว์เซอร์ชั่วคราวแล้ว");
       }
     } catch (error) {
       setStaffPhotoError(
-        error instanceof Error ? error.message : "上传失败",
+        error instanceof Error ? error.message : "อัปโหลดไม่สำเร็จ",
       );
     } finally {
       setUploadingPhotoId(null);
@@ -1136,7 +1379,7 @@ export default function App() {
       });
     } catch (error) {
       setStaffPhotoError(
-        error instanceof Error ? error.message : "删除失败",
+        error instanceof Error ? error.message : "ลบรูปภาพไม่สำเร็จ",
       );
     } finally {
       setUploadingPhotoId(null);
@@ -1360,7 +1603,7 @@ export default function App() {
                   <div className="lg:w-2/3 bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 flex flex-col shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
                     <div className="flex justify-between items-center mb-6">
                       <h2 className="text-lg font-semibold tracking-tight">
-                        Sales Trend (Last 7 Days)
+                        {uploadedFiles.current.length > 0 ? "Sales Trend (Last 7 Days)" : "Sales by Branch (Comparison)"}
                       </h2>
                     </div>
                     <div className="flex-1 w-full min-h-[220px] min-w-0">
@@ -1443,23 +1686,7 @@ export default function App() {
                       Top Performing Products
                     </h2>
                     <div className="flex flex-col gap-4 flex-1 justify-center">
-                      {[
-                        {
-                          name: "iPhone 15 Pro Max",
-                          value: 85,
-                          color: "bg-emerald-400",
-                        },
-                        {
-                          name: 'MacBook Pro 16"',
-                          value: 65,
-                          color: "bg-emerald-500",
-                        },
-                        {
-                          name: "AirPods Pro 2",
-                          value: 45,
-                          color: "bg-white/40",
-                        },
-                      ].map((prod, i) => (
+                      {topPerformingProducts.map((prod, i) => (
                         <div key={i}>
                           <div className="flex justify-between text-sm mb-1.5">
                             <span className="text-white/90">{prod.name}</span>
@@ -1912,7 +2139,7 @@ export default function App() {
                           cx="50%"
                           cy="50%"
                           outerRadius="65%"
-                          data={currentStaff.radar}
+                          data={dynamicRadarData}
                         >
                           <PolarGrid
                             gridType="polygon"
@@ -1946,13 +2173,13 @@ export default function App() {
                         <div className="w-16 h-16 rounded-full border border-emerald-500/30 flex items-center justify-center bg-emerald-500/10 backdrop-blur-sm">
                           <AnimatePresence mode="wait">
                             <motion.span
-                              key={currentStaff.score}
+                              key={dynamicScore}
                               initial={{ opacity: 0, scale: 0.5 }}
                               animate={{ opacity: 1, scale: 1 }}
                               exit={{ opacity: 0, scale: 0.5 }}
                               className="text-white/60 text-3xl font-bold tracking-tighter"
                             >
-                              {currentStaff.score}
+                              {dynamicScore}
                             </motion.span>
                           </AnimatePresence>
                         </div>
@@ -2070,13 +2297,13 @@ export default function App() {
                         </div>
                         <AnimatePresence mode="wait">
                           <motion.div
-                            key={currentOfficer?.branch ?? currentStaff.role}
+                            key={dynamicRole}
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             className="text-[10px] lg:text-xs font-semibold w-full truncate"
                           >
-                            {currentOfficer?.branch ?? currentStaff.role}
+                            {dynamicRole}
                           </motion.div>
                         </AnimatePresence>
                       </div>
@@ -2086,13 +2313,13 @@ export default function App() {
                         </div>
                         <AnimatePresence mode="wait">
                           <motion.div
-                            key={currentOfficer?.target ?? currentStaff.experience}
+                            key={dynamicExperience}
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             className="text-[10px] lg:text-xs font-semibold w-full truncate"
                           >
-                            {currentOfficer?.target ? `${currentOfficer.target.toLocaleString()} target` : currentStaff.experience}
+                            {dynamicExperience}
                           </motion.div>
                         </AnimatePresence>
                       </div>
@@ -2102,13 +2329,13 @@ export default function App() {
                         </div>
                         <AnimatePresence mode="wait">
                           <motion.div
-                            key={currentStaff.expertise}
+                            key={dynamicExpertise}
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             className="text-[10px] lg:text-xs font-semibold w-full truncate"
                           >
-                            {currentStaff.expertise}
+                            {dynamicExpertise}
                           </motion.div>
                         </AnimatePresence>
                       </div>
@@ -2118,7 +2345,7 @@ export default function App() {
                         </div>
                         <AnimatePresence mode="wait">
                           <motion.div
-                            key={currentStaff.languages}
+                            key={dynamicLanguages}
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
@@ -2133,7 +2360,7 @@ export default function App() {
                                 <div className="h-[2px] bg-red-600"></div>
                               </div>
                             </div>{" "}
-                            {currentStaff.languages}
+                            {dynamicLanguages}
                           </motion.div>
                         </AnimatePresence>
                       </div>
@@ -2330,9 +2557,9 @@ export default function App() {
                       <ImagePlus className="w-6 h-6" />
                     </div>
                     <div>
-                      <h2 className="text-xl font-bold tracking-tight">员工头像</h2>
+                      <h2 className="text-xl font-bold tracking-tight">รูปประจำตัวพนักงาน</h2>
                       <p className="text-sm text-white/60 mt-1">
-                        上传后会在员工页、排行榜和 Attach 表格中显示。需先上传 Target Excel 才会出现员工列表。
+                        รูปภาพจะแสดงในหน้าข้อมูลพนักงาน บอร์ดจัดอันดับ และตารางการขายร่วม (Attach) จำเป็นต้องอัปโหลดข้อมูลเป้าหมาย (Target) ในส่วนรายงานก่อน จึงจะแสดงรายชื่อพนักงาน
                       </p>
                     </div>
                   </div>
@@ -2344,22 +2571,22 @@ export default function App() {
                   {staffRoster.length === 0 ? (
                     <div className="flex-1 flex flex-col items-center justify-center text-center py-12">
                       <Users className="w-14 h-14 text-white/20 mb-4" />
-                      <h3 className="text-lg font-semibold mb-2">暂无员工数据</h3>
+                      <h3 className="text-lg font-semibold mb-2">ไม่พบข้อมูลพนักงาน</h3>
                       <p className="text-white/60 text-sm max-w-md mb-4">
-                        请先在 Reports 页面上传 Target（员工目标）Excel，或上传包含员工姓名的报表。
+                        กรุณาอัปโหลดเป้าหมายยอดขาย (Target Excel) ในหน้ารายงานก่อน หรืออัปโหลดรายงานยอดขายที่มีรายชื่อพนักงาน
                       </p>
                       <button
                         type="button"
                         onClick={() => setCurrentView("reports")}
                         className="rounded-xl bg-emerald-500/20 border border-emerald-400/30 px-4 py-2 text-sm text-emerald-300 hover:bg-emerald-500/30 transition-colors"
                       >
-                        前往 Reports 上传
+                        ไปที่หน้ารายงานเพื่ออัปโหลด
                       </button>
                     </div>
                   ) : (
                     <div className="overflow-y-auto flex-1 -mx-2 px-2">
                       <p className="text-xs text-white/50 mb-3">
-                        共 {staffRoster.length} 人 · PNG/WebP 保留透明底 · JPG 自动压缩
+                        ทั้งหมด {staffRoster.length} คน · รองรับ PNG/WebP (พื้นหลังโปร่งใส) · JPG จะถูกบีบอัดอัตโนมัติ
                       </p>
                       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                         {staffRoster.map((entry, index) => {
@@ -2410,7 +2637,7 @@ export default function App() {
                                     }}
                                   />
                                   <ImagePlus className="w-3.5 h-3.5" />
-                                  {isUploading ? "上传中…" : hasCustom ? "更换" : "上传"}
+                                  {isUploading ? "กำลังอัปโหลด..." : hasCustom ? "เปลี่ยนรูป" : "อัปโหลด"}
                                 </label>
                                 {hasCustom && (
                                   <button
@@ -2420,7 +2647,7 @@ export default function App() {
                                     className="inline-flex items-center justify-center gap-1 rounded-xl px-3 py-1.5 text-xs text-white/50 hover:text-red-300 hover:bg-red-500/10 transition-colors disabled:opacity-40"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
-                                    删除
+                                    ลบรูปภาพ
                                   </button>
                                 )}
                               </div>
