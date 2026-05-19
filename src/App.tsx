@@ -30,6 +30,15 @@ import {
   type UploadState,
 } from "./lib/uploadsApi";
 import {
+  computeAttachRateRows,
+  DEFAULT_ATTACH_CATEGORIES,
+  DEFAULT_BASE_CATEGORIES,
+  matchesOfficer as attachMatchesOfficer,
+  overallAttachRate,
+  toLegacyAttachRates,
+  type AttachOfficerRow,
+} from "./lib/attachRate";
+import {
   PolarAngleAxis,
   PolarGrid,
   PolarRadiusAxis,
@@ -609,72 +618,180 @@ export default function App() {
     );
   };
 
+  const attachBaseCategories = useMemo(
+    () => (currentView === "staff_overview" && selectedDevice ? [selectedDevice] : DEFAULT_BASE_CATEGORIES),
+    [currentView, selectedDevice],
+  );
+
+  const attachTargetCategories = useMemo(
+    () => (selectedAttachCategories.length ? selectedAttachCategories : DEFAULT_ATTACH_CATEGORIES),
+    [selectedAttachCategories],
+  );
+
+  const attachOfficerRows = useMemo<AttachOfficerRow[]>(() => {
+    if (!uploadedFiles.current.length) return [];
+    return computeAttachRateRows({
+      currentRows: uploadedFiles.current,
+      targetRows: uploadedFiles.target,
+      categoryMaster: uploadedFiles.categoryMaster,
+      baseCategories: attachBaseCategories,
+      attachCategories: attachTargetCategories,
+      kpiTarget: 20,
+    });
+  }, [
+    uploadedFiles.current,
+    uploadedFiles.target,
+    uploadedFiles.categoryMaster,
+    attachBaseCategories,
+    attachTargetCategories,
+  ]);
+
   const attachRateData = useMemo<DerivedAttachRow[]>(() => {
-    const currentRows = uploadedFiles.current;
-    const targetRows = uploadedFiles.target;
-    const categoryMasterRows = uploadedFiles.categoryMaster;
-    const categoryLookup = new Map<string, string>();
-    categoryMasterRows.forEach((row) => {
-      const key = normalizeText(row["Cat & Sub Cat"] ?? row["Category (Name)"] ?? row.SubCategory);
-      const value = String(row["CAT Daily"] ?? row["Category (Name)"] ?? "Other").trim();
-      if (key) categoryLookup.set(key, value);
-    });
+    const selectedOfficerSet = selectedAttachOfficers.length
+      ? new Set(selectedAttachOfficers.map(cleanOfficerName))
+      : null;
 
-    const officerBuckets = new Map<string, { branch: string; baseUnits: number; appleCare: number; accessories: number; services: number }>();
-    currentRows.forEach((row) => {
-      const officerName = String(row["Officer (Name)"] ?? row.Officer ?? row.officer ?? row.NAME ?? "Unknown Officer").trim();
-      const branch = String(row["Branch (Name)"] ?? row.branch ?? "Unknown Branch").trim();
-      const categoryName = String(row["Category (Name)"] ?? row.category ?? row.cat ?? "Other").trim();
-      const subCategory = String(row["Sub Category"] ?? row.subcategory ?? "").trim();
-      const productName = String(row["Product (Name)"] ?? row.product ?? "").trim();
-      const mappedCategory = categoryLookup.get(normalizeText(`${categoryName}${subCategory}`)) ?? categoryLookup.get(normalizeText(productName)) ?? categoryName;
-      const categoryGroup = categoryGroupKey(mappedCategory);
-      const quantity = Math.max(toNumber(row.Number ?? row.number ?? row.qty), 1);
-      const officerKey = cleanOfficerName(officerName);
-      const existing = officerBuckets.get(officerKey) ?? { branch, baseUnits: 0, appleCare: 0, accessories: 0, services: 0 };
-      existing.branch = existing.branch || branch;
-      existing.baseUnits += quantity;
-      if (categoryGroup === "appleCare") existing.appleCare += quantity;
-      else if (categoryGroup === "services") existing.services += quantity;
-      else existing.accessories += quantity;
-      officerBuckets.set(officerKey, existing);
-    });
+    const rows: AttachOfficerRow[] = attachOfficerRows;
 
-    const targetLookup = new Map<string, RawRow>();
-    targetRows.forEach((row) => {
-      const officerKey = cleanOfficerName(`${row.NAME ?? ""} ${row.SURNAME ?? ""}`.trim());
-      targetLookup.set(officerKey, row);
-    });
-
-    const selectedCategorySet = selectedAttachCategories.length ? new Set(selectedAttachCategories.map(normalizeText)) : null;
-    const selectedOfficerSet = selectedAttachOfficers.length ? new Set(selectedAttachOfficers.map(cleanOfficerName)) : null;
-    const officerList = parsedReport.officers.length ? parsedReport.officers : [...officerBuckets.keys()].map((name) => ({ name, branch: officerBuckets.get(name)?.branch ?? "", actual: 0, target: 0, rate: 0 }));
-
-    return officerList
-      .filter((officer) => !selectedOfficerSet || selectedOfficerSet.has(cleanOfficerName(officer.name)))
-      .map((officer, index) => {
-        const key = cleanOfficerName(officer.name);
-        const bucket = officerBuckets.get(key) ?? { branch: officer.branch, baseUnits: 0, appleCare: 0, accessories: 0, services: 0 };
-        const targetRow = targetLookup.get(key);
-        const target = toNumber(targetRow?.Total ?? targetRow?.total ?? officer.target);
-        const base = Math.max(bucket.baseUnits || target || 1, 1);
-        const appleCareRate = Math.round((bucket.appleCare / base) * 100);
-        const accessoriesRate = Math.round((bucket.accessories / base) * 100);
-        const servicesRate = Math.round((bucket.services / base) * 100);
-        const selectedApple = !selectedCategorySet || selectedCategorySet.has(normalizeText("appleCare")) || [...selectedCategorySet].some((cat) => normalizeText(cat).includes("apple"));
-        const selectedAccessories = !selectedCategorySet || selectedCategorySet.has(normalizeText("accessories")) || [...selectedCategorySet].some((cat) => normalizeText(cat).includes("access"));
-        const selectedServices = !selectedCategorySet || selectedCategorySet.has(normalizeText("services")) || [...selectedCategorySet].some((cat) => normalizeText(cat).includes("service"));
-        return {
-          id: key,
+    if (!rows.length && parsedReport.officers.length) {
+      return parsedReport.officers
+        .filter((officer) => !selectedOfficerSet || selectedOfficerSet.has(cleanOfficerName(officer.name)))
+        .map((officer, index) => ({
+          id: cleanOfficerName(officer.name),
           name: officer.name,
-          branch: bucket.branch || officer.branch,
-          appleCare: selectedApple ? Math.min(appleCareRate, 160) : 0,
-          accessories: selectedAccessories ? Math.min(accessoriesRate, 180) : 0,
-          services: selectedServices ? Math.min(servicesRate, 100) : 0,
-          avatar: index % 3 === 0 ? "/staff1.png" : index % 3 === 1 ? "/staff2.png" : "/staff3.png",
+          branch: officer.branch,
+          appleCare: Math.min(officer.rate, 160),
+          accessories: Math.min(Math.round(officer.rate * 0.85), 180),
+          services: Math.min(Math.round(officer.rate * 0.55), 100),
+          avatar:
+            index % 3 === 0
+              ? "/staff1.png"
+              : index % 3 === 1
+                ? "/staff2.png"
+                : "/staff3.png",
+        }));
+    }
+
+    return rows
+      .filter((row) => !selectedOfficerSet || selectedOfficerSet.has(row.id))
+      .filter((row) => row.baseUnits > 0 || row.totalAttachUnitsForSorting > 0)
+      .map((row, index) => {
+        const legacy = toLegacyAttachRates(row);
+        const selectedCategorySet = selectedAttachCategories.length
+          ? new Set(selectedAttachCategories.map(normalizeText))
+          : null;
+        const selectedApple =
+          !selectedCategorySet ||
+          selectedCategorySet.has(normalizeText("appleCare")) ||
+          [...selectedCategorySet].some((cat) => normalizeText(cat).includes("apple"));
+        const selectedAccessories =
+          !selectedCategorySet ||
+          selectedCategorySet.has(normalizeText("accessories")) ||
+          [...selectedCategorySet].some((cat) => normalizeText(cat).includes("access"));
+        const selectedServices =
+          !selectedCategorySet ||
+          selectedCategorySet.has(normalizeText("services")) ||
+          [...selectedCategorySet].some((cat) => normalizeText(cat).includes("service"));
+        return {
+          id: row.id,
+          name: row.name,
+          branch: row.branch,
+          appleCare: selectedApple ? legacy.appleCare : 0,
+          accessories: selectedAccessories ? legacy.accessories : 0,
+          services: selectedServices ? legacy.services : 0,
+          avatar:
+            index % 3 === 0
+              ? "/staff1.png"
+              : index % 3 === 1
+                ? "/staff2.png"
+                : "/staff3.png",
         };
       });
-  }, [uploadedFiles.current, uploadedFiles.target, uploadedFiles.categoryMaster, parsedReport.officers, selectedAttachCategories, selectedAttachOfficers]);
+  }, [attachOfficerRows, parsedReport.officers, selectedAttachCategories, selectedAttachOfficers]);
+
+  const staffLeaderboard = useMemo(() => {
+    const ranked = attachOfficerRows.filter(
+      (row) => row.baseUnits > 0 || row.totalAttachUnitsForSorting > 0,
+    );
+    if (ranked.length) return ranked.slice(0, 3);
+    return parsedReport.officers
+      .slice()
+      .sort((a, b) => b.actual - a.actual)
+      .slice(0, 3)
+      .map((officer) => ({
+        id: cleanOfficerName(officer.name),
+        name: officer.name,
+        branch: officer.branch,
+        staffId: 0,
+        baseUnits: officer.actual,
+        attachMap: {} as AttachOfficerRow["attachMap"],
+        totalAttachUnitsForSorting: 0,
+      }));
+  }, [attachOfficerRows, parsedReport.officers]);
+
+  const activeOfficerInteractions = useMemo(() => {
+    const officerName = activeOfficer?.name ?? currentStaff.name;
+    if (!uploadedFiles.current.length) return interactionsData;
+
+    const formatDocDate = (raw: unknown) => {
+      const text = String(raw ?? "").replace(/^\S+\.\s*/, "");
+      const parsed = Date.parse(text);
+      if (!Number.isFinite(parsed)) return String(raw ?? "-");
+      return new Date(parsed).toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+    };
+
+    const formatValue = (row: RawRow) => {
+      const amount = toNumber(
+        row["ราคาขายตามบิล"] ?? row["Total Price"] ?? row.totalPrice,
+      );
+      return amount ? amount.toLocaleString() : "-";
+    };
+
+    const rows = uploadedFiles.current
+      .filter((row) =>
+        attachMatchesOfficer(
+          String(row["Officer (Name)"] ?? row.Officer ?? ""),
+          officerName,
+        ),
+      )
+      .slice()
+      .sort((a, b) => getSalesDate(b) - getSalesDate(a))
+      .slice(0, 8)
+      .map((row) => {
+        const category = String(row["Category (Name)"] ?? row.category ?? "Sales").trim();
+        const subCategory = String(row["Sub Category"] ?? "").trim();
+        return {
+          date: formatDocDate(row["Doc Date"] ?? row["doc date"]),
+          type: subCategory || category,
+          typeIcon: category.toLowerCase().includes("corporate")
+            ? "building"
+            : category.toLowerCase().includes("call")
+              ? "phone"
+              : "user",
+          product: String(row["Product (Name)"] ?? row.product ?? "-").trim(),
+          status:
+            DEFAULT_ATTACH_CATEGORIES.some(
+              (cat) =>
+                normalizeText(category).includes(normalizeText(cat)) ||
+                normalizeText(subCategory).includes(normalizeText(cat)),
+            )
+              ? "Attached"
+              : "Closed Won",
+          value: formatValue(row),
+        };
+      });
+
+    if (!rows.length) return interactionsData;
+    return {
+      sales: rows,
+      csat: rows,
+      target: rows,
+    };
+  }, [uploadedFiles.current, activeOfficer?.name, currentStaff.name]);
 
   const persistUploadsLocal = (nextUploads: UploadState) => {
     try {
@@ -1703,7 +1820,7 @@ export default function App() {
                           </tr>
                         </thead>
                         <tbody className="text-white/90">
-                          {interactionsData[activeStat].map(
+                          {activeOfficerInteractions[activeStat].map(
                             (interaction, idx) => (
                               <tr
                                 key={idx}
@@ -1772,87 +1889,76 @@ export default function App() {
 
                     {/* Performers List */}
                     <div className="flex-1 flex flex-col gap-2.5 relative">
-                      {/* Performer 1 */}
-                      <div
-                        className="bg-white/10 backdrop-blur-md rounded-2xl p-3.5 flex items-center border border-white/10 shadow-[0_4px_24px_rgba(0,0,0,0.1)] cursor-pointer hover:bg-white/[0.15] transition-colors"
-                        onClick={() => setActiveStaffId("1")}
-                      >
-                        <div className="bg-emerald-500 rounded-full w-9 h-9 flex items-center justify-center font-bold text-base mr-3 shadow-[0_0_15px_rgba(16,185,129,0.5)]">
-                          1
-                        </div>
-                        <div>
-                          <div className="text-[9px] text-white/60 uppercase tracking-wider mb-0.5">
-                            This Month
-                          </div>
-                          <div className="font-semibold text-[13px] text-white">
-                            Sarut Jitranon
-                          </div>
-                        </div>
-                        <div className="ml-auto text-right flex flex-col items-end">
-                          <div className="font-bold text-lg leading-tight">
-                            142
-                          </div>
-                          <div className="bg-emerald-500/20 text-emerald-400 text-[9px] font-bold px-1.5 py-0.5 rounded border border-emerald-500/20 mt-1 leading-none">
-                            115%
-                          </div>
-                        </div>
-                      </div>
+                      {staffLeaderboard.map((performer, rank) => {
+                        const officerIndex = parsedReport.officers.findIndex((o) =>
+                          attachMatchesOfficer(o.name, performer.name),
+                        );
+                        const attachRate = overallAttachRate(performer);
+                        const displayUnits = performer.baseUnits || 0;
+                        const isFirst = rank === 0;
+                        const isLast =
+                          rank === staffLeaderboard.length - 1 &&
+                          staffLeaderboard.length === 3;
+                        const shortName = performer.name.split(" ");
+                        const label =
+                          shortName.length > 1
+                            ? `${shortName[0]} ${shortName[1].charAt(0)}.`
+                            : performer.name;
 
-                      {/* Performer 2 */}
-                      <div
-                        className="bg-white/5 backdrop-blur-sm rounded-2xl p-3.5 flex items-center border border-white/5 cursor-pointer hover:bg-white/10 transition-colors"
-                        onClick={() => setActiveStaffId("2")}
-                      >
-                        <div className="bg-white/10 rounded-full w-9 h-9 flex items-center justify-center font-bold text-base text-white/80 border border-white/5 mr-3">
-                          2
-                        </div>
-                        <div>
-                          <div className="text-[9px] text-white/50 uppercase tracking-wider mb-0.5">
-                            This Month
+                        return (
+                          <div
+                            key={performer.id}
+                            className={`${isFirst ? "bg-white/10 backdrop-blur-md border-white/10 shadow-[0_4px_24px_rgba(0,0,0,0.1)]" : "bg-white/5 backdrop-blur-sm border-white/5"} rounded-2xl p-3.5 flex items-center border cursor-pointer hover:bg-white/[0.15] transition-colors ${isLast ? "h-[72px] overflow-hidden relative" : ""}`}
+                            onClick={() => {
+                              if (officerIndex >= 0)
+                                setActiveStaffId(String(officerIndex + 1));
+                            }}
+                          >
+                            <div
+                              className={`${isFirst ? "bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]" : "bg-white/10 border border-white/5 text-white/80"} rounded-full w-9 h-9 flex items-center justify-center font-bold text-base mr-3`}
+                            >
+                              {rank + 1}
+                            </div>
+                            <div>
+                              <div
+                                className={`text-[9px] uppercase tracking-wider mb-0.5 ${isFirst ? "text-white/60" : isLast ? "text-white/40" : "text-white/50"}`}
+                              >
+                                This Month
+                              </div>
+                              <div
+                                className={`font-semibold text-[13px] ${isFirst ? "text-white" : isLast ? "text-white/70 font-medium" : "text-white/90 font-medium"}`}
+                              >
+                                {isFirst ? performer.name : label}
+                              </div>
+                            </div>
+                            <div
+                              className={`ml-auto text-right flex flex-col items-end ${isLast ? "mr-2" : ""}`}
+                            >
+                              <div
+                                className={`font-bold text-lg leading-tight ${isFirst ? "" : isLast ? "text-white/70" : "text-white/90"}`}
+                              >
+                                {displayUnits.toLocaleString()}
+                              </div>
+                              {!isLast && (
+                                <div
+                                  className={`${attachRate >= 20 ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/20" : "bg-white/5 text-white/60 border-white/10"} text-[9px] font-bold px-1.5 py-0.5 rounded border mt-1 leading-none`}
+                                >
+                                  {attachRate}%
+                                </div>
+                              )}
+                            </div>
+                            {isLast && (
+                              <div className="absolute inset-x-0 bottom-0 top-1/2 bg-gradient-to-t from-[rgba(18,54,39,1)] to-transparent pointer-events-none rounded-b-2xl" />
+                            )}
                           </div>
-                          <div className="font-medium text-[13px] text-white/90">
-                            Nadech K.
-                          </div>
-                        </div>
-                        <div className="ml-auto text-right flex flex-col items-end">
-                          <div className="font-bold text-lg leading-tight text-white/90">
-                            256
-                          </div>
-                          <div className="bg-white/5 text-white/60 text-[9px] font-bold px-1.5 py-0.5 rounded border border-white/10 mt-1 leading-none">
-                            125%
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Performer 3 */}
-                      <div
-                        className="bg-white/5 backdrop-blur-sm rounded-2xl p-3.5 flex items-center border border-white/5 h-[72px] overflow-hidden relative cursor-pointer hover:bg-white/10 transition-colors"
-                        onClick={() => setActiveStaffId("3")}
-                      >
-                        <div className="bg-white/10 rounded-full w-9 h-9 flex items-center justify-center font-bold text-base text-white/60 border border-white/5 mr-3">
-                          3
-                        </div>
-                        <div>
-                          <div className="text-[9px] text-white/40 uppercase tracking-wider mb-0.5">
-                            This Month
-                          </div>
-                          <div className="font-medium text-[13px] text-white/70">
-                            Yaya U.
-                          </div>
-                        </div>
-                        <div className="ml-auto text-right mr-2">
-                          <div className="font-bold text-lg leading-tight text-white/70">
-                            118
-                          </div>
-                        </div>
-                        {/* Fade out mask to match the UI screenshot */}
-                        <div className="absolute inset-x-0 bottom-0 top-1/2 bg-gradient-to-t from-[rgba(18,54,39,1)] to-transparent pointer-events-none rounded-b-2xl" />
-                      </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
               </motion.div>
             )}
+
             {currentView === "settings" && (
               <motion.div
                 key="settings"
