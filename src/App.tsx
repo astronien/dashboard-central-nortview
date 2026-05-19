@@ -20,6 +20,7 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import CategoryTreePicker from "./components/CategoryTreePicker";
+import AttachTargetGroupEditor from "./components/AttachTargetGroupEditor";
 import { AnimatePresence, motion } from "motion/react";
 import React, { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
@@ -45,6 +46,7 @@ import {
   overallAttachRate,
   type AttachMatrixDisplayRow,
   type AttachOfficerRow,
+  type AttachTargetGroup,
 } from "./lib/attachRate";
 import {
   PolarAngleAxis,
@@ -539,9 +541,13 @@ export default function App() {
   const [staffBaseCategories, setStaffBaseCategories] = useState<string[]>([
     ...DEFAULT_BASE_CATEGORIES,
   ]);
-  const [staffAttachCategories, setStaffAttachCategories] = useState<string[]>([
-    ...DEFAULT_ATTACH_CATEGORIES,
-  ]);
+  const [staffAttachGroups, setStaffAttachGroups] = useState<AttachTargetGroup[]>(() =>
+    DEFAULT_ATTACH_CATEGORIES.map((cat) => ({
+      id: `grp-${cat}`,
+      label: cat,
+      members: [cat],
+    })),
+  );
   const [staffKpiTargets, setStaffKpiTargets] = useState<Record<string, number>>(() =>
     Object.fromEntries(DEFAULT_ATTACH_CATEGORIES.map((cat) => [cat, 20])),
   );
@@ -643,9 +649,11 @@ export default function App() {
   }, [currentView, staffBaseCategories]);
 
   const attachTargetCategories = useMemo(() => {
-    if (currentView === "staff_overview") return staffAttachCategories;
+    if (currentView === "staff_overview") {
+      return staffAttachGroups.map((g) => g.label);
+    }
     return DEFAULT_ATTACH_CATEGORIES;
-  }, [currentView, staffAttachCategories]);
+  }, [currentView, staffAttachGroups]);
 
   const attachFilterBranch =
     currentView === "staff_overview" ? staffFilterBranch : "All Branches";
@@ -679,26 +687,33 @@ export default function App() {
   };
 
   const toggleStaffCategory = (cat: string, isBase: boolean) => {
-    if (isBase) {
-      setStaffBaseCategories((prev) =>
-        prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat],
-      );
-    } else {
-      setStaffAttachCategories((prev) => {
-        if (prev.includes(cat)) return prev.filter((c) => c !== cat);
-        setStaffKpiTargets((kpi) => ({ ...kpi, [cat]: kpi[cat] ?? 20 }));
-        return [...prev, cat];
+    setStaffBaseCategories((prev) =>
+      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat],
+    );
+  };
+
+  const syncKpiForGroups = (groups: AttachTargetGroup[]) => {
+    setStaffKpiTargets((prev) => {
+      const next = { ...prev };
+      groups.forEach((g) => {
+        if (next[g.label] == null) next[g.label] = 20;
       });
-    }
+      return next;
+    });
+  };
+
+  const handleAttachGroupsChange = (groups: AttachTargetGroup[]) => {
+    setStaffAttachGroups(groups);
+    syncKpiForGroups(groups);
   };
 
   const attachKpiTargetsByCategory = useMemo(() => {
     const map: Record<string, number> = {};
-    staffAttachCategories.forEach((cat) => {
-      map[cat] = staffKpiTargets[cat] ?? 20;
+    staffAttachGroups.forEach((g) => {
+      map[g.label] = staffKpiTargets[g.label] ?? 20;
     });
     return map;
-  }, [staffAttachCategories, staffKpiTargets]);
+  }, [staffAttachGroups, staffKpiTargets]);
 
   const attachOfficerRows = useMemo<AttachOfficerRow[]>(() => {
     if (!uploadedFiles.current.length) return [];
@@ -708,6 +723,8 @@ export default function App() {
       categoryMaster: uploadedFiles.categoryMaster,
       baseCategories: attachBaseCategories,
       attachCategories: attachTargetCategories,
+      attachGroups:
+        currentView === "staff_overview" ? staffAttachGroups : undefined,
       kpiTargetsByCategory:
         currentView === "staff_overview" ? attachKpiTargetsByCategory : undefined,
       kpiTarget: 20,
@@ -719,6 +736,7 @@ export default function App() {
     uploadedFiles.categoryMaster,
     attachBaseCategories,
     attachTargetCategories,
+    staffAttachGroups,
     attachKpiTargetsByCategory,
     attachFilterBranch,
     currentView,
@@ -1396,9 +1414,9 @@ export default function App() {
                       Custom Attach Builder
                     </span>
                     <span className="flex items-center gap-3 text-xs text-white/60">
-                      {staffBaseCategories.length} base · {staffAttachCategories.length} attach
-                      {staffAttachCategories.length > 0
-                        ? ` · KPI ${staffAttachCategories.map((c) => `${staffKpiTargets[c] ?? 20}%`).join(" / ")}`
+                      {staffBaseCategories.length} base · {staffAttachGroups.length} attach
+                      {staffAttachGroups.length > 0
+                        ? ` · KPI ${staffAttachGroups.map((g) => `${staffKpiTargets[g.label] ?? 20}%`).join(" / ")}`
                         : ""}
                       <ChevronDown
                         className={`w-4 h-4 transition-transform ${staffBuilderOpen ? "rotate-180" : ""}`}
@@ -1431,11 +1449,10 @@ export default function App() {
                                 <span className="text-[10px] font-bold text-teal-400 uppercase tracking-widest block mb-3">
                                   2. Attach Target (ตัวแนบ)
                                 </span>
-                                <CategoryTreePicker
+                                <AttachTargetGroupEditor
                                   treeMap={staffCategoryTree}
-                                  selected={staffAttachCategories}
-                                  toggle={(cat) => toggleStaffCategory(cat, false)}
-                                  variant="attach"
+                                  groups={staffAttachGroups}
+                                  onGroupsChange={handleAttachGroupsChange}
                                 />
                               </div>
                             </div>
@@ -1461,18 +1478,18 @@ export default function App() {
                                   <SlidersHorizontal className="w-3 h-3" />
                                   Target KPI ต่อหมวด Attach
                                 </div>
-                                {staffAttachCategories.length === 0 ? (
+                                {staffAttachGroups.length === 0 ? (
                                   <p className="text-xs text-white/50">
-                                    เลือกหมวดใน Attach Target ก่อน
+                                    เลือกหมวดหรือสร้างกลุ่ม Attach ก่อน
                                   </p>
                                 ) : (
                                   <div className="space-y-3 max-h-40 overflow-y-auto pr-1">
-                                    {staffAttachCategories.map((cat) => {
-                                      const kpi = staffKpiTargets[cat] ?? 20;
+                                    {staffAttachGroups.map((group) => {
+                                      const kpi = staffKpiTargets[group.label] ?? 20;
                                       return (
-                                        <div key={cat}>
+                                        <div key={group.id}>
                                           <label className="flex items-center justify-between gap-2 text-xs mb-1">
-                                            <span className="text-white/80 truncate">{cat}</span>
+                                            <span className="text-white/80 truncate">{group.label}</span>
                                             <span className="bg-teal-500/20 text-teal-200 px-1.5 rounded tabular-nums shrink-0">
                                               {kpi}%
                                             </span>
@@ -1485,7 +1502,7 @@ export default function App() {
                                             value={kpi}
                                             onChange={(e) =>
                                               setStaffKpiForCategory(
-                                                cat,
+                                                group.label,
                                                 Number(e.target.value),
                                               )
                                             }
@@ -1552,7 +1569,7 @@ export default function App() {
                 </div>
 
                 <div className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 flex flex-col shadow-[0_8px_32px_rgba(0,0,0,0.12)] min-h-[450px] relative z-10 w-full shrink-0 min-w-0">
-                  {attachTargetCategories.length === 0 || staffBaseCategories.length === 0 ? (
+                  {staffAttachGroups.length === 0 || staffBaseCategories.length === 0 ? (
                     <p className="text-sm text-white/60 py-8 text-center">
                       เลือกอย่างน้อย 1 หมวดใน Base และ Attach จาก Custom Attach Builder
                     </p>

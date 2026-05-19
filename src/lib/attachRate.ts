@@ -29,6 +29,32 @@ export type SpreadsheetRow = Record<string, string | number | undefined>;
 
 export type AttachMapEntry = { units: number; rate: number; isHit: boolean };
 
+export type AttachTargetGroup = {
+  id: string;
+  label: string;
+  members: string[];
+};
+
+export function matchesAttachMember(
+  gc: string,
+  subCategory: string,
+  member: string,
+) {
+  const nSub = normalizeText(subCategory);
+  const nGc = normalizeText(gc);
+  const nMember = normalizeText(member);
+  if (!nMember) return false;
+  return (
+    nGc === nMember ||
+    nSub === nMember ||
+    (nSub && nMember && (nSub.includes(nMember) || nMember.includes(nSub)))
+  );
+}
+
+export function attachGroupsToLabels(groups: AttachTargetGroup[]) {
+  return groups.map((g) => g.label);
+}
+
 export type AttachOfficerRow = {
   id: string;
   name: string;
@@ -262,6 +288,7 @@ export function computeAttachRateRows(params: {
   categoryMaster: SpreadsheetRow[];
   baseCategories: string[];
   attachCategories: string[];
+  attachGroups?: AttachTargetGroup[];
   /** @deprecated use kpiTargetsByCategory — fallback when a category has no entry */
   kpiTarget?: number;
   kpiTargetsByCategory?: Record<string, number>;
@@ -273,10 +300,22 @@ export function computeAttachRateRows(params: {
     categoryMaster,
     baseCategories,
     attachCategories,
+    attachGroups,
     kpiTarget = 20,
     kpiTargetsByCategory = {},
     filterBranch = "All Branches",
   } = params;
+
+  const resolvedGroups: AttachTargetGroup[] =
+    attachGroups?.length
+      ? attachGroups
+      : attachCategories.map((label) => ({
+          id: label,
+          label,
+          members: [label],
+        }));
+
+  const attachLabels = resolvedGroups.map((g) => g.label);
 
   const kpiForCategory = (cat: string) =>
     kpiTargetsByCategory[cat] ?? kpiTarget;
@@ -309,7 +348,7 @@ export function computeAttachRateRows(params: {
     const key = cleanOfficerName(name);
     if (officersMap.has(key)) return;
     const attachMap: Record<string, AttachMapEntry> = {};
-    attachCategories.forEach((cat) => {
+    attachLabels.forEach((cat) => {
       attachMap[cat] = { units: 0, rate: 0, isHit: false };
     });
     officersMap.set(key, {
@@ -348,20 +387,22 @@ export function computeAttachRateRows(params: {
       mappedOfficer.baseUnits += units;
     }
 
-    attachCategories.forEach((cat) => {
-      if (gc === cat || subCategory === cat) {
-        if (!mappedOfficer.attachMap[cat]) {
-          mappedOfficer.attachMap[cat] = { units: 0, rate: 0, isHit: false };
-        }
-        mappedOfficer.attachMap[cat].units += units;
+    resolvedGroups.forEach((group) => {
+      const matched = group.members.some((member) =>
+        matchesAttachMember(gc, subCategory, member),
+      );
+      if (!matched) return;
+      if (!mappedOfficer.attachMap[group.label]) {
+        mappedOfficer.attachMap[group.label] = { units: 0, rate: 0, isHit: false };
       }
+      mappedOfficer.attachMap[group.label].units += units;
     });
   });
 
   return officerRows
     .map((o) => {
       let totalAttachUnitsForSorting = 0;
-      attachCategories.forEach((cat) => {
+      attachLabels.forEach((cat) => {
         const units = o.attachMap[cat]?.units || 0;
         const rate = o.baseUnits > 0 ? (units / o.baseUnits) * 100 : 0;
         if (o.attachMap[cat]) {
