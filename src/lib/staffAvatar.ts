@@ -90,7 +90,7 @@ const preservesTransparency = (file: File) =>
   file.type === "image/gif";
 
 /** PNG/WebP เก็บ alpha — JPEG บีบอัดไฟล์เล็กลง (พื้นหลังขาว) */
-export const resizeImageFile = (file: File, maxSize = 320): Promise<string> =>
+export const resizeImageFile = (file: File, maxSize = 800): Promise<string> =>
   new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();

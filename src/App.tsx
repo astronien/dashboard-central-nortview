@@ -2138,10 +2138,10 @@ export default function App() {
                 className="flex flex-col w-full h-full gap-6 relative"
               >
                 {/* TOP HALF: Person | Radar | Stats */}
-                <div className="flex-1 flex flex-col lg:flex-row min-h-[360px] lg:min-h-[460px] shrink-0 gap-6 lg:gap-0">
+                <div className="flex-1 bg-gradient-to-br from-[#113a29]/80 via-[#0c291d]/85 to-[#051710]/95 backdrop-blur-xl border border-white/10 shadow-[0_16px_48px_rgba(0,0,0,0.35)] rounded-[2.5rem] p-6 lg:p-8 lg:pb-6 flex flex-col lg:flex-row min-h-[360px] lg:min-h-[460px] shrink-0 relative overflow-visible gap-6 lg:gap-0">
                   {/* Left Column - Image */}
-                  <div className="lg:w-[35%] relative self-stretch flex items-end justify-center overflow-hidden rounded-[2rem] lg:rounded-none z-30 min-h-[320px] sm:min-h-[360px] lg:min-h-0 pointer-events-none">
-                    <div className="absolute bottom-[12%] left-1/2 -translate-x-1/2 w-[85%] max-w-[360px] h-[55%] bg-emerald-500/10 blur-[60px] lg:blur-[90px] rounded-full pointer-events-none -z-10 mix-blend-screen" />
+                  <div className="lg:w-[38%] relative self-stretch flex items-end justify-center z-30 min-h-[320px] sm:min-h-[360px] lg:min-h-0 pointer-events-none lg:-ml-8 lg:-mb-6 lg:-mt-20 xl:-mt-28">
+                    <div className="absolute bottom-[8%] left-1/2 -translate-x-1/2 w-[85%] max-w-[360px] h-[60%] bg-emerald-500/15 blur-[60px] lg:blur-[85px] rounded-full pointer-events-none -z-10 mix-blend-screen" />
                     <AnimatePresence mode="wait">
                       <motion.img
                         key={displayStaffAvatar}
@@ -2151,17 +2151,17 @@ export default function App() {
                         transition={{ duration: 0.45, type: "spring", bounce: 0.3 }}
                         src={displayStaffAvatar}
                         alt={activeOfficer?.name ?? currentStaff.name}
-                        className="relative z-20 mx-auto w-auto h-[min(88%,72vh)] max-h-[min(520px,72vh)] max-w-[min(100%,92vw)] sm:max-w-[min(92%,420px)] lg:h-[94%] lg:max-h-[min(560px,62vh)] lg:max-w-[min(100%,440px)] object-contain object-bottom drop-shadow-[0_20px_32px_rgba(0,0,0,0.5)] pointer-events-none"
+                        className="relative z-20 mx-auto w-auto h-[105%] max-h-[480px] sm:max-h-[520px] lg:h-[125%] lg:max-h-[640px] xl:h-[130%] lg:scale-105 xl:scale-110 object-contain object-bottom drop-shadow-[0_25px_35px_rgba(0,0,0,0.6)] pointer-events-none"
                         style={{
-                          WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,1) 92%, rgba(0,0,0,0) 100%)",
-                          maskImage: "linear-gradient(to bottom, rgba(0,0,0,1) 92%, rgba(0,0,0,0) 100%)",
+                          WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,1) 85%, rgba(0,0,0,0) 100%)",
+                          maskImage: "linear-gradient(to bottom, rgba(0,0,0,1) 85%, rgba(0,0,0,0) 100%)",
                         }}
                       />
                     </AnimatePresence>
                   </div>
 
                   {/* Center Column - Radar Chart */}
-                  <div className="lg:w-[30%] relative flex items-center justify-center py-4 lg:py-0 z-40">
+                  <div className="lg:w-[28%] relative flex items-center justify-center py-4 lg:py-0 z-40">
                     <div className="w-full max-w-[260px] h-[260px] min-h-[260px] relative text-xs">
                       <ResponsiveContainer width="100%" height={260} minWidth={0}>
                         <RadarChart
@@ -2217,7 +2217,7 @@ export default function App() {
                   </div>
 
                   {/* Right Column - Stats Grid */}
-                  <div className="lg:w-[35%] flex flex-col justify-center lg:justify-end pb-4 relative z-40">
+                  <div className="lg:w-[34%] flex flex-col justify-center lg:justify-end pb-4 relative z-40">
                     <div className="text-center lg:text-right mb-4">
                       <AnimatePresence mode="wait">
                         <motion.h1
