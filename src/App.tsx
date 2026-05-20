@@ -596,11 +596,18 @@ const fallbackReport: ParsedReport = {
   ],
 };
 
+const emptyReport: ParsedReport = {
+  fileName: "",
+  branches: [],
+  categories: [],
+  officers: [],
+};
+
 export default function App() {
   const [currentView, setCurrentView] = useState<
     "home" | "staff" | "staff_overview" | "settings" | "reports"
   >("home");
-  const [parsedReport, setParsedReport] = useState<ParsedReport>(fallbackReport);
+  const [parsedReport, setParsedReport] = useState<ParsedReport>(emptyReport);
   const [uploadedFiles, setUploadedFiles] = useState<Record<UploadKind, RawRow[]>>({ target: [], current: [], lastMonth: [], lastYear: [], categoryMaster: [] });
   const [activeTab, setActiveTab] = useState("Store");
   const [activeStat, setActiveStat] = useState<"sales" | "csat" | "target">(
@@ -619,6 +626,7 @@ export default function App() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isParsing, setIsParsing] = useState(false);
   const [isSavingTurso, setIsSavingTurso] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [tursoDatabase, setTursoDatabase] = useState<string | null>(null);
   const [tursoStats, setTursoStats] = useState<TursoHealthStats | null>(null);
   const [staffBaseCategories, setStaffBaseCategories] = useState<string[]>([
@@ -873,13 +881,7 @@ export default function App() {
 
   const salesTrendData = useMemo(() => {
     if (!uploadedFiles.current.length) {
-      return [...parsedReport.branches]
-        .slice(0, 7)
-        .map((branch, index) => ({
-          date: branch.label.length > 12 ? branch.label.slice(0, 12) : branch.label,
-          sales: Math.round(branch.actual / 1000),
-          index,
-        }));
+      return [];
     }
 
     const dailySales = new Map<string, number>();
@@ -914,11 +916,7 @@ export default function App() {
 
   const topPerformingProducts = useMemo(() => {
     if (!uploadedFiles.current.length) {
-      return [
-        { name: "iPhone 15 Pro Max", value: 85, color: "bg-emerald-400" },
-        { name: 'MacBook Pro 16"', value: 65, color: "bg-emerald-500" },
-        { name: "AirPods Pro 2", value: 45, color: "bg-white/40" },
-      ];
+      return [];
     }
 
     const productSales = new Map<string, number>();
@@ -1309,7 +1307,7 @@ export default function App() {
     }
     const empty = emptyUploadState();
     setUploadedFiles(empty);
-    setParsedReport(fallbackReport);
+    setParsedReport(emptyReport);
     setTursoStats(null);
     await refreshTursoStats();
     setUploadError(cleared ? null : "ลบบน Turso ไม่สำเร็จ — ลบในเบราว์เซอร์แล้ว ลองกดอีกครั้งหลัง deploy");
@@ -1317,15 +1315,18 @@ export default function App() {
 
   useEffect(() => {
     void (async () => {
+      setIsInitialLoading(true);
       await refreshTursoStats();
       const [persisted, photos] = await Promise.all([
         loadPersistedUploads(),
         fetchStaffPhotos(),
       ]);
       if (photos) setStaffPhotos(photos);
-      if (!persisted) return;
-      setUploadedFiles(persisted);
-      rebuildReport(persisted, { skipPersist: true });
+      if (persisted && hasUploadData(persisted)) {
+        setUploadedFiles(persisted);
+        rebuildReport(persisted, { skipPersist: true });
+      }
+      setIsInitialLoading(false);
     })();
   }, []);
 
@@ -1428,7 +1429,7 @@ export default function App() {
       setCurrentView("reports");
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : "อ่านไฟล์ไม่สำเร็จ");
-      setParsedReport(fallbackReport);
+      setParsedReport(emptyReport);
     } finally {
       setIsParsing(false);
       event.target.value = "";
@@ -1566,148 +1567,176 @@ export default function App() {
                 transition={{ duration: 0.4, ease: "easeOut" }}
                 className="flex flex-col gap-6 w-full h-full"
               >
-                {/* Dashboard Top Stats */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  {derivedHomeStats.map((stat, idx) => (
-                    <div
-                      key={idx}
-                      className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 p-5 shadow-[0_8px_32px_rgba(0,0,0,0.12)] flex flex-col justify-between hover:bg-white/[0.15] transition-colors cursor-pointer"
-                    >
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="p-2.5 bg-white/5 rounded-xl border border-white/5">
-                          <stat.icon className="w-5 h-5 text-emerald-400" />
-                        </div>
-                        <div
-                          className={`text-xs font-semibold px-2 py-1 rounded-lg ${stat.isUp ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"} flex items-center gap-1`}
-                        >
-                          {stat.isUp ? (
-                            <TrendingUp className="w-3 h-3" />
-                          ) : null}{" "}
-                          {stat.trend}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-sm text-white/60 mb-1">
-                          {stat.label}
-                        </div>
-                        <div className="text-3xl font-bold tracking-tight">
-                          {stat.value}
-                        </div>
-                      </div>
+                {isInitialLoading ? (
+                  <div className="flex flex-col items-center justify-center min-h-[480px] bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)] p-12 text-center w-full my-auto">
+                    <div className="relative w-16 h-16 mb-6">
+                      <div className="absolute inset-0 rounded-full border-4 border-emerald-500/20"></div>
+                      <div className="absolute inset-0 rounded-full border-4 border-t-emerald-400 animate-spin"></div>
+                      <div className="absolute inset-2 rounded-full border-4 border-emerald-500/10"></div>
+                      <div className="absolute inset-2 rounded-full border-4 border-b-emerald-300 animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
                     </div>
-                  ))}
-                </div>
-
-                {/* Middle Charts */}
-                <div className="flex flex-col lg:flex-row gap-6 min-h-[300px]">
-                  <div className="lg:w-2/3 bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 flex flex-col shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
-                    <div className="flex justify-between items-center mb-6">
-                      <h2 className="text-lg font-semibold tracking-tight">
-                        {uploadedFiles.current.length > 0 ? "Sales Trend (Last 7 Days)" : "Sales by Branch (Comparison)"}
-                      </h2>
-                    </div>
-                    <div className="flex-1 w-full min-h-[220px] min-w-0">
-                      <ResponsiveContainer width="100%" height={220} minWidth={0}>
-                        <AreaChart
-                          data={salesTrendData}
-                          margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-                        >
-                          <defs>
-                            <linearGradient
-                              id="colorSales"
-                              x1="0"
-                              y1="0"
-                              x2="0"
-                              y2="1"
-                            >
-                              <stop
-                                offset="5%"
-                                stopColor="#10b981"
-                                stopOpacity={0.5}
-                              />
-                              <stop
-                                offset="95%"
-                                stopColor="#10b981"
-                                stopOpacity={0}
-                              />
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid
-                            strokeDasharray="3 3"
-                            stroke="rgba(255,255,255,0.05)"
-                            vertical={false}
-                          />
-                          <XAxis
-                            dataKey="date"
-                            stroke="rgba(255,255,255,0.3)"
-                            tick={{
-                              fill: "rgba(255,255,255,0.6)",
-                              fontSize: 12,
-                            }}
-                            axisLine={false}
-                            tickLine={false}
-                            dy={10}
-                          />
-                          <YAxis
-                            stroke="rgba(255,255,255,0.3)"
-                            tick={{
-                              fill: "rgba(255,255,255,0.6)",
-                              fontSize: 12,
-                            }}
-                            axisLine={false}
-                            tickLine={false}
-                            dx={-10}
-                            tickFormatter={(value) => `${value}k`}
-                          />
-                          <RechartsTooltip
-                            contentStyle={{
-                              backgroundColor: "rgba(12, 49, 35, 0.9)",
-                              borderColor: "rgba(255,255,255,0.1)",
-                              borderRadius: "12px",
-                              color: "#fff",
-                            }}
-                            itemStyle={{ color: "#10b981" }}
-                          />
-                          <Area
-                            type="monotone"
-                            dataKey="sales"
-                            stroke="#10b981"
-                            strokeWidth={3}
-                            fillOpacity={1}
-                            fill="url(#colorSales)"
-                          />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </div>
+                    <h3 className="text-2xl font-bold tracking-tight text-white mb-2">
+                      กำลังประมวลผลอยู่ โปรดรอสักครู่
+                    </h3>
+                    <p className="text-sm text-white/60 max-w-sm leading-relaxed">
+                      ระบบกำลังดึงข้อมูลและเตรียมรายงานสำหรับคุณ...
+                    </p>
                   </div>
-
-                  <div className="lg:w-1/3 bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 flex flex-col shadow-[0_8px_32px_rgba(0,0,0,0.12)] justify-between">
-                    <h2 className="text-lg font-semibold tracking-tight mb-4">
-                      Top Performing Products
-                    </h2>
-                    <div className="flex flex-col gap-4 flex-1 justify-center">
-                      {topPerformingProducts.map((prod, i) => (
-                        <div key={i}>
-                          <div className="flex justify-between text-sm mb-1.5">
-                            <span className="text-white/90">{prod.name}</span>
-                            <span className="text-white/60 font-medium">
-                              {prod.value}%
-                            </span>
-                          </div>
-                          <div className="w-full h-2.5 bg-white/5 rounded-full overflow-hidden border border-white/5">
+                ) : (
+                  <>
+                    {/* Dashboard Top Stats */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                      {derivedHomeStats.map((stat, idx) => (
+                        <div
+                          key={idx}
+                          className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 p-5 shadow-[0_8px_32px_rgba(0,0,0,0.12)] flex flex-col justify-between hover:bg-white/[0.15] transition-colors cursor-pointer"
+                        >
+                          <div className="flex justify-between items-start mb-2">
+                            <div className="p-2.5 bg-white/5 rounded-xl border border-white/5">
+                              <stat.icon className="w-5 h-5 text-emerald-400" />
+                            </div>
                             <div
-                              className={`h-full ${prod.color} rounded-full`}
-                              style={{ width: `${prod.value}%` }}
-                            ></div>
+                              className={`text-xs font-semibold px-2 py-1 rounded-lg ${stat.isUp ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"} flex items-center gap-1`}
+                            >
+                              {stat.isUp ? (
+                                <TrendingUp className="w-3 h-3" />
+                              ) : null}{" "}
+                              {stat.trend}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-sm text-white/60 mb-1">
+                              {stat.label}
+                            </div>
+                            <div className="text-3xl font-bold tracking-tight">
+                              {stat.value}
+                            </div>
                           </div>
                         </div>
                       ))}
                     </div>
-                    <button className="w-full mt-4 py-3 bg-white/5 hover:bg-white/10 rounded-xl transition-colors text-sm font-medium border border-white/5">
-                      View Full Report
-                    </button>
-                  </div>
-                </div>
+
+                    {/* Middle Charts */}
+                    <div className="flex flex-col lg:flex-row gap-6 min-h-[300px]">
+                      <div className="lg:w-2/3 bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 flex flex-col shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+                        <div className="flex justify-between items-center mb-6">
+                          <h2 className="text-lg font-semibold tracking-tight">
+                            {uploadedFiles.current.length > 0 ? "Sales Trend (Last 7 Days)" : "Sales by Branch (Comparison)"}
+                          </h2>
+                        </div>
+                        <div className="flex-1 w-full min-h-[220px] min-w-0">
+                          <ResponsiveContainer width="100%" height={220} minWidth={0}>
+                            <AreaChart
+                              data={salesTrendData}
+                              margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                            >
+                              <defs>
+                                <linearGradient
+                                  id="colorSales"
+                                  x1="0"
+                                  y1="0"
+                                  x2="0"
+                                  y2="1"
+                                >
+                                  <stop
+                                    offset="5%"
+                                    stopColor="#10b981"
+                                    stopOpacity={0.5}
+                                  />
+                                  <stop
+                                    offset="95%"
+                                    stopColor="#10b981"
+                                    stopOpacity={0}
+                                  />
+                                </linearGradient>
+                              </defs>
+                              <CartesianGrid
+                                strokeDasharray="3 3"
+                                stroke="rgba(255,255,255,0.05)"
+                                vertical={false}
+                              />
+                              <XAxis
+                                dataKey="date"
+                                stroke="rgba(255,255,255,0.3)"
+                                tick={{
+                                  fill: "rgba(255,255,255,0.6)",
+                                  fontSize: 12,
+                                }}
+                                axisLine={false}
+                                tickLine={false}
+                                dy={10}
+                              />
+                              <YAxis
+                                stroke="rgba(255,255,255,0.3)"
+                                tick={{
+                                  fill: "rgba(255,255,255,0.6)",
+                                  fontSize: 12,
+                                }}
+                                axisLine={false}
+                                tickLine={false}
+                                dx={-10}
+                                tickFormatter={(value) => `${value}k`}
+                              />
+                              <RechartsTooltip
+                                contentStyle={{
+                                  backgroundColor: "rgba(12, 49, 35, 0.9)",
+                                  borderColor: "rgba(255,255,255,0.1)",
+                                  borderRadius: "12px",
+                                  color: "#fff",
+                                }}
+                                itemStyle={{ color: "#10b981" }}
+                              />
+                              <Area
+                                type="monotone"
+                                dataKey="sales"
+                                stroke="#10b981"
+                                strokeWidth={3}
+                                fillOpacity={1}
+                                fill="url(#colorSales)"
+                              />
+                            </AreaChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+
+                      <div className="lg:w-1/3 bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 flex flex-col shadow-[0_8px_32px_rgba(0,0,0,0.12)] justify-between">
+                        <h2 className="text-lg font-semibold tracking-tight mb-4">
+                          Top Performing Products
+                        </h2>
+                        <div className="flex flex-col gap-4 flex-1 justify-center">
+                          {topPerformingProducts.length > 0 ? (
+                            topPerformingProducts.map((prod, i) => (
+                              <div key={i}>
+                                <div className="flex justify-between text-sm mb-1.5">
+                                  <span className="text-white/90">{prod.name}</span>
+                                  <span className="text-white/60 font-medium">
+                                    {prod.value}%
+                                  </span>
+                                </div>
+                                <div className="w-full h-2.5 bg-white/5 rounded-full overflow-hidden border border-white/5">
+                                  <div
+                                    className={`h-full ${prod.color} rounded-full`}
+                                    style={{ width: `${prod.value}%` }}
+                                  ></div>
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="text-center text-sm text-white/40 py-6">
+                              ไม่มีข้อมูลสินค้า
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          className="w-full mt-4 py-3 bg-white/5 hover:bg-white/10 rounded-xl transition-colors text-sm font-medium border border-white/5"
+                          onClick={() => setCurrentView("reports")}
+                        >
+                          View Full Report
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
               </motion.div>
             )}
 
