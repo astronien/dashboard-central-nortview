@@ -1022,6 +1022,33 @@ export default function App() {
     currentStaff.image,
   ]);
 
+  const parsedStoreHeader = useMemo(() => {
+    const branchLabel = parsedReport.branches[0]?.label || "";
+    if (!branchLabel) {
+      return {
+        name: "iStudio Mega Bangna",
+        id: "10452",
+      };
+    }
+
+    if (branchLabel.includes(":")) {
+      const parts = branchLabel.split(":");
+      const idPart = parts[0].replace(/ID/i, "").trim();
+      const namePart = parts[1].trim();
+      return {
+        name: namePart,
+        id: idPart,
+      };
+    }
+
+    return {
+      name: branchLabel.startsWith("iStudio") || branchLabel.startsWith("Studio 7")
+        ? branchLabel
+        : `iStudio ${branchLabel}`,
+      id: "10452",
+    };
+  }, [parsedReport.branches]);
+
   const attachOverviewRows = useMemo<AttachMatrixDisplayRow[]>(() => {
     const selectedOfficerSet = selectedAttachOfficers.length
       ? new Set(selectedAttachOfficers.map(cleanOfficerName))
@@ -1330,6 +1357,13 @@ export default function App() {
     })();
   }, []);
 
+  useEffect(() => {
+    if (parsedStoreHeader.name) {
+      document.title = parsedStoreHeader.name;
+    }
+  }, [parsedStoreHeader.name]);
+
+
   const handleStaffPhotoUpload = async (
     entry: { staffId: string; officerKey: string; name: string; branch: string },
     file: File,
@@ -1445,10 +1479,10 @@ export default function App() {
           {currentView === "home" && (
             <div className="hidden lg:flex flex-col ml-4">
               <h1 className="text-xl font-bold tracking-tight drop-shadow-md">
-                iStudio Mega Bangna
+                {parsedStoreHeader.name}
               </h1>
               <span className="text-xs text-white/80 drop-shadow-md">
-                Store ID: 10452 • Opening Hours: 10:00 - 22:00
+                Store ID: {parsedStoreHeader.id} • Opening Hours: 10:00 - 22:00
               </span>
             </div>
           )}
@@ -2140,7 +2174,7 @@ export default function App() {
                 {/* TOP HALF: Person | Radar | Stats */}
                 <div className="flex-1 bg-gradient-to-br from-[#113a29]/80 via-[#0c291d]/85 to-[#051710]/95 backdrop-blur-xl border border-white/10 shadow-[0_16px_48px_rgba(0,0,0,0.35)] rounded-[2.5rem] p-6 lg:p-8 lg:pb-6 flex flex-col lg:flex-row min-h-[360px] lg:min-h-[460px] shrink-0 relative overflow-visible gap-6 lg:gap-0">
                   {/* Left Column - Image */}
-                  <div className="lg:w-[38%] relative self-stretch flex items-end justify-center z-30 min-h-[320px] sm:min-h-[360px] lg:min-h-0 pointer-events-none lg:-ml-8 lg:-mb-6 lg:-mt-20 xl:-mt-28">
+                  <div className="lg:w-[38%] relative self-stretch flex items-end justify-center z-30 min-h-[320px] sm:min-h-[360px] lg:min-h-0 pointer-events-none -mb-6 lg:-ml-8 lg:-mt-20 xl:-mt-28">
                     <div className="absolute bottom-[8%] left-1/2 -translate-x-1/2 w-[85%] max-w-[360px] h-[60%] bg-emerald-500/15 blur-[60px] lg:blur-[85px] rounded-full pointer-events-none -z-10 mix-blend-screen" />
                     <AnimatePresence mode="wait">
                       <motion.img
@@ -2153,8 +2187,8 @@ export default function App() {
                         alt={activeOfficer?.name ?? currentStaff.name}
                         className="relative z-20 mx-auto w-auto h-[105%] max-h-[480px] sm:max-h-[520px] lg:h-[125%] lg:max-h-[640px] xl:h-[130%] lg:scale-105 xl:scale-110 object-contain object-bottom drop-shadow-[0_25px_35px_rgba(0,0,0,0.6)] pointer-events-none"
                         style={{
-                          WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,1) 85%, rgba(0,0,0,0) 100%)",
-                          maskImage: "linear-gradient(to bottom, rgba(0,0,0,1) 85%, rgba(0,0,0,0) 100%)",
+                          WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,1) 60%, rgba(0,0,0,0) 95%)",
+                          maskImage: "linear-gradient(to bottom, rgba(0,0,0,1) 60%, rgba(0,0,0,0) 95%)",
                         }}
                       />
                     </AnimatePresence>
