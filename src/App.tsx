@@ -1,6 +1,7 @@
 import {
   Apple,
   Building2,
+  Building,
   Calendar,
   ChevronDown,
   DollarSign,
@@ -28,6 +29,8 @@ import {
   PenTool,
   Laptop,
   Activity,
+  Watch,
+  CreditCard,
 } from "lucide-react";
 import CategoryTreePicker from "./components/CategoryTreePicker";
 import AttachTargetGroupEditor from "./components/AttachTargetGroupEditor";
@@ -1123,6 +1126,171 @@ export default function App() {
       lowForecast: lowForecastCount,
     };
   }, [uploadedFiles, parsedReport, attachOfficerRows]);
+
+  const categorySnapshotData = useMemo(() => {
+    const hasData = uploadedFiles.current.length > 0;
+
+    const getCategorySales = (categories: string[]) => {
+      return sumSales(uploadedFiles.current, (cat, prod, sub) => {
+        const text = `${cat} ${prod} ${sub}`.toLowerCase();
+        return categories.some(c => text.includes(c.toLowerCase()));
+      });
+    };
+
+    const getCategoryTarget = (categories: string[]) => {
+      let sum = 0;
+      parsedReport.categories.forEach(c => {
+        if (categories.some(cat => c.category.toLowerCase().includes(cat.toLowerCase()))) {
+          sum += c.target;
+        }
+      });
+      return sum;
+    };
+
+    const getSimCount = () => {
+      return countRows(uploadedFiles.current, (cat) => cat.includes("sim"));
+    };
+
+    const snapshotDefs = [
+      {
+        category: "Total Sales",
+        icon: DollarSign,
+        defaultActual: 54305081,
+        defaultTarget: 86221775,
+        defaultForecast: 76520796,
+        defaultTargetDay: 3546299,
+        defaultToday: 1228696,
+        categories: ["all"],
+      },
+      {
+        category: "Mac",
+        icon: Laptop,
+        defaultActual: 5158197,
+        defaultTarget: 9275095,
+        defaultForecast: 7268369,
+        defaultTargetDay: 457433,
+        defaultToday: 109000,
+        categories: ["mac"],
+      },
+      {
+        category: "iPad",
+        icon: Tablet,
+        defaultActual: 10980713,
+        defaultTarget: 15123152,
+        defaultForecast: 15472823,
+        defaultTargetDay: 460271,
+        defaultToday: 298275,
+        categories: ["ipad"],
+      },
+      {
+        category: "iPhone",
+        icon: Smartphone,
+        defaultActual: 28662705,
+        defaultTarget: 46857322,
+        defaultForecast: 40388357,
+        defaultTargetDay: 2021624,
+        defaultToday: 562275,
+        categories: ["iphone"],
+      },
+      {
+        category: "Apple Watch",
+        icon: Watch,
+        defaultActual: 2653850,
+        defaultTarget: 4166500,
+        defaultForecast: 3739516,
+        defaultTargetDay: 168072,
+        defaultToday: 77290,
+        categories: ["watch", "clock"],
+      },
+      {
+        category: "BTB(Apple)",
+        icon: Building2,
+        defaultActual: 4066982,
+        defaultTarget: 5684752,
+        defaultForecast: 5730747,
+        defaultTargetDay: 179752,
+        defaultToday: 103620,
+        categories: ["btb apple", "btb(apple)"],
+      },
+      {
+        category: "BTB",
+        icon: Building,
+        defaultActual: 2782486,
+        defaultTarget: 5114754,
+        defaultForecast: 3920776,
+        defaultTargetDay: 259141,
+        defaultToday: 78233,
+        categories: ["btb"],
+      },
+      {
+        category: "SIM",
+        icon: CreditCard,
+        defaultActual: 148,
+        defaultTarget: 199,
+        defaultForecast: 209,
+        defaultTargetDay: 6,
+        defaultToday: 3,
+        categories: ["sim"],
+      }
+    ];
+
+    return snapshotDefs.map(def => {
+      let actual = def.defaultActual;
+      let target = def.defaultTarget;
+      let forecast = def.defaultForecast;
+      let targetDay = def.defaultTargetDay;
+      let today = def.defaultToday;
+
+      if (hasData) {
+        if (def.category === "Total Sales") {
+          actual = parsedReport.branches.reduce((sum, b) => sum + b.actual, 0) || def.defaultActual;
+          target = parsedReport.branches.reduce((sum, b) => sum + b.target, 0) || def.defaultTarget;
+          const scale = actual / def.defaultActual;
+          forecast = Math.round(def.defaultForecast * scale);
+          targetDay = Math.round(def.defaultTargetDay * scale);
+          today = Math.round(sumSales(uploadedFiles.current, () => true) / 30) || def.defaultToday;
+        } else if (def.category === "SIM") {
+          actual = getSimCount() || def.defaultActual;
+          target = def.defaultTarget;
+          const scale = actual / def.defaultActual;
+          forecast = Math.round(def.defaultForecast * scale);
+          targetDay = def.defaultTargetDay;
+          today = Math.max(1, Math.round(actual / 30));
+        } else {
+          const matchedSales = getCategorySales(def.categories);
+          const matchedTarget = getCategoryTarget(def.categories);
+
+          actual = matchedSales || def.defaultActual;
+          target = matchedTarget || def.defaultTarget;
+          const scale = actual / def.defaultActual;
+          forecast = Math.round(def.defaultForecast * scale);
+          targetDay = Math.round(def.defaultTargetDay * scale);
+          today = Math.round(actual / 30) || def.defaultToday;
+        }
+      }
+
+      target = target || 1;
+      const achieveRate = (actual / target) * 100;
+      const forecastRate = (forecast / target) * 100;
+      targetDay = targetDay || 1;
+      const todayAchieveRate = (today / targetDay) * 100;
+
+      return {
+        category: def.category,
+        icon: def.icon,
+        actual,
+        target,
+        forecast,
+        achieveRate,
+        forecastRate,
+        mom: "New",
+        yoy: "New",
+        targetDay,
+        today,
+        todayAchieveRate
+      };
+    });
+  }, [uploadedFiles, parsedReport]);
 
   const salesTrendData = useMemo(() => {
     if (!uploadedFiles.current.length) {
@@ -2624,6 +2792,98 @@ export default function App() {
                           </span>
                         </div>
                       </div>
+                    </div>
+
+                    {/* Performance Snapshot by Category Section */}
+                    <div className="flex items-center gap-3 mt-8">
+                      <div className="p-2 bg-emerald-500/20 rounded-xl border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+                        <PieChart className="w-5 h-5 text-emerald-400" />
+                      </div>
+                      <h2 className="text-xl font-bold tracking-tight text-white drop-shadow-md">
+                        Performance Snapshot by Category
+                      </h2>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 w-full">
+                      {categorySnapshotData.map((item, idx) => {
+                        const IconComponent = item.icon;
+                        return (
+                          <div 
+                            key={idx} 
+                            className="bg-[#052b20] border border-emerald-500/20 rounded-2xl p-5 shadow-lg flex flex-col hover:border-emerald-500/40 hover:bg-[#063326] transition-all duration-300 relative overflow-hidden group min-h-[340px]"
+                          >
+                            {/* Background light glow effect */}
+                            <div className="absolute -right-10 -bottom-10 w-24 h-24 bg-emerald-500/5 rounded-full blur-xl group-hover:bg-emerald-500/10 transition-all duration-500" />
+                            
+                            {/* Header */}
+                            <div className="flex items-center gap-2 relative z-10 mb-4">
+                              <div className="p-1 bg-white/5 rounded-lg border border-white/5 group-hover:bg-amber-500/10 group-hover:border-amber-500/20 transition-colors">
+                                <IconComponent className="w-3.5 h-3.5 text-amber-400 group-hover:scale-110 transition-transform" />
+                              </div>
+                              <span className="text-[11px] font-bold text-white/95 tracking-wide">{item.category}</span>
+                            </div>
+
+                            {/* Main Value */}
+                            <div className="relative z-10 mb-4">
+                              <h3 className="text-2xl font-black text-white tracking-tight leading-none">
+                                {item.category === "SIM" 
+                                  ? item.actual.toLocaleString() 
+                                  : item.actual.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                              </h3>
+                              <p className="text-[10px] text-amber-400/80 font-bold mt-1.5 uppercase tracking-wide">
+                                Target: {item.category === "SIM" ? item.target.toLocaleString() : item.target.toLocaleString()}
+                              </p>
+                            </div>
+
+                            {/* Table Metrics */}
+                            <div className="mt-auto space-y-2.5 relative z-10 pt-3 border-t border-emerald-500/10 text-[10px]">
+                              {/* Group 1: Forecast / Achieve% / Forecast% */}
+                              <div className="space-y-1.5 pb-2">
+                                <div className="flex justify-between text-white/50 font-medium">
+                                  <span>Forecast</span>
+                                  <span className="text-white font-bold">{item.category === "SIM" ? item.forecast.toLocaleString() : item.forecast.toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between text-white/50 font-medium">
+                                  <span>Achieve %</span>
+                                  <span className="text-[#34d399] font-extrabold">{item.achieveRate.toFixed(2)}%</span>
+                                </div>
+                                <div className="flex justify-between text-white/50 font-medium">
+                                  <span>Forecast %</span>
+                                  <span className="text-amber-400 font-extrabold">{item.forecastRate.toFixed(2)}%</span>
+                                </div>
+                              </div>
+
+                              {/* Group 2: % MoM / % YoY */}
+                              <div className="py-2 border-y border-emerald-500/10 space-y-1.5">
+                                <div className="flex justify-between text-white/50 font-medium">
+                                  <span>% MoM</span>
+                                  <span className="text-[#34d399] font-bold">{item.mom}</span>
+                                </div>
+                                <div className="flex justify-between text-white/50 font-medium">
+                                  <span>% YoY</span>
+                                  <span className="text-[#34d399] font-bold">{item.yoy}</span>
+                                </div>
+                              </div>
+
+                              {/* Group 3: Target Day / Today / % Achieve */}
+                              <div className="pt-2 space-y-1.5">
+                                <div className="flex justify-between text-white/50 font-medium">
+                                  <span>Target Day</span>
+                                  <span className="text-white font-bold">{item.category === "SIM" ? item.targetDay.toLocaleString() : item.targetDay.toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between text-white/50 font-medium">
+                                  <span>Today</span>
+                                  <span className="text-white font-bold">{item.category === "SIM" ? item.today.toLocaleString() : item.today.toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between text-white/50 font-medium">
+                                  <span>% Achieve</span>
+                                  <span className="text-[#34d399] font-extrabold">{item.todayAchieveRate.toFixed(2)}%</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
 
                     {/* Middle Charts */}
