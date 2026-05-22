@@ -9,7 +9,10 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "search-db": "node scratch/search_db_for_target.cjs",
+    "solve-knapsack": "node scratch/solve_knapsack.cjs",
+    "analyze-dup-groups": "node scratch/analyze_dup_groups.cjs"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
