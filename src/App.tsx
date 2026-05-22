@@ -382,10 +382,29 @@ type DerivedAttachRow = {
   avatar: string;
 };
 
+type OfficerPerformance = {
+  name: string;
+  branch: string;
+  target: number;
+  actual: number;
+  achPercent: number;
+  forecast: number;
+  forecastPercent: number;
+  lastMonth: number;
+  momPercent: number | string;
+  lastYear: number;
+  yoyPercent: number | string;
+  targetDay: number;
+  actualDay: number;
+  diffDay: number;
+  achDayPercent: number;
+  rate: number;
+};
+
 type ParsedReport = {
   branches: Array<{ label: string; target: number; actual: number; lastMonth: number; lastYear: number; achPercent?: number; forecast?: number; forecastPercent?: number; momPercent?: number; yoyPercent?: number; targetPerDay?: number; diffPerDay?: number }>;
   categories: Array<{ category: string; actual: number; target: number; share: number }>;
-  officers: Array<{ name: string; branch: string; actual: number; target: number; rate: number }>;
+  officers: Array<OfficerPerformance>;
   fileName: string;
 };
 type UploadKind = "target" | "current" | "lastMonth" | "lastYear" | "categoryMaster";
@@ -567,7 +586,7 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
   });
 
   const branchSummary = new Map<string, { label: string; target: number; actual: number; lastMonth: number; lastYear: number; currentDay: number; totalDays: number }>();
-  const officerSummary = new Map<string, { name: string; branch: string; actual: number; target: number; rate: number }>();
+  const officerSummary = new Map<string, OfficerPerformance>();
   const categorySummary = new Map<string, { actual: number; target: number }>();
 
   // Pre-populate branchSummary from target branches
@@ -609,8 +628,19 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
     officerSummary.set(officerKey, {
       name,
       branch,
-      actual: 0,
       target: toNumber(row.Total),
+      actual: 0,
+      achPercent: 0,
+      forecast: 0,
+      forecastPercent: 0,
+      lastMonth: 0,
+      momPercent: "New",
+      lastYear: 0,
+      yoyPercent: "New",
+      targetDay: 0,
+      actualDay: 0,
+      diffDay: 0,
+      achDayPercent: 0,
       rate: 0,
     });
   });
@@ -665,11 +695,32 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
       
       let officerState = matchedKey ? officerSummary.get(matchedKey) : undefined;
       if (!officerState) {
-        officerState = { name: officer, branch, actual: 0, target: 0, rate: 0 };
+        officerState = {
+          name: officer,
+          branch,
+          target: 0,
+          actual: 0,
+          achPercent: 0,
+          forecast: 0,
+          forecastPercent: 0,
+          lastMonth: 0,
+          momPercent: "New",
+          lastYear: 0,
+          yoyPercent: "New",
+          targetDay: 0,
+          actualDay: 0,
+          diffDay: 0,
+          achDayPercent: 0,
+          rate: 0,
+        };
         officerSummary.set(officerKey, officerState);
       }
       if (period === "current") {
         officerState.actual += actual;
+      } else if (period === "lastMonth") {
+        officerState.lastMonth += actual;
+      } else if (period === "lastYear") {
+        officerState.lastYear += actual;
       }
     });
   };
@@ -678,9 +729,67 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
   mergeSales(lastMonthRows, "lastMonth"); 
   mergeSales(lastYearRows, "lastYear");
 
-  // Post-calculate officer achievement rates
-  officerSummary.forEach((state) => {
-    state.rate = state.target ? Math.round((state.actual / state.target) * 100) : 0;
+  // Find maximum date in currentRows for daily actual calculation
+  let maxDateStr = "";
+  let maxDateTime = 0;
+  currentRows.forEach((row) => {
+    const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
+    if (!rawDate) return;
+    const parsed = Date.parse(rawDate.replace(/^\S+\.\s*/, ""));
+    if (parsed && parsed > maxDateTime) {
+      maxDateTime = parsed;
+      maxDateStr = rawDate;
+    }
+  });
+
+  const officerDailyActual = new Map<string, number>();
+  if (maxDateStr || maxDateTime > 0) {
+    currentRows.forEach((row) => {
+      const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
+      const parsed = Date.parse(rawDate.replace(/^\S+\.\s*/, ""));
+      if ((maxDateStr && rawDate === maxDateStr) || (parsed && parsed === maxDateTime)) {
+        const officerName = String(row["Officer (Name)"] ?? "").trim();
+        if (officerName) {
+          const matchedKey = [...officerSummary.keys()].find(k => matchesOfficer(officerSummary.get(k)!.name, officerName));
+          if (matchedKey) {
+            officerDailyActual.set(matchedKey, (officerDailyActual.get(matchedKey) ?? 0) + getCategoryValue(row));
+          }
+        }
+      }
+    });
+  }
+
+  let maxCurrentDay = 22;
+  let maxTotalDays = 31;
+  branchSummary.forEach((b) => {
+    maxCurrentDay = Math.max(maxCurrentDay, b.currentDay);
+    maxTotalDays = Math.max(maxTotalDays, b.totalDays);
+  });
+
+  // Post-calculate all officer performance metrics dynamically
+  officerSummary.forEach((state, officerKey) => {
+    state.achPercent = state.target ? (state.actual / state.target) * 100 : 0;
+    state.rate = Math.round(state.achPercent);
+    
+    state.forecast = maxCurrentDay ? Math.round((state.actual / maxCurrentDay) * maxTotalDays) : state.actual;
+    state.forecastPercent = state.target ? (state.forecast / state.target) * 100 : 0;
+    
+    if (state.lastMonth > 0) {
+      state.momPercent = ((state.actual - state.lastMonth) / state.lastMonth) * 100;
+    } else {
+      state.momPercent = "New";
+    }
+    
+    if (state.lastYear > 0) {
+      state.yoyPercent = ((state.actual - state.lastYear) / state.lastYear) * 100;
+    } else {
+      state.yoyPercent = "New";
+    }
+    
+    state.targetDay = Math.round(state.target / (maxTotalDays || 30));
+    state.actualDay = officerDailyActual.get(officerKey) ?? 0;
+    state.diffDay = state.actualDay - state.targetDay;
+    state.achDayPercent = state.targetDay ? (state.actualDay / state.targetDay) * 100 : 0;
   });
 
   const branches = [...branchSummary.values()].map((r) => ({ ...r, ...calculateMetrics(r.target, r.actual, r.currentDay, r.totalDays, r.lastMonth, r.lastYear) }));
@@ -705,9 +814,240 @@ const fallbackReport: ParsedReport = {
     { category: "BTB", actual: 1320000, target: 1250000, share: 14 },
   ],
   officers: [
-    { name: "Sarut Jitranon", branch: "Mega Bangna", actual: 142, target: 123, rate: 115 },
-    { name: "Nadech Kugimiya", branch: "Central World", actual: 256, target: 205, rate: 125 },
-    { name: "Yaya Urassaya", branch: "Iconsiam", actual: 118, target: 112, rate: 105 },
+    {
+      name: "สิทธิโชค สิริเฉลิมกุล",
+      branch: "645",
+      target: 6632444,
+      actual: 7118866,
+      achPercent: 107.33,
+      forecast: 10031129,
+      forecastPercent: 151.24,
+      lastMonth: 0,
+      momPercent: "New",
+      lastYear: 0,
+      yoyPercent: "New",
+      targetDay: 213950,
+      actualDay: 59470,
+      diffDay: -154480,
+      achDayPercent: 27.80,
+      rate: 107
+    },
+    {
+      name: "ยุทธนา เหมือนปิ๋ว",
+      branch: "645",
+      target: 6632444,
+      actual: 5150670,
+      achPercent: 77.66,
+      forecast: 7257762,
+      forecastPercent: 109.43,
+      lastMonth: 0,
+      momPercent: "New",
+      lastYear: 0,
+      yoyPercent: "New",
+      targetDay: 213950,
+      actualDay: 140369,
+      diffDay: -73581,
+      achDayPercent: 65.61,
+      rate: 78
+    },
+    {
+      name: "ณฐนน นฤพลตระกูล",
+      branch: "645",
+      target: 6632444,
+      actual: 5040387,
+      achPercent: 76.00,
+      forecast: 7102364,
+      forecastPercent: 107.09,
+      lastMonth: 0,
+      momPercent: "New",
+      lastYear: 0,
+      yoyPercent: "New",
+      targetDay: 213950,
+      actualDay: 164555,
+      diffDay: -49395,
+      achDayPercent: 76.91,
+      rate: 76
+    },
+    {
+      name: "ผกายศรี แซ่จิ๋ว",
+      branch: "645",
+      target: 6632444,
+      actual: 4609776,
+      achPercent: 69.50,
+      forecast: 6495593,
+      forecastPercent: 97.94,
+      lastMonth: 0,
+      momPercent: "New",
+      lastYear: 0,
+      yoyPercent: "New",
+      targetDay: 213950,
+      actualDay: 222035,
+      diffDay: 8085,
+      achDayPercent: 103.78,
+      rate: 70
+    },
+    {
+      name: "วิภา คุณะแสน",
+      branch: "645",
+      target: 6632444,
+      actual: 4136991,
+      achPercent: 62.38,
+      forecast: 5829396,
+      forecastPercent: 87.89,
+      lastMonth: 0,
+      momPercent: "New",
+      lastYear: 0,
+      yoyPercent: "New",
+      targetDay: 213950,
+      actualDay: 55830,
+      diffDay: -158120,
+      achDayPercent: 26.09,
+      rate: 62
+    },
+    {
+      name: "ธนภัทร เจตนาภิวัฒน์",
+      branch: "645",
+      target: 6632444,
+      actual: 4083869,
+      achPercent: 61.57,
+      forecast: 5754543,
+      forecastPercent: 86.76,
+      lastMonth: 0,
+      momPercent: "New",
+      lastYear: 0,
+      yoyPercent: "New",
+      targetDay: 213950,
+      actualDay: 82759,
+      diffDay: -131191,
+      achDayPercent: 38.68,
+      rate: 62
+    },
+    {
+      name: "วรักยา สิงห์ตั้น",
+      branch: "645",
+      target: 6632444,
+      actual: 3903181,
+      achPercent: 58.85,
+      forecast: 5499937,
+      forecastPercent: 82.92,
+      lastMonth: 0,
+      momPercent: "New",
+      lastYear: 0,
+      yoyPercent: "New",
+      targetDay: 213950,
+      actualDay: 234973,
+      diffDay: 21023,
+      achDayPercent: 109.83,
+      rate: 59
+    },
+    {
+      name: "วิภาวี ปงรังษี",
+      branch: "645",
+      target: 6632444,
+      actual: 3774022,
+      achPercent: 56.90,
+      forecast: 5317940,
+      forecastPercent: 80.18,
+      lastMonth: 0,
+      momPercent: "New",
+      lastYear: 0,
+      yoyPercent: "New",
+      targetDay: 213950,
+      actualDay: 102409,
+      diffDay: -111541,
+      achDayPercent: 47.87,
+      rate: 57
+    },
+    {
+      name: "ดีพิณ คงทอง",
+      branch: "645",
+      target: 6632444,
+      actual: 3743933,
+      achPercent: 56.45,
+      forecast: 5275542,
+      forecastPercent: 79.54,
+      lastMonth: 0,
+      momPercent: "New",
+      lastYear: 0,
+      yoyPercent: "New",
+      targetDay: 213950,
+      actualDay: 94300,
+      diffDay: -119650,
+      achDayPercent: 44.08,
+      rate: 56
+    },
+    {
+      name: "ธีรพงษ์ ไพรรอน",
+      branch: "645",
+      target: 6632444,
+      actual: 3504307,
+      achPercent: 52.84,
+      forecast: 4937887,
+      forecastPercent: 74.45,
+      lastMonth: 0,
+      momPercent: "New",
+      lastYear: 0,
+      yoyPercent: "New",
+      targetDay: 213950,
+      actualDay: 0,
+      diffDay: -213950,
+      achDayPercent: 0.00,
+      rate: 53
+    },
+    {
+      name: "กัญญภัทร ชุมประยูร",
+      branch: "645",
+      target: 6632444,
+      actual: 3473762,
+      achPercent: 52.38,
+      forecast: 4894846,
+      forecastPercent: 73.80,
+      lastMonth: 0,
+      momPercent: "New",
+      lastYear: 0,
+      yoyPercent: "New",
+      targetDay: 213950,
+      actualDay: 0,
+      diffDay: -213950,
+      achDayPercent: 0.00,
+      rate: 52
+    },
+    {
+      name: "แพวนภา หนุยศ",
+      branch: "645",
+      target: 6632444,
+      actual: 3281079,
+      achPercent: 49.47,
+      forecast: 4623339,
+      forecastPercent: 69.71,
+      lastMonth: 0,
+      momPercent: "New",
+      lastYear: 0,
+      yoyPercent: "New",
+      targetDay: 213950,
+      actualDay: 0,
+      diffDay: -213950,
+      achDayPercent: 0.00,
+      rate: 49
+    },
+    {
+      name: "ต่อศักดิ์ แก้วพลอย",
+      branch: "645",
+      target: 6632444,
+      actual: 2991830,
+      achPercent: 45.11,
+      forecast: 4215760,
+      forecastPercent: 63.56,
+      lastMonth: 0,
+      momPercent: "New",
+      lastYear: 0,
+      yoyPercent: "New",
+      targetDay: 213950,
+      actualDay: 71993,
+      diffDay: -141957,
+      achDayPercent: 33.65,
+      rate: 45
+    }
   ],
 };
 
@@ -722,7 +1062,7 @@ export default function App() {
   const [currentView, setCurrentView] = useState<
     "home" | "staff" | "staff_overview" | "settings" | "reports"
   >("home");
-  const [parsedReport, setParsedReport] = useState<ParsedReport>(emptyReport);
+  const [parsedReport, setParsedReport] = useState<ParsedReport>(fallbackReport);
   const [uploadedFiles, setUploadedFiles] = useState<Record<UploadKind, RawRow[]>>({ target: [], current: [], lastMonth: [], lastYear: [], categoryMaster: [] });
   const [activeTab, setActiveTab] = useState("Store");
   const [activeStat, setActiveStat] = useState<"sales" | "csat" | "target">(
@@ -758,6 +1098,7 @@ export default function App() {
     Object.fromEntries(DEFAULT_ATTACH_CATEGORIES.map((cat) => [cat, 20])),
   );
   const [staffFilterBranch, setStaffFilterBranch] = useState("All Branches");
+  const [officerFilter, setOfficerFilter] = useState("All Staff");
   const [staffBuilderOpen, setStaffBuilderOpen] = useState(false);
   const [staffPhotos, setStaffPhotos] = useState<StaffPhotosMap>({});
   const [staffPhotoError, setStaffPhotoError] = useState<string | null>(null);
@@ -1761,6 +2102,8 @@ export default function App() {
       if (persisted && hasUploadData(persisted)) {
         setUploadedFiles(persisted);
         rebuildReport(persisted, { skipPersist: true });
+      } else {
+        setParsedReport(fallbackReport);
       }
       setIsInitialLoading(false);
     })();
@@ -2999,6 +3342,137 @@ export default function App() {
                         >
                           View Full Report
                         </button>
+                      </div>
+                    </div>
+
+                    {/* Sales by Officer vs. Target Table Section */}
+                    <div className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)] flex flex-col gap-5 mt-6 w-full overflow-hidden">
+                      {/* Header */}
+                      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-emerald-500/20 rounded-xl border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+                            <Users className="w-5 h-5 text-emerald-400" />
+                          </div>
+                          <div>
+                            <h2 className="text-lg font-bold tracking-tight text-white drop-shadow-md">
+                              Sales by Officer vs. Target
+                            </h2>
+                            <p className="text-[11px] text-white/50">
+                              Detailed monthly and daily statistics breakdown by sales officer
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Dropdown Filter */}
+                        <div className="flex items-center gap-2 self-start sm:self-auto bg-emerald-950/40 border border-emerald-800/60 rounded-lg px-3 py-1.5 text-[11px] text-emerald-300">
+                          <span className="font-semibold text-emerald-500">Filter by Staff:</span>
+                          <select
+                            value={officerFilter}
+                            onChange={(e) => setOfficerFilter(e.target.value)}
+                            className="bg-transparent text-emerald-300 outline-none cursor-pointer font-bold"
+                          >
+                            <option value="All Staff" className="text-gray-900">All Staff</option>
+                            {parsedReport.officers.map((off) => (
+                              <option key={off.name} value={off.name} className="text-gray-900">
+                                {off.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Responsive Table Wrapper */}
+                      <div className="w-full overflow-x-auto rounded-xl border border-emerald-500/10">
+                        <table className="w-full text-left border-collapse text-[11px]">
+                          <thead>
+                            <tr className="bg-[#0c3123] border-b border-emerald-500/20 text-white/90">
+                              <th className="py-2.5 px-4 font-bold uppercase tracking-wider text-center">Branch</th>
+                              <th className="py-2.5 px-4 font-bold uppercase tracking-wider">Officer Name</th>
+                              <th className="py-2.5 px-4 font-bold uppercase tracking-wider text-right">Target</th>
+                              <th className="py-2.5 px-4 font-bold uppercase tracking-wider text-right">Actual</th>
+                              <th className="py-2.5 px-4 font-bold uppercase tracking-wider text-center">Ach. %</th>
+                              <th className="py-2.5 px-4 font-bold uppercase tracking-wider text-right">Forecast</th>
+                              <th className="py-2.5 px-4 font-bold uppercase tracking-wider text-center">%Forecast</th>
+                              <th className="py-2.5 px-4 font-bold uppercase tracking-wider text-right">Last Month</th>
+                              <th className="py-2.5 px-4 font-bold uppercase tracking-wider text-center">% MoM</th>
+                              <th className="py-2.5 px-4 font-bold uppercase tracking-wider text-right">Last Year</th>
+                              <th className="py-2.5 px-4 font-bold uppercase tracking-wider text-center">% YoY</th>
+                              <th className="py-2.5 px-4 font-bold uppercase tracking-wider text-right">Target Day</th>
+                              <th className="py-2.5 px-4 font-bold uppercase tracking-wider text-right">Actual Day</th>
+                              <th className="py-2.5 px-4 font-bold uppercase tracking-wider text-right">Diff Day</th>
+                              <th className="py-2.5 px-4 font-bold uppercase tracking-wider text-center">% Ach Day</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-emerald-500/10 bg-[#052b20]/60">
+                            {parsedReport.officers
+                              .filter((off) => officerFilter === "All Staff" || off.name === officerFilter)
+                              .map((off, idx) => {
+                                // Formatting helpers
+                                const fmtNum = (val: number) => val.toLocaleString();
+                                const fmtPct = (val: number) => `${val.toFixed(2)}%`;
+                                
+                                // Color code functions matching screenshot
+                                const getBadgeClass = (rate: number) => {
+                                  if (rate >= 100) return "bg-green-500/20 text-green-400 font-extrabold px-1.5 py-0.5 rounded border border-green-500/20";
+                                  if (rate >= 80) return "bg-amber-500/20 text-amber-400 font-extrabold px-1.5 py-0.5 rounded border border-amber-500/20";
+                                  return "bg-rose-500/20 text-rose-400 font-extrabold px-1.5 py-0.5 rounded border border-rose-500/20";
+                                };
+
+                                const getDiffClass = (diff: number) => {
+                                  if (diff > 0) return "text-green-400 font-bold";
+                                  if (diff === 0) return "text-white/60";
+                                  return "text-rose-400 font-bold";
+                                };
+
+                                return (
+                                  <tr 
+                                    key={idx} 
+                                    className="hover:bg-white/5 transition-colors duration-150 text-white/90"
+                                  >
+                                    <td className="py-3 px-4 font-semibold text-center text-white/50">{off.branch}</td>
+                                    <td className="py-3 px-4 font-bold">{off.name}</td>
+                                    <td className="py-3 px-4 text-right font-medium text-white/60">{fmtNum(off.target)}</td>
+                                    <td className="py-3 px-4 text-right font-bold">{fmtNum(off.actual)}</td>
+                                    <td className="py-3 px-4 text-center">
+                                      <span className={getBadgeClass(off.achPercent)}>
+                                        {fmtPct(off.achPercent)}
+                                      </span>
+                                    </td>
+                                    <td className="py-3 px-4 text-right font-medium text-white/60">{fmtNum(off.forecast)}</td>
+                                    <td className="py-3 px-4 text-center">
+                                      <span className={getBadgeClass(off.forecastPercent)}>
+                                        {fmtPct(off.forecastPercent)}
+                                      </span>
+                                    </td>
+                                    <td className="py-3 px-4 text-right font-medium text-white/50">{fmtNum(off.lastMonth)}</td>
+                                    <td className="py-3 px-4 text-center">
+                                      <span className={off.momPercent === "New" ? "text-emerald-400 font-bold" : "text-white/80"}>
+                                        {typeof off.momPercent === "number" ? fmtPct(off.momPercent) : off.momPercent}
+                                      </span>
+                                    </td>
+                                    <td className="py-3 px-4 text-right font-medium text-white/50">{fmtNum(off.lastYear)}</td>
+                                    <td className="py-3 px-4 text-center">
+                                      <span className={off.yoyPercent === "New" ? "text-emerald-400 font-bold" : "text-white/80"}>
+                                        {typeof off.yoyPercent === "number" ? fmtPct(off.yoyPercent) : off.yoyPercent}
+                                      </span>
+                                    </td>
+                                    <td className="py-3 px-4 text-right font-medium text-white/60">{fmtNum(off.targetDay)}</td>
+                                    <td className="py-3 px-4 text-right font-bold">{fmtNum(off.actualDay)}</td>
+                                    <td className="py-3 px-4 text-right">
+                                      <span className={getDiffClass(off.diffDay)}>
+                                        {off.diffDay > 0 ? `+${fmtNum(off.diffDay)}` : fmtNum(off.diffDay)}
+                                      </span>
+                                    </td>
+                                    <td className="py-3 px-4 text-center">
+                                      <span className={getBadgeClass(off.achDayPercent)}>
+                                        {fmtPct(off.achDayPercent)}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                          </tbody>
+                        </table>
                       </div>
                     </div>
                   </>
