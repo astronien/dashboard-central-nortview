@@ -1968,10 +1968,10 @@ export default function App() {
                         </div>
                         
                         {/* Bottom: Split Metrics */}
-                        <div className="grid grid-cols-2 gap-2 mt-auto pt-3 border-t border-white/5 relative z-10 items-end">
-                          <div className="flex flex-col">
-                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">Sales Actual</span>
-                            <span className="text-lg font-black text-white mt-0.5 leading-none">
+                        <div className="flex justify-between items-end gap-1.5 mt-auto pt-3 border-t border-white/5 relative z-10">
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider truncate">Sales Actual</span>
+                            <span className="text-xs font-black text-white mt-0.5 leading-none tracking-tight truncate">
                               {(monthlyPerformance.actualSales.actual / 1000000).toFixed(2)}M
                             </span>
                             <span className="text-[8px] text-white/35 mt-1 font-medium truncate">
@@ -1979,9 +1979,9 @@ export default function App() {
                             </span>
                           </div>
                           
-                          <div className="flex flex-col items-end">
+                          <div className="flex flex-col items-end shrink-0">
                             <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">Achievement</span>
-                            <span className="text-xl font-black text-[#34d399] mt-0.5 leading-none">
+                            <span className="text-xs font-black text-[#34d399] mt-0.5 leading-none tracking-tight">
                               {monthlyPerformance.actualSales.rate.toFixed(2)}%
                             </span>
                             <span className="text-[8px] text-white/35 mt-1 font-medium">
@@ -2025,10 +2025,10 @@ export default function App() {
                         </div>
                         
                         {/* Bottom: Split Metrics */}
-                        <div className="grid grid-cols-2 gap-2 mt-auto pt-3 border-t border-white/5 relative z-10 items-end">
-                          <div className="flex flex-col">
-                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">SIMs / Devices</span>
-                            <span className="text-lg font-black text-white mt-0.5 leading-none">
+                        <div className="flex justify-between items-end gap-1.5 mt-auto pt-3 border-t border-white/5 relative z-10">
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider truncate">SIMs / Devices</span>
+                            <span className="text-xs font-black text-white mt-0.5 leading-none tracking-tight truncate">
                               {monthlyPerformance.trueSim.count}
                             </span>
                             <span className="text-[8px] text-white/35 mt-1 font-medium truncate">
@@ -2036,9 +2036,9 @@ export default function App() {
                             </span>
                           </div>
                           
-                          <div className="flex flex-col items-end">
+                          <div className="flex flex-col items-end shrink-0">
                             <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">Target</span>
-                            <span className="text-xl font-black text-emerald-400 mt-0.5 leading-none">
+                            <span className="text-xs font-black text-emerald-400 mt-0.5 leading-none tracking-tight">
                               {monthlyPerformance.trueSim.target}%
                             </span>
                             <span className="text-[8px] text-white/35 mt-1 font-medium">
@@ -2082,10 +2082,10 @@ export default function App() {
                         </div>
                         
                         {/* Bottom: Split Metrics */}
-                        <div className="grid grid-cols-2 gap-2 mt-auto pt-3 border-t border-white/5 relative z-10 items-end">
-                          <div className="flex flex-col">
-                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">Cases / Devices</span>
-                            <span className="text-lg font-black text-white mt-0.5 leading-none">
+                        <div className="flex justify-between items-end gap-1.5 mt-auto pt-3 border-t border-white/5 relative z-10">
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider truncate">Cases / Devices</span>
+                            <span className="text-xs font-black text-white mt-0.5 leading-none tracking-tight truncate">
                               {monthlyPerformance.caseIphone.count}
                             </span>
                             <span className="text-[8px] text-white/35 mt-1 font-medium truncate">
@@ -2093,9 +2093,9 @@ export default function App() {
                             </span>
                           </div>
                           
-                          <div className="flex flex-col items-end">
+                          <div className="flex flex-col items-end shrink-0">
                             <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">Target</span>
-                            <span className="text-xl font-black text-emerald-400 mt-0.5 leading-none">
+                            <span className="text-xs font-black text-emerald-400 mt-0.5 leading-none tracking-tight">
                               {monthlyPerformance.caseIphone.target}%
                             </span>
                             <span className="text-[8px] text-white/35 mt-1 font-medium">
@@ -2139,10 +2139,10 @@ export default function App() {
                         </div>
                         
                         {/* Bottom: Split Metrics */}
-                        <div className="grid grid-cols-2 gap-2 mt-auto pt-3 border-t border-white/5 relative z-10 items-end">
-                          <div className="flex flex-col">
-                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">UFUND / Devices</span>
-                            <span className="text-lg font-black text-white mt-0.5 leading-none">
+                        <div className="flex justify-between items-end gap-1.5 mt-auto pt-3 border-t border-white/5 relative z-10">
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider truncate">UFUND / Devices</span>
+                            <span className="text-xs font-black text-white mt-0.5 leading-none tracking-tight truncate">
                               {monthlyPerformance.ufundPersonal.count}
                             </span>
                             <span className="text-[8px] text-white/35 mt-1 font-medium truncate">
@@ -2150,9 +2150,9 @@ export default function App() {
                             </span>
                           </div>
                           
-                          <div className="flex flex-col items-end">
+                          <div className="flex flex-col items-end shrink-0">
                             <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">Target</span>
-                            <span className="text-xl font-black text-emerald-400 mt-0.5 leading-none">
+                            <span className="text-xs font-black text-emerald-400 mt-0.5 leading-none tracking-tight">
                               {monthlyPerformance.ufundPersonal.target}%
                             </span>
                             <span className="text-[8px] text-white/35 mt-1 font-medium">
@@ -2196,10 +2196,10 @@ export default function App() {
                         </div>
                         
                         {/* Bottom: Split Metrics */}
-                        <div className="grid grid-cols-2 gap-2 mt-auto pt-3 border-t border-white/10 relative z-10 items-end">
-                          <div className="flex flex-col">
-                            <span className="text-[8px] text-white/60 font-bold uppercase tracking-wider">Cover / Devices</span>
-                            <span className="text-lg font-black text-white mt-0.5 leading-none">
+                        <div className="flex justify-between items-end gap-1.5 mt-auto pt-3 border-t border-white/10 relative z-10">
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-[8px] text-white/60 font-bold uppercase tracking-wider truncate">Cover / Devices</span>
+                            <span className="text-xs font-black text-white mt-0.5 leading-none tracking-tight truncate">
                               {monthlyPerformance.coverPlus.count}
                             </span>
                             <span className="text-[8px] text-white/40 mt-1 font-medium truncate">
@@ -2207,9 +2207,9 @@ export default function App() {
                             </span>
                           </div>
                           
-                          <div className="flex flex-col items-end">
+                          <div className="flex flex-col items-end shrink-0">
                             <span className="text-[8px] text-white/60 font-bold uppercase tracking-wider">Target</span>
-                            <span className="text-xl font-black text-amber-400 mt-0.5 leading-none">
+                            <span className="text-xs font-black text-amber-400 mt-0.5 leading-none tracking-tight">
                               {monthlyPerformance.coverPlus.target}%
                             </span>
                             <span className="text-[8px] text-white/40 mt-1 font-medium">
@@ -2253,10 +2253,10 @@ export default function App() {
                         </div>
                         
                         {/* Bottom: Split Metrics */}
-                        <div className="grid grid-cols-2 gap-2 mt-auto pt-3 border-t border-white/5 relative z-10 items-end">
-                          <div className="flex flex-col">
-                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">Pencils / iPads</span>
-                            <span className="text-lg font-black text-white mt-0.5 leading-none">
+                        <div className="flex justify-between items-end gap-1.5 mt-auto pt-3 border-t border-white/5 relative z-10">
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider truncate">Pencils / iPads</span>
+                            <span className="text-xs font-black text-white mt-0.5 leading-none tracking-tight truncate">
                               {monthlyPerformance.pencil.count}
                             </span>
                             <span className="text-[8px] text-white/35 mt-1 font-medium truncate">
@@ -2264,9 +2264,9 @@ export default function App() {
                             </span>
                           </div>
                           
-                          <div className="flex flex-col items-end">
+                          <div className="flex flex-col items-end shrink-0">
                             <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">Target</span>
-                            <span className="text-xl font-black text-emerald-400 mt-0.5 leading-none">
+                            <span className="text-xs font-black text-emerald-400 mt-0.5 leading-none tracking-tight">
                               {monthlyPerformance.pencil.target}%
                             </span>
                             <span className="text-[8px] text-white/35 mt-1 font-medium">
@@ -2310,10 +2310,10 @@ export default function App() {
                         </div>
                         
                         {/* Bottom: Split Metrics */}
-                        <div className="grid grid-cols-2 gap-2 mt-auto pt-3 border-t border-white/5 relative z-10 items-end">
-                          <div className="flex flex-col">
-                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">Mac / Devices</span>
-                            <span className="text-lg font-black text-white mt-0.5 leading-none">
+                        <div className="flex justify-between items-end gap-1.5 mt-auto pt-3 border-t border-white/5 relative z-10">
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider truncate">Mac / Devices</span>
+                            <span className="text-xs font-black text-white mt-0.5 leading-none tracking-tight truncate">
                               {monthlyPerformance.kpisMac.count}
                             </span>
                             <span className="text-[8px] text-white/35 mt-1 font-medium truncate">
@@ -2321,9 +2321,9 @@ export default function App() {
                             </span>
                           </div>
                           
-                          <div className="flex flex-col items-end">
+                          <div className="flex flex-col items-end shrink-0">
                             <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">Target</span>
-                            <span className="text-xl font-black text-emerald-400 mt-0.5 leading-none">
+                            <span className="text-xs font-black text-emerald-400 mt-0.5 leading-none tracking-tight">
                               {monthlyPerformance.kpisMac.target}%
                             </span>
                             <span className="text-[8px] text-white/35 mt-1 font-medium">
@@ -2367,10 +2367,10 @@ export default function App() {
                         </div>
                         
                         {/* Bottom: Split Metrics */}
-                        <div className="grid grid-cols-2 gap-2 mt-auto pt-3 border-t border-white/5 relative z-10 items-end">
-                          <div className="flex flex-col">
-                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">iPad / Devices</span>
-                            <span className="text-lg font-black text-white mt-0.5 leading-none">
+                        <div className="flex justify-between items-end gap-1.5 mt-auto pt-3 border-t border-white/5 relative z-10">
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider truncate">iPad / Devices</span>
+                            <span className="text-xs font-black text-white mt-0.5 leading-none tracking-tight truncate">
                               {monthlyPerformance.kpisIpad.count}
                             </span>
                             <span className="text-[8px] text-white/35 mt-1 font-medium truncate">
@@ -2378,9 +2378,9 @@ export default function App() {
                             </span>
                           </div>
                           
-                          <div className="flex flex-col items-end">
+                          <div className="flex flex-col items-end shrink-0">
                             <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">Target</span>
-                            <span className="text-xl font-black text-emerald-400 mt-0.5 leading-none">
+                            <span className="text-xs font-black text-emerald-400 mt-0.5 leading-none tracking-tight">
                               {monthlyPerformance.kpisIpad.target}%
                             </span>
                             <span className="text-[8px] text-white/35 mt-1 font-medium">
@@ -2424,10 +2424,10 @@ export default function App() {
                         </div>
                         
                         {/* Bottom: Split Metrics */}
-                        <div className="grid grid-cols-2 gap-2 mt-auto pt-3 border-t border-white/5 relative z-10 items-end">
-                          <div className="flex flex-col">
-                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">BTB Sales</span>
-                            <span className="text-lg font-black text-white mt-0.5 leading-none">
+                        <div className="flex justify-between items-end gap-1.5 mt-auto pt-3 border-t border-white/5 relative z-10">
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider truncate">BTB Sales</span>
+                            <span className="text-xs font-black text-white mt-0.5 leading-none tracking-tight truncate">
                               {(monthlyPerformance.btbMix.btbSales / 1000000).toFixed(2)}M
                             </span>
                             <span className="text-[8px] text-white/35 mt-1 font-medium truncate">
@@ -2435,9 +2435,9 @@ export default function App() {
                             </span>
                           </div>
                           
-                          <div className="flex flex-col items-end">
+                          <div className="flex flex-col items-end shrink-0">
                             <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">Target</span>
-                            <span className="text-xl font-black text-emerald-400 mt-0.5 leading-none">
+                            <span className="text-xs font-black text-emerald-400 mt-0.5 leading-none tracking-tight">
                               {monthlyPerformance.btbMix.target}%
                             </span>
                             <span className="text-[8px] text-white/35 mt-1 font-medium">
@@ -2487,10 +2487,10 @@ export default function App() {
                         </div>
                         
                         {/* Bottom: Split Metrics */}
-                        <div className="grid grid-cols-2 gap-2 mt-auto pt-3 border-t border-white/5 relative z-10 items-end">
-                          <div className="flex flex-col">
-                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">Current Act/Fcst</span>
-                            <span className="text-sm font-black text-white mt-0.5 leading-none">
+                        <div className="flex justify-between items-end gap-1.5 mt-auto pt-3 border-t border-white/5 relative z-10">
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider truncate">Current Act/Fcst</span>
+                            <span className="text-xs font-black text-white mt-0.5 leading-none tracking-tight truncate">
                               {(monthlyPerformance.macYoY.actual / 1000000).toFixed(2)}M
                             </span>
                             <span className="text-[8px] text-white/35 mt-1 font-medium truncate">
@@ -2498,9 +2498,9 @@ export default function App() {
                             </span>
                           </div>
                           
-                          <div className="flex flex-col items-end">
+                          <div className="flex flex-col items-end shrink-0">
                             <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">YoY Target</span>
-                            <span className="text-xl font-black text-emerald-400 mt-0.5 leading-none">
+                            <span className="text-xs font-black text-emerald-400 mt-0.5 leading-none tracking-tight">
                               {monthlyPerformance.macYoY.targetRate}%
                             </span>
                             <span className="text-[8px] text-white/35 mt-1 font-medium">
@@ -2550,10 +2550,10 @@ export default function App() {
                         </div>
                         
                         {/* Bottom: Split Metrics */}
-                        <div className="grid grid-cols-2 gap-2 mt-auto pt-3 border-t border-white/5 relative z-10 items-end">
-                          <div className="flex flex-col">
-                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">Current Act/Fcst</span>
-                            <span className="text-sm font-black text-white mt-0.5 leading-none">
+                        <div className="flex justify-between items-end gap-1.5 mt-auto pt-3 border-t border-white/5 relative z-10">
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider truncate">Current Act/Fcst</span>
+                            <span className="text-xs font-black text-white mt-0.5 leading-none tracking-tight truncate">
                               {(monthlyPerformance.totalYoY.actual / 1000000).toFixed(2)}M
                             </span>
                             <span className="text-[8px] text-white/35 mt-1 font-medium truncate">
@@ -2561,9 +2561,9 @@ export default function App() {
                             </span>
                           </div>
                           
-                          <div className="flex flex-col items-end">
+                          <div className="flex flex-col items-end shrink-0">
                             <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">YoY Target</span>
-                            <span className="text-xl font-black text-emerald-400 mt-0.5 leading-none">
+                            <span className="text-xs font-black text-emerald-400 mt-0.5 leading-none tracking-tight">
                               {monthlyPerformance.totalYoY.targetRate}%
                             </span>
                             <span className="text-[8px] text-white/35 mt-1 font-medium">
