@@ -1798,7 +1798,10 @@ export default function App() {
                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
                         className="absolute right-0 top-12 w-48 bg-[#0c3123]/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 flex flex-col"
                       >
-                        {parsedReport.officers.map((officer, idx) => (
+                        {(parsedReport.officers.length > 0
+                          ? parsedReport.officers
+                          : staffData.map((s) => ({ name: s.name, branch: s.store }))
+                        ).map((officer, idx) => (
                           <button
                             key={`${officer.name}-${idx}`}
                             className={`flex items-center gap-3 w-full text-left px-4 py-3 hover:bg-white/10 transition-colors ${idx === activeOfficerIndex ? "bg-white/5" : ""}`}
@@ -1908,7 +1911,7 @@ export default function App() {
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 w-full">
                       {/* 1. Overall Score */}
-                      <div className="bg-white/5 backdrop-blur-md rounded-[1.5rem] border border-white/10 p-5 shadow-lg flex flex-col justify-between hover:bg-white/[0.08] hover:border-white/20 transition-all duration-300 min-h-[180px] group relative overflow-hidden">
+                      <div className="bg-white/5 backdrop-blur-md rounded-[1.5rem] border border-white/10 p-5 shadow-lg flex flex-col justify-between hover:bg-white/[0.08] hover:border-white/20 transition-all duration-300 min-h-[220px] group relative overflow-hidden">
                         <div className="flex items-center justify-between">
                           <span className="text-[11px] font-semibold tracking-wider text-white/50 uppercase">Overall Score</span>
                           <Star className="w-4 h-4 text-white/30 group-hover:text-amber-400 group-hover:rotate-12 transition-all duration-300" />
@@ -1924,7 +1927,7 @@ export default function App() {
                             </span>
                           </div>
                         </div>
-                        <div className="text-center">
+                        <div className="text-center mt-2">
                           <span className="text-[10px] tracking-wider text-white/40 font-bold uppercase">
                             {monthlyPerformance.overallScore.score.toFixed(2)} AVG. SCORE
                           </span>
@@ -1932,33 +1935,56 @@ export default function App() {
                       </div>
 
                       {/* 2. Actual Sales */}
-                      <div className="bg-white/5 backdrop-blur-md rounded-[1.5rem] border border-white/10 p-5 shadow-lg flex flex-col justify-between hover:bg-white/[0.08] hover:border-white/20 transition-all duration-300 min-h-[180px] group relative overflow-hidden">
-                        <div className="flex items-center justify-between">
+                      <div className="bg-white/5 backdrop-blur-md rounded-[1.5rem] border border-white/10 p-5 shadow-lg flex flex-col justify-between hover:bg-white/[0.08] hover:border-white/20 transition-all duration-300 min-h-[220px] group relative overflow-hidden">
+                        {/* Background light glow effect */}
+                        <div className="absolute -right-10 -bottom-10 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl group-hover:bg-emerald-500/15 transition-all duration-500" />
+                        
+                        {/* Card Header */}
+                        <div className="flex items-center justify-between relative z-10">
                           <div className="flex items-center gap-1.5">
-                            <DollarSign className="w-4 h-4 text-white/40 group-hover:text-emerald-400 transition-colors" />
-                            <span className="text-[11px] font-semibold text-white/60">Actual Sales</span>
+                            <div className="p-1 bg-white/5 rounded-lg border border-white/5 group-hover:bg-emerald-500/10 group-hover:border-emerald-500/20 transition-colors">
+                              <DollarSign className="w-3.5 h-3.5 text-white/50 group-hover:text-emerald-400 transition-colors" />
+                            </div>
+                            <span className="text-[11px] font-bold text-white/70 tracking-wide">Actual Sales</span>
                           </div>
                           <div className="flex flex-col items-end">
-                            <span className="text-[8px] uppercase tracking-wider text-white/40 font-bold leading-none mb-0.5">SCORE</span>
+                            <span className="text-[7px] uppercase tracking-wider text-white/40 font-bold leading-none mb-0.5">SCORE</span>
                             <span className="text-sm font-black text-blue-400 leading-none">64</span>
                           </div>
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-2 mt-4 items-end">
+                        {/* Middle: Progress Bar */}
+                        <div className="my-auto py-3 relative z-10 flex flex-col justify-center">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[9px] text-white/45 font-bold uppercase tracking-wider">Progress</span>
+                            <span className="text-[10px] text-emerald-400 font-extrabold">{monthlyPerformance.actualSales.rate.toFixed(2)}%</span>
+                          </div>
+                          <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden border border-white/5 p-[1px]">
+                            <div 
+                              className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(52,211,153,0.4)]"
+                              style={{ width: `${Math.min(monthlyPerformance.actualSales.rate, 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                        
+                        {/* Bottom: Split Metrics */}
+                        <div className="grid grid-cols-2 gap-2 mt-auto pt-3 border-t border-white/5 relative z-10 items-end">
                           <div className="flex flex-col">
-                            <span className="text-2xl font-bold tracking-tight text-white leading-none">
+                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">Sales Actual</span>
+                            <span className="text-lg font-black text-white mt-0.5 leading-none">
                               {(monthlyPerformance.actualSales.actual / 1000000).toFixed(2)}M
                             </span>
-                            <span className="text-[9px] text-white/40 mt-1.5 leading-tight font-medium">
+                            <span className="text-[8px] text-white/35 mt-1 font-medium truncate">
                               of {(monthlyPerformance.actualSales.target / 1000000).toFixed(2)}M Target
                             </span>
                           </div>
                           
                           <div className="flex flex-col items-end">
-                            <span className="text-2xl font-bold text-emerald-400 leading-none">
+                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">Achievement</span>
+                            <span className="text-xl font-black text-[#34d399] mt-0.5 leading-none">
                               {monthlyPerformance.actualSales.rate.toFixed(2)}%
                             </span>
-                            <span className="text-[9px] text-white/40 mt-1.5 leading-tight font-medium text-right">
+                            <span className="text-[8px] text-white/35 mt-1 font-medium">
                               Achieve
                             </span>
                           </div>
@@ -1966,356 +1992,583 @@ export default function App() {
                       </div>
 
                       {/* 3. True Sim */}
-                      <div className="bg-white/5 backdrop-blur-md rounded-[1.5rem] border border-white/10 p-5 shadow-lg flex flex-col justify-between hover:bg-white/[0.08] hover:border-white/20 transition-all duration-300 min-h-[180px] group relative overflow-hidden">
-                        <div className="flex items-center justify-between">
+                      <div className="bg-white/5 backdrop-blur-md rounded-[1.5rem] border border-white/10 p-5 shadow-lg flex flex-col justify-between hover:bg-white/[0.08] hover:border-white/20 transition-all duration-300 min-h-[220px] group relative overflow-hidden">
+                        {/* Background light glow effect */}
+                        <div className="absolute -right-10 -bottom-10 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl group-hover:bg-emerald-500/15 transition-all duration-500" />
+                        
+                        {/* Card Header */}
+                        <div className="flex items-center justify-between relative z-10">
                           <div className="flex items-center gap-1.5">
-                            <Smartphone className="w-4 h-4 text-white/40 group-hover:text-emerald-400 transition-colors" />
-                            <span className="text-[11px] font-semibold text-white/60">True Sim</span>
+                            <div className="p-1 bg-white/5 rounded-lg border border-white/5 group-hover:bg-emerald-500/10 group-hover:border-emerald-500/20 transition-colors">
+                              <Smartphone className="w-3.5 h-3.5 text-white/50 group-hover:text-emerald-400 transition-colors" />
+                            </div>
+                            <span className="text-[11px] font-bold text-white/70 tracking-wide">True Sim</span>
                           </div>
                           <div className="flex flex-col items-end">
-                            <span className="text-[8px] uppercase tracking-wider text-white/40 font-bold leading-none mb-0.5">SCORE</span>
+                            <span className="text-[7px] uppercase tracking-wider text-white/40 font-bold leading-none mb-0.5">SCORE</span>
                             <span className="text-sm font-black text-emerald-400 leading-none">100</span>
                           </div>
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-2 mt-4 items-end">
+                        {/* Middle: Progress Bar */}
+                        <div className="my-auto py-3 relative z-10 flex flex-col justify-center">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[9px] text-white/45 font-bold uppercase tracking-wider">Attach Rate</span>
+                            <span className="text-[10px] text-emerald-400 font-extrabold">{monthlyPerformance.trueSim.rate.toFixed(2)}%</span>
+                          </div>
+                          <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden border border-white/5 p-[1px]">
+                            <div 
+                              className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(52,211,153,0.4)]"
+                              style={{ width: `${Math.min(monthlyPerformance.trueSim.rate, 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                        
+                        {/* Bottom: Split Metrics */}
+                        <div className="grid grid-cols-2 gap-2 mt-auto pt-3 border-t border-white/5 relative z-10 items-end">
                           <div className="flex flex-col">
-                            <div className="flex flex-col leading-none">
-                              <span className="text-xl font-bold text-white">{monthlyPerformance.trueSim.count}</span>
-                              <div className="w-6 my-1 border-t border-white/20"></div>
-                              <span className="text-xs text-white/50">{monthlyPerformance.trueSim.base}</span>
-                            </div>
-                            <span className="text-[9px] text-white/40 mt-2 font-medium">SIMs / iPhones</span>
+                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">SIMs / Devices</span>
+                            <span className="text-lg font-black text-white mt-0.5 leading-none">
+                              {monthlyPerformance.trueSim.count}
+                            </span>
+                            <span className="text-[8px] text-white/35 mt-1 font-medium truncate">
+                              base: {monthlyPerformance.trueSim.base}
+                            </span>
                           </div>
                           
                           <div className="flex flex-col items-end">
-                            <span className={`text-xl font-bold leading-none ${
-                              monthlyPerformance.trueSim.rate >= monthlyPerformance.trueSim.target ? "text-emerald-400" : "text-rose-400"
-                            }`}>
-                              {monthlyPerformance.trueSim.rate.toFixed(2)}%
+                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">Target</span>
+                            <span className="text-xl font-black text-emerald-400 mt-0.5 leading-none">
+                              {monthlyPerformance.trueSim.target}%
                             </span>
-                            <span className="text-[9px] text-white/40 mt-3 font-medium text-right">
-                              Target: {monthlyPerformance.trueSim.target}%
+                            <span className="text-[8px] text-white/35 mt-1 font-medium">
+                              Required
                             </span>
                           </div>
                         </div>
                       </div>
 
                       {/* 4. Case iPhone */}
-                      <div className="bg-white/5 backdrop-blur-md rounded-[1.5rem] border border-white/10 p-5 shadow-lg flex flex-col justify-between hover:bg-white/[0.08] hover:border-white/20 transition-all duration-300 min-h-[180px] group relative overflow-hidden">
-                        <div className="flex items-center justify-between">
+                      <div className="bg-white/5 backdrop-blur-md rounded-[1.5rem] border border-white/10 p-5 shadow-lg flex flex-col justify-between hover:bg-white/[0.08] hover:border-white/20 transition-all duration-300 min-h-[220px] group relative overflow-hidden">
+                        {/* Background light glow effect */}
+                        <div className="absolute -right-10 -bottom-10 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl group-hover:bg-emerald-500/15 transition-all duration-500" />
+                        
+                        {/* Card Header */}
+                        <div className="flex items-center justify-between relative z-10">
                           <div className="flex items-center gap-1.5">
-                            <Smartphone className="w-4 h-4 text-white/40 group-hover:text-emerald-400 transition-colors" />
-                            <span className="text-[11px] font-semibold text-white/60">Case iPhone</span>
+                            <div className="p-1 bg-white/5 rounded-lg border border-white/5 group-hover:bg-emerald-500/10 group-hover:border-emerald-500/20 transition-colors">
+                              <Smartphone className="w-3.5 h-3.5 text-white/50 group-hover:text-emerald-400 transition-colors" />
+                            </div>
+                            <span className="text-[11px] font-bold text-white/70 tracking-wide">Case iPhone</span>
                           </div>
                           <div className="flex flex-col items-end">
-                            <span className="text-[8px] uppercase tracking-wider text-white/40 font-bold leading-none mb-0.5">SCORE</span>
+                            <span className="text-[7px] uppercase tracking-wider text-white/40 font-bold leading-none mb-0.5">SCORE</span>
                             <span className="text-sm font-black text-rose-400 leading-none">79</span>
                           </div>
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-2 mt-4 items-end">
+                        {/* Middle: Progress Bar */}
+                        <div className="my-auto py-3 relative z-10 flex flex-col justify-center">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[9px] text-white/45 font-bold uppercase tracking-wider">Attach Rate</span>
+                            <span className="text-[10px] text-emerald-400 font-extrabold">{monthlyPerformance.caseIphone.rate.toFixed(2)}%</span>
+                          </div>
+                          <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden border border-white/5 p-[1px]">
+                            <div 
+                              className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(52,211,153,0.4)]"
+                              style={{ width: `${Math.min(monthlyPerformance.caseIphone.rate, 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                        
+                        {/* Bottom: Split Metrics */}
+                        <div className="grid grid-cols-2 gap-2 mt-auto pt-3 border-t border-white/5 relative z-10 items-end">
                           <div className="flex flex-col">
-                            <div className="flex flex-col leading-none">
-                              <span className="text-xl font-bold text-white">{monthlyPerformance.caseIphone.count}</span>
-                              <div className="w-6 my-1 border-t border-white/20"></div>
-                              <span className="text-xs text-white/50">{monthlyPerformance.caseIphone.base}</span>
-                            </div>
-                            <span className="text-[9px] text-white/40 mt-2 font-medium">Cases / iPhones</span>
+                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">Cases / Devices</span>
+                            <span className="text-lg font-black text-white mt-0.5 leading-none">
+                              {monthlyPerformance.caseIphone.count}
+                            </span>
+                            <span className="text-[8px] text-white/35 mt-1 font-medium truncate">
+                              base: {monthlyPerformance.caseIphone.base}
+                            </span>
                           </div>
                           
                           <div className="flex flex-col items-end">
-                            <span className={`text-xl font-bold leading-none ${
-                              monthlyPerformance.caseIphone.rate >= monthlyPerformance.caseIphone.target ? "text-emerald-400" : "text-amber-500"
-                            }`}>
-                              {monthlyPerformance.caseIphone.rate.toFixed(2)}%
+                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">Target</span>
+                            <span className="text-xl font-black text-emerald-400 mt-0.5 leading-none">
+                              {monthlyPerformance.caseIphone.target}%
                             </span>
-                            <span className="text-[9px] text-white/40 mt-3 font-medium text-right">
-                              Target: {monthlyPerformance.caseIphone.target}%
+                            <span className="text-[8px] text-white/35 mt-1 font-medium">
+                              Required
                             </span>
                           </div>
                         </div>
                       </div>
 
                       {/* 5. UFUND PERSONAL */}
-                      <div className="bg-white/5 backdrop-blur-md rounded-[1.5rem] border border-white/10 p-5 shadow-lg flex flex-col justify-between hover:bg-white/[0.08] hover:border-white/20 transition-all duration-300 min-h-[180px] group relative overflow-hidden">
-                        <div className="flex items-center justify-between">
+                      <div className="bg-white/5 backdrop-blur-md rounded-[1.5rem] border border-white/10 p-5 shadow-lg flex flex-col justify-between hover:bg-white/[0.08] hover:border-white/20 transition-all duration-300 min-h-[220px] group relative overflow-hidden">
+                        {/* Background light glow effect */}
+                        <div className="absolute -right-10 -bottom-10 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl group-hover:bg-emerald-500/15 transition-all duration-500" />
+                        
+                        {/* Card Header */}
+                        <div className="flex items-center justify-between relative z-10">
                           <div className="flex items-center gap-1.5">
-                            <Activity className="w-4 h-4 text-white/40 group-hover:text-emerald-400 transition-colors" />
-                            <span className="text-[11px] font-semibold text-white/60">UFUND PERSONAL</span>
+                            <div className="p-1 bg-white/5 rounded-lg border border-white/5 group-hover:bg-emerald-500/10 group-hover:border-emerald-500/20 transition-colors">
+                              <Activity className="w-3.5 h-3.5 text-white/50 group-hover:text-emerald-400 transition-colors" />
+                            </div>
+                            <span className="text-[11px] font-bold text-white/70 tracking-wide">UFUND PERSONAL</span>
                           </div>
                           <div className="flex flex-col items-end">
-                            <span className="text-[8px] uppercase tracking-wider text-white/40 font-bold leading-none mb-0.5">SCORE</span>
+                            <span className="text-[7px] uppercase tracking-wider text-white/40 font-bold leading-none mb-0.5">SCORE</span>
                             <span className="text-sm font-black text-rose-400 leading-none">90</span>
                           </div>
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-2 mt-4 items-end">
+                        {/* Middle: Progress Bar */}
+                        <div className="my-auto py-3 relative z-10 flex flex-col justify-center">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[9px] text-white/45 font-bold uppercase tracking-wider">Attach Rate</span>
+                            <span className="text-[10px] text-emerald-400 font-extrabold">{monthlyPerformance.ufundPersonal.rate.toFixed(2)}%</span>
+                          </div>
+                          <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden border border-white/5 p-[1px]">
+                            <div 
+                              className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(52,211,153,0.4)]"
+                              style={{ width: `${Math.min(monthlyPerformance.ufundPersonal.rate * 5, 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                        
+                        {/* Bottom: Split Metrics */}
+                        <div className="grid grid-cols-2 gap-2 mt-auto pt-3 border-t border-white/5 relative z-10 items-end">
                           <div className="flex flex-col">
-                            <div className="flex flex-col leading-none">
-                              <span className="text-xl font-bold text-white">{monthlyPerformance.ufundPersonal.count}</span>
-                              <div className="w-6 my-1 border-t border-white/20"></div>
-                              <span className="text-xs text-white/50">{monthlyPerformance.ufundPersonal.base}</span>
-                            </div>
-                            <span className="text-[9px] text-white/40 mt-2 font-medium">UFUND / iPhones</span>
+                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">UFUND / Devices</span>
+                            <span className="text-lg font-black text-white mt-0.5 leading-none">
+                              {monthlyPerformance.ufundPersonal.count}
+                            </span>
+                            <span className="text-[8px] text-white/35 mt-1 font-medium truncate">
+                              base: {monthlyPerformance.ufundPersonal.base}
+                            </span>
                           </div>
                           
                           <div className="flex flex-col items-end">
-                            <span className={`text-xl font-bold leading-none ${
-                              monthlyPerformance.ufundPersonal.rate >= monthlyPerformance.ufundPersonal.target ? "text-emerald-400" : "text-amber-500"
-                            }`}>
-                              {monthlyPerformance.ufundPersonal.rate.toFixed(2)}%
+                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">Target</span>
+                            <span className="text-xl font-black text-emerald-400 mt-0.5 leading-none">
+                              {monthlyPerformance.ufundPersonal.target}%
                             </span>
-                            <span className="text-[9px] text-white/40 mt-3 font-medium text-right">
-                              Target: {monthlyPerformance.ufundPersonal.target}%
+                            <span className="text-[8px] text-white/35 mt-1 font-medium">
+                              Required
                             </span>
                           </div>
                         </div>
                       </div>
 
                       {/* 6. COVER + */}
-                      <div className="bg-[#032e1f] rounded-[1.5rem] border border-[#10b981]/30 p-5 shadow-lg flex flex-col justify-between hover:bg-[#043d29] hover:border-[#10b981]/50 transition-all duration-300 min-h-[180px] group relative overflow-hidden">
-                        <div className="flex items-center justify-between">
+                      <div className="bg-[#032e1f] rounded-[1.5rem] border border-[#10b981]/30 p-5 shadow-lg flex flex-col justify-between hover:bg-[#043d29] hover:border-[#10b981]/50 transition-all duration-300 min-h-[220px] group relative overflow-hidden">
+                        {/* Background light glow effect */}
+                        <div className="absolute -right-10 -bottom-10 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl group-hover:bg-emerald-500/15 transition-all duration-500" />
+                        
+                        {/* Card Header */}
+                        <div className="flex items-center justify-between relative z-10">
                           <div className="flex items-center gap-1.5">
-                            <ShieldCheck className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
+                            <div className="p-1 bg-white/5 rounded-lg border border-white/5">
+                              <ShieldCheck className="w-3.5 h-3.5 text-amber-400 group-hover:scale-110 transition-transform" />
+                            </div>
                             <span className="text-[11px] font-black tracking-wide text-white">COVER +</span>
                           </div>
-                        </div>
-                        
-                        <div className="mt-2">
-                          <span className="text-2xl font-black text-white">
-                            {monthlyPerformance.coverPlus.count} <span className="text-sm font-normal text-white/55">/ {monthlyPerformance.coverPlus.base}</span>
-                          </span>
-                          <div className="text-[9px] text-white/60 font-semibold mt-1">
-                            Target: {monthlyPerformance.coverPlus.target}%
+                          <div className="flex flex-col items-end">
+                            <span className="text-[7px] uppercase tracking-wider text-white/40 font-bold leading-none mb-0.5">SCORE</span>
+                            <span className="text-sm font-black text-[#34d399] leading-none">56</span>
                           </div>
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-2 mt-4 pt-2 border-t border-white/10 items-end">
+                        {/* Middle: Progress Bar */}
+                        <div className="my-auto py-3 relative z-10 flex flex-col justify-center">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[9px] text-white/60 font-semibold tracking-wider">Attach Rate</span>
+                            <span className="text-[10px] text-amber-400 font-extrabold">{monthlyPerformance.coverPlus.rate.toFixed(2)}%</span>
+                          </div>
+                          <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden border border-white/5 p-[1px]">
+                            <div 
+                              className="bg-gradient-to-r from-amber-400 to-emerald-500 h-full rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(245,158,11,0.4)]"
+                              style={{ width: `${Math.min(monthlyPerformance.coverPlus.rate * 4, 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                        
+                        {/* Bottom: Split Metrics */}
+                        <div className="grid grid-cols-2 gap-2 mt-auto pt-3 border-t border-white/10 relative z-10 items-end">
                           <div className="flex flex-col">
-                            <span className="text-[9px] text-white/55 font-medium">Achieve %</span>
-                            <span className="text-sm font-bold text-[#f87171] mt-0.5">
-                              {monthlyPerformance.coverPlus.rate.toFixed(2)}%
+                            <span className="text-[8px] text-white/60 font-bold uppercase tracking-wider">Cover / Devices</span>
+                            <span className="text-lg font-black text-white mt-0.5 leading-none">
+                              {monthlyPerformance.coverPlus.count}
+                            </span>
+                            <span className="text-[8px] text-white/40 mt-1 font-medium truncate">
+                              base: {monthlyPerformance.coverPlus.base}
                             </span>
                           </div>
                           
                           <div className="flex flex-col items-end">
-                            <span className="text-[9px] text-white/55 font-medium">Score</span>
-                            <span className="text-sm font-black text-[#34d399] mt-0.5">56</span>
+                            <span className="text-[8px] text-white/60 font-bold uppercase tracking-wider">Target</span>
+                            <span className="text-xl font-black text-amber-400 mt-0.5 leading-none">
+                              {monthlyPerformance.coverPlus.target}%
+                            </span>
+                            <span className="text-[8px] text-white/40 mt-1 font-medium">
+                              Required
+                            </span>
                           </div>
                         </div>
                       </div>
 
                       {/* 7. KPIs Pencil 85% */}
-                      <div className="bg-white/5 backdrop-blur-md rounded-[1.5rem] border border-white/10 p-5 shadow-lg flex flex-col justify-between hover:bg-white/[0.08] hover:border-white/20 transition-all duration-300 min-h-[180px] group relative overflow-hidden">
-                        <div className="flex items-center justify-between">
+                      <div className="bg-white/5 backdrop-blur-md rounded-[1.5rem] border border-white/10 p-5 shadow-lg flex flex-col justify-between hover:bg-white/[0.08] hover:border-white/20 transition-all duration-300 min-h-[220px] group relative overflow-hidden">
+                        {/* Background light glow effect */}
+                        <div className="absolute -right-10 -bottom-10 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl group-hover:bg-emerald-500/15 transition-all duration-500" />
+                        
+                        {/* Card Header */}
+                        <div className="flex items-center justify-between relative z-10">
                           <div className="flex items-center gap-1.5">
-                            <PenTool className="w-4 h-4 text-white/40 group-hover:text-emerald-400 transition-colors" />
-                            <span className="text-[11px] font-semibold text-white/60">KPIs Pencil 85%</span>
+                            <div className="p-1 bg-white/5 rounded-lg border border-white/5 group-hover:bg-emerald-500/10 group-hover:border-emerald-500/20 transition-colors">
+                              <PenTool className="w-3.5 h-3.5 text-white/50 group-hover:text-emerald-400 transition-colors" />
+                            </div>
+                            <span className="text-[11px] font-bold text-white/70 tracking-wide">Pencil Attach</span>
                           </div>
                           <div className="flex flex-col items-end">
-                            <span className="text-[8px] uppercase tracking-wider text-white/40 font-bold leading-none mb-0.5">SCORE</span>
+                            <span className="text-[7px] uppercase tracking-wider text-white/40 font-bold leading-none mb-0.5">SCORE</span>
                             <span className="text-sm font-black text-rose-400 leading-none">81</span>
                           </div>
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-2 mt-4 items-end">
+                        {/* Middle: Progress Bar */}
+                        <div className="my-auto py-3 relative z-10 flex flex-col justify-center">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[9px] text-white/45 font-bold uppercase tracking-wider">Attach Rate</span>
+                            <span className="text-[10px] text-emerald-400 font-extrabold">{monthlyPerformance.pencil.rate.toFixed(2)}%</span>
+                          </div>
+                          <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden border border-white/5 p-[1px]">
+                            <div 
+                              className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(52,211,153,0.4)]"
+                              style={{ width: `${Math.min(monthlyPerformance.pencil.rate, 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                        
+                        {/* Bottom: Split Metrics */}
+                        <div className="grid grid-cols-2 gap-2 mt-auto pt-3 border-t border-white/5 relative z-10 items-end">
                           <div className="flex flex-col">
-                            <div className="flex flex-col leading-none">
-                              <span className="text-xl font-bold text-white">{monthlyPerformance.pencil.count}</span>
-                              <div className="w-6 my-1 border-t border-white/20"></div>
-                              <span className="text-xs text-white/50">{monthlyPerformance.pencil.base}</span>
-                            </div>
-                            <span className="text-[9px] text-white/40 mt-2 font-medium">Pencil / iPads</span>
+                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">Pencils / iPads</span>
+                            <span className="text-lg font-black text-white mt-0.5 leading-none">
+                              {monthlyPerformance.pencil.count}
+                            </span>
+                            <span className="text-[8px] text-white/35 mt-1 font-medium truncate">
+                              base: {monthlyPerformance.pencil.base}
+                            </span>
                           </div>
                           
                           <div className="flex flex-col items-end">
-                            <span className={`text-xl font-bold leading-none ${
-                              monthlyPerformance.pencil.rate >= monthlyPerformance.pencil.target ? "text-emerald-400" : "text-rose-400"
-                            }`}>
-                              {monthlyPerformance.pencil.rate.toFixed(2)}%
+                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">Target</span>
+                            <span className="text-xl font-black text-emerald-400 mt-0.5 leading-none">
+                              {monthlyPerformance.pencil.target}%
                             </span>
-                            <span className="text-[9px] text-white/40 mt-3 font-medium text-right">
-                              Target: {monthlyPerformance.pencil.target}%
+                            <span className="text-[8px] text-white/35 mt-1 font-medium">
+                              Required
                             </span>
                           </div>
                         </div>
                       </div>
 
                       {/* 8. KPIs Mac 10% */}
-                      <div className="bg-white/5 backdrop-blur-md rounded-[1.5rem] border border-white/10 p-5 shadow-lg flex flex-col justify-between hover:bg-white/[0.08] hover:border-white/20 transition-all duration-300 min-h-[180px] group relative overflow-hidden">
-                        <div className="flex items-center justify-between">
+                      <div className="bg-white/5 backdrop-blur-md rounded-[1.5rem] border border-white/10 p-5 shadow-lg flex flex-col justify-between hover:bg-white/[0.08] hover:border-white/20 transition-all duration-300 min-h-[220px] group relative overflow-hidden">
+                        {/* Background light glow effect */}
+                        <div className="absolute -right-10 -bottom-10 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl group-hover:bg-emerald-500/15 transition-all duration-500" />
+                        
+                        {/* Card Header */}
+                        <div className="flex items-center justify-between relative z-10">
                           <div className="flex items-center gap-1.5">
-                            <Laptop className="w-4 h-4 text-white/40 group-hover:text-emerald-400 transition-colors" />
-                            <span className="text-[11px] font-semibold text-white/60">KPIs Mac 10%</span>
+                            <div className="p-1 bg-white/5 rounded-lg border border-white/5 group-hover:bg-emerald-500/10 group-hover:border-emerald-500/20 transition-colors">
+                              <Laptop className="w-3.5 h-3.5 text-white/50 group-hover:text-emerald-400 transition-colors" />
+                            </div>
+                            <span className="text-[11px] font-bold text-white/70 tracking-wide">KPIs Mac 10%</span>
                           </div>
                           <div className="flex flex-col items-end">
-                            <span className="text-[8px] uppercase tracking-wider text-white/40 font-bold leading-none mb-0.5">SCORE</span>
+                            <span className="text-[7px] uppercase tracking-wider text-white/40 font-bold leading-none mb-0.5">SCORE</span>
                             <span className="text-sm font-black text-emerald-400 leading-none">100</span>
                           </div>
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-2 mt-4 items-end">
+                        {/* Middle: Progress Bar */}
+                        <div className="my-auto py-3 relative z-10 flex flex-col justify-center">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[9px] text-white/45 font-bold uppercase tracking-wider">Attach Rate</span>
+                            <span className="text-[10px] text-emerald-400 font-extrabold">{monthlyPerformance.kpisMac.rate.toFixed(2)}%</span>
+                          </div>
+                          <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden border border-white/5 p-[1px]">
+                            <div 
+                              className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(52,211,153,0.4)]"
+                              style={{ width: `${Math.min(monthlyPerformance.kpisMac.rate * 10, 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                        
+                        {/* Bottom: Split Metrics */}
+                        <div className="grid grid-cols-2 gap-2 mt-auto pt-3 border-t border-white/5 relative z-10 items-end">
                           <div className="flex flex-col">
-                            <div className="flex flex-col leading-none">
-                              <span className="text-xl font-bold text-white">{monthlyPerformance.kpisMac.count}</span>
-                              <div className="w-6 my-1 border-t border-white/20"></div>
-                              <span className="text-xs text-white/50">{monthlyPerformance.kpisMac.base}</span>
-                            </div>
-                            <span className="text-[9px] text-white/40 mt-2 font-medium">Mac / iPhones</span>
+                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">Mac / Devices</span>
+                            <span className="text-lg font-black text-white mt-0.5 leading-none">
+                              {monthlyPerformance.kpisMac.count}
+                            </span>
+                            <span className="text-[8px] text-white/35 mt-1 font-medium truncate">
+                              base: {monthlyPerformance.kpisMac.base}
+                            </span>
                           </div>
                           
                           <div className="flex flex-col items-end">
-                            <span className={`text-xl font-bold leading-none ${
-                              monthlyPerformance.kpisMac.rate >= monthlyPerformance.kpisMac.target ? "text-emerald-400" : "text-rose-400"
-                            }`}>
-                              {monthlyPerformance.kpisMac.rate.toFixed(2)}%
+                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">Target</span>
+                            <span className="text-xl font-black text-emerald-400 mt-0.5 leading-none">
+                              {monthlyPerformance.kpisMac.target}%
                             </span>
-                            <span className="text-[9px] text-white/40 mt-3 font-medium text-right">
-                              Target: {monthlyPerformance.kpisMac.target}%
+                            <span className="text-[8px] text-white/35 mt-1 font-medium">
+                              Required
                             </span>
                           </div>
                         </div>
                       </div>
 
                       {/* 9. KPIs iPad 30% */}
-                      <div className="bg-white/5 backdrop-blur-md rounded-[1.5rem] border border-white/10 p-5 shadow-lg flex flex-col justify-between hover:bg-white/[0.08] hover:border-white/20 transition-all duration-300 min-h-[180px] group relative overflow-hidden">
-                        <div className="flex items-center justify-between">
+                      <div className="bg-white/5 backdrop-blur-md rounded-[1.5rem] border border-white/10 p-5 shadow-lg flex flex-col justify-between hover:bg-white/[0.08] hover:border-white/20 transition-all duration-300 min-h-[220px] group relative overflow-hidden">
+                        {/* Background light glow effect */}
+                        <div className="absolute -right-10 -bottom-10 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl group-hover:bg-emerald-500/15 transition-all duration-500" />
+                        
+                        {/* Card Header */}
+                        <div className="flex items-center justify-between relative z-10">
                           <div className="flex items-center gap-1.5">
-                            <Tablet className="w-4 h-4 text-white/40 group-hover:text-emerald-400 transition-colors" />
-                            <span className="text-[11px] font-semibold text-white/60">KPIs iPad 30%</span>
+                            <div className="p-1 bg-white/5 rounded-lg border border-white/5 group-hover:bg-emerald-500/10 group-hover:border-emerald-500/20 transition-colors">
+                              <Tablet className="w-3.5 h-3.5 text-white/50 group-hover:text-emerald-400 transition-colors" />
+                            </div>
+                            <span className="text-[11px] font-bold text-white/70 tracking-wide">KPIs iPad 30%</span>
                           </div>
                           <div className="flex flex-col items-end">
-                            <span className="text-[8px] uppercase tracking-wider text-white/40 font-bold leading-none mb-0.5">SCORE</span>
+                            <span className="text-[7px] uppercase tracking-wider text-white/40 font-bold leading-none mb-0.5">SCORE</span>
                             <span className="text-sm font-black text-emerald-400 leading-none">100</span>
                           </div>
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-2 mt-4 items-end">
+                        {/* Middle: Progress Bar */}
+                        <div className="my-auto py-3 relative z-10 flex flex-col justify-center">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[9px] text-white/45 font-bold uppercase tracking-wider">Attach Rate</span>
+                            <span className="text-[10px] text-emerald-400 font-extrabold">{monthlyPerformance.kpisIpad.rate.toFixed(2)}%</span>
+                          </div>
+                          <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden border border-white/5 p-[1px]">
+                            <div 
+                              className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(52,211,153,0.4)]"
+                              style={{ width: `${Math.min(monthlyPerformance.kpisIpad.rate * 3.33, 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                        
+                        {/* Bottom: Split Metrics */}
+                        <div className="grid grid-cols-2 gap-2 mt-auto pt-3 border-t border-white/5 relative z-10 items-end">
                           <div className="flex flex-col">
-                            <div className="flex flex-col leading-none">
-                              <span className="text-xl font-bold text-white">{monthlyPerformance.kpisIpad.count}</span>
-                              <div className="w-6 my-1 border-t border-white/20"></div>
-                              <span className="text-xs text-white/50">{monthlyPerformance.kpisIpad.base}</span>
-                            </div>
-                            <span className="text-[9px] text-white/40 mt-2 font-medium">iPad / iPhones</span>
+                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">iPad / Devices</span>
+                            <span className="text-lg font-black text-white mt-0.5 leading-none">
+                              {monthlyPerformance.kpisIpad.count}
+                            </span>
+                            <span className="text-[8px] text-white/35 mt-1 font-medium truncate">
+                              base: {monthlyPerformance.kpisIpad.base}
+                            </span>
                           </div>
                           
                           <div className="flex flex-col items-end">
-                            <span className={`text-xl font-bold leading-none ${
-                              monthlyPerformance.kpisIpad.rate >= monthlyPerformance.kpisIpad.target ? "text-emerald-400" : "text-rose-400"
-                            }`}>
-                              {monthlyPerformance.kpisIpad.rate.toFixed(2)}%
+                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">Target</span>
+                            <span className="text-xl font-black text-emerald-400 mt-0.5 leading-none">
+                              {monthlyPerformance.kpisIpad.target}%
                             </span>
-                            <span className="text-[9px] text-white/40 mt-3 font-medium text-right">
-                              Target: {monthlyPerformance.kpisIpad.target}%
+                            <span className="text-[8px] text-white/35 mt-1 font-medium">
+                              Required
                             </span>
                           </div>
                         </div>
                       </div>
 
                       {/* 10. KPIs BTB Mix 10% */}
-                      <div className="bg-white/5 backdrop-blur-md rounded-[1.5rem] border border-white/10 p-5 shadow-lg flex flex-col justify-between hover:bg-white/[0.08] hover:border-white/20 transition-all duration-300 min-h-[180px] group relative overflow-hidden">
-                        <div className="flex items-center justify-between">
+                      <div className="bg-white/5 backdrop-blur-md rounded-[1.5rem] border border-white/10 p-5 shadow-lg flex flex-col justify-between hover:bg-white/[0.08] hover:border-white/20 transition-all duration-300 min-h-[220px] group relative overflow-hidden">
+                        {/* Background light glow effect */}
+                        <div className="absolute -right-10 -bottom-10 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl group-hover:bg-emerald-500/15 transition-all duration-500" />
+                        
+                        {/* Card Header */}
+                        <div className="flex items-center justify-between relative z-10">
                           <div className="flex items-center gap-1.5">
-                            <Building2 className="w-4 h-4 text-white/40 group-hover:text-emerald-400 transition-colors" />
-                            <span className="text-[11px] font-semibold text-white/60">KPIs BTB Mix 10%</span>
+                            <div className="p-1 bg-white/5 rounded-lg border border-white/5 group-hover:bg-emerald-500/10 group-hover:border-emerald-500/20 transition-colors">
+                              <Building2 className="w-3.5 h-3.5 text-white/50 group-hover:text-emerald-400 transition-colors" />
+                            </div>
+                            <span className="text-[11px] font-bold text-white/70 tracking-wide">BTB Mix 10%</span>
                           </div>
                           <div className="flex flex-col items-end">
-                            <span className="text-[8px] uppercase tracking-wider text-white/40 font-bold leading-none mb-0.5">SCORE</span>
+                            <span className="text-[7px] uppercase tracking-wider text-white/40 font-bold leading-none mb-0.5">SCORE</span>
                             <span className="text-sm font-black text-emerald-400 leading-none">100</span>
                           </div>
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-2 mt-4 items-end">
+                        {/* Middle: Progress Bar */}
+                        <div className="my-auto py-3 relative z-10 flex flex-col justify-center">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[9px] text-white/45 font-bold uppercase tracking-wider">Mix Rate</span>
+                            <span className="text-[10px] text-emerald-400 font-extrabold">{monthlyPerformance.btbMix.rate.toFixed(2)}%</span>
+                          </div>
+                          <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden border border-white/5 p-[1px]">
+                            <div 
+                              className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(52,211,153,0.4)]"
+                              style={{ width: `${Math.min(monthlyPerformance.btbMix.rate * 10, 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                        
+                        {/* Bottom: Split Metrics */}
+                        <div className="grid grid-cols-2 gap-2 mt-auto pt-3 border-t border-white/5 relative z-10 items-end">
                           <div className="flex flex-col">
-                            <div className="flex flex-col leading-none">
-                              <span className="text-lg font-bold text-white">{(monthlyPerformance.btbMix.btbSales / 1000000).toFixed(2)}M</span>
-                              <div className="w-6 my-1 border-t border-white/20"></div>
-                              <span className="text-xs text-white/50">{(monthlyPerformance.btbMix.totalSales / 1000000).toFixed(2)}M</span>
-                            </div>
-                            <span className="text-[8px] text-white/40 mt-2 font-medium leading-tight text-left">BTB / All Cate (Baht)</span>
+                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">BTB Sales</span>
+                            <span className="text-lg font-black text-white mt-0.5 leading-none">
+                              {(monthlyPerformance.btbMix.btbSales / 1000000).toFixed(2)}M
+                            </span>
+                            <span className="text-[8px] text-white/35 mt-1 font-medium truncate">
+                              total: {(monthlyPerformance.btbMix.totalSales / 1000000).toFixed(2)}M
+                            </span>
                           </div>
                           
                           <div className="flex flex-col items-end">
-                            <span className={`text-xl font-bold leading-none ${
-                              monthlyPerformance.btbMix.rate >= monthlyPerformance.btbMix.target ? "text-emerald-400" : "text-rose-400"
-                            }`}>
-                              {monthlyPerformance.btbMix.rate.toFixed(2)}%
+                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">Target</span>
+                            <span className="text-xl font-black text-emerald-400 mt-0.5 leading-none">
+                              {monthlyPerformance.btbMix.target}%
                             </span>
-                            <span className="text-[9px] text-white/40 mt-3 font-medium text-right">
-                              Target: {monthlyPerformance.btbMix.target}%
+                            <span className="text-[8px] text-white/35 mt-1 font-medium">
+                              Required
                             </span>
                           </div>
                         </div>
                       </div>
 
                       {/* 11. Mac Growth YoY */}
-                      <div className="bg-white/5 backdrop-blur-md rounded-[1.5rem] border border-white/10 p-5 shadow-lg flex flex-col justify-between hover:bg-white/[0.08] hover:border-white/20 transition-all duration-300 min-h-[180px] group relative overflow-hidden">
-                        <div className="flex items-center justify-between">
+                      <div className="bg-white/5 backdrop-blur-md rounded-[1.5rem] border border-white/10 p-5 shadow-lg flex flex-col justify-between hover:bg-white/[0.08] hover:border-white/20 transition-all duration-300 min-h-[220px] group relative overflow-hidden">
+                        {/* Background light glow effect */}
+                        <div className="absolute -right-10 -bottom-10 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl group-hover:bg-emerald-500/15 transition-all duration-500" />
+                        
+                        {/* Card Header */}
+                        <div className="flex items-center justify-between relative z-10">
                           <div className="flex items-center gap-1.5">
-                            <Check className="w-4 h-4 text-emerald-400" />
-                            <span className="text-[11px] font-semibold text-white/60">Mac Growth YoY</span>
+                            <div className="p-1 bg-white/5 rounded-lg border border-white/5 group-hover:bg-emerald-500/10 group-hover:border-emerald-500/20 transition-colors">
+                              <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            </div>
+                            <span className="text-[11px] font-bold text-white/70 tracking-wide">Mac Growth YoY</span>
                           </div>
                           <div className="flex flex-col items-end">
-                            <span className="text-[8px] uppercase tracking-wider text-white/40 font-bold leading-none mb-0.5">SCORE</span>
+                            <span className="text-[7px] uppercase tracking-wider text-white/40 font-bold leading-none mb-0.5">SCORE</span>
                             <span className="text-sm font-black text-rose-400 leading-none">0</span>
                           </div>
                         </div>
                         
-                        <div className="flex flex-col mt-2">
-                          <span className="text-[9px] text-white/40 uppercase font-semibold">CURRENT (ACT / FCST)</span>
-                          <span className="text-sm font-bold text-white mt-0.5">
-                            {(monthlyPerformance.macYoY.actual / 1000000).toFixed(2)}M / {(monthlyPerformance.macYoY.target / 1000000).toFixed(2)}M
-                          </span>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-2 mt-2 pt-1.5 border-t border-white/10 items-end">
-                          <div className="flex flex-col">
-                            <span className="text-[9px] text-white/40 font-medium">LAST YEAR</span>
-                            <span className="text-xs font-semibold text-white mt-0.5">0</span>
-                          </div>
-                          <div className="flex flex-col items-end">
-                            <span className="text-[9px] text-white/40 font-medium text-right leading-none">% YoY Growth (Fcst)</span>
-                            <span className="text-xs font-bold text-rose-400 mt-0.5">
+                        {/* Middle: Progress Bar */}
+                        <div className="my-auto py-3 relative z-10 flex flex-col justify-center">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[9px] text-white/45 font-bold uppercase tracking-wider">YoY Growth</span>
+                            <span className={`text-[10px] font-extrabold ${monthlyPerformance.macYoY.rate >= monthlyPerformance.macYoY.targetRate ? 'text-emerald-400' : 'text-rose-400'}`}>
                               {monthlyPerformance.macYoY.rate.toFixed(2)}%
                             </span>
-                            <span className="text-[8px] text-white/30 font-medium mt-0.5">Target: {monthlyPerformance.macYoY.targetRate}%</span>
+                          </div>
+                          <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden border border-white/5 p-[1px]">
+                            <div 
+                              className={`h-full rounded-full transition-all duration-500 ${
+                                monthlyPerformance.macYoY.rate >= monthlyPerformance.macYoY.targetRate 
+                                  ? 'bg-gradient-to-r from-emerald-500 to-teal-400 shadow-[0_0_8px_rgba(52,211,153,0.4)]' 
+                                  : 'bg-gradient-to-r from-rose-500 to-amber-400 shadow-[0_0_8px_rgba(244,63,94,0.4)]'
+                              }`}
+                              style={{ width: `${Math.max(0, Math.min((monthlyPerformance.macYoY.rate / (monthlyPerformance.macYoY.targetRate || 10)) * 100, 100))}%` }}
+                            />
+                          </div>
+                        </div>
+                        
+                        {/* Bottom: Split Metrics */}
+                        <div className="grid grid-cols-2 gap-2 mt-auto pt-3 border-t border-white/5 relative z-10 items-end">
+                          <div className="flex flex-col">
+                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">Current Act/Fcst</span>
+                            <span className="text-sm font-black text-white mt-0.5 leading-none">
+                              {(monthlyPerformance.macYoY.actual / 1000000).toFixed(2)}M
+                            </span>
+                            <span className="text-[8px] text-white/35 mt-1 font-medium truncate">
+                              target: {(monthlyPerformance.macYoY.target / 1000000).toFixed(2)}M
+                            </span>
+                          </div>
+                          
+                          <div className="flex flex-col items-end">
+                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">YoY Target</span>
+                            <span className="text-xl font-black text-emerald-400 mt-0.5 leading-none">
+                              {monthlyPerformance.macYoY.targetRate}%
+                            </span>
+                            <span className="text-[8px] text-white/35 mt-1 font-medium">
+                              Required
+                            </span>
                           </div>
                         </div>
                       </div>
 
                       {/* 12. Total Sales Growth YoY */}
-                      <div className="bg-white/5 backdrop-blur-md rounded-[1.5rem] border border-white/10 p-5 shadow-lg flex flex-col justify-between hover:bg-white/[0.08] hover:border-white/20 transition-all duration-300 min-h-[180px] group relative overflow-hidden">
-                        <div className="flex items-center justify-between">
+                      <div className="bg-white/5 backdrop-blur-md rounded-[1.5rem] border border-white/10 p-5 shadow-lg flex flex-col justify-between hover:bg-white/[0.08] hover:border-white/20 transition-all duration-300 min-h-[220px] group relative overflow-hidden">
+                        {/* Background light glow effect */}
+                        <div className="absolute -right-10 -bottom-10 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl group-hover:bg-emerald-500/15 transition-all duration-500" />
+                        
+                        {/* Card Header */}
+                        <div className="flex items-center justify-between relative z-10">
                           <div className="flex items-center gap-1.5">
-                            <TrendingUp className="w-4 h-4 text-emerald-400" />
-                            <span className="text-[11px] font-semibold text-white/60">Total Sales Growth YoY</span>
+                            <div className="p-1 bg-white/5 rounded-lg border border-white/5 group-hover:bg-emerald-500/10 group-hover:border-emerald-500/20 transition-colors">
+                              <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                            </div>
+                            <span className="text-[11px] font-bold text-white/70 tracking-wide">Total Sales YoY</span>
                           </div>
                           <div className="flex flex-col items-end">
-                            <span className="text-[8px] uppercase tracking-wider text-white/40 font-bold leading-none mb-0.5">SCORE</span>
+                            <span className="text-[7px] uppercase tracking-wider text-white/40 font-bold leading-none mb-0.5">SCORE</span>
                             <span className="text-sm font-black text-rose-400 leading-none">0</span>
                           </div>
                         </div>
                         
-                        <div className="flex flex-col mt-2">
-                          <span className="text-[9px] text-white/40 uppercase font-semibold">CURRENT (ACT / FCST)</span>
-                          <span className="text-sm font-bold text-white mt-0.5">
-                            {(monthlyPerformance.totalYoY.actual / 1000000).toFixed(2)}M / {(monthlyPerformance.totalYoY.target / 1000000).toFixed(2)}M
-                          </span>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-2 mt-2 pt-1.5 border-t border-white/10 items-end">
-                          <div className="flex flex-col">
-                            <span className="text-[9px] text-white/40 font-medium">LAST YEAR</span>
-                            <span className="text-xs font-semibold text-white mt-0.5">0</span>
-                          </div>
-                          <div className="flex flex-col items-end">
-                            <span className="text-[9px] text-white/40 font-medium text-right leading-none">% YoY Growth (Fcst)</span>
-                            <span className="text-xs font-bold text-rose-400 mt-0.5">
+                        {/* Middle: Progress Bar */}
+                        <div className="my-auto py-3 relative z-10 flex flex-col justify-center">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[9px] text-white/45 font-bold uppercase tracking-wider">YoY Growth</span>
+                            <span className={`text-[10px] font-extrabold ${monthlyPerformance.totalYoY.rate >= monthlyPerformance.totalYoY.targetRate ? 'text-emerald-400' : 'text-rose-400'}`}>
                               {monthlyPerformance.totalYoY.rate.toFixed(2)}%
                             </span>
-                            <span className="text-[8px] text-white/30 font-medium mt-0.5">Target: {monthlyPerformance.totalYoY.targetRate}%</span>
+                          </div>
+                          <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden border border-white/5 p-[1px]">
+                            <div 
+                              className={`h-full rounded-full transition-all duration-500 ${
+                                monthlyPerformance.totalYoY.rate >= monthlyPerformance.totalYoY.targetRate 
+                                  ? 'bg-gradient-to-r from-emerald-500 to-teal-400 shadow-[0_0_8px_rgba(52,211,153,0.4)]' 
+                                  : 'bg-gradient-to-r from-rose-500 to-amber-400 shadow-[0_0_8px_rgba(244,63,94,0.4)]'
+                              }`}
+                              style={{ width: `${Math.max(0, Math.min((monthlyPerformance.totalYoY.rate / (monthlyPerformance.totalYoY.targetRate || 10)) * 100, 100))}%` }}
+                            />
+                          </div>
+                        </div>
+                        
+                        {/* Bottom: Split Metrics */}
+                        <div className="grid grid-cols-2 gap-2 mt-auto pt-3 border-t border-white/5 relative z-10 items-end">
+                          <div className="flex flex-col">
+                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">Current Act/Fcst</span>
+                            <span className="text-sm font-black text-white mt-0.5 leading-none">
+                              {(monthlyPerformance.totalYoY.actual / 1000000).toFixed(2)}M
+                            </span>
+                            <span className="text-[8px] text-white/35 mt-1 font-medium truncate">
+                              target: {(monthlyPerformance.totalYoY.target / 1000000).toFixed(2)}M
+                            </span>
+                          </div>
+                          
+                          <div className="flex flex-col items-end">
+                            <span className="text-[8px] text-white/45 font-bold uppercase tracking-wider">YoY Target</span>
+                            <span className="text-xl font-black text-emerald-400 mt-0.5 leading-none">
+                              {monthlyPerformance.totalYoY.targetRate}%
+                            </span>
+                            <span className="text-[8px] text-white/35 mt-1 font-medium">
+                              Required
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -3016,13 +3269,21 @@ export default function App() {
                         </div>
                         <AnimatePresence mode="wait">
                           <motion.div
-                            key={Math.round(activeOfficer?.actual ?? 0)}
+                            key={activeOfficer ? Math.round(activeOfficer.actual) : currentStaff.stats.sales}
                             initial={{ opacity: 0, y: 5 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -5 }}
-                            className={`font-bold transition-all ${(Math.round(activeOfficer?.actual ?? 0).toLocaleString()).length > 7 ? "text-base sm:text-lg lg:text-xl tracking-tighter" : "text-xl lg:text-2xl"}`}
+                            className={`font-bold transition-all ${
+                              (activeOfficer 
+                                ? Math.round(activeOfficer.actual).toLocaleString() 
+                                : currentStaff.stats.sales
+                              ).length > 7 ? "text-base sm:text-lg lg:text-xl tracking-tighter" : "text-xl lg:text-2xl"
+                            }`}
                           >
-                            {Math.round(activeOfficer?.actual ?? 0).toLocaleString()}
+                            {activeOfficer 
+                              ? Math.round(activeOfficer.actual).toLocaleString() 
+                              : Number(currentStaff.stats.sales).toLocaleString()
+                            }
                           </motion.div>
                         </AnimatePresence>
                       </button>
@@ -3038,13 +3299,16 @@ export default function App() {
                         </div>
                         <AnimatePresence mode="wait">
                           <motion.div
-                            key={Math.round(activeOfficer?.rate ?? 0)}
+                            key={activeOfficer ? Math.round(activeOfficer.rate) : currentStaff.stats.csat}
                             initial={{ opacity: 0, y: 5 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -5 }}
                             className="text-xl lg:text-2xl font-bold"
                           >
-                            {Math.round(activeOfficer?.rate ?? 0)}%
+                            {activeOfficer 
+                              ? `${Math.round(activeOfficer.rate)}%` 
+                              : currentStaff.stats.csat
+                            }
                           </motion.div>
                         </AnimatePresence>
                       </button>
@@ -3063,13 +3327,21 @@ export default function App() {
                         </div>
                         <AnimatePresence mode="wait">
                           <motion.div
-                            key={Math.round(activeOfficer?.target ?? 0)}
+                            key={activeOfficer ? Math.round(activeOfficer.target) : currentStaff.stats.target}
                             initial={{ opacity: 0, y: 5 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -5 }}
-                            className={`font-bold text-white relative z-10 transition-all ${(Math.round(activeOfficer?.target ?? 0).toLocaleString()).length > 7 ? "text-base sm:text-lg lg:text-xl tracking-tighter" : "text-xl lg:text-2xl"}`}
+                            className={`font-bold text-white relative z-10 transition-all ${
+                              (activeOfficer 
+                                ? Math.round(activeOfficer.target).toLocaleString() 
+                                : currentStaff.stats.target
+                              ).length > 7 ? "text-base sm:text-lg lg:text-xl tracking-tighter" : "text-xl lg:text-2xl"
+                            }`}
                           >
-                            {Math.round(activeOfficer?.target ?? 0).toLocaleString()}
+                            {activeOfficer 
+                              ? Math.round(activeOfficer.target).toLocaleString() 
+                              : currentStaff.stats.target
+                            }
                           </motion.div>
                         </AnimatePresence>
                       </button>
