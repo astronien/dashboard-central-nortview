@@ -921,21 +921,21 @@ export default function App() {
       {
         label: "Total Sales",
         value: `฿${Math.round(totalSales).toLocaleString()}`,
-        trend: `${trendPercent >= 0 ? "+" : ""}${trendPercent.toFixed(1)}%`,
+        trend: `${trendPercent >= 0 ? "+" : ""}${Math.round(trendPercent)}%`,
         icon: DollarSign,
         isUp: trendPercent >= 0,
       },
       {
         label: "Store Target",
-        value: `${avgAch.toFixed(1)}%`,
-        trend: `${avgAch >= 100 ? "+" : ""}${(avgAch - 100).toFixed(1)}%`,
+        value: `${Math.round(avgAch)}%`,
+        trend: `${avgAch >= 100 ? "+" : ""}${Math.round(avgAch - 100)}%`,
         icon: Star,
         isUp: avgAch >= 100,
       },
       {
         label: "Avg Staff Ach %",
-        value: `${avgRate.toFixed(1)}%`,
-        trend: `${avgRate >= 100 ? "+" : ""}${avgRate.toFixed(1)}%`,
+        value: `${Math.round(avgRate)}%`,
+        trend: `${avgRate >= 100 ? "+" : ""}${Math.round(avgRate)}%`,
         icon: Smile,
         isUp: true,
       },
@@ -1369,7 +1369,7 @@ export default function App() {
       ...parsedReport.categories.map((row) => [row.category, row.actual, row.target, `${row.share}%`]),
       [],
       ["Officer Summary", "Branch", "Actual", "Target", "Rate"],
-      ...parsedReport.officers.map((row) => [row.name, row.branch, row.actual, row.target, `${row.rate}%`]),
+      ...parsedReport.officers.map((row) => [row.name, row.branch, row.actual, row.target, `${Math.round(row.rate)}%`]),
     ];
     const csv = rows.map((row) => row.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -2364,13 +2364,13 @@ export default function App() {
                         </div>
                         <AnimatePresence mode="wait">
                           <motion.div
-                            key={activeOfficer?.actual ?? 0}
+                            key={Math.round(activeOfficer?.actual ?? 0)}
                             initial={{ opacity: 0, y: 5 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -5 }}
-                            className={`font-bold transition-all ${(activeOfficer?.actual?.toLocaleString() ?? "0").length > 7 ? "text-base sm:text-lg lg:text-xl tracking-tighter" : "text-xl lg:text-2xl"}`}
+                            className={`font-bold transition-all ${(Math.round(activeOfficer?.actual ?? 0).toLocaleString()).length > 7 ? "text-base sm:text-lg lg:text-xl tracking-tighter" : "text-xl lg:text-2xl"}`}
                           >
-                            {activeOfficer?.actual?.toLocaleString() ?? 0}
+                            {Math.round(activeOfficer?.actual ?? 0).toLocaleString()}
                           </motion.div>
                         </AnimatePresence>
                       </button>
@@ -2386,13 +2386,13 @@ export default function App() {
                         </div>
                         <AnimatePresence mode="wait">
                           <motion.div
-                            key={activeOfficer?.rate ?? 0}
+                            key={Math.round(activeOfficer?.rate ?? 0)}
                             initial={{ opacity: 0, y: 5 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -5 }}
                             className="text-xl lg:text-2xl font-bold"
                           >
-                            {activeOfficer?.rate ?? 0}%
+                            {Math.round(activeOfficer?.rate ?? 0)}%
                           </motion.div>
                         </AnimatePresence>
                       </button>
@@ -2411,13 +2411,13 @@ export default function App() {
                         </div>
                         <AnimatePresence mode="wait">
                           <motion.div
-                            key={activeOfficer?.target ?? 0}
+                            key={Math.round(activeOfficer?.target ?? 0)}
                             initial={{ opacity: 0, y: 5 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -5 }}
-                            className={`font-bold text-white relative z-10 transition-all ${(activeOfficer?.target?.toLocaleString() ?? "0").length > 7 ? "text-base sm:text-lg lg:text-xl tracking-tighter" : "text-xl lg:text-2xl"}`}
+                            className={`font-bold text-white relative z-10 transition-all ${(Math.round(activeOfficer?.target ?? 0).toLocaleString()).length > 7 ? "text-base sm:text-lg lg:text-xl tracking-tighter" : "text-xl lg:text-2xl"}`}
                           >
-                            {activeOfficer?.target?.toLocaleString() ?? 0}
+                            {Math.round(activeOfficer?.target ?? 0).toLocaleString()}
                           </motion.div>
                         </AnimatePresence>
                       </button>
@@ -2933,9 +2933,9 @@ export default function App() {
                                 <td className="py-3 pr-4 font-medium text-white/90">{row.label}</td>
                                 <td className="py-3 px-3 text-white/80">฿{Math.round(row.target).toLocaleString()}</td>
                                 <td className="py-3 px-3 text-white/80">฿{Math.round(row.actual).toLocaleString()}</td>
-                                <td className={`py-3 px-3 font-semibold ${achPercent >= 100 ? "text-emerald-400" : "text-yellow-400"}`}>{achPercent.toFixed(1)}%</td>
-                                <td className={`py-3 px-3 font-semibold ${momPercent >= 0 ? "text-emerald-400" : "text-red-400"}`}>{momPercent.toFixed(1)}%</td>
-                                <td className={`py-3 px-3 font-semibold ${yoyPercent >= 0 ? "text-emerald-400" : "text-red-400"}`}>{yoyPercent.toFixed(1)}%</td>
+                                <td className={`py-3 px-3 font-semibold ${achPercent >= 100 ? "text-emerald-400" : "text-yellow-400"}`}>{Math.round(achPercent)}%</td>
+                                <td className={`py-3 px-3 font-semibold ${momPercent >= 0 ? "text-emerald-400" : "text-red-400"}`}>{Math.round(momPercent)}%</td>
+                                <td className={`py-3 px-3 font-semibold ${yoyPercent >= 0 ? "text-emerald-400" : "text-red-400"}`}>{Math.round(yoyPercent)}%</td>
                               </tr>
                             );
                           })}
@@ -3011,7 +3011,7 @@ export default function App() {
                               <td className="py-3 px-4 text-white/70">{item.branch}</td>
                               <td className="py-3 px-4 text-white/70">฿{Math.round(item.actual).toLocaleString()}</td>
                               <td className="py-3 px-4 text-white/70">฿{Math.round(item.target).toLocaleString()}</td>
-                              <td className="py-3 px-4 font-semibold text-emerald-400">{item.rate}%</td>
+                              <td className="py-3 px-4 font-semibold text-emerald-400">{Math.round(item.rate)}%</td>
                             </tr>
                           ))}
                         </tbody>
