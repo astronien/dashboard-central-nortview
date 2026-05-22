@@ -390,9 +390,17 @@ const cleanOfficerName = (name: string) => {
   return cleaned;
 };
 const matchesOfficer = (a: string, b: string) => {
-  const left = cleanOfficerName(a);
-  const right = cleanOfficerName(b);
-  return left === right || left.includes(right) || right.includes(left);
+  if (!a || !b) return false;
+  const cleanA = cleanOfficerName(a);
+  const cleanB = cleanOfficerName(b);
+  if (cleanA === cleanB) return true;
+
+  // Split original names by whitespace to get first names
+  const firstA = cleanOfficerName(a.split(/\s+/)[0] || "");
+  const firstB = cleanOfficerName(b.split(/\s+/)[0] || "");
+  if (firstA && firstB && firstA === firstB) return true;
+
+  return false;
 };
 const getCategoryValue = (row: RawRow) => {
   const category = normalizeText(row["Category (Name)"] ?? row.category ?? row.cat ?? row["Cat & Sub Cat"]);
@@ -602,7 +610,15 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
       
       // Update Officer summary
       const officerKey = cleanOfficerName(officer);
-      let officerState = officerSummary.get(officerKey);
+      let matchedKey = "";
+      for (const [existingKey, value] of officerSummary.entries()) {
+        if (matchesOfficer(value.name, officer)) {
+          matchedKey = existingKey;
+          break;
+        }
+      }
+      
+      let officerState = matchedKey ? officerSummary.get(matchedKey) : undefined;
       if (!officerState) {
         officerState = { name: officer, branch, actual: 0, target: 0, rate: 0 };
         officerSummary.set(officerKey, officerState);
@@ -1494,12 +1510,13 @@ export default function App() {
       const nextUploads: Record<UploadKind, RawRow[]> = { ...uploadedFiles };
       const changedKinds = new Set<UploadKind>();
       for (const file of files) {
-        const buffer = await file.arrayBuffer();
+        const f = file as File;
+        const buffer = await f.arrayBuffer();
         const workbook = XLSX.read(buffer, { type: "array" });
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         if (!sheet) continue;
         const rows = XLSX.utils.sheet_to_json<RawRow>(sheet, { defval: "", raw: false });
-        const detectedKind = forcedKind ?? acceptDetected(file.name, getUploadKind(Object.keys(rows[0] ?? {})));
+        const detectedKind = forcedKind ?? acceptDetected(f.name, getUploadKind(Object.keys(rows[0] ?? {})));
         nextUploads[detectedKind] = rows;
         changedKinds.add(detectedKind);
       }
@@ -2880,7 +2897,7 @@ export default function App() {
                     <div className="flex gap-2 flex-wrap justify-end">
                       {Object.entries(uploadedFiles).map(([kind, rows]) => (
                         <button key={kind} onClick={() => removeUploadedFile(kind as UploadKind)} className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-white/70 hover:bg-white/10">
-                          Clear {kind} ({rows.length})
+                          Clear {kind} ({(rows as RawRow[]).length})
                         </button>
                       ))}
                     </div>
