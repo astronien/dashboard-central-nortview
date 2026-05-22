@@ -435,6 +435,40 @@ const getSalesDate = (row: RawRow) => {
   const parsed = Date.parse(raw.replace(/^\S+\.\s*/, ""));
   return Number.isFinite(parsed) ? parsed : 0;
 };
+const countRows = (
+  rows: RawRow[], 
+  filterFn: (cat: string, prod: string, sub: string) => boolean
+) => {
+  let count = 0;
+  rows.forEach(row => {
+    const cat = String(row["Category (Name)"] ?? row.category ?? "").toLowerCase();
+    const prod = String(row["Product (Name)"] ?? row.product ?? "").toLowerCase();
+    const sub = String(row["Sub Category"] ?? "").toLowerCase();
+    if (filterFn(cat, prod, sub)) {
+      if (cat.includes("sim")) {
+        count += toNumber(row.Number ?? row.number ?? row.qty ?? 1);
+      } else {
+        count += 1;
+      }
+    }
+  });
+  return count;
+};
+const sumSales = (
+  rows: RawRow[], 
+  filterFn: (cat: string, prod: string, sub: string) => boolean
+) => {
+  let sum = 0;
+  rows.forEach(row => {
+    const cat = String(row["Category (Name)"] ?? row.category ?? "").toLowerCase();
+    const prod = String(row["Product (Name)"] ?? row.product ?? "").toLowerCase();
+    const sub = String(row["Sub Category"] ?? "").toLowerCase();
+    if (filterFn(cat, prod, sub)) {
+      sum += toNumber(row["ราคาขายตามบิล"] ?? row["Total Price"] ?? row.totalPrice);
+    }
+  });
+  return sum;
+};
 const getUploadKind = (headers: string[]): UploadKind => {
   const normalized = headers.map(normalizeText);
   if (normalized.some((h) => h.includes("cat & sub cat") || h.includes("cat daily"))) return "categoryMaster";
@@ -961,44 +995,6 @@ export default function App() {
   }, [parsedReport]);
 
   const monthlyPerformance = useMemo(() => {
-    // Helper to count rows matching filters or categories
-    const countRows = (
-      rows: RawRow[], 
-      filterFn: (cat: string, prod: string, sub: string) => boolean
-    ) => {
-      let count = 0;
-      rows.forEach(row => {
-        const cat = String(row["Category (Name)"] ?? row.category ?? "").toLowerCase();
-        const prod = String(row["Product (Name)"] ?? row.product ?? "").toLowerCase();
-        const sub = String(row["Sub Category"] ?? "").toLowerCase();
-        if (filterFn(cat, prod, sub)) {
-          if (cat.includes("sim")) {
-            count += toNumber(row.Number ?? row.number ?? row.qty ?? 1);
-          } else {
-            count += 1;
-          }
-        }
-      });
-      return count;
-    };
-
-    // Helper to sum sales value matching filters
-    const sumSales = (
-      rows: RawRow[], 
-      filterFn: (cat: string, prod: string, sub: string) => boolean
-    ) => {
-      let sum = 0;
-      rows.forEach(row => {
-        const cat = String(row["Category (Name)"] ?? row.category ?? "").toLowerCase();
-        const prod = String(row["Product (Name)"] ?? row.product ?? "").toLowerCase();
-        const sub = String(row["Sub Category"] ?? "").toLowerCase();
-        if (filterFn(cat, prod, sub)) {
-          sum += toNumber(row["ราคาขายตามบิล"] ?? row["Total Price"] ?? row.totalPrice);
-        }
-      });
-      return sum;
-    };
-
     const hasData = uploadedFiles.current.length > 0;
     
     // Dynamic calculations or fallback mock values matching user's image exactly!
