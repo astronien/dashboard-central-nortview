@@ -2354,7 +2354,7 @@ export default function App() {
                     <div className="flex justify-center lg:justify-end gap-3 mb-3">
                       <button
                         onClick={() => setActiveStat("sales")}
-                        className={`rounded-2xl p-4 w-28 text-center border shadow-lg transition-all ${activeStat === "sales" ? "bg-[#0c3123] border-white/20 ring-1 ring-emerald-500/50" : "bg-black/20 border-white/5 hover:bg-black/30"}`}
+                        className={`rounded-2xl px-2 py-4 w-28 sm:w-32 text-center border shadow-lg transition-all ${activeStat === "sales" ? "bg-[#0c3123] border-white/20 ring-1 ring-emerald-500/50" : "bg-black/20 border-white/5 hover:bg-black/30"}`}
                       >
                         <ShoppingBag
                           className={`w-5 h-5 mx-auto mb-2 ${activeStat === "sales" ? "text-white" : "text-white/60"}`}
@@ -2368,7 +2368,7 @@ export default function App() {
                             initial={{ opacity: 0, y: 5 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -5 }}
-                            className="text-2xl font-bold"
+                            className={`font-bold transition-all ${(activeOfficer?.actual?.toLocaleString() ?? "0").length > 7 ? "text-base sm:text-lg lg:text-xl tracking-tighter" : "text-xl lg:text-2xl"}`}
                           >
                             {activeOfficer?.actual?.toLocaleString() ?? 0}
                           </motion.div>
@@ -2376,7 +2376,7 @@ export default function App() {
                       </button>
                       <button
                         onClick={() => setActiveStat("csat")}
-                        className={`backdrop-blur-md rounded-2xl p-4 w-28 text-center border shadow-inner transition-all ${activeStat === "csat" ? "bg-white/[0.15] border-white/30 ring-1 ring-emerald-500/50" : "bg-white/5 border-white/10 hover:bg-white/10"}`}
+                        className={`backdrop-blur-md rounded-2xl px-2 py-4 w-28 sm:w-32 text-center border shadow-inner transition-all ${activeStat === "csat" ? "bg-white/[0.15] border-white/30 ring-1 ring-emerald-500/50" : "bg-white/5 border-white/10 hover:bg-white/10"}`}
                       >
                         <Smile
                           className={`w-5 h-5 mx-auto mb-2 ${activeStat === "csat" ? "text-emerald-300 fill-emerald-300/20" : "text-white/60"}`}
@@ -2390,7 +2390,7 @@ export default function App() {
                             initial={{ opacity: 0, y: 5 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -5 }}
-                            className="text-2xl font-bold"
+                            className="text-xl lg:text-2xl font-bold"
                           >
                             {activeOfficer?.rate ?? 0}%
                           </motion.div>
@@ -2398,7 +2398,7 @@ export default function App() {
                       </button>
                       <button
                         onClick={() => setActiveStat("target")}
-                        className={`backdrop-blur-xl rounded-2xl p-4 w-28 text-center border shadow-xl relative overflow-hidden transition-all ${activeStat === "target" ? "bg-white/20 border-white/40 ring-1 ring-emerald-500/50" : "bg-white/5 border-white/10 hover:bg-white/10"}`}
+                        className={`backdrop-blur-xl rounded-2xl px-2 py-4 w-28 sm:w-32 text-center border shadow-xl relative overflow-hidden transition-all ${activeStat === "target" ? "bg-white/20 border-white/40 ring-1 ring-emerald-500/50" : "bg-white/5 border-white/10 hover:bg-white/10"}`}
                       >
                         {activeStat === "target" && (
                           <div className="absolute inset-0 bg-emerald-400/20 mix-blend-overlay"></div>
@@ -2415,7 +2415,7 @@ export default function App() {
                             initial={{ opacity: 0, y: 5 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -5 }}
-                            className="text-2xl font-bold text-white relative z-10"
+                            className={`font-bold text-white relative z-10 transition-all ${(activeOfficer?.target?.toLocaleString() ?? "0").length > 7 ? "text-base sm:text-lg lg:text-xl tracking-tighter" : "text-xl lg:text-2xl"}`}
                           >
                             {activeOfficer?.target?.toLocaleString() ?? 0}
                           </motion.div>
