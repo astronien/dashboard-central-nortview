@@ -1129,6 +1129,188 @@ export default function App() {
     return map;
   }, [uploadedFiles.categoryMaster]);
 
+  const todayRows = useMemo(() => {
+    if (!uploadedFiles.current.length) return [];
+    let maxDateStr = "";
+    let maxDateTime = 0;
+    uploadedFiles.current.forEach((row) => {
+      const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
+      if (!rawDate) return;
+      const parsed = Date.parse(rawDate.replace(/^\S+\.\s*/, ""));
+      if (parsed && parsed > maxDateTime) {
+        maxDateTime = parsed;
+        maxDateStr = rawDate;
+      }
+    });
+    if (!maxDateStr) return [];
+    return uploadedFiles.current.filter(row => String(row["Doc Date"] ?? "").trim() === maxDateStr.trim());
+  }, [uploadedFiles.current]);
+
+  const todayStats = useMemo(() => {
+    if (!todayRows.length) return { revenue: 0, units: 0, target: 0, ach: 0, mom: 0, yoy: 0, categories: [], dateStr: "" };
+    
+    let totalRevenue = 0;
+    let totalUnits = 0;
+    
+    todayRows.forEach(row => {
+      const cat = String(row["Category (Name)"] ?? "").toLowerCase();
+      const val = getCategoryValue(row);
+      totalRevenue += val;
+      if (cat.includes("sim")) {
+        totalUnits += toNumber(row.Number ?? row.number ?? row.qty ?? 1);
+      } else {
+        totalUnits += 1;
+      }
+    });
+    
+    const totalDays = parsedReport.branches.reduce((acc, b) => Math.max(acc, b.totalDays || 30), 30);
+    const totalTarget = parsedReport.branches.reduce((acc, b) => acc + (b.target || 0), 0);
+    const dailyTarget = totalTarget / totalDays;
+    const ach = dailyTarget ? (totalRevenue / dailyTarget) * 100 : 0;
+    
+    const momVal = parsedReport.branches.reduce((acc, b) => acc + (typeof b.momPercent === "number" ? b.momPercent : 0), 0) / (parsedReport.branches.length || 1);
+    const yoyVal = parsedReport.branches.reduce((acc, b) => acc + (typeof b.yoyPercent === "number" ? b.yoyPercent : 0), 0) / (parsedReport.branches.length || 1);
+    
+    const cats = ["Grand Total", "iPhone", "Mac", "iPad", "Apple Watch", "BTB", "3rd Party"];
+    const catStats = cats.map(cName => {
+      let catRevenue = 0;
+      let catUnits = 0;
+      
+      todayRows.forEach(row => {
+        const mapped = getCategory(row);
+        let match = false;
+        if (cName === "Grand Total") {
+          match = true;
+        } else if (cName === "3rd Party") {
+          match = mapped.toLowerCase().includes("accessories") || mapped.toLowerCase().includes("other") || mapped.toLowerCase().includes("3rd");
+        } else {
+          match = mapped.toLowerCase().includes(cName.toLowerCase());
+        }
+        
+        if (match) {
+          catRevenue += getCategoryValue(row);
+          const cat = String(row["Category (Name)"] ?? "").toLowerCase();
+          if (cat.includes("sim")) {
+            catUnits += toNumber(row.Number ?? row.number ?? row.qty ?? 1);
+          } else {
+            catUnits += 1;
+          }
+        }
+      });
+      
+      let catDailyTarget = 0;
+      if (cName === "Grand Total") {
+        catDailyTarget = dailyTarget;
+      } else {
+        const catTargetSum = parsedReport.categories.find(item => item.category.toLowerCase().includes(cName.toLowerCase()))?.target || 0;
+        catDailyTarget = catTargetSum / totalDays;
+      }
+      const catAch = catDailyTarget ? (catRevenue / catDailyTarget) * 100 : 0;
+      
+      return {
+        name: cName,
+        actual: catRevenue,
+        units: catUnits,
+        target: catDailyTarget,
+        ach: catAch
+      };
+    });
+    
+    const rawDateStr = String(todayRows[0]?.["Doc Date"] ?? "");
+    let dateStr = "";
+    if (rawDateStr) {
+      const parts = rawDateStr.split(/\s+/);
+      dateStr = parts.slice(0, 3).join(" ");
+    }
+    
+    return {
+      revenue: totalRevenue,
+      units: totalUnits,
+      target: dailyTarget,
+      ach,
+      mom: momVal,
+      yoy: yoyVal,
+      categories: catStats,
+      dateStr
+    };
+  }, [todayRows, parsedReport, getCategory, getCategoryValue]);
+
+  const staffAttachMatrix = useMemo(() => {
+    if (!uploadedFiles.current.length || !uploadedFiles.target.length) return [];
+    const groups: AttachTargetGroup[] = [
+      { id: "Cover+", label: "Cover+", members: ["Cover+"] },
+      { id: "AppleCare+", label: "AC+", members: ["Apple Care", "AppleCare+"] },
+      { id: "Pencil", label: "Pencil", members: ["Pencil", "Apple Pencil"] },
+      { id: "Case", label: "Case", members: ["Case", "Casing"] },
+      { id: "SIM", label: "SIM", members: ["SIM"] },
+      { id: "AirPods", label: "AirPods", members: ["AirPods", "AirPod"] },
+      { id: "UFD", label: "UFD", members: ["UFD", "UFUND"] }
+    ];
+    return computeAttachRateRows({
+      currentRows: uploadedFiles.current,
+      targetRows: uploadedFiles.target,
+      categoryMaster: uploadedFiles.categoryMaster,
+      baseCategories: ["iPhone", "iPad", "Mac", "Apple Watch"],
+      attachCategories: groups.map(g => g.label),
+      attachGroups: groups,
+      kpiTargetsByCategory: {
+        "Cover+": 25,
+        "AC+": 20,
+        "Pencil": 85,
+        "Case": 60,
+        "SIM": 15,
+        "AirPods": 25,
+        "UFD": 5
+      }
+    });
+  }, [uploadedFiles.current, uploadedFiles.target, uploadedFiles.categoryMaster]);
+
+  const pcZoneStats = useMemo(() => {
+    if (!uploadedFiles.current.length) return [];
+    
+    const distributors = [
+      { name: "SUPER SALES", brands: ["BLUE BOX", "TECHPRO", "QPLUS", "TITANV", "MCDODO"] },
+      { name: "RTB", brands: ["UNIQ", "ENERGEA", "B&O", "VONMAEHLEN", "JISULIFE"] },
+      { name: "MTJ", brands: ["MTJ", "MOFT", "SKINARMA"] }
+    ];
+    
+    return distributors.map(dist => {
+      let distRevenue = 0;
+      let distUnits = 0;
+      const brandMap = new Map<string, { revenue: number, units: number }>();
+      
+      uploadedFiles.current.forEach(row => {
+        const brand = String(row["Brand"] ?? row.brand ?? "").toUpperCase().trim();
+        const cat = String(row["Category (Name)"] ?? "").toLowerCase();
+        const matchesBrand = dist.brands.some(b => brand.includes(b));
+        
+        if (matchesBrand) {
+          const val = getCategoryValue(row);
+          const qty = cat.includes("sim") ? toNumber(row.Number ?? row.number ?? row.qty ?? 1) : 1;
+          distRevenue += val;
+          distUnits += qty;
+          
+          const existing = brandMap.get(brand) ?? { revenue: 0, units: 0 };
+          existing.revenue += val;
+          existing.units += qty;
+          brandMap.set(brand, existing);
+        }
+      });
+      
+      const topBrands = Array.from(brandMap.entries())
+        .map(([brand, data]) => ({ name: brand, ...data }))
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, 5);
+        
+      return {
+        name: dist.name,
+        revenue: distRevenue,
+        units: distUnits,
+        topBrands
+      };
+    });
+  }, [uploadedFiles.current, getCategoryValue]);
+
   const getCategory = (row: RawRow): string => {
     const cat = String(row["Category (Name)"] ?? row.category_name ?? row.Category ?? "").trim();
     const sub = String(row["Sub Category"] ?? row.sub_category ?? row.SubCategory ?? "").trim();
@@ -1172,6 +1354,10 @@ export default function App() {
   const [isParsing, setIsParsing] = useState(false);
   const [isSavingTurso, setIsSavingTurso] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isSyncingSheets, setIsSyncingSheets] = useState(false);
+  const [syncResult, setSyncResult] = useState<any>(null);
+  const [homeTab, setHomeTab] = useState<"monthly" | "today">("monthly");
+  const [staffViewTab, setStaffViewTab] = useState<"leaderboard" | "attach_builder" | "pc_zone">("leaderboard");
   const [tursoDatabase, setTursoDatabase] = useState<string | null>(null);
   const [tursoStats, setTursoStats] = useState<TursoHealthStats | null>(null);
   const [staffBaseCategories, setStaffBaseCategories] = useState<string[]>([
@@ -2568,6 +2754,33 @@ export default function App() {
     categoryMaster: [],
   });
 
+  const handleSyncSheets = async (kind?: string) => {
+    setIsSyncingSheets(true);
+    setUploadError(null);
+    setSyncResult(null);
+    try {
+      const url = kind ? `/api/sync-sheets?kind=${kind}` : "/api/sync-sheets";
+      const res = await fetch(url, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "ซิงก์ข้อมูลจาก Google Sheets ไม่สำเร็จ");
+      }
+      setSyncResult(data);
+      
+      const nextUploads = await fetchUploads();
+      setUploadedFiles(nextUploads);
+      
+      rebuildReport(nextUploads, { changedKinds: kind ? [kind as UploadKind] : undefined });
+      
+      const stats = await fetchTursoStats();
+      setTursoStats(stats);
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการซิงก์ข้อมูล");
+    } finally {
+      setIsSyncingSheets(false);
+    }
+  };
+
   const clearAllUploadData = async () => {
     const cleared = await clearAllUploads();
     try {
@@ -2850,6 +3063,32 @@ export default function App() {
                 transition={{ duration: 0.4, ease: "easeOut" }}
                 className="flex flex-col gap-6 w-full h-full"
               >
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-emerald-500/20 rounded-xl text-emerald-400 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)]">
+                      <TrendingUp className="w-5 h-5 animate-pulse" />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-bold tracking-tight text-white">Store Metrics Dashboard</h2>
+                      <p className="text-[10px] text-white/50 font-medium">สลับการแสดงผลภาพรวมเปรียบเทียบหรือข้อมูลสดวันนี้</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center bg-black/20 border border-white/5 rounded-xl p-1 text-xs font-semibold self-stretch md:self-auto justify-center">
+                    <button
+                      onClick={() => setHomeTab("monthly")}
+                      className={`px-4.5 py-2 rounded-lg transition-all duration-200 cursor-pointer ${homeTab === "monthly" ? "bg-emerald-500 text-white shadow-lg font-bold" : "text-white/60 hover:text-white"}`}
+                    >
+                      Monthly Performance (เดิม)
+                    </button>
+                    <button
+                      onClick={() => setHomeTab("today")}
+                      className={`px-4.5 py-2 rounded-lg transition-all duration-200 cursor-pointer ${homeTab === "today" ? "bg-emerald-500 text-white shadow-lg font-bold" : "text-white/60 hover:text-white"}`}
+                    >
+                      Today's Mission (ใหม่)
+                    </button>
+                  </div>
+                </div>
+
                 {isInitialLoading ? (
                   <div className="flex flex-col items-center justify-center min-h-[480px] bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)] p-12 text-center w-full my-auto">
                     <div className="relative w-16 h-16 mb-6">
@@ -2865,7 +3104,7 @@ export default function App() {
                       ระบบกำลังดึงข้อมูลและเตรียมรายงานสำหรับคุณ...
                     </p>
                   </div>
-                ) : (
+                ) : homeTab === "monthly" ? (
                   <>
                     {/* Dashboard Top Stats */}
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -3969,6 +4208,231 @@ export default function App() {
                       </div>
                     </div>
                   </>
+                ) : (
+                  <>
+                    {/* Today's Sales Dashboard Header / Stats */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {/* 1. Today's Revenue */}
+                      <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 p-5 shadow-[0_8px_32px_rgba(0,0,0,0.12)] flex flex-col justify-between hover:bg-white/[0.15] hover:border-emerald-500/25 hover:scale-[1.02] transition-all duration-300">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="p-2.5 bg-emerald-500/20 rounded-xl text-emerald-400 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)]">
+                            <DollarSign className="w-5 h-5" />
+                          </div>
+                          <div className="text-[10px] font-bold px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-300">
+                            LIVE • TODAY
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-white/50 mb-1">Today's Group Revenue</div>
+                          <div className="text-3xl font-black tracking-tight text-white">
+                            ฿{Math.round(todayStats.revenue).toLocaleString()}
+                          </div>
+                          <div className="text-[10px] text-white/40 mt-1">
+                            ข้อมูลล่าสุด: {todayStats.dateStr || "N/A"}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 2. Today's Achievement */}
+                      <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 p-5 shadow-[0_8px_32px_rgba(0,0,0,0.12)] flex flex-col justify-between hover:bg-white/[0.15] hover:border-amber-500/25 hover:scale-[1.02] transition-all duration-300">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="p-2.5 bg-amber-500/20 rounded-xl text-amber-400 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)]">
+                            <Target className="w-5 h-5 animate-pulse" />
+                          </div>
+                          <div className={`text-[10px] font-bold px-2.5 py-1 rounded ${todayStats.ach >= 100 ? "bg-emerald-500/20 text-emerald-300" : "bg-amber-500/20 text-amber-300"}`}>
+                            {todayStats.ach >= 100 ? "GOAL MET" : "RUNNING"}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-white/50 mb-1">Today's Achievement</div>
+                          <div className="text-3xl font-black tracking-tight text-amber-300">
+                            {todayStats.ach.toFixed(1)}%
+                          </div>
+                          <div className="text-[10px] text-white/40 mt-1">
+                            Daily Target: ฿{Math.round(todayStats.target).toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 3. Group MoM */}
+                      <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 p-5 shadow-[0_8px_32px_rgba(0,0,0,0.12)] flex flex-col justify-between hover:bg-white/[0.15] hover:border-blue-500/25 hover:scale-[1.02] transition-all duration-300">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="p-2.5 bg-blue-500/20 rounded-xl text-blue-400 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)]">
+                            <TrendingUp className="w-5 h-5" />
+                          </div>
+                          <div className={`text-[10px] font-bold px-2.5 py-1 rounded ${todayStats.mom >= 0 ? "bg-emerald-500/20 text-emerald-300" : "bg-red-500/20 text-red-300"}`}>
+                            {todayStats.mom >= 0 ? "GROWING" : "DECLINING"}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-white/50 mb-1">Group MoM Growth</div>
+                          <div className={`text-3xl font-black tracking-tight ${todayStats.mom >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                            {todayStats.mom >= 0 ? "+" : ""}{todayStats.mom.toFixed(1)}%
+                          </div>
+                          <div className="text-[10px] text-white/40 mt-1">เทียบผลงานเดือนที่แล้วในช่วงเดียวกัน</div>
+                        </div>
+                      </div>
+
+                      {/* 4. Group YoY */}
+                      <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 p-5 shadow-[0_8px_32px_rgba(0,0,0,0.12)] flex flex-col justify-between hover:bg-white/[0.15] hover:border-purple-500/25 hover:scale-[1.02] transition-all duration-300">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="p-2.5 bg-purple-500/20 rounded-xl text-purple-400 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)]">
+                            <Award className="w-5 h-5" />
+                          </div>
+                          <div className="text-[10px] font-bold px-2.5 py-1 rounded bg-teal-500/20 text-teal-300 animate-pulse">
+                            YTD YOY
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-white/50 mb-1">Group YoY Growth</div>
+                          <div className={`text-3xl font-black tracking-tight ${todayStats.yoy >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                            {todayStats.yoy >= 0 ? "+" : ""}{todayStats.yoy.toFixed(1)}%
+                          </div>
+                          <div className="text-[10px] text-white/40 mt-1">เทียบผลงานปีที่แล้วในช่วงเดียวกัน</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Category Velocity (Today's Mission) */}
+                    <div className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+                      <div className="flex justify-between items-center mb-5">
+                        <div>
+                          <h3 className="text-lg font-extrabold text-white tracking-tight flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                            Category Velocity (ยอดวันนี้รายหมวด)
+                          </h3>
+                          <p className="text-xs text-white/50 mt-1">อัตราความสำเร็จและยอดขายจริงประจำวันนี้ของแต่ละประเภทผลิตภัณฑ์</p>
+                        </div>
+                      </div>
+                      <div className="space-y-4">
+                        {todayStats.categories.map((item) => {
+                          const isTotal = item.name === "Grand Total";
+                          const percent = Math.min(item.ach, 140);
+                          const barColor = isTotal ? "from-amber-500 to-yellow-400" :
+                                           item.name === "iPhone" ? "from-rose-500 to-red-400" :
+                                           item.name === "Mac" ? "from-emerald-500 to-teal-400" :
+                                           item.name === "iPad" ? "from-blue-500 to-indigo-400" :
+                                           item.name === "Apple Watch" ? "from-purple-500 to-pink-400" : "from-teal-500 to-emerald-400";
+                          return (
+                            <div key={item.name} className={`p-4 rounded-2xl border transition-all duration-300 ${isTotal ? "bg-white/10 border-white/10" : "bg-white/5 border-white/5 hover:bg-white/[0.08]"}`}>
+                              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 mb-2.5">
+                                <div className="flex items-center gap-2.5">
+                                  <div className={`w-2.5 h-2.5 rounded-full ${
+                                    isTotal ? "bg-yellow-400 animate-pulse" :
+                                    item.name === "iPhone" ? "bg-rose-400" :
+                                    item.name === "Mac" ? "bg-emerald-400" :
+                                    item.name === "iPad" ? "bg-blue-400" :
+                                    item.name === "Apple Watch" ? "bg-purple-400" : "bg-teal-400"
+                                  }`}></div>
+                                  <span className={`text-sm font-bold tracking-tight ${isTotal ? "text-white text-base font-black" : "text-white/95"}`}>{item.name}</span>
+                                </div>
+                                <div className="flex items-center gap-4 text-xs font-semibold flex-wrap">
+                                  <span className="text-white/60">ยอดขายจริง: <strong className="text-white font-extrabold">฿{Math.round(item.actual).toLocaleString()}</strong></span>
+                                  {!isTotal && <span className="text-white/60">จำนวน: <strong className="text-white font-extrabold">{item.units} Units</strong></span>}
+                                  <span className="text-white/40">เป้าวัน: ฿{Math.round(item.target).toLocaleString()}</span>
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${item.ach >= 100 ? "bg-emerald-500/20 text-emerald-400" : "bg-white/10 text-white/70"}`}>{item.ach.toFixed(1)}%</span>
+                                </div>
+                              </div>
+                              <div className="w-full bg-white/10 rounded-full h-2.5 overflow-hidden border border-white/5 p-[1px]">
+                                <div 
+                                  className={`bg-gradient-to-r ${barColor} h-full rounded-full transition-all duration-500`}
+                                  style={{ width: `${percent}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Unit Ring & Device Mix Section */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                      <div className="lg:col-span-2 bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+                        <div className="flex items-center justify-between mb-5">
+                          <h3 className="text-lg font-bold tracking-tight text-white">Device Mix & Attach Ratios</h3>
+                          <span className="text-xs text-white/50">สัดส่วนสินค้าและอัตราการแนบอุปกรณ์วันนี้</span>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-4">
+                          <div className="rounded-2xl border border-white/5 bg-white/5 p-4 flex flex-col justify-between">
+                            <span className="text-xs font-bold text-white/40 uppercase tracking-widest block mb-4 border-b border-white/5 pb-2">Device Mix (สัดส่วนขายวันนี้)</span>
+                            <div className="space-y-4">
+                              {todayStats.categories.filter(c => c.name !== "Grand Total" && c.name !== "3rd Party").map((item) => {
+                                const totalCategorySum = todayStats.categories.filter(c => c.name !== "Grand Total").reduce((acc, c) => acc + c.actual, 0);
+                                const share = totalCategorySum ? (item.actual / totalCategorySum) * 100 : 0;
+                                return (
+                                  <div key={item.name} className="flex justify-between items-center text-xs">
+                                    <span className="text-white/80 font-semibold">{item.name}</span>
+                                    <span className="font-extrabold text-white text-right">{share.toFixed(1)}% ({item.units} Unit)</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          <div className="rounded-2xl border border-white/5 bg-white/5 p-4 flex flex-col justify-between">
+                            <span className="text-xs font-bold text-teal-400 uppercase tracking-widest block mb-4 border-b border-white/5 pb-2">iPhone Cross Attach Ratio (วันนี้)</span>
+                            <div className="space-y-4 text-xs text-white/70">
+                              {(() => {
+                                const iphones = todayStats.categories.find(c => c.name === "iPhone")?.units || 0;
+                                const ipads = todayStats.categories.find(c => c.name === "iPad")?.units || 0;
+                                const macs = todayStats.categories.find(c => c.name === "Mac")?.units || 0;
+                                const watches = todayStats.categories.find(c => c.name === "Apple Watch")?.units || 0;
+                                const btb = todayStats.categories.find(c => c.name === "BTB")?.units || 0;
+                                
+                                const getRatio = (val: number) => iphones > 0 ? (val / iphones) * 100 : 0;
+                                
+                                return (
+                                  <div className="space-y-3.5">
+                                    <div className="flex justify-between">
+                                      <span className="font-semibold text-white/80">iPad / iPhone</span>
+                                      <strong className="text-white font-extrabold">{getRatio(ipads).toFixed(1)}%</strong>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="font-semibold text-white/80">Mac / iPhone</span>
+                                      <strong className="text-white font-extrabold">{getRatio(macs).toFixed(1)}%</strong>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="font-semibold text-white/80">Apple Watch / iPhone</span>
+                                      <strong className="text-white font-extrabold">{getRatio(watches).toFixed(1)}%</strong>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="font-semibold text-white/80">BTB / iPhone</span>
+                                      <strong className="text-white font-extrabold">{getRatio(btb).toFixed(1)}%</strong>
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Quick Links / The Flash */}
+                      <div className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)] flex flex-col justify-between">
+                        <div>
+                          <h3 className="text-lg font-bold tracking-tight mb-4 text-white">Quick Links (The Flash)</h3>
+                          <div className="grid grid-cols-2 gap-2 text-center text-xs font-semibold">
+                            <a href="https://candy-five-pearl.vercel.app/" target="_blank" rel="noreferrer" className="p-3 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl block text-white/85 hover:text-white hover:border-emerald-400/30 hover:scale-[1.03] transition-all cursor-pointer">
+                              ASM Master
+                            </a>
+                            <a href="#reports" onClick={() => setCurrentView("reports")} className="p-3 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl block text-white/85 hover:text-white hover:border-emerald-400/30 hover:scale-[1.03] transition-all cursor-pointer">
+                              Sync Portal
+                            </a>
+                            <a href="#staff_overview" onClick={() => setCurrentView("staff_overview")} className="p-3 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl block text-white/85 hover:text-white hover:border-emerald-400/30 hover:scale-[1.03] transition-all cursor-pointer">
+                              Leaderboard
+                            </a>
+                            <a href="https://studio7thailand.com" target="_blank" rel="noreferrer" className="p-3 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl block text-white/85 hover:text-white hover:border-emerald-400/30 hover:scale-[1.03] transition-all cursor-pointer">
+                              Studio 7
+                            </a>
+                          </div>
+                        </div>
+                        <div className="mt-4 pt-3 border-t border-white/5 text-[10px] text-white/40 text-center">
+                          ASM MASTER Hybrid Data Hub v3.5
+                        </div>
+                      </div>
+                    </div>
+                  </>
                 )}
               </motion.div>
             )}
@@ -3982,18 +4446,41 @@ export default function App() {
                 transition={{ duration: 0.4, ease: "easeOut" }}
                 className="flex flex-col gap-6 w-full h-full"
               >
-                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-5 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)] relative z-20">
-                  <h2 className="text-xl font-bold tracking-tight">
-                    Staff Attach Rate Performance
-                  </h2>
-                  <p className="text-sm text-white/60 mt-1">
-                    Compare how well the team is attaching secondary products to
-                    main units
-                  </p>
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white/10 backdrop-blur-md rounded-2xl p-5 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)] relative z-20 animate-none">
+                  <div>
+                    <h2 className="text-xl font-bold tracking-tight text-white">
+                      Staff Attach Rate & PC Performance
+                    </h2>
+                    <p className="text-xs text-white/60 mt-1">
+                      วิเคราะห์เปรียบเทียบคะแนนแนบพนักงาน ยอดขายพีซี และแบรนด์อุปกรณ์เสริมภายนอก
+                    </p>
+                  </div>
+                  <div className="flex items-center bg-black/20 border border-white/5 rounded-xl p-1 text-xs font-semibold self-stretch md:self-auto justify-center">
+                    <button
+                      onClick={() => setStaffViewTab("leaderboard")}
+                      className={`px-3.5 py-2 rounded-lg transition-all duration-200 cursor-pointer ${staffViewTab === "leaderboard" ? "bg-emerald-500 text-white shadow-lg font-bold" : "text-white/60 hover:text-white"}`}
+                    >
+                      🏅 Staff Leaderboard
+                    </button>
+                    <button
+                      onClick={() => setStaffViewTab("attach_builder")}
+                      className={`px-3.5 py-2 rounded-lg transition-all duration-200 cursor-pointer ${staffViewTab === "attach_builder" ? "bg-emerald-500 text-white shadow-lg font-bold" : "text-white/60 hover:text-white"}`}
+                    >
+                      🛠️ Attach Builder (เดิม)
+                    </button>
+                    <button
+                      onClick={() => setStaffViewTab("pc_zone")}
+                      className={`px-3.5 py-2 rounded-lg transition-all duration-200 cursor-pointer ${staffViewTab === "pc_zone" ? "bg-emerald-500 text-white shadow-lg font-bold" : "text-white/60 hover:text-white"}`}
+                    >
+                      💼 PC Zone Performance
+                    </button>
+                  </div>
                 </div>
 
-                {/* Custom Attach Builder */}
-                <div className="relative z-40">
+                {staffViewTab === "attach_builder" ? (
+                  <>
+                    {/* Custom Attach Builder */}
+                    <div className="relative z-40">
                   <button
                     type="button"
                     onClick={() => setStaffBuilderOpen((v) => !v)}
@@ -4357,7 +4844,206 @@ export default function App() {
                       </tbody>
                     </table>
                   </div>
-                </div>
+                ) : staffViewTab === "pc_zone" ? (
+                  <>
+                    {/* PC Zone Distributor Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      {pcZoneStats.map((dist) => (
+                        <div key={dist.name} className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+                          <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-4">
+                            <div>
+                              <h4 className="text-base font-bold text-teal-300 tracking-tight">{dist.name}</h4>
+                              <span className="text-[10px] text-white/50">Accessories managed group</span>
+                            </div>
+                            <span className="text-xs bg-teal-500/20 text-teal-300 px-2 py-0.5 rounded font-extrabold">{dist.units} Units</span>
+                          </div>
+                          <div className="space-y-3.5">
+                            {dist.topBrands.length === 0 ? (
+                              <p className="text-xs text-white/40 text-center py-4">ไม่มีข้อมูลยอดขายในกลุ่มนี้</p>
+                            ) : (
+                              dist.topBrands.map((brand, idx) => (
+                                <div key={idx} className="flex justify-between items-center text-xs">
+                                  <span className="text-white/80 font-medium truncate max-w-[120px]">{idx + 1}. {brand.name}</span>
+                                  <span className="font-extrabold text-white">฿{Math.round(brand.revenue).toLocaleString()} ({brand.units} U)</span>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                          <div className="mt-4 pt-3 border-t border-white/5 flex justify-between items-center text-xs">
+                            <span className="text-white/40">Total Revenue</span>
+                            <span className="font-bold text-white">฿{Math.round(dist.revenue).toLocaleString()}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* 🏅 Staff Leaderboards Top 5 */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {/* Cover+ Leaderboard */}
+                      <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+                        <span className="text-xs font-bold text-white/50 uppercase tracking-widest block mb-3 border-b border-white/5 pb-2">🛡️ Cover+ tgt25%</span>
+                        <div className="space-y-2.5">
+                          {staffAttachMatrix
+                            .map((row) => ({ name: row.name, rate: row.rates["Cover+"] || 0 }))
+                            .sort((a, b) => b.rate - a.rate)
+                            .slice(0, 5)
+                            .map((p, idx) => (
+                              <div key={idx} className="flex justify-between items-center text-xs">
+                                <span className="text-white/80 font-medium truncate max-w-[120px]">
+                                  {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx + 1}`} {formatOfficerShortName(p.name)}
+                                </span>
+                                <span className={`font-bold ${p.rate >= 25 ? "text-emerald-400" : "text-white"}`}>
+                                  {Math.round(p.rate)}%
+                                </span>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+
+                      {/* AC+ Leaderboard */}
+                      <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+                        <span className="text-xs font-bold text-teal-400 uppercase tracking-widest block mb-3 border-b border-white/5 pb-2">🍎 AC+ tgt20%</span>
+                        <div className="space-y-2.5">
+                          {staffAttachMatrix
+                            .map((row) => ({ name: row.name, rate: row.rates["AC+"] || 0 }))
+                            .sort((a, b) => b.rate - a.rate)
+                            .slice(0, 5)
+                            .map((p, idx) => (
+                              <div key={idx} className="flex justify-between items-center text-xs">
+                                <span className="text-white/80 font-medium truncate max-w-[120px]">
+                                  {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx + 1}`} {formatOfficerShortName(p.name)}
+                                </span>
+                                <span className={`font-bold ${p.rate >= 20 ? "text-emerald-400" : "text-white"}`}>
+                                  {Math.round(p.rate)}%
+                                </span>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+
+                      {/* Pencil Leaderboard */}
+                      <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+                        <span className="text-xs font-bold text-purple-400 uppercase tracking-widest block mb-3 border-b border-white/5 pb-2">✏️ Pencil tgt85%</span>
+                        <div className="space-y-2.5">
+                          {staffAttachMatrix
+                            .map((row) => ({ name: row.name, rate: row.rates["Pencil"] || 0 }))
+                            .sort((a, b) => b.rate - a.rate)
+                            .slice(0, 5)
+                            .map((p, idx) => (
+                              <div key={idx} className="flex justify-between items-center text-xs">
+                                <span className="text-white/80 font-medium truncate max-w-[120px]">
+                                  {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx + 1}`} {formatOfficerShortName(p.name)}
+                                </span>
+                                <span className={`font-bold ${p.rate >= 85 ? "text-emerald-400" : "text-white"}`}>
+                                  {Math.round(p.rate)}%
+                                </span>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+
+                      {/* Case Leaderboard */}
+                      <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+                        <span className="text-xs font-bold text-pink-400 uppercase tracking-widest block mb-3 border-b border-white/5 pb-2">📱 Case tgt60%</span>
+                        <div className="space-y-2.5">
+                          {staffAttachMatrix
+                            .map((row) => ({ name: row.name, rate: row.rates["Case"] || 0 }))
+                            .sort((a, b) => b.rate - a.rate)
+                            .slice(0, 5)
+                            .map((p, idx) => (
+                              <div key={idx} className="flex justify-between items-center text-xs">
+                                <span className="text-white/80 font-medium truncate max-w-[120px]">
+                                  {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx + 1}`} {formatOfficerShortName(p.name)}
+                                </span>
+                                <span className={`font-bold ${p.rate >= 60 ? "text-emerald-400" : "text-white"}`}>
+                                  {Math.round(p.rate)}%
+                                </span>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Staff Performance Matrix Table */}
+                    <div className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)] overflow-hidden">
+                      <div className="flex justify-between items-center mb-5">
+                        <h3 className="text-base font-bold text-white tracking-tight">ตารางเปรียบเทียบผลงานพนักงาน (Staff Performance Matrix)</h3>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs border-collapse">
+                          <thead>
+                            <tr className="border-b border-white/10 text-white/50">
+                              <th className="py-3 pr-4 font-bold text-center">#</th>
+                              <th className="py-3 px-3 font-bold">Staff</th>
+                              <th className="py-3 px-3 font-bold text-right">Target</th>
+                              <th className="py-3 px-3 font-bold text-right">Actual</th>
+                              <th className="py-3 px-3 font-bold text-center">Ach%</th>
+                              <th className="py-3 px-3 font-bold text-right">Forecast</th>
+                              <th className="py-3 px-3 font-bold text-center">C+ (25%)</th>
+                              <th className="py-3 px-3 font-bold text-center">AC+ (20%)</th>
+                              <th className="py-3 px-3 font-bold text-center">Pen (85%)</th>
+                              <th className="py-3 px-3 font-bold text-center">Case (60%)</th>
+                              <th className="py-3 px-3 font-bold text-center">SIM</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {staffAttachMatrix.map((staff, idx) => {
+                              const officerState = parsedReport.officers.find(o => matchesOfficer(o.name, staff.name));
+                              const target = officerState?.target || 0;
+                              const actual = officerState?.actual || 0;
+                              const achPercent = officerState?.achPercent || 0;
+                              const forecast = officerState?.forecast || 0;
+                              
+                              const coverPlusRate = Math.round(staff.rates["Cover+"] || 0);
+                              const acRate = Math.round(staff.rates["AC+"] || 0);
+                              const penRate = Math.round(staff.rates["Pencil"] || 0);
+                              const caseRate = Math.round(staff.rates["Case"] || 0);
+                              const simUnits = staff.units["SIM"] || 0;
+                              
+                              const rankEmoji = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx + 1}`;
+                              
+                              return (
+                                <tr key={staff.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                                  <td className="py-3.5 pr-4 text-center font-bold text-sm">{rankEmoji}</td>
+                                  <td className="py-3.5 px-3">
+                                    <div className="font-semibold text-white/95">{staff.name}</div>
+                                    <div className="text-[10px] text-white/45">ID: {staff.staffId} • {staff.branch || "Unknown Branch"}</div>
+                                  </td>
+                                  <td className="py-3.5 px-3 text-right font-medium text-white/70">฿{Math.round(target).toLocaleString()}</td>
+                                  <td className="py-3.5 px-3 text-right font-bold text-white">฿{Math.round(actual).toLocaleString()}</td>
+                                  <td className="py-3.5 px-3 text-center">
+                                    <span className={`px-2 py-0.5 rounded font-bold text-[10px] ${achPercent >= 100 ? "bg-emerald-500/20 text-emerald-400" : "bg-white/10 text-white/70"}`}>
+                                      {achPercent.toFixed(1)}%
+                                    </span>
+                                  </td>
+                                  <td className="py-3.5 px-3 text-right font-medium text-white/60">฿{Math.round(forecast).toLocaleString()}</td>
+                                  
+                                  <td className="py-3.5 px-3 text-center">
+                                    <span className={`font-semibold ${coverPlusRate >= 25 ? "text-emerald-400" : "text-white/60"}`}>{coverPlusRate}%</span>
+                                  </td>
+                                  <td className="py-3.5 px-3 text-center">
+                                    <span className={`font-semibold ${acRate >= 20 ? "text-emerald-400" : "text-white/60"}`}>{acRate}%</span>
+                                  </td>
+                                  <td className="py-3.5 px-3 text-center">
+                                    <span className={`font-semibold ${penRate >= 85 ? "text-emerald-400" : "text-white/60"}`}>{penRate}%</span>
+                                  </td>
+                                  <td className="py-3.5 px-3 text-center">
+                                    <span className={`font-semibold ${caseRate >= 60 ? "text-emerald-400" : "text-white/60"}`}>{caseRate}%</span>
+                                  </td>
+                                  <td className="py-3.5 px-3 text-center">
+                                    <span className="font-bold text-teal-300">{simUnits} Unit</span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </>
+                )}
               </motion.div>
             )}
 
@@ -5088,6 +5774,7 @@ export default function App() {
                 transition={{ duration: 0.4, ease: "easeOut" }}
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
+                <div className="text-xs font-semibold tracking-wider text-white/45 uppercase mb-1">Option A: Manual Excel Upload (.xlsx) • ระบบสำรองแมนนวล</div>
                 <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
                   {(["target", "current", "lastMonth", "lastYear", "categoryMaster"] as UploadKind[]).map((kind) => {
                     const fileCount = uploadedFiles[kind].length;
@@ -5110,6 +5797,74 @@ export default function App() {
                       </label>
                     );
                   })}
+                </div>
+
+                <div className="text-xs font-semibold tracking-wider text-teal-400/80 uppercase mt-2 mb-1">Option B: Google Sheets Live Sync • ระบบดึงสดแบบพรีเมียม</div>
+                <div className="bg-white/10 backdrop-blur-md rounded-[2rem] p-6 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+                  <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-teal-500/20 rounded-xl text-teal-400 shrink-0 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)]">
+                        <Activity className={`w-6 h-6 ${isSyncingSheets ? "animate-pulse" : ""}`} />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold tracking-tight text-white">Live Data Synchronization</h3>
+                        <p className="text-xs text-white/60 mt-0.5">
+                          ดึงข้อมูลและยอดขายล่าสุดแบบเรียลไทม์จาก Google Sheets ของ ASM MASTER บันทึกลงฐานข้อมูล Turso DB
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <button
+                      type="button"
+                      disabled={isSyncingSheets}
+                      onClick={() => handleSyncSheets()}
+                      className={`rounded-xl px-5 py-3 font-semibold text-xs transition-all duration-300 shadow-lg flex items-center gap-2 shrink-0 ${
+                        isSyncingSheets
+                          ? "bg-teal-600/30 border border-teal-500/20 text-teal-300 cursor-not-allowed"
+                          : "bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white shadow-teal-500/25 hover:shadow-teal-400/30 hover:scale-[1.02] active:scale-98 cursor-pointer"
+                      }`}
+                    >
+                      {isSyncingSheets ? (
+                        <>
+                          <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                          <span>กำลังดึงข้อมูล...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Rocket className="w-3.5 h-3.5" />
+                          <span>ซิงก์ข้อมูลทั้งหมด (Live Sync)</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mt-5">
+                    {(["target", "current", "lastMonth", "lastYear", "categoryMaster"] as UploadKind[]).map((kind) => {
+                      const label = kind.replace(/([A-Z])/g, " $1");
+                      const rowCount = uploadedFiles[kind].length;
+                      const isLoaded = rowCount > 0;
+                      return (
+                        <div key={kind} className={`rounded-2xl border p-4 flex flex-col justify-between min-h-[90px] transition-all bg-white/5 ${isLoaded ? "border-teal-500/25 bg-teal-500/[0.02]" : "border-white/5"}`}>
+                          <div className="flex justify-between items-start">
+                            <span className="text-[10px] font-bold text-white/50 uppercase tracking-wider">{label}</span>
+                            <span className={`w-2 h-2 rounded-full ${isLoaded ? "bg-teal-400 animate-pulse shadow-[0_0_8px_#2dd4bf]" : "bg-white/10"}`}></span>
+                          </div>
+                          <div className="mt-2.5 flex items-end justify-between">
+                            <div className="text-[11px] font-extrabold text-white">
+                              {isLoaded ? `${rowCount.toLocaleString()} rows` : "No data"}
+                            </div>
+                            <button
+                              onClick={() => handleSyncSheets(kind)}
+                              disabled={isSyncingSheets}
+                              className="text-[9px] bg-white/5 border border-white/10 hover:bg-white/10 hover:border-teal-400/30 active:bg-white/15 rounded px-2.5 py-1.5 text-white font-medium transition-all cursor-pointer"
+                            >
+                              Sync
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/70">
