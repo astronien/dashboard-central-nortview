@@ -2759,13 +2759,34 @@ export default function App() {
     setUploadError(null);
     setSyncResult(null);
     try {
-      const url = kind ? `/api/sync-sheets?kind=${kind}` : "/api/sync-sheets";
-      const res = await fetch(url, { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "ซิงก์ข้อมูลจาก Google Sheets ไม่สำเร็จ");
+      const kindsToSync: UploadKind[] = kind 
+        ? [kind as UploadKind] 
+        : ["target", "categoryMaster", "current", "lastMonth", "lastYear"];
+        
+      let combinedSummary: Record<string, number> = {};
+      let combinedErrors: any[] = [];
+      
+      for (const k of kindsToSync) {
+        const url = `/api/sync-sheets?kind=${k}`;
+        const res = await fetch(url, { method: "POST" });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || `ซิงก์ข้อมูล ${k} ไม่สำเร็จ`);
+        }
+        if (data.summary) {
+          combinedSummary = { ...combinedSummary, ...data.summary };
+        }
+        if (data.errors) {
+          combinedErrors = [...combinedErrors, ...data.errors];
+        }
       }
-      setSyncResult(data);
+      
+      setSyncResult({
+        ok: true,
+        message: "Sync completed.",
+        summary: combinedSummary,
+        errors: combinedErrors.length ? combinedErrors : undefined
+      });
       
       const nextUploads = await fetchUploads();
       setUploadedFiles(nextUploads);
