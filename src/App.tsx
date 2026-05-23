@@ -1356,6 +1356,23 @@ export default function App() {
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isSyncingSheets, setIsSyncingSheets] = useState(false);
   const [syncResult, setSyncResult] = useState<any>(null);
+  const [selectedBranch, setSelectedBranch] = useState<string>(() => {
+    try {
+      return window.localStorage.getItem("dashboard-selected-branch") || "Mega Bangna";
+    } catch {
+      return "Mega Bangna";
+    }
+  });
+
+  const handleBranchChange = (newBranch: string) => {
+    setSelectedBranch(newBranch);
+    try {
+      window.localStorage.setItem("dashboard-selected-branch", newBranch);
+    } catch {
+      // ignore
+    }
+  };
+
   const [homeTab, setHomeTab] = useState<"monthly" | "today">("monthly");
   const [staffViewTab, setStaffViewTab] = useState<"leaderboard" | "attach_builder" | "pc_zone">("leaderboard");
   const [tursoDatabase, setTursoDatabase] = useState<string | null>(null);
@@ -2452,20 +2469,22 @@ export default function App() {
   ]);
 
   const parsedStoreHeader = useMemo(() => {
-    const branchLabel = parsedReport.branches[0]?.label || "";
-    if (!branchLabel) {
-      return {
-        name: "iStudio Mega Bangna",
-        id: "10452",
-      };
-    }
-
+    const cleanBranch = selectedBranch.replace(/^(istudio|istudio by spvi|spvi)\s*/i, "").trim();
+    
+    const matchedBranch = parsedReport.branches.find(b => {
+      const bNorm = b.label.toLowerCase().replace(/[^a-z0-9ก-๙]/gi, "");
+      const cNorm = cleanBranch.toLowerCase().replace(/[^a-z0-9ก-๙]/gi, "");
+      return bNorm.includes(cNorm) || cNorm.includes(bNorm);
+    });
+    
+    const branchLabel = matchedBranch?.label || selectedBranch;
+    
     if (branchLabel.includes(":")) {
       const parts = branchLabel.split(":");
       const idPart = parts[0].replace(/ID/i, "").trim();
       const namePart = parts[1].trim();
       return {
-        name: namePart,
+        name: namePart.startsWith("iStudio") || namePart.startsWith("Studio 7") ? namePart : `iStudio ${namePart}`,
         id: idPart,
       };
     }
@@ -2476,7 +2495,7 @@ export default function App() {
         : `iStudio ${branchLabel}`,
       id: "10452",
     };
-  }, [parsedReport.branches]);
+  }, [parsedReport.branches, selectedBranch]);
 
   const attachOverviewRows = useMemo<AttachMatrixDisplayRow[]>(() => {
     const selectedOfficerSet = selectedAttachOfficers.length
@@ -5680,6 +5699,52 @@ export default function App() {
                 transition={{ duration: 0.4, ease: "easeOut" }}
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
+                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-emerald-500/20 rounded-xl text-emerald-400">
+                      <Building2 className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold tracking-tight">เลือกสาขาประจำแดชบอร์ด</h2>
+                      <p className="text-sm text-white/60 mt-1">
+                        เลือกสาขาประจำร้านของคุณ เมื่อทำการกดดึงข้อมูลสด (Live Sync) ระบบจะดึงและบันทึกข้อมูลเฉพาะของสาขานี้เพื่อความรวดเร็ว
+                      </p>
+                    </div>
+                  </div>
+                  <div className="w-full lg:w-72 shrink-0">
+                    <select
+                      value={selectedBranch}
+                      onChange={(e) => handleBranchChange(e.target.value)}
+                      className="w-full bg-[#051710] border border-white/15 rounded-xl px-4 py-3 text-white text-sm font-semibold focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400 transition-all cursor-pointer shadow-lg"
+                    >
+                      {[
+                        "Mega Bangna",
+                        "Central World",
+                        "Central Rama 9",
+                        "Iconsiam",
+                        "Central Phitsanulok",
+                        "Central Plaza Rayong",
+                        "Central Chiangmai Airport",
+                        "Central Plaza Westgate",
+                        ...staffBranchesList.filter(b => b !== "All Branches" && ![
+                          "Mega Bangna",
+                          "Central World",
+                          "Central Rama 9",
+                          "Iconsiam",
+                          "Central Phitsanulok",
+                          "Central Plaza Rayong",
+                          "Central Chiangmai Airport",
+                          "Central Plaza Westgate"
+                        ].some(def => b.toLowerCase().includes(def.toLowerCase())))
+                      ].map((br) => (
+                        <option key={br} value={br} className="bg-[#051710] text-white">
+                          {br.startsWith("iStudio") || br.startsWith("Studio 7") ? br : `iStudio ${br}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
                 <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
                   <div className="flex items-center gap-4">
                     <div className="p-3 bg-emerald-500/20 rounded-xl text-emerald-400">
