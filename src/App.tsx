@@ -1051,12 +1051,49 @@ const fallbackReport: ParsedReport = {
   ],
 };
 
+type CategoryPerformanceRow = {
+  category: string;
+  target: number;
+  actual: number;
+  achPercent: number;
+  forecast: number;
+  forecastPercent: number;
+  lastMonth: number;
+  momPercent: number | string;
+  lastYear: number;
+  yoyPercent: number | string;
+  targetDay: number;
+  actualDay: number;
+  diffDay: number;
+  achDayPercent: number;
+};
+
+const getCategoryForSalesRow = (row: RawRow): string => {
+  const cat = String(row["Category (Name)"] ?? row.category_name ?? row.Category ?? "").trim();
+  const sub = String(row["Sub Category"] ?? row.sub_category ?? row.SubCategory ?? "").trim();
+  const prod = String(row["Product (Name)"] ?? row.product_name ?? row.Product ?? "").trim();
+  
+  const text = normalizeText(`${cat} ${sub} ${prod}`);
+  
+  if (text.includes("iphone")) return "iPhone";
+  if (text.includes("mac") || text.includes("macbook") || text.includes("imac") || text.includes("desktop") || text.includes("notebook")) return "Mac";
+  if (text.includes("ipad")) return "iPad";
+  if (text.includes("watch")) return "Apple Watch";
+  if (text.includes("sim")) return "SIM";
+  
+  if (text.includes("btb apple") || text.includes("btb(apple)")) return "BTB(Apple)";
+  if (text.includes("btb") || text.includes("business") || text.includes("accessory") || text.includes("apple acc") || text.includes("care") || text.includes("service") || text.includes("insurance") || text.includes("smile")) return "BTB";
+  
+  return "Other";
+};
+
 const emptyReport: ParsedReport = {
   fileName: "",
   branches: [],
   categories: [],
   officers: [],
 };
+
 
 export default function App() {
   const [currentView, setCurrentView] = useState<
@@ -1278,6 +1315,196 @@ export default function App() {
     if (lower.includes("btb")) return "Corporate Sales Spec.";
     return `${maxCat} Specialist`;
   }, [uploadedFiles.current, activeOfficer, activeStaffId, currentStaff]);
+
+  const activeOfficerCategoryPerformance = useMemo<CategoryPerformanceRow[]>(() => {
+    if (!activeOfficer) return [];
+    
+    const categoriesList = ["Mac", "iPad", "iPhone", "Apple Watch", "BTB", "BTB(Apple)"];
+    const hasData = uploadedFiles.current.length > 0;
+    
+    // 1. Get currentDay and totalDays
+    let currentDay = 22;
+    let totalDays = 31;
+    parsedReport.branches.forEach((b) => {
+      currentDay = Math.max(currentDay, b.currentDay || 22);
+      totalDays = Math.max(totalDays, b.totalDays || 31);
+    });
+    
+    // 2. Find max date in currentRows for daily actual calculation
+    let maxDateStr = "";
+    let maxDateTime = 0;
+    if (hasData) {
+      uploadedFiles.current.forEach((row) => {
+        const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
+        if (!rawDate) return;
+        const parsed = Date.parse(rawDate.replace(/^\S+\.\s*/, ""));
+        if (parsed && parsed > maxDateTime) {
+          maxDateTime = parsed;
+          maxDateStr = rawDate;
+        }
+      });
+    }
+    
+    // 3. For each category, compute target, actual, forecast, lastMonth, lastYear, actualDay
+    const rows: CategoryPerformanceRow[] = categoriesList.map((catName) => {
+      let target = 0;
+      let actual = 0;
+      let lastMonth = 0;
+      let lastYear = 0;
+      let actualDay = 0;
+      
+      if (hasData) {
+        // Sum Target
+        const targetRow = uploadedFiles.target.find((row) => {
+          const name = `${row.NAME ?? ""} ${row.SURNAME ?? ""}`.trim();
+          return matchesOfficer(name, activeOfficer.name);
+        });
+        if (targetRow) {
+          const catKey = catName === "BTB(Apple)" ? "BTB(Apple)" : catName;
+          target = toNumber(targetRow[catKey] ?? targetRow[catKey.toLowerCase()]);
+        }
+        
+        // Sum Actuals
+        uploadedFiles.current.forEach((row) => {
+          const officer = String(row["Officer (Name)"] ?? "").trim();
+          if (matchesOfficer(officer, activeOfficer.name)) {
+            const rowCat = getCategoryForSalesRow(row);
+            if (rowCat === catName) {
+              actual += getCategoryValue(row);
+              
+              // Check if daily
+              const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
+              const parsed = Date.parse(rawDate.replace(/^\S+\.\s*/, ""));
+              if ((maxDateStr && rawDate === maxDateStr) || (parsed && parsed === maxDateTime)) {
+                actualDay += getCategoryValue(row);
+              }
+            }
+          }
+        });
+        
+        // Sum Last Month Actuals
+        uploadedFiles.lastMonth.forEach((row) => {
+          const officer = String(row["Officer (Name)"] ?? "").trim();
+          if (matchesOfficer(officer, activeOfficer.name)) {
+            const rowCat = getCategoryForSalesRow(row);
+            if (rowCat === catName) {
+              lastMonth += getCategoryValue(row);
+            }
+          }
+        });
+        
+        // Sum Last Year Actuals
+        uploadedFiles.lastYear.forEach((row) => {
+          const officer = String(row["Officer (Name)"] ?? "").trim();
+          if (matchesOfficer(officer, activeOfficer.name)) {
+            const rowCat = getCategoryForSalesRow(row);
+            if (rowCat === catName) {
+              lastYear += getCategoryValue(row);
+            }
+          }
+        });
+      } else {
+        // Fallback/Mock distribution matching activeOfficer total values!
+        const targetRates: Record<string, number> = {
+          "iPhone": 0.54,
+          "Mac": 0.11,
+          "iPad": 0.18,
+          "Apple Watch": 0.05,
+          "BTB(Apple)": 0.07,
+          "BTB": 0.05,
+        };
+        const actualRates: Record<string, number> = {
+          "iPhone": 0.53,
+          "Mac": 0.10,
+          "iPad": 0.20,
+          "Apple Watch": 0.05,
+          "BTB(Apple)": 0.07,
+          "BTB": 0.05,
+        };
+        
+        target = Math.round(activeOfficer.target * (targetRates[catName] ?? 0.1));
+        actual = Math.round(activeOfficer.actual * (actualRates[catName] ?? 0.1));
+        lastMonth = 0;
+        lastYear = 0;
+        actualDay = Math.round(activeOfficer.actualDay * (actualRates[catName] ?? 0.1));
+      }
+      
+      const achPercent = target ? (actual / target) * 100 : 0;
+      const forecast = currentDay ? Math.round((actual / currentDay) * totalDays) : actual;
+      const forecastPercent = target ? (forecast / target) * 100 : 0;
+      
+      let momPercent: number | string = "New";
+      if (lastMonth > 0) {
+        momPercent = ((actual - lastMonth) / lastMonth) * 100;
+      }
+      
+      let yoyPercent: number | string = "New";
+      if (lastYear > 0) {
+        yoyPercent = ((actual - lastYear) / lastYear) * 100;
+      }
+      
+      const targetDay = Math.round(target / (totalDays || 30));
+      const diffDay = actualDay - targetDay;
+      const achDayPercent = targetDay ? (actualDay / targetDay) * 100 : 0;
+      
+      return {
+        category: catName,
+        target,
+        actual,
+        achPercent,
+        forecast,
+        forecastPercent,
+        lastMonth,
+        momPercent,
+        lastYear,
+        yoyPercent,
+        targetDay,
+        actualDay,
+        diffDay,
+        achDayPercent,
+      };
+    });
+    
+    // 4. Calculate Total row
+    const totalTarget = rows.reduce((s, r) => s + r.target, 0);
+    const totalActual = rows.reduce((s, r) => s + r.actual, 0);
+    const totalAchPercent = totalTarget ? (totalActual / totalTarget) * 100 : 0;
+    const totalForecast = rows.reduce((s, r) => s + r.forecast, 0);
+    const totalForecastPercent = totalTarget ? (totalForecast / totalTarget) * 100 : 0;
+    const totalLastMonth = rows.reduce((s, r) => s + r.lastMonth, 0);
+    let totalMomPercent: number | string = "New";
+    if (totalLastMonth > 0) {
+      totalMomPercent = ((totalActual - totalLastMonth) / totalLastMonth) * 100;
+    }
+    const totalLastYear = rows.reduce((s, r) => s + r.lastYear, 0);
+    let totalYoyPercent: number | string = "New";
+    if (totalLastYear > 0) {
+      totalYoyPercent = ((totalActual - totalLastYear) / totalLastYear) * 100;
+    }
+    const totalTargetDay = rows.reduce((s, r) => s + r.targetDay, 0);
+    const totalActualDay = rows.reduce((s, r) => s + r.actualDay, 0);
+    const totalDiffDay = totalActualDay - totalTargetDay;
+    const totalAchDayPercent = totalTargetDay ? (totalActualDay / totalTargetDay) * 100 : 0;
+    
+    const totalRow: CategoryPerformanceRow = {
+      category: "Total",
+      target: totalTarget,
+      actual: totalActual,
+      achPercent: totalAchPercent,
+      forecast: totalForecast,
+      forecastPercent: totalForecastPercent,
+      lastMonth: totalLastMonth,
+      momPercent: totalMomPercent,
+      lastYear: totalLastYear,
+      yoyPercent: totalYoyPercent,
+      targetDay: totalTargetDay,
+      actualDay: totalActualDay,
+      diffDay: totalDiffDay,
+      achDayPercent: totalAchDayPercent,
+    };
+    
+    return [...rows, totalRow];
+  }, [activeOfficer, uploadedFiles, parsedReport]);
 
   const staffRoster = useMemo(
     () => buildStaffRoster(uploadedFiles.target, parsedReport.officers, cleanOfficerName),
@@ -4159,73 +4386,106 @@ export default function App() {
 
                 {/* BOTTOM HALF: Tables */}
                 <div className="relative z-40 flex flex-col lg:flex-row gap-6 min-h-[260px]">
-                  {/* Recent Customer Interactions */}
-                  <div className="lg:w-2/3 bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-6 flex flex-col shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
-                    <div className="flex justify-between items-center mb-6">
-                      <h2 className="text-lg font-semibold tracking-tight">
-                        {activeStat === "sales" &&
-                          "Recent Customer Interactions"}
-                        {activeStat === "csat" && "Recent Customer Feedback"}
-                        {activeStat === "target" &&
-                          "Recent Target Achievements"}
-                      </h2>
-                      <button className="text-sm text-white/60 hover:text-white flex items-center gap-1 transition-colors">
-                        By Date <ChevronDown className="w-4 h-4" />
-                      </button>
+                  {/* Category Performance vs. Target */}
+                  <div className="lg:w-2/3 bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-6 flex flex-col shadow-[0_8px_32px_rgba(0,0,0,0.12)] overflow-hidden">
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="p-2 bg-emerald-500/20 rounded-xl border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+                        <TrendingUp className="w-4 h-4 text-emerald-400" />
+                      </div>
+                      <div>
+                        <h2 className="text-base font-bold tracking-tight text-white">
+                          Category Performance vs. Target
+                        </h2>
+                        <p className="text-[10px] text-white/50">
+                          Performance breakdown for {activeOfficer?.name ?? currentStaff.name} by product category
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex-1 overflow-auto -mx-2 px-2">
-                      <table className="w-full text-left text-[13px] border-separate border-spacing-y-2">
+                    
+                    <div className="flex-1 overflow-x-auto rounded-xl border border-emerald-500/10">
+                      <table className="w-full text-left border-collapse text-[11px]">
                         <thead>
-                          <tr className="text-white/50 border-b border-white/10">
-                            <th className="pb-3 px-3 font-medium">Date</th>
-                            <th className="pb-3 px-3 font-medium">
-                              Customer Type
-                            </th>
-                            <th className="pb-3 px-3 font-medium">
-                              Product Focus
-                            </th>
-                            <th className="pb-3 px-3 font-medium">Status</th>
-                            <th className="pb-3 px-3 font-medium text-right">
-                              Value (THB)
-                            </th>
+                          <tr className="bg-[#0c3123] border-b border-emerald-500/20 text-white/90">
+                            <th className="py-2.5 px-3 font-bold uppercase tracking-wider">Group Category</th>
+                            <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Target</th>
+                            <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Actual</th>
+                            <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-center">Ach. %</th>
+                            <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Forecast</th>
+                            <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-center">%Forecast</th>
+                            <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Last Month</th>
+                            <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-center">% MoM</th>
+                            <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Last Year</th>
+                            <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-center">% YoY</th>
+                            <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Target Day</th>
+                            <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Actual Day</th>
+                            <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Diff Day</th>
+                            <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-center">% Ach Day</th>
                           </tr>
                         </thead>
-                        <tbody className="text-white/90">
-                          {activeOfficerInteractions[activeStat].map(
-                            (interaction, idx) => (
-                              <tr
-                                key={idx}
-                                className={
-                                  idx === 1
-                                    ? "bg-white/[0.04] hover:bg-white/[0.06] transition-colors rounded-xl border border-white/5 shadow-sm"
-                                    : "bg-white/0 hover:bg-white/5 transition-colors group rounded-xl"
-                                }
+                        <tbody className="divide-y divide-emerald-500/10 bg-[#052b20]/60">
+                          {activeOfficerCategoryPerformance.map((row, idx) => {
+                            const isTotal = row.category === "Total";
+                            const fmtNum = (val: number) => val.toLocaleString();
+                            const fmtPct = (val: number) => `${val.toFixed(2)}%`;
+                            
+                            const getBadgeClass = (rate: number) => {
+                              if (rate >= 100) return "bg-green-500/20 text-green-400 font-extrabold px-1.5 py-0.5 rounded border border-green-500/20";
+                              if (rate >= 80) return "bg-amber-500/20 text-amber-400 font-extrabold px-1.5 py-0.5 rounded border border-amber-500/20";
+                              return "bg-rose-500/20 text-rose-400 font-extrabold px-1.5 py-0.5 rounded border border-rose-500/20";
+                            };
+
+                            const getDiffClass = (diff: number) => {
+                              if (diff > 0) return "text-green-400 font-bold";
+                              if (diff === 0) return "text-white/60";
+                              return "text-rose-400 font-bold";
+                            };
+
+                            return (
+                              <tr 
+                                key={idx} 
+                                className={`hover:bg-white/5 transition-colors duration-150 text-white/90 ${isTotal ? "bg-[#0c3123]/90 font-bold border-t border-emerald-500/30" : ""}`}
                               >
-                                <td
-                                  className={`py-2.5 px-3 rounded-l-xl ${idx === 1 ? "text-white" : ""}`}
-                                >
-                                  {interaction.date}
+                                <td className="py-2.5 px-3 font-bold">{row.category}</td>
+                                <td className={`py-2.5 px-3 text-right ${isTotal ? "text-white" : "text-white/60"}`}>{fmtNum(row.target)}</td>
+                                <td className="py-2.5 px-3 text-right font-bold">{fmtNum(row.actual)}</td>
+                                <td className="py-2.5 px-3 text-center">
+                                  <span className={getBadgeClass(row.achPercent)}>
+                                    {fmtPct(row.achPercent)}
+                                  </span>
                                 </td>
-                                <td
-                                  className={`py-2.5 px-3 flex items-center gap-2 ${idx === 1 ? "" : "text-white"}`}
-                                >
-                                  {getIcon(interaction.typeIcon)}{" "}
-                                  {interaction.type}
+                                <td className={`py-2.5 px-3 text-right ${isTotal ? "text-white" : "text-white/60"}`}>{fmtNum(row.forecast)}</td>
+                                <td className="py-2.5 px-3 text-center">
+                                  <span className={getBadgeClass(row.forecastPercent)}>
+                                    {fmtPct(row.forecastPercent)}
+                                  </span>
                                 </td>
-                                <td className="py-2.5 px-3 text-white/80">
-                                  {interaction.product}
+                                <td className="py-2.5 px-3 text-right text-white/50">{fmtNum(row.lastMonth)}</td>
+                                <td className="py-2.5 px-3 text-center">
+                                  <span className={row.momPercent === "New" ? "text-emerald-400 font-bold" : "text-white/80"}>
+                                    {typeof row.momPercent === "number" ? fmtPct(row.momPercent) : row.momPercent}
+                                  </span>
                                 </td>
-                                <td
-                                  className={`py-2.5 px-3 ${getStatusColor(interaction.status)}`}
-                                >
-                                  {interaction.status}
+                                <td className="py-2.5 px-3 text-right text-white/50">{fmtNum(row.lastYear)}</td>
+                                <td className="py-2.5 px-3 text-center">
+                                  <span className={row.yoyPercent === "New" ? "text-emerald-400 font-bold" : "text-white/80"}>
+                                    {typeof row.yoyPercent === "number" ? fmtPct(row.yoyPercent) : row.yoyPercent}
+                                  </span>
                                 </td>
-                                <td className="py-2.5 px-3 text-right rounded-r-xl font-medium">
-                                  {interaction.value}
+                                <td className={`py-2.5 px-3 text-right ${isTotal ? "text-white" : "text-white/60"}`}>{fmtNum(row.targetDay)}</td>
+                                <td className="py-2.5 px-3 text-right font-bold">{fmtNum(row.actualDay)}</td>
+                                <td className="py-2.5 px-3 text-right">
+                                  <span className={getDiffClass(row.diffDay)}>
+                                    {row.diffDay > 0 ? `+${fmtNum(row.diffDay)}` : fmtNum(row.diffDay)}
+                                  </span>
+                                </td>
+                                <td className="py-2.5 px-3 text-center">
+                                  <span className={getBadgeClass(row.achDayPercent)}>
+                                    {fmtPct(row.achDayPercent)}
+                                  </span>
                                 </td>
                               </tr>
-                            ),
-                          )}
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
