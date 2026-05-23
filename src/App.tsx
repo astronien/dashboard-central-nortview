@@ -4844,7 +4844,9 @@ export default function App() {
                       </tbody>
                     </table>
                   </div>
-                ) : staffViewTab === "pc_zone" ? (
+                </div>
+              </>
+            ) : staffViewTab === "pc_zone" ? (
                   <>
                     {/* PC Zone Distributor Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
