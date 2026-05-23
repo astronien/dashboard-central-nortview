@@ -1601,6 +1601,175 @@ export default function App() {
     return [...rows, totalRow];
   }, [activeOfficer, uploadedFiles, parsedReport]);
 
+  const activeOfficer7WondersPerformance = useMemo<CategoryPerformanceRow[]>(() => {
+    if (!activeOfficer) return [];
+    
+    const officerName = activeOfficer?.name ?? currentStaff.name;
+    const officerIndex = activeOfficerIndex;
+    
+    let tradeInVal = 45 + (officerIndex % 3) * 3;
+    let coverPlusVal = 22 + (officerIndex % 5) * 1.5;
+    let ufundVal = 5.5 + (officerIndex % 4) * 0.3;
+    let simVal = 13 + (officerIndex % 3) * 1.5;
+    let pencilVal = 78 + (officerIndex % 3) * 4;
+    let macAppVal = 12 + (officerIndex % 3) * 2;
+    let caseVal = 46 + (officerIndex % 5) * 2;
+    
+    const hasData = uploadedFiles.current.length > 0;
+    
+    if (hasData) {
+      const officerRows = uploadedFiles.current.filter((row) => {
+        const officer = String(row["Officer (Name)"] ?? "").trim();
+        return matchesOfficer(officer, officerName);
+      });
+      
+      if (officerRows.length > 0) {
+        let iphoneCount = 0;
+        let ipadCount = 0;
+        let macCount = 0;
+        
+        let coverPlusCount = 0;
+        let ufundCount = 0;
+        let simCount = 0;
+        let pencilCount = 0;
+        let macAppCount = 0;
+        let caseCount = 0;
+        let tradeInCount = 0;
+        
+        officerRows.forEach((row) => {
+          const categoryName = String(row["Category (Name)"] ?? "Other").trim();
+          const subCategory = String(row["Sub Category"] ?? "").trim();
+          const productName = String(row["Product (Name)"] ?? "").trim();
+          const units = Math.max(toNumber(row.Number ?? row.number ?? row.qty), 0);
+          
+          const text = normalizeText(`${categoryName} ${subCategory} ${productName}`);
+          
+          if (text.includes("iphone")) iphoneCount += units;
+          if (text.includes("mac") || text.includes("macbook") || text.includes("imac") || text.includes("desktop") || text.includes("notebook")) macCount += units;
+          if (text.includes("ipad")) ipadCount += units;
+          
+          if (text.includes("trade") || text.includes("เทรด")) {
+            tradeInCount += units;
+          }
+          if (productName.toUpperCase().includes("COVER+") || text.includes("cover+")) {
+            coverPlusCount += units;
+          }
+          if (text.includes("ufund") || text.includes("personal")) {
+            ufundCount += units;
+          }
+          if (text.includes("sim")) {
+            simCount += units;
+          }
+          if (text.includes("pencil")) {
+            pencilCount += units;
+          }
+          if ((text.includes("applecare") || text.includes("care")) && (text.includes("mac") || text.includes("macbook") || text.includes("imac"))) {
+            macAppCount += units;
+          }
+          if (text.includes("case") && (text.includes("iphone") || text.includes("ipad"))) {
+            caseCount += units;
+          }
+        });
+        
+        if (iphoneCount > 0) {
+          tradeInVal = (tradeInCount / iphoneCount) * 100;
+          coverPlusVal = (coverPlusCount / iphoneCount) * 100;
+          ufundVal = (ufundCount / iphoneCount) * 100;
+          simVal = (simCount / iphoneCount) * 100;
+        } else {
+          tradeInVal = 0;
+          coverPlusVal = 0;
+          ufundVal = 0;
+          simVal = 0;
+        }
+        
+        if (ipadCount > 0) {
+          pencilVal = (pencilCount / ipadCount) * 100;
+        } else {
+          pencilVal = 0;
+        }
+        
+        if (macCount > 0) {
+          macAppVal = (macAppCount / macCount) * 100;
+        } else {
+          macAppVal = 0;
+        }
+        
+        const phoneAndTabletCount = iphoneCount + ipadCount;
+        if (phoneAndTabletCount > 0) {
+          caseVal = (caseCount / phoneAndTabletCount) * 100;
+        } else {
+          caseVal = 0;
+        }
+      }
+    }
+    
+    const wondersList = [
+      { name: "1. Trade In", actual: tradeInVal, target: 50 },
+      { name: "2. Cover Plus", actual: coverPlusVal, target: 25 },
+      { name: "3. UFUND Personal", actual: ufundVal, target: 6 },
+      { name: "4. SIM Attach", actual: simVal, target: 15 },
+      { name: "5. Pencil Attach", actual: pencilVal, target: 85 },
+      { name: "6. Mac APP (APP=15%)", actual: macAppVal, target: 15 },
+      { name: "7. Case iPhone+iPad", actual: caseVal, target: 50 },
+    ];
+    
+    const rows = wondersList.map((w) => {
+      const achPercent = w.target ? (w.actual / w.target) * 100 : 0;
+      const forecast = w.actual;
+      const forecastPercent = achPercent;
+      const lastMonth = 0;
+      const momPercent = "New";
+      const lastYear = 0;
+      const yoyPercent = "New";
+      
+      const targetDay = w.target;
+      const actualDay = w.actual;
+      const diffDay = actualDay - targetDay;
+      const achDayPercent = achPercent;
+      
+      return {
+        category: w.name,
+        target: w.target,
+        actual: w.actual,
+        achPercent,
+        forecast,
+        forecastPercent,
+        lastMonth,
+        momPercent,
+        lastYear,
+        yoyPercent,
+        targetDay,
+        actualDay,
+        diffDay,
+        achDayPercent,
+      };
+    });
+    
+    const totalTarget = rows.reduce((s, r) => s + r.target, 0) / 7;
+    const totalActual = rows.reduce((s, r) => s + r.actual, 0) / 7;
+    const totalAchPercent = rows.reduce((s, r) => s + r.achPercent, 0) / 7;
+    
+    const totalRow: CategoryPerformanceRow = {
+      category: "Average",
+      target: totalTarget,
+      actual: totalActual,
+      achPercent: totalAchPercent,
+      forecast: totalActual,
+      forecastPercent: totalAchPercent,
+      lastMonth: 0,
+      momPercent: "New",
+      lastYear: 0,
+      yoyPercent: "New",
+      targetDay: totalTarget,
+      actualDay: totalActual,
+      diffDay: totalActual - totalTarget,
+      achDayPercent: totalAchPercent,
+    };
+    
+    return [...rows, totalRow];
+  }, [activeOfficer, uploadedFiles, parsedReport, activeOfficerIndex]);
+
   const staffRoster = useMemo(
     () => buildStaffRoster(uploadedFiles.target, parsedReport.officers, cleanOfficerName),
     [uploadedFiles.target, parsedReport.officers],
@@ -4343,24 +4512,21 @@ export default function App() {
                         onClick={() => setActiveStat("csat")}
                         className={`backdrop-blur-md rounded-2xl px-2 py-4 w-28 sm:w-32 text-center border shadow-inner transition-all ${activeStat === "csat" ? "bg-white/[0.15] border-white/30 ring-1 ring-emerald-500/50" : "bg-white/5 border-white/10 hover:bg-white/10"}`}
                       >
-                        <Smile
+                        <Award
                           className={`w-5 h-5 mx-auto mb-2 ${activeStat === "csat" ? "text-emerald-300 fill-emerald-300/20" : "text-white/60"}`}
                         />
                         <div className="text-[10px] text-white/80 mb-1 font-medium">
-                          CSAT
+                          7 Wonder
                         </div>
                         <AnimatePresence mode="wait">
                           <motion.div
-                            key={activeOfficer ? Math.round(activeOfficer.rate) : currentStaff.stats.csat}
+                            key={dynamicScore}
                             initial={{ opacity: 0, y: 5 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -5 }}
-                            className="text-xl lg:text-2xl font-bold"
+                            className="text-xl lg:text-2xl font-bold text-white"
                           >
-                            {activeOfficer 
-                              ? `${Math.round(activeOfficer.rate)}%` 
-                              : currentStaff.stats.csat
-                            }
+                            {dynamicScore}%
                           </motion.div>
                         </AnimatePresence>
                       </button>
@@ -4450,7 +4616,7 @@ export default function App() {
                         </AnimatePresence>
                       </div>
                       <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-full px-2 lg:px-4 py-2.5 text-center flex flex-col items-center justify-center overflow-hidden min-w-0">
-                        <div className="text-[9px] uppercase tracking-wider text-white/60 mb-0.5">
+                        <div className="text-[9px] uppercase tracking-wider text-white/60 mb-0.5 w-full truncate">
                           Language
                         </div>
                         <AnimatePresence mode="wait">
@@ -4481,18 +4647,25 @@ export default function App() {
 
                 {/* BOTTOM HALF: Tables */}
                 <div className="relative z-40 flex flex-col lg:flex-row gap-6 min-h-[260px]">
-                  {/* Category Performance vs. Target */}
+                  {/* Category Performance or 7 Wonders Attach Rates Table */}
                   <div className="lg:w-2/3 bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-6 flex flex-col shadow-[0_8px_32px_rgba(0,0,0,0.12)] overflow-hidden">
                     <div className="flex items-center gap-3 mb-6">
                       <div className="p-2 bg-emerald-500/20 rounded-xl border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
-                        <TrendingUp className="w-4 h-4 text-emerald-400" />
+                        {activeStat === "csat" ? (
+                          <Award className="w-4 h-4 text-emerald-400" />
+                        ) : (
+                          <TrendingUp className="w-4 h-4 text-emerald-400" />
+                        )}
                       </div>
                       <div>
                         <h2 className="text-base font-bold tracking-tight text-white">
-                          Category Performance vs. Target
+                          {activeStat === "csat" ? "7 Wonders Attach Rates" : "Category Performance vs. Target"}
                         </h2>
                         <p className="text-[10px] text-white/50">
-                          Performance breakdown for {activeOfficer?.name ?? currentStaff.name} by product category
+                          {activeStat === "csat" 
+                            ? `Attach rate breakdown for ${activeOfficer?.name ?? currentStaff.name} against KPI targets`
+                            : `Performance breakdown for ${activeOfficer?.name ?? currentStaff.name} by product category`
+                          }
                         </p>
                       </div>
                     </div>
@@ -4501,7 +4674,9 @@ export default function App() {
                       <table className="w-full text-left border-collapse text-[11px]">
                         <thead>
                           <tr className="bg-[#0c3123] border-b border-emerald-500/20 text-white/90">
-                            <th className="py-2.5 px-3 font-bold uppercase tracking-wider">Group Category</th>
+                            <th className="py-2.5 px-3 font-bold uppercase tracking-wider">
+                              {activeStat === "csat" ? "Attach Category" : "Group Category"}
+                            </th>
                             <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Target</th>
                             <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Actual</th>
                             <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-center">Ach. %</th>
@@ -4518,9 +4693,10 @@ export default function App() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-emerald-500/10 bg-[#052b20]/60">
-                          {activeOfficerCategoryPerformance.map((row, idx) => {
-                            const isTotal = row.category === "Total";
-                            const fmtNum = (val: number) => val.toLocaleString();
+                          {(activeStat === "csat" ? activeOfficer7WondersPerformance : activeOfficerCategoryPerformance).map((row, idx) => {
+                            const isCsat = activeStat === "csat";
+                            const isTotal = row.category === "Total" || row.category === "Average";
+                            const fmtNum = (val: number) => isCsat ? `${val.toFixed(2)}%` : val.toLocaleString();
                             const fmtPct = (val: number) => `${val.toFixed(2)}%`;
                             
                             const getBadgeClass = (rate: number) => {
@@ -4533,6 +4709,11 @@ export default function App() {
                               if (diff > 0) return "text-green-400 font-bold";
                               if (diff === 0) return "text-white/60";
                               return "text-rose-400 font-bold";
+                            };
+
+                            const getDiffText = (diff: number) => {
+                              if (isCsat) return `${diff > 0 ? "+" : ""}${diff.toFixed(2)}%`;
+                              return diff > 0 ? `+${diff.toLocaleString()}` : diff.toLocaleString();
                             };
 
                             return (
@@ -4570,7 +4751,7 @@ export default function App() {
                                 <td className="py-2.5 px-3 text-right font-bold">{fmtNum(row.actualDay)}</td>
                                 <td className="py-2.5 px-3 text-right">
                                   <span className={getDiffClass(row.diffDay)}>
-                                    {row.diffDay > 0 ? `+${fmtNum(row.diffDay)}` : fmtNum(row.diffDay)}
+                                    {getDiffText(row.diffDay)}
                                   </span>
                                 </td>
                                 <td className="py-2.5 px-3 text-center">
