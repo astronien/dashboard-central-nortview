@@ -502,12 +502,18 @@ const getUploadKind = (headers: string[]): UploadKind => {
 };
 const mapTargetCategoryKey = (category: string, subCategory = "", productName = "") => {
   const text = normalizeText(`${category} ${subCategory} ${productName}`);
+  
+  // Corporate checks must come first so device keywords do not steal corporate rows
+  if (text.includes("btb apple") || text.includes("btb(apple)")) return "BTB(Apple)";
+  if (text.includes("btb") || text.includes("business")) return "BTB";
+  
   if (text.includes("iphone") || text.includes("iphone")) return "iPhone";
   if (text.includes("mac") || text.includes("macbook") || text.includes("imac") || text.includes("desktop") || text.includes("notebook")) return "Mac";
   if (text.includes("ipad")) return "iPad";
   if (text.includes("watch")) return "Apple Watch";
   if (text.includes("sim")) return "SIM";
-  if (text.includes("btb") || text.includes("business") || text.includes("accessory") || text.includes("apple acc") || text.includes("care") || text.includes("service") || text.includes("insurance") || text.includes("smile")) return "BTB";
+  
+  if (text.includes("accessory") || text.includes("apple acc") || text.includes("care") || text.includes("service") || text.includes("insurance") || text.includes("smile")) return "BTB";
   if (text.includes("smartphone")) return "Smartphone";
   return category || "Other";
 };
@@ -1081,14 +1087,17 @@ const getCategoryForSalesRow = (row: RawRow): string => {
   
   const text = normalizeText(`${cat} ${sub} ${prod}`);
   
+  // Corporate checks must come first so device keywords do not steal corporate rows
+  if (text.includes("btb apple") || text.includes("btb(apple)")) return "BTB(Apple)";
+  if (text.includes("btb") || text.includes("business")) return "BTB";
+  
   if (text.includes("iphone")) return "iPhone";
   if (text.includes("mac") || text.includes("macbook") || text.includes("imac") || text.includes("desktop") || text.includes("notebook")) return "Mac";
   if (text.includes("ipad")) return "iPad";
   if (text.includes("watch")) return "Apple Watch";
   if (text.includes("sim")) return "SIM";
   
-  if (text.includes("btb apple") || text.includes("btb(apple)")) return "BTB(Apple)";
-  if (text.includes("btb") || text.includes("business") || text.includes("accessory") || text.includes("apple acc") || text.includes("care") || text.includes("service") || text.includes("insurance") || text.includes("smile")) return "BTB";
+  if (text.includes("accessory") || text.includes("apple acc") || text.includes("care") || text.includes("service") || text.includes("insurance") || text.includes("smile")) return "BTB";
   
   return "Other";
 };
@@ -1328,8 +1337,19 @@ export default function App() {
           return matchesOfficer(name, activeOfficer.name);
         });
         if (targetRow) {
-          const catKey = catName === "BTB(Apple)" ? "BTB(Apple)" : catName;
-          target = toNumber(targetRow[catKey] ?? targetRow[catKey.toLowerCase()]);
+          if (catName === "BTB(Apple)") {
+            const btbAppleVal = targetRow["BTB(Apple)"] ?? 
+                                targetRow["BTB (Apple)"] ?? 
+                                targetRow["BTB Apple"] ?? 
+                                targetRow["btb(apple)"] ?? 
+                                targetRow["btb (apple)"] ?? 
+                                targetRow["btb apple"] ?? 
+                                targetRow["BTB_Apple"] ?? 
+                                targetRow["btb_apple"];
+            target = toNumber(btbAppleVal);
+          } else {
+            target = toNumber(targetRow[catName] ?? targetRow[catName.toLowerCase()]);
+          }
         }
         
         // Sum Actuals
