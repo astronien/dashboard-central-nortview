@@ -1129,6 +1129,31 @@ export default function App() {
     return map;
   }, [uploadedFiles.categoryMaster]);
 
+  const getCategory = (row: RawRow): string => {
+    const cat = String(row["Category (Name)"] ?? row.category_name ?? row.Category ?? "").trim();
+    const sub = String(row["Sub Category"] ?? row.sub_category ?? row.SubCategory ?? "").trim();
+    const prod = String(row["Product (Name)"] ?? row.product_name ?? row.Product ?? "").trim();
+    
+    const keyCombo = normalizeText(`${cat}${sub}`);
+    const keyCat = normalizeText(cat);
+    const keyProd = normalizeText(prod);
+    
+    const mapped = categoryMap.get(keyCombo) ?? 
+                   categoryMap.get(keyCat) ?? 
+                   categoryMap.get(keyProd);
+                   
+    if (mapped) {
+      const normalizedMapped = mapped.trim();
+      const lower = normalizedMapped.toLowerCase();
+      if (lower === "btb apple" || lower === "btb(apple)") {
+        return "BTB(Apple)";
+      }
+      return normalizedMapped;
+    }
+    
+    return mapTargetCategoryKey(cat, sub, prod);
+  };
+
   const todayRows = useMemo(() => {
     if (!uploadedFiles.current.length) return [];
     let maxDateStr = "";
@@ -1310,31 +1335,6 @@ export default function App() {
       };
     });
   }, [uploadedFiles.current, getCategoryValue]);
-
-  const getCategory = (row: RawRow): string => {
-    const cat = String(row["Category (Name)"] ?? row.category_name ?? row.Category ?? "").trim();
-    const sub = String(row["Sub Category"] ?? row.sub_category ?? row.SubCategory ?? "").trim();
-    const prod = String(row["Product (Name)"] ?? row.product_name ?? row.Product ?? "").trim();
-    
-    const keyCombo = normalizeText(`${cat}${sub}`);
-    const keyCat = normalizeText(cat);
-    const keyProd = normalizeText(prod);
-    
-    const mapped = categoryMap.get(keyCombo) ?? 
-                   categoryMap.get(keyCat) ?? 
-                   categoryMap.get(keyProd);
-                   
-    if (mapped) {
-      const normalizedMapped = mapped.trim();
-      const lower = normalizedMapped.toLowerCase();
-      if (lower === "btb apple" || lower === "btb(apple)") {
-        return "BTB(Apple)";
-      }
-      return normalizedMapped;
-    }
-    
-    return mapTargetCategoryKey(cat, sub, prod);
-  };
 
   const [activeTab, setActiveTab] = useState("Store");
   const [activeStat, setActiveStat] = useState<"sales" | "csat" | "target">(
