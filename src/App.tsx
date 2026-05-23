@@ -2767,7 +2767,8 @@ export default function App() {
       let combinedErrors: any[] = [];
       
       for (const k of kindsToSync) {
-        const url = `/api/sync-sheets?kind=${k}`;
+        const branchName = parsedStoreHeader.name || "Mega Bangna";
+        const url = `/api/sync-sheets?kind=${k}&branch=${encodeURIComponent(branchName)}`;
         const res = await fetch(url, { method: "POST" });
         const data = await res.json();
         if (!res.ok) {

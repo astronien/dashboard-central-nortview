@@ -131,6 +131,7 @@ async function handler(req, res) {
   }
 
   const kindParam = req.query?.kind;
+  const branchParam = req.query?.branch;
   const kindsToSync = kindParam 
     ? (Array.isArray(kindParam) ? kindParam : [kindParam])
     : UPLOAD_KINDS;
@@ -167,7 +168,25 @@ async function handler(req, res) {
           throw new Error("No data found or failed to parse CSV.");
         }
 
-        const normalizedRows = normalizeSheetRows(rawRows, kind);
+        let normalizedRows = normalizeSheetRows(rawRows, kind);
+        
+        if (branchParam && (kind === "current" || kind === "lastMonth" || kind === "lastYear" || kind === "target")) {
+          const normalizeBranchText = (val) => 
+            String(val ?? "")
+              .toLowerCase()
+              .replace(/\s+/g, "")
+              .replace(/[^a-z0-9ก-๙]/gi, "")
+              .trim();
+              
+          const normParam = normalizeBranchText(branchParam);
+          
+          normalizedRows = normalizedRows.filter(row => {
+            const rowBranchVal = row["Branch (Name)"] || row["BRANCH NAME"] || "";
+            const normRow = normalizeBranchText(rowBranchVal);
+            return normRow.includes(normParam) || normParam.includes(normRow);
+          });
+          console.log(`[Sync] Filtered rows for branch "${branchParam}": ${normalizedRows.length} rows remaining.`);
+        }
         
         console.log(`[Sync] Saving ${normalizedRows.length} rows to Turso DB for: ${kind}`);
         await saveUploadKind(kind, normalizedRows);
