@@ -1211,134 +1211,7 @@ export default function App() {
     currentView,
   ]);
 
-  const dynamicRadarData = useMemo(() => {
-    if (!uploadedFiles.current.length && Number(activeStaffId) <= 3) {
-      return currentStaff.radar;
-    }
-    
-    const officerName = activeOfficer?.name ?? currentStaff.name;
-    const officerIndex = activeOfficerIndex;
-    
-    let tradeInVal = 45 + (officerIndex % 3) * 3;
-    let coverPlusVal = 22 + (officerIndex % 5) * 1.5;
-    let ufundVal = 5.5 + (officerIndex % 4) * 0.3;
-    let simVal = 13 + (officerIndex % 3) * 1.5;
-    let pencilVal = 78 + (officerIndex % 3) * 4;
-    let macAppVal = 12 + (officerIndex % 3) * 2;
-    let caseVal = 46 + (officerIndex % 5) * 2;
-    
-    const hasData = uploadedFiles.current.length > 0;
-    
-    if (hasData) {
-      const officerRows = uploadedFiles.current.filter((row) => {
-        const officer = String(row["Officer (Name)"] ?? "").trim();
-        return matchesOfficer(officer, officerName);
-      });
-      
-      if (officerRows.length > 0) {
-        let iphoneCount = 0;
-        let ipadCount = 0;
-        let macCount = 0;
-        
-        let coverPlusCount = 0;
-        let ufundCount = 0;
-        let simCount = 0;
-        let pencilCount = 0;
-        let macAppCount = 0;
-        let caseCount = 0;
-        let tradeInCount = 0;
-        
-        officerRows.forEach((row) => {
-          const categoryName = String(row["Category (Name)"] ?? "Other").trim();
-          const subCategory = String(row["Sub Category"] ?? "").trim();
-          const productName = String(row["Product (Name)"] ?? "").trim();
-          const units = Math.max(toNumber(row.Number ?? row.number ?? row.qty), 0);
-          
-          const text = normalizeText(`${categoryName} ${subCategory} ${productName}`);
-          
-          if (text.includes("iphone")) iphoneCount += units;
-          if (text.includes("mac") || text.includes("macbook") || text.includes("imac") || text.includes("desktop") || text.includes("notebook")) macCount += units;
-          if (text.includes("ipad")) ipadCount += units;
-          
-          if (text.includes("trade") || text.includes("เทรด")) {
-            tradeInCount += units;
-          }
-          if (productName.toUpperCase().includes("COVER+") || text.includes("cover+")) {
-            coverPlusCount += units;
-          }
-          if (text.includes("ufund") || text.includes("personal")) {
-            ufundCount += units;
-          }
-          if (text.includes("sim")) {
-            simCount += units;
-          }
-          if (text.includes("pencil")) {
-            pencilCount += units;
-          }
-          if ((text.includes("applecare") || text.includes("care")) && (text.includes("mac") || text.includes("macbook") || text.includes("imac"))) {
-            macAppCount += units;
-          }
-          if (text.includes("case") && (text.includes("iphone") || text.includes("ipad"))) {
-            caseCount += units;
-          }
-        });
-        
-        if (iphoneCount > 0) {
-          tradeInVal = (tradeInCount / iphoneCount) * 100;
-          coverPlusVal = (coverPlusCount / iphoneCount) * 100;
-          ufundVal = (ufundCount / iphoneCount) * 100;
-          simVal = (simCount / iphoneCount) * 100;
-        } else {
-          tradeInVal = 0;
-          coverPlusVal = 0;
-          ufundVal = 0;
-          simVal = 0;
-        }
-        
-        if (ipadCount > 0) {
-          pencilVal = (pencilCount / ipadCount) * 100;
-        } else {
-          pencilVal = 0;
-        }
-        
-        if (macCount > 0) {
-          macAppVal = (macAppCount / macCount) * 100;
-        } else {
-          macAppVal = 0;
-        }
-        
-        const phoneAndTabletCount = iphoneCount + ipadCount;
-        if (phoneAndTabletCount > 0) {
-          caseVal = (caseCount / phoneAndTabletCount) * 100;
-        } else {
-          caseVal = 0;
-        }
-      }
-    }
-    
-    const scale = (val: number, target: number) => {
-      const pct = target > 0 ? (val / target) * 100 : 0;
-      return Math.min(Math.max(Math.round(pct), 0), 100);
-    };
-    
-    return [
-      { subject: `Trade In|${Math.round(tradeInVal)}%`, value: scale(tradeInVal, 50), fullMark: 100 },
-      { subject: `Cover Plus|${Math.round(coverPlusVal)}%`, value: scale(coverPlusVal, 25), fullMark: 100 },
-      { subject: `UFUND|${Math.round(ufundVal)}%`, value: scale(ufundVal, 6), fullMark: 100 },
-      { subject: `SIM|${Math.round(simVal)}%`, value: scale(simVal, 15), fullMark: 100 },
-      { subject: `Pencil|${Math.round(pencilVal)}%`, value: scale(pencilVal, 85), fullMark: 100 },
-      { subject: `Mac Att|${Math.round(macAppVal)}%`, value: scale(macAppVal, 15), fullMark: 100 },
-      { subject: `Case Att|${Math.round(caseVal)}%`, value: scale(caseVal, 50), fullMark: 100 },
-    ];
-  }, [uploadedFiles.current, activeOfficer, attachOfficerRows, activeOfficerIndex, activeStaffId, currentStaff]);
-  
-  const dynamicScore = useMemo(() => {
-    if (!uploadedFiles.current.length && Number(activeStaffId) <= 3) {
-      return currentStaff.score;
-    }
-    const sum = dynamicRadarData.reduce((acc, curr) => acc + curr.value, 0);
-    return Math.round(sum / 7);
-  }, [dynamicRadarData, uploadedFiles.current, activeStaffId, currentStaff]);
+
 
   const dynamicLanguages = useMemo(() => {
     if (!uploadedFiles.current.length && Number(activeStaffId) <= 3) {
@@ -1769,6 +1642,77 @@ export default function App() {
     
     return [...rows, totalRow];
   }, [activeOfficer, uploadedFiles, parsedReport, activeOfficerIndex]);
+
+  const sevenWondersScore = useMemo(() => {
+    if (!uploadedFiles.current.length && Number(activeStaffId) <= 3) {
+      return currentStaff.score;
+    }
+    const wondersRows = activeOfficer7WondersPerformance.filter(r => r.category !== "Average" && r.category !== "Total");
+    if (wondersRows.length === 0) return 0;
+    
+    const scale = (val: number, target: number) => {
+      const pct = target > 0 ? (val / target) * 100 : 0;
+      return Math.min(Math.max(Math.round(pct), 0), 100);
+    };
+    
+    const sum = wondersRows.reduce((acc, row) => acc + scale(row.actual, row.target), 0);
+    return Math.round(sum / wondersRows.length);
+  }, [activeOfficer7WondersPerformance, uploadedFiles.current, activeStaffId, currentStaff]);
+
+  const dynamicRadarData = useMemo(() => {
+    if (!uploadedFiles.current.length && Number(activeStaffId) <= 3 && activeStat === "csat") {
+      return currentStaff.radar;
+    }
+    
+    if (activeStat === "csat") {
+      const wondersRows = activeOfficer7WondersPerformance.filter(r => r.category !== "Average" && r.category !== "Total");
+      
+      const scale = (val: number, target: number) => {
+        const pct = target > 0 ? (val / target) * 100 : 0;
+        return Math.min(Math.max(Math.round(pct), 0), 100);
+      };
+      
+      return wondersRows.map((row) => {
+        const rawActual = row.actual;
+        const rawTarget = row.target;
+        const scaledVal = scale(rawActual, rawTarget);
+        
+        return {
+          subject: `${row.category}|${Math.round(rawActual)}%`,
+          value: scaledVal,
+          fullMark: 100
+        };
+      });
+    } else {
+      const catRows = activeOfficerCategoryPerformance.filter(r => r.category !== "Total" && r.category !== "Average");
+      
+      return catRows.map((row) => {
+        const ach = Math.round(row.achPercent);
+        
+        return {
+          subject: `${row.category}|${ach}%`,
+          value: Math.min(Math.max(ach, 0), 100),
+          fullMark: 100
+        };
+      });
+    }
+  }, [
+    activeStat,
+    activeOfficerCategoryPerformance,
+    activeOfficer7WondersPerformance,
+    uploadedFiles.current,
+    activeStaffId,
+    currentStaff
+  ]);
+
+  const dynamicScore = useMemo(() => {
+    if (!uploadedFiles.current.length && Number(activeStaffId) <= 3 && activeStat === "csat") {
+      return currentStaff.score;
+    }
+    if (dynamicRadarData.length === 0) return 0;
+    const sum = dynamicRadarData.reduce((acc, curr) => acc + curr.value, 0);
+    return Math.round(sum / dynamicRadarData.length);
+  }, [dynamicRadarData, uploadedFiles.current, activeStaffId, currentStaff, activeStat]);
 
   const staffRoster = useMemo(
     () => buildStaffRoster(uploadedFiles.target, parsedReport.officers, cleanOfficerName),
@@ -4551,13 +4495,13 @@ export default function App() {
                         </div>
                         <AnimatePresence mode="wait">
                           <motion.div
-                            key={dynamicScore}
+                            key={sevenWondersScore}
                             initial={{ opacity: 0, y: 5 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -5 }}
                             className="text-xl lg:text-2xl font-bold text-white"
                           >
-                            {dynamicScore}%
+                            {sevenWondersScore}%
                           </motion.div>
                         </AnimatePresence>
                       </motion.button>
