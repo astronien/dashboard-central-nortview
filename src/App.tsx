@@ -4888,7 +4888,7 @@ export default function App() {
                         <span className="text-xs font-bold text-white/50 uppercase tracking-widest block mb-3 border-b border-white/5 pb-2">🛡️ Cover+ tgt25%</span>
                         <div className="space-y-2.5">
                           {staffAttachMatrix
-                            .map((row) => ({ name: row.name, rate: row.rates["Cover+"] || 0 }))
+                            .map((row) => ({ name: row.name, rate: row.attachMap["Cover+"]?.rate || 0 }))
                             .sort((a, b) => b.rate - a.rate)
                             .slice(0, 5)
                             .map((p, idx) => (
@@ -4909,7 +4909,7 @@ export default function App() {
                         <span className="text-xs font-bold text-teal-400 uppercase tracking-widest block mb-3 border-b border-white/5 pb-2">🍎 AC+ tgt20%</span>
                         <div className="space-y-2.5">
                           {staffAttachMatrix
-                            .map((row) => ({ name: row.name, rate: row.rates["AC+"] || 0 }))
+                            .map((row) => ({ name: row.name, rate: row.attachMap["AC+"]?.rate || 0 }))
                             .sort((a, b) => b.rate - a.rate)
                             .slice(0, 5)
                             .map((p, idx) => (
@@ -4930,7 +4930,7 @@ export default function App() {
                         <span className="text-xs font-bold text-purple-400 uppercase tracking-widest block mb-3 border-b border-white/5 pb-2">✏️ Pencil tgt85%</span>
                         <div className="space-y-2.5">
                           {staffAttachMatrix
-                            .map((row) => ({ name: row.name, rate: row.rates["Pencil"] || 0 }))
+                            .map((row) => ({ name: row.name, rate: row.attachMap["Pencil"]?.rate || 0 }))
                             .sort((a, b) => b.rate - a.rate)
                             .slice(0, 5)
                             .map((p, idx) => (
@@ -4951,7 +4951,7 @@ export default function App() {
                         <span className="text-xs font-bold text-pink-400 uppercase tracking-widest block mb-3 border-b border-white/5 pb-2">📱 Case tgt60%</span>
                         <div className="space-y-2.5">
                           {staffAttachMatrix
-                            .map((row) => ({ name: row.name, rate: row.rates["Case"] || 0 }))
+                            .map((row) => ({ name: row.name, rate: row.attachMap["Case"]?.rate || 0 }))
                             .sort((a, b) => b.rate - a.rate)
                             .slice(0, 5)
                             .map((p, idx) => (
@@ -4998,11 +4998,11 @@ export default function App() {
                               const achPercent = officerState?.achPercent || 0;
                               const forecast = officerState?.forecast || 0;
                               
-                              const coverPlusRate = Math.round(staff.rates["Cover+"] || 0);
-                              const acRate = Math.round(staff.rates["AC+"] || 0);
-                              const penRate = Math.round(staff.rates["Pencil"] || 0);
-                              const caseRate = Math.round(staff.rates["Case"] || 0);
-                              const simUnits = staff.units["SIM"] || 0;
+                              const coverPlusRate = Math.round(staff.attachMap["Cover+"]?.rate || 0);
+                              const acRate = Math.round(staff.attachMap["AC+"]?.rate || 0);
+                              const penRate = Math.round(staff.attachMap["Pencil"]?.rate || 0);
+                              const caseRate = Math.round(staff.attachMap["Case"]?.rate || 0);
+                              const simUnits = staff.attachMap["SIM"]?.units || 0;
                               
                               const rankEmoji = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx + 1}`;
                               
