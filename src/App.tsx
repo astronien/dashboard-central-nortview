@@ -118,13 +118,15 @@ const staffData: Staff[] = [
     expertise: "iPhone & Mac",
     languages: "TH / EN",
     image: "/staff1.png",
-    score: 95,
+    score: 97,
     radar: [
-      { subject: "Product Knowledge|98", value: 98, fullMark: 100 },
-      { subject: "Customer Service|95", value: 95, fullMark: 100 },
-      { subject: "Upselling|88", value: 88, fullMark: 100 },
-      { subject: "Communication|92", value: 92, fullMark: 100 },
-      { subject: "Tech Support|90", value: 90, fullMark: 100 },
+      { subject: "Trade In|48%", value: 96, fullMark: 100 },
+      { subject: "Cover Plus|26%", value: 100, fullMark: 100 },
+      { subject: "UFUND|5.7%", value: 95, fullMark: 100 },
+      { subject: "SIM|16%", value: 100, fullMark: 100 },
+      { subject: "Pencil|82%", value: 96, fullMark: 100 },
+      { subject: "Mac Att|14%", value: 93, fullMark: 100 },
+      { subject: "Case Att|48%", value: 96, fullMark: 100 },
     ],
     stats: {
       sales: "142",
@@ -141,13 +143,15 @@ const staffData: Staff[] = [
     expertise: "All Products",
     languages: "TH / EN / JP",
     image: "/staff2.png",
-    score: 98,
+    score: 100,
     radar: [
-      { subject: "Product Knowledge|99", value: 99, fullMark: 100 },
-      { subject: "Customer Service|98", value: 98, fullMark: 100 },
-      { subject: "Upselling|95", value: 95, fullMark: 100 },
-      { subject: "Communication|97", value: 97, fullMark: 100 },
-      { subject: "Tech Support|92", value: 92, fullMark: 100 },
+      { subject: "Trade In|52%", value: 100, fullMark: 100 },
+      { subject: "Cover Plus|28%", value: 100, fullMark: 100 },
+      { subject: "UFUND|6.3%", value: 100, fullMark: 100 },
+      { subject: "SIM|17%", value: 100, fullMark: 100 },
+      { subject: "Pencil|86%", value: 100, fullMark: 100 },
+      { subject: "Mac Att|16%", value: 100, fullMark: 100 },
+      { subject: "Case Att|53%", value: 100, fullMark: 100 },
     ],
     stats: {
       sales: "256",
@@ -164,13 +168,15 @@ const staffData: Staff[] = [
     expertise: "iPad & Watch",
     languages: "TH / EN",
     image: "/staff3.png",
-    score: 92,
+    score: 90,
     radar: [
-      { subject: "Product Knowledge|94", value: 94, fullMark: 100 },
-      { subject: "Customer Service|97", value: 97, fullMark: 100 },
-      { subject: "Upselling|85", value: 85, fullMark: 100 },
-      { subject: "Communication|96", value: 96, fullMark: 100 },
-      { subject: "Tech Support|88", value: 88, fullMark: 100 },
+      { subject: "Trade In|42%", value: 84, fullMark: 100 },
+      { subject: "Cover Plus|22%", value: 88, fullMark: 100 },
+      { subject: "UFUND|5.4%", value: 90, fullMark: 100 },
+      { subject: "SIM|13.5%", value: 90, fullMark: 100 },
+      { subject: "Pencil|80%", value: 94, fullMark: 100 },
+      { subject: "Mac Att|13.5%", value: 90, fullMark: 100 },
+      { subject: "Case Att|46%", value: 92, fullMark: 100 },
     ],
     stats: {
       sales: "118",
@@ -1209,40 +1215,129 @@ export default function App() {
     if (!uploadedFiles.current.length && Number(activeStaffId) <= 3) {
       return currentStaff.radar;
     }
-    const attachRow = attachOfficerRows.find((row) =>
-      attachMatchesOfficer(row.name, activeOfficer?.name ?? ""),
-    );
-    const attRate = attachRow ? overallAttachRate(attachRow) : 0;
-    const upselling = Math.min(Math.max(50 + Math.round(attRate * 1.2), 50), 99);
-    let soldCategoriesCount = 0;
-    if (attachRow && attachRow.attachMap) {
-      Object.keys(attachRow.attachMap).forEach((cat) => {
-        if ((attachRow.attachMap[cat]?.units ?? 0) > 0) {
-          soldCategoriesCount++;
-        }
+    
+    const officerName = activeOfficer?.name ?? currentStaff.name;
+    const officerIndex = activeOfficerIndex;
+    
+    let tradeInVal = 45 + (officerIndex % 3) * 3;
+    let coverPlusVal = 22 + (officerIndex % 5) * 1.5;
+    let ufundVal = 5.5 + (officerIndex % 4) * 0.3;
+    let simVal = 13 + (officerIndex % 3) * 1.5;
+    let pencilVal = 78 + (officerIndex % 3) * 4;
+    let macAppVal = 12 + (officerIndex % 3) * 2;
+    let caseVal = 46 + (officerIndex % 5) * 2;
+    
+    const hasData = uploadedFiles.current.length > 0;
+    
+    if (hasData) {
+      const officerRows = uploadedFiles.current.filter((row) => {
+        const officer = String(row["Officer (Name)"] ?? "").trim();
+        return matchesOfficer(officer, officerName);
       });
+      
+      if (officerRows.length > 0) {
+        let iphoneCount = 0;
+        let ipadCount = 0;
+        let macCount = 0;
+        
+        let coverPlusCount = 0;
+        let ufundCount = 0;
+        let simCount = 0;
+        let pencilCount = 0;
+        let macAppCount = 0;
+        let caseCount = 0;
+        let tradeInCount = 0;
+        
+        officerRows.forEach((row) => {
+          const categoryName = String(row["Category (Name)"] ?? "Other").trim();
+          const subCategory = String(row["Sub Category"] ?? "").trim();
+          const productName = String(row["Product (Name)"] ?? "").trim();
+          const units = Math.max(toNumber(row.Number ?? row.number ?? row.qty), 0);
+          
+          const text = normalizeText(`${categoryName} ${subCategory} ${productName}`);
+          
+          if (text.includes("iphone")) iphoneCount += units;
+          if (text.includes("mac") || text.includes("macbook") || text.includes("imac") || text.includes("desktop") || text.includes("notebook")) macCount += units;
+          if (text.includes("ipad")) ipadCount += units;
+          
+          if (text.includes("trade") || text.includes("เทรด")) {
+            tradeInCount += units;
+          }
+          if (productName.toUpperCase().includes("COVER+") || text.includes("cover+")) {
+            coverPlusCount += units;
+          }
+          if (text.includes("ufund") || text.includes("personal")) {
+            ufundCount += units;
+          }
+          if (text.includes("sim")) {
+            simCount += units;
+          }
+          if (text.includes("pencil")) {
+            pencilCount += units;
+          }
+          if ((text.includes("applecare") || text.includes("care")) && (text.includes("mac") || text.includes("macbook") || text.includes("imac"))) {
+            macAppCount += units;
+          }
+          if (text.includes("case") && (text.includes("iphone") || text.includes("ipad"))) {
+            caseCount += units;
+          }
+        });
+        
+        if (iphoneCount > 0) {
+          tradeInVal = (tradeInCount / iphoneCount) * 100;
+          coverPlusVal = (coverPlusCount / iphoneCount) * 100;
+          ufundVal = (ufundCount / iphoneCount) * 100;
+          simVal = (simCount / iphoneCount) * 100;
+        } else {
+          tradeInVal = 0;
+          coverPlusVal = 0;
+          ufundVal = 0;
+          simVal = 0;
+        }
+        
+        if (ipadCount > 0) {
+          pencilVal = (pencilCount / ipadCount) * 100;
+        } else {
+          pencilVal = 0;
+        }
+        
+        if (macCount > 0) {
+          macAppVal = (macAppCount / macCount) * 100;
+        } else {
+          macAppVal = 0;
+        }
+        
+        const phoneAndTabletCount = iphoneCount + ipadCount;
+        if (phoneAndTabletCount > 0) {
+          caseVal = (caseCount / phoneAndTabletCount) * 100;
+        } else {
+          caseVal = 0;
+        }
+      }
     }
-    const achRate = activeOfficer?.rate ?? 0;
-    const prodKnowledge = Math.min(Math.max(65 + Math.round(achRate * 0.15) + (soldCategoriesCount * 4), 60), 99);
-    const custService = Math.min(Math.max(80 + Math.round(achRate * 0.1) + (activeOfficerIndex % 3) * 3, 75), 100);
-    const baseUnits = attachRow?.baseUnits ?? 0;
-    const communication = Math.min(Math.max(70 + Math.round(Math.min(baseUnits, 100) * 0.2) + (activeOfficerIndex % 4) * 3, 65), 98);
-    const techSupport = Math.min(Math.max(70 + Math.round(achRate * 0.08) + ((activeOfficerIndex * 7) % 5) * 4, 60), 97);
+    
+    const scale = (val: number, target: number) => {
+      const pct = target > 0 ? (val / target) * 100 : 0;
+      return Math.min(Math.max(Math.round(pct), 0), 100);
+    };
+    
     return [
-      { subject: `Product Knowledge|${prodKnowledge}`, value: prodKnowledge, fullMark: 100 },
-      { subject: `Customer Service|${custService}`, value: custService, fullMark: 100 },
-      { subject: `Upselling|${upselling}`, value: upselling, fullMark: 100 },
-      { subject: `Communication|${communication}`, value: communication, fullMark: 100 },
-      { subject: `Tech Support|${techSupport}`, value: techSupport, fullMark: 100 },
+      { subject: `Trade In|${Math.round(tradeInVal)}%`, value: scale(tradeInVal, 50), fullMark: 100 },
+      { subject: `Cover Plus|${Math.round(coverPlusVal)}%`, value: scale(coverPlusVal, 25), fullMark: 100 },
+      { subject: `UFUND|${Math.round(ufundVal)}%`, value: scale(ufundVal, 6), fullMark: 100 },
+      { subject: `SIM|${Math.round(simVal)}%`, value: scale(simVal, 15), fullMark: 100 },
+      { subject: `Pencil|${Math.round(pencilVal)}%`, value: scale(pencilVal, 85), fullMark: 100 },
+      { subject: `Mac Att|${Math.round(macAppVal)}%`, value: scale(macAppVal, 15), fullMark: 100 },
+      { subject: `Case Att|${Math.round(caseVal)}%`, value: scale(caseVal, 50), fullMark: 100 },
     ];
   }, [uploadedFiles.current, activeOfficer, attachOfficerRows, activeOfficerIndex, activeStaffId, currentStaff]);
-
+  
   const dynamicScore = useMemo(() => {
     if (!uploadedFiles.current.length && Number(activeStaffId) <= 3) {
       return currentStaff.score;
     }
     const sum = dynamicRadarData.reduce((acc, curr) => acc + curr.value, 0);
-    return Math.round(sum / 5);
+    return Math.round(sum / 7);
   }, [dynamicRadarData, uploadedFiles.current, activeStaffId, currentStaff]);
 
   const dynamicLanguages = useMemo(() => {
