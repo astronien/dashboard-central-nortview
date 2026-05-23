@@ -1116,6 +1116,44 @@ export default function App() {
   >("home");
   const [parsedReport, setParsedReport] = useState<ParsedReport>(fallbackReport);
   const [uploadedFiles, setUploadedFiles] = useState<Record<UploadKind, RawRow[]>>({ target: [], current: [], lastMonth: [], lastYear: [], categoryMaster: [] });
+
+  const categoryMap = useMemo(() => {
+    const map = new Map<string, string>();
+    if (uploadedFiles.categoryMaster) {
+      uploadedFiles.categoryMaster.forEach((row) => {
+        const key = normalizeText(row["Cat & Sub Cat"] ?? row["Category (Name)"] ?? row.SubCategory);
+        const value = String(row["CAT Daily"] ?? row["Category (Name)"] ?? "Other").trim();
+        if (key) map.set(key, value);
+      });
+    }
+    return map;
+  }, [uploadedFiles.categoryMaster]);
+
+  const getCategory = (row: RawRow): string => {
+    const cat = String(row["Category (Name)"] ?? row.category_name ?? row.Category ?? "").trim();
+    const sub = String(row["Sub Category"] ?? row.sub_category ?? row.SubCategory ?? "").trim();
+    const prod = String(row["Product (Name)"] ?? row.product_name ?? row.Product ?? "").trim();
+    
+    const keyCombo = normalizeText(`${cat}${sub}`);
+    const keyCat = normalizeText(cat);
+    const keyProd = normalizeText(prod);
+    
+    const mapped = categoryMap.get(keyCombo) ?? 
+                   categoryMap.get(keyCat) ?? 
+                   categoryMap.get(keyProd);
+                   
+    if (mapped) {
+      const normalizedMapped = mapped.trim();
+      const lower = normalizedMapped.toLowerCase();
+      if (lower === "btb apple" || lower === "btb(apple)") {
+        return "BTB(Apple)";
+      }
+      return normalizedMapped;
+    }
+    
+    return mapTargetCategoryKey(cat, sub, prod);
+  };
+
   const [activeTab, setActiveTab] = useState("Store");
   const [activeStat, setActiveStat] = useState<"sales" | "csat" | "target">(
     "sales",
@@ -1356,7 +1394,7 @@ export default function App() {
         uploadedFiles.current.forEach((row) => {
           const officer = String(row["Officer (Name)"] ?? "").trim();
           if (matchesOfficer(officer, activeOfficer.name)) {
-            const rowCat = getCategoryForSalesRow(row);
+            const rowCat = getCategory(row);
             if (rowCat === catName) {
               actual += getCategoryValue(row);
               
@@ -1374,7 +1412,7 @@ export default function App() {
         uploadedFiles.lastMonth.forEach((row) => {
           const officer = String(row["Officer (Name)"] ?? "").trim();
           if (matchesOfficer(officer, activeOfficer.name)) {
-            const rowCat = getCategoryForSalesRow(row);
+            const rowCat = getCategory(row);
             if (rowCat === catName) {
               lastMonth += getCategoryValue(row);
             }
@@ -1385,7 +1423,7 @@ export default function App() {
         uploadedFiles.lastYear.forEach((row) => {
           const officer = String(row["Officer (Name)"] ?? "").trim();
           if (matchesOfficer(officer, activeOfficer.name)) {
-            const rowCat = getCategoryForSalesRow(row);
+            const rowCat = getCategory(row);
             if (rowCat === catName) {
               lastYear += getCategoryValue(row);
             }
@@ -1492,7 +1530,7 @@ export default function App() {
     };
     
     return [...rows, totalRow];
-  }, [activeOfficer, uploadedFiles, parsedReport]);
+  }, [activeOfficer, uploadedFiles, parsedReport, getCategory]);
 
   const activeOfficer7WondersPerformance = useMemo<CategoryPerformanceRow[]>(() => {
     if (!activeOfficer) return [];
