@@ -97,10 +97,24 @@ function normalizeSheetRows(rows, kind) {
   }
 
   if (kind === "categoryMaster") {
-    return rows.map((r) => ({
-      "Cat & Sub Cat": r["Cat & Sub Cat"] || r.cat_sub_cat || r["Sub Category"] || r.SubCategory || "",
-      "CAT Daily": r["CAT Daily"] || r.cat_daily || r["Category (Name)"] || "",
-    }));
+    const seen = new Set();
+    const unique = [];
+    rows.forEach((r) => {
+      const catSubCat = String(r["Cat & Sub Cat"] || r.cat_sub_cat || r["Sub Category"] || r.SubCategory || "").trim();
+      const catDaily = String(r["CAT Daily"] || r.cat_daily || r["Category (Name)"] || "").trim();
+      if (!catSubCat || !catDaily) return;
+      
+      const key = `${catSubCat.toLowerCase()}||${catDaily.toLowerCase()}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        unique.push({
+          "Cat & Sub Cat": catSubCat,
+          "CAT Daily": catDaily
+        });
+      }
+    });
+    console.log(`[Sync] Deduplicated categoryMaster: from ${rows.length} to ${unique.length} unique rows.`);
+    return unique;
   }
 
   // สำหรับกลุ่ม transactions (current, lastMonth, lastYear)
