@@ -297,18 +297,11 @@ const ensureRelationalSchema = async (tursoExecute) => {
 
 const textArg = (value) => ({ type: "text", value: value ?? "" });
 
-const insertBatch = async (tursoPipeline, getExecuteResult, table, columns, rows, batchSize = 80) => {
+const insertBatch = async (tursoPipeline, getExecuteResult, table, columns, rows, batchSize = 200) => {
   if (!rows.length) return;
 
   const requests = [];
-  const flush = async () => {
-    if (!requests.length) return;
-    const payload = await tursoPipeline(requests);
-    for (let i = 0; i < requests.length; i += 1) {
-      getExecuteResult(payload, i);
-    }
-    requests.length = 0;
-  };
+  requests.push({ type: "execute", stmt: { sql: "BEGIN TRANSACTION" } });
 
   for (let offset = 0; offset < rows.length; offset += batchSize) {
     const slice = rows.slice(offset, offset + batchSize);
@@ -325,10 +318,14 @@ const insertBatch = async (tursoPipeline, getExecuteResult, table, columns, rows
     }
 
     requests.push({ type: "execute", stmt: { sql, args } });
-    if (requests.length >= 12) await flush();
   }
 
-  await flush();
+  requests.push({ type: "execute", stmt: { sql: "COMMIT" } });
+
+  const payload = await tursoPipeline(requests);
+  for (let i = 0; i < requests.length; i += 1) {
+    getExecuteResult(payload, i);
+  }
 };
 
 const clearRelationalKind = async (kind, tursoExecute) => {
