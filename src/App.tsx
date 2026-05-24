@@ -599,21 +599,35 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
     if (key) categoryMap.set(key, value);
   });
 
-  const branchTargets = new Map<string, { totalTarget: number; days: number }>();
-  const targetByOfficer = new Map<string, RawRow[]>();
+  const branchRowsMap = new Map<string, RawRow[]>();
   targetRows.forEach((row) => {
     const branchKey = normalizeText(row["BRANCH NAME"]);
-    const officerKey = cleanOfficerName(`${row.NAME ?? ""} ${row.SURNAME ?? ""}`.trim());
+    const list = branchRowsMap.get(branchKey) ?? [];
+    list.push(row);
+    branchRowsMap.set(branchKey, list);
+  });
+
+  const branchTargets = new Map<string, { totalTarget: number; days: number }>();
+  const branchDivisors = new Map<string, number>();
+  const branchTargetsIdentical = new Map<string, boolean>();
+  
+  branchRowsMap.forEach((rows, branchKey) => {
+    const nonZeroTargets = rows.map(r => toNumber(r.Total)).filter(t => t > 0);
+    const allIdentical = nonZeroTargets.length > 0 && nonZeroTargets.every(t => t === nonZeroTargets[0]);
+    const divisor = nonZeroTargets.length || 1;
     
-    const targetVal = toNumber(row.Total);
-    const days = toNumber(row.DAY) || 30;
+    branchDivisors.set(branchKey, divisor);
+    branchTargetsIdentical.set(branchKey, allIdentical);
     
-    const currentBranchTarget = branchTargets.get(branchKey) ?? { totalTarget: 0, days: 30 };
-    currentBranchTarget.totalTarget += targetVal;
-    currentBranchTarget.days = Math.max(currentBranchTarget.days, days);
-    branchTargets.set(branchKey, currentBranchTarget);
+    const totalTarget = allIdentical ? (nonZeroTargets[0] || 0) : nonZeroTargets.reduce((acc, t) => acc + t, 0);
     
-    targetByOfficer.set(officerKey, [...(targetByOfficer.get(officerKey) ?? []), row]);
+    let maxDays = 30;
+    rows.forEach(r => {
+      const days = toNumber(r.DAY) || 30;
+      if (days > maxDays) maxDays = days;
+    });
+    
+    branchTargets.set(branchKey, { totalTarget, days: maxDays });
   });
 
   const branchSummary = new Map<string, { label: string; target: number; actual: number; lastMonth: number; lastYear: number; currentDay: number; totalDays: number }>();
@@ -638,14 +652,29 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
     });
   });
 
-  // Pre-calculate Category Targets by summing them up across all targetRows
+  // Pre-calculate Category Targets by summing them up across all branches
   const catsToSum = ["iPhone", "Mac", "iPad", "Apple Watch", "SIM", "BTB"];
-  targetRows.forEach((row) => {
+  catsToSum.forEach((cat) => {
+    categorySummary.set(normalizeText(cat), { actual: 0, target: 0 });
+  });
+
+  branchRowsMap.forEach((rows, branchKey) => {
+    const isIdentical = branchTargetsIdentical.get(branchKey) ?? false;
+    
     catsToSum.forEach((cat) => {
       const key = normalizeText(cat);
-      const targetVal = toNumber(row[cat] ?? row[cat.toLowerCase()]);
+      const catTargets = rows.map(r => toNumber(r[cat] ?? r[cat.toLowerCase()])).filter(t => t > 0);
+      const allCatIdentical = catTargets.length > 0 && catTargets.every(t => t === catTargets[0]);
+      
+      let branchCatTarget = 0;
+      if (isIdentical || allCatIdentical) {
+        branchCatTarget = catTargets[0] || 0;
+      } else {
+        branchCatTarget = catTargets.reduce((acc, t) => acc + t, 0);
+      }
+      
       const catItem = categorySummary.get(key) ?? { actual: 0, target: 0 };
-      catItem.target += targetVal;
+      catItem.target += branchCatTarget;
       categorySummary.set(key, catItem);
     });
   });
@@ -655,11 +684,19 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
     const name = `${row.NAME ?? ""} ${row.SURNAME ?? ""}`.trim();
     if (!name) return;
     const officerKey = cleanOfficerName(name);
+    const branchKey = normalizeText(row["BRANCH NAME"]);
     const branch = String(row["BRANCH NAME"] ?? "").trim();
+    
+    const isIdentical = branchTargetsIdentical.get(branchKey) ?? false;
+    const divisor = branchDivisors.get(branchKey) ?? 1;
+    
+    const rawTotalTarget = toNumber(row.Total);
+    const target = isIdentical ? (rawTotalTarget / divisor) : rawTotalTarget;
+    
     officerSummary.set(officerKey, {
       name,
       branch,
-      target: toNumber(row.Total),
+      target: target,
       actual: 0,
       achPercent: 0,
       forecast: 0,
@@ -1591,12 +1628,13 @@ export default function App() {
       let actualDay = 0;
       
       if (hasData) {
-        // Sum Target
+        // Sum Target (supporting non-zero identical divisor scaling)
         const targetRow = uploadedFiles.target.find((row) => {
           const name = `${row.NAME ?? ""} ${row.SURNAME ?? ""}`.trim();
           return matchesOfficer(name, activeOfficer.name);
         });
         if (targetRow) {
+          let rawTarget = 0;
           if (catName === "BTB(Apple)") {
             const btbAppleVal = targetRow["BTB(Apple)"] ?? 
                                 targetRow["BTB (Apple)"] ?? 
@@ -1606,10 +1644,18 @@ export default function App() {
                                 targetRow["btb apple"] ?? 
                                 targetRow["BTB_Apple"] ?? 
                                 targetRow["btb_apple"];
-            target = toNumber(btbAppleVal);
+            rawTarget = toNumber(btbAppleVal);
           } else {
-            target = toNumber(targetRow[catName] ?? targetRow[catName.toLowerCase()]);
+            rawTarget = toNumber(targetRow[catName] ?? targetRow[catName.toLowerCase()]);
           }
+
+          const branchKey = normalizeText(targetRow["BRANCH NAME"]);
+          const branchRows = uploadedFiles.target.filter(r => normalizeText(r["BRANCH NAME"]) === branchKey);
+          const nonZeroTargets = branchRows.map(r => toNumber(r.Total)).filter(t => t > 0);
+          const allIdentical = nonZeroTargets.length > 0 && nonZeroTargets.every(t => t === nonZeroTargets[0]);
+          const divisor = nonZeroTargets.length || 1;
+          
+          target = allIdentical ? (rawTarget / divisor) : rawTarget;
         }
         
         // Sum Actuals
