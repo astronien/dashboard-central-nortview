@@ -416,6 +416,25 @@ type ParsedReport = {
 type UploadKind = "target" | "current" | "lastMonth" | "lastYear" | "categoryMaster";
 
 const normalizeText = (value: unknown) => String(value ?? "").toLowerCase().replace(/\s+/g, " ").replace(/[^a-z0-9ก-๙ ]/gi, "").trim();
+const cleanBranchForMatching = (val: unknown): string => {
+  if (!val) return "";
+  let clean = String(val).toLowerCase();
+  clean = clean.replace(/id\s*:?\s*\d+/g, "");
+  clean = clean.replace(/istudio\s*by\s*spvi/g, "");
+  clean = clean.replace(/istudio/g, "");
+  clean = clean.replace(/studio\s*7/g, "");
+  clean = clean.replace(/studio7/g, "");
+  clean = clean.replace(/studio/g, "");
+  clean = clean.replace(/spvi/g, "");
+  clean = clean.replace(/uficon/g, "");
+  clean = clean.replace(/copperwired/g, "");
+  clean = clean.replace(/iserve/g, "");
+  clean = clean.replace(/dotlife/g, "");
+  clean = clean.replace(/banana\s*it/g, "");
+  clean = clean.replace(/banana/g, "");
+  clean = clean.replace(/[^a-z0-9ก-๙]/gi, "");
+  return clean.trim();
+};
 const toNumber = (value: unknown) => Number(String(value ?? "").replace(/[^\d.-]/g, "")) || 0;
 const cleanOfficerName = (name: string) => {
   const aliases: Record<string, string> = { "แพวนภา": "แพรวนภา" };
@@ -2469,12 +2488,10 @@ export default function App() {
   ]);
 
   const parsedStoreHeader = useMemo(() => {
-    const cleanBranch = selectedBranch.replace(/^(istudio|istudio by spvi|spvi)\s*/i, "").trim();
-    
     const matchedBranch = parsedReport.branches.find(b => {
-      const bNorm = b.label.toLowerCase().replace(/[^a-z0-9ก-๙]/gi, "");
-      const cNorm = cleanBranch.toLowerCase().replace(/[^a-z0-9ก-๙]/gi, "");
-      return bNorm.includes(cNorm) || cNorm.includes(bNorm);
+      const bNorm = cleanBranchForMatching(b.label);
+      const cNorm = cleanBranchForMatching(selectedBranch);
+      return bNorm && cNorm && (bNorm.includes(cNorm) || cNorm.includes(bNorm));
     });
     
     const branchLabel = matchedBranch?.label || selectedBranch;

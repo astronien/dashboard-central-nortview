@@ -171,21 +171,34 @@ async function handler(req, res) {
         let normalizedRows = normalizeSheetRows(rawRows, kind);
         
         if (branchParam && (kind === "current" || kind === "lastMonth" || kind === "lastYear" || kind === "target")) {
-          const normalizeBranchText = (val) => 
-            String(val ?? "")
-              .toLowerCase()
-              .replace(/\s+/g, "")
-              .replace(/[^a-z0-9ก-๙]/gi, "")
-              .trim();
+          const cleanBranchForMatching = (val) => {
+            if (!val) return "";
+            let clean = String(val).toLowerCase();
+            clean = clean.replace(/id\s*:?\s*\d+/g, "");
+            clean = clean.replace(/istudio\s*by\s*spvi/g, "");
+            clean = clean.replace(/istudio/g, "");
+            clean = clean.replace(/studio\s*7/g, "");
+            clean = clean.replace(/studio7/g, "");
+            clean = clean.replace(/studio/g, "");
+            clean = clean.replace(/spvi/g, "");
+            clean = clean.replace(/uficon/g, "");
+            clean = clean.replace(/copperwired/g, "");
+            clean = clean.replace(/iserve/g, "");
+            clean = clean.replace(/dotlife/g, "");
+            clean = clean.replace(/banana\s*it/g, "");
+            clean = clean.replace(/banana/g, "");
+            clean = clean.replace(/[^a-z0-9ก-๙]/gi, "");
+            return clean.trim();
+          };
               
-          const normParam = normalizeBranchText(branchParam);
+          const normParam = cleanBranchForMatching(branchParam);
           
           normalizedRows = normalizedRows.filter(row => {
             const rowBranchVal = row["Branch (Name)"] || row["BRANCH NAME"] || "";
-            const normRow = normalizeBranchText(rowBranchVal);
-            return normRow.includes(normParam) || normParam.includes(normRow);
+            const normRow = cleanBranchForMatching(rowBranchVal);
+            return normRow && normParam && (normRow.includes(normParam) || normParam.includes(normRow));
           });
-          console.log(`[Sync] Filtered rows for branch "${branchParam}": ${normalizedRows.length} rows remaining.`);
+          console.log(`[Sync] Filtered rows for branch "${branchParam}" (norm: "${normParam}"): ${normalizedRows.length} rows remaining.`);
         }
         
         console.log(`[Sync] Saving ${normalizedRows.length} rows to Turso DB for: ${kind}`);
