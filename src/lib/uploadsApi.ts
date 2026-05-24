@@ -37,7 +37,9 @@ const splitRows = (rows: RawRow[]) => {
 
 const fetchUploadKind = async (kind: UploadKind): Promise<RawRow[]> => {
   const response = await fetch(kindUrl(kind));
-  if (!response.ok) return [];
+  if (!response.ok) {
+    throw new Error(`โหลดข้อมูล ${kind} ล้มเหลว (${response.status})`);
+  }
 
   const payload = (await response.json()) as { rows?: RawRow[] };
   return Array.isArray(payload.rows) ? payload.rows : [];

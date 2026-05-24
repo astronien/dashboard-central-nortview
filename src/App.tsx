@@ -2852,9 +2852,11 @@ export default function App() {
       });
       
       const nextUploads = await fetchUploads();
-      setUploadedFiles(nextUploads);
-      
-      rebuildReport(nextUploads, { changedKinds: kind ? [kind as UploadKind] : undefined });
+      if (nextUploads) {
+        setUploadedFiles(nextUploads);
+        persistUploadsLocal(nextUploads);
+        rebuildReport(nextUploads, { skipPersist: true });
+      }
       
       const stats = await fetchTursoStats();
       setTursoStats(stats);
