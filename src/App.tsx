@@ -599,35 +599,21 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
     if (key) categoryMap.set(key, value);
   });
 
-  const branchRowsMap = new Map<string, RawRow[]>();
+  const branchTargets = new Map<string, { totalTarget: number; days: number }>();
+  const targetByOfficer = new Map<string, RawRow[]>();
   targetRows.forEach((row) => {
     const branchKey = normalizeText(row["BRANCH NAME"]);
-    const list = branchRowsMap.get(branchKey) ?? [];
-    list.push(row);
-    branchRowsMap.set(branchKey, list);
-  });
-
-  const branchTargets = new Map<string, { totalTarget: number; days: number }>();
-  const branchDivisors = new Map<string, number>();
-  const branchTargetsIdentical = new Map<string, boolean>();
-  
-  branchRowsMap.forEach((rows, branchKey) => {
-    const nonZeroTargets = rows.map(r => toNumber(r.Total)).filter(t => t > 0);
-    const allIdentical = nonZeroTargets.length > 0 && nonZeroTargets.every(t => t === nonZeroTargets[0]);
-    const divisor = nonZeroTargets.length || 1;
+    const officerKey = cleanOfficerName(`${row.NAME ?? ""} ${row.SURNAME ?? ""}`.trim());
     
-    branchDivisors.set(branchKey, divisor);
-    branchTargetsIdentical.set(branchKey, allIdentical);
+    const targetVal = toNumber(row.Total);
+    const days = toNumber(row.DAY) || 30;
     
-    const totalTarget = allIdentical ? (nonZeroTargets[0] || 0) : nonZeroTargets.reduce((acc, t) => acc + t, 0);
+    const currentBranchTarget = branchTargets.get(branchKey) ?? { totalTarget: 0, days: 30 };
+    currentBranchTarget.totalTarget += targetVal;
+    currentBranchTarget.days = Math.max(currentBranchTarget.days, days);
+    branchTargets.set(branchKey, currentBranchTarget);
     
-    let maxDays = 30;
-    rows.forEach(r => {
-      const days = toNumber(r.DAY) || 30;
-      if (days > maxDays) maxDays = days;
-    });
-    
-    branchTargets.set(branchKey, { totalTarget, days: maxDays });
+    targetByOfficer.set(officerKey, [...(targetByOfficer.get(officerKey) ?? []), row]);
   });
 
   const branchSummary = new Map<string, { label: string; target: number; actual: number; lastMonth: number; lastYear: number; currentDay: number; totalDays: number }>();
@@ -652,29 +638,27 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
     });
   });
 
-  // Pre-calculate Category Targets by summing them up across all branches
-  const catsToSum = ["iPhone", "Mac", "iPad", "Apple Watch", "SIM", "BTB"];
-  catsToSum.forEach((cat) => {
-    categorySummary.set(normalizeText(cat), { actual: 0, target: 0 });
-  });
-
-  branchRowsMap.forEach((rows, branchKey) => {
-    const isIdentical = branchTargetsIdentical.get(branchKey) ?? false;
-    
+  // Pre-calculate Category Targets by summing them up across all targetRows
+  const catsToSum = ["iPhone", "Mac", "iPad", "Apple Watch", "SIM", "BTB", "BTB(Apple)"];
+  targetRows.forEach((row) => {
     catsToSum.forEach((cat) => {
       const key = normalizeText(cat);
-      const catTargets = rows.map(r => toNumber(r[cat] ?? r[cat.toLowerCase()])).filter(t => t > 0);
-      const allCatIdentical = catTargets.length > 0 && catTargets.every(t => t === catTargets[0]);
-      
-      let branchCatTarget = 0;
-      if (isIdentical || allCatIdentical) {
-        branchCatTarget = catTargets[0] || 0;
+      let targetVal = 0;
+      if (cat === "BTB(Apple)") {
+        const btbAppleVal = row["BTB(Apple)"] ?? 
+                            row["BTB (Apple)"] ?? 
+                            row["BTB Apple"] ?? 
+                            row["btb(apple)"] ?? 
+                            row["btb (apple)"] ?? 
+                            row["btb apple"] ?? 
+                            row["BTB_Apple"] ?? 
+                            row["btb_apple"];
+        targetVal = toNumber(btbAppleVal);
       } else {
-        branchCatTarget = catTargets.reduce((acc, t) => acc + t, 0);
+        targetVal = toNumber(row[cat] ?? row[cat.toLowerCase()]);
       }
-      
       const catItem = categorySummary.get(key) ?? { actual: 0, target: 0 };
-      catItem.target += branchCatTarget;
+      catItem.target += targetVal;
       categorySummary.set(key, catItem);
     });
   });
@@ -684,19 +668,11 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
     const name = `${row.NAME ?? ""} ${row.SURNAME ?? ""}`.trim();
     if (!name) return;
     const officerKey = cleanOfficerName(name);
-    const branchKey = normalizeText(row["BRANCH NAME"]);
     const branch = String(row["BRANCH NAME"] ?? "").trim();
-    
-    const isIdentical = branchTargetsIdentical.get(branchKey) ?? false;
-    const divisor = branchDivisors.get(branchKey) ?? 1;
-    
-    const rawTotalTarget = toNumber(row.Total);
-    const target = isIdentical ? (rawTotalTarget / divisor) : rawTotalTarget;
-    
     officerSummary.set(officerKey, {
       name,
       branch,
-      target: target,
+      target: toNumber(row.Total),
       actual: 0,
       achPercent: 0,
       forecast: 0,
@@ -1628,13 +1604,12 @@ export default function App() {
       let actualDay = 0;
       
       if (hasData) {
-        // Sum Target (supporting non-zero identical divisor scaling)
+        // Sum Target
         const targetRow = uploadedFiles.target.find((row) => {
           const name = `${row.NAME ?? ""} ${row.SURNAME ?? ""}`.trim();
           return matchesOfficer(name, activeOfficer.name);
         });
         if (targetRow) {
-          let rawTarget = 0;
           if (catName === "BTB(Apple)") {
             const btbAppleVal = targetRow["BTB(Apple)"] ?? 
                                 targetRow["BTB (Apple)"] ?? 
@@ -1644,18 +1619,10 @@ export default function App() {
                                 targetRow["btb apple"] ?? 
                                 targetRow["BTB_Apple"] ?? 
                                 targetRow["btb_apple"];
-            rawTarget = toNumber(btbAppleVal);
+            target = toNumber(btbAppleVal);
           } else {
-            rawTarget = toNumber(targetRow[catName] ?? targetRow[catName.toLowerCase()]);
+            target = toNumber(targetRow[catName] ?? targetRow[catName.toLowerCase()]);
           }
-
-          const branchKey = normalizeText(targetRow["BRANCH NAME"]);
-          const branchRows = uploadedFiles.target.filter(r => normalizeText(r["BRANCH NAME"]) === branchKey);
-          const nonZeroTargets = branchRows.map(r => toNumber(r.Total)).filter(t => t > 0);
-          const allIdentical = nonZeroTargets.length > 0 && nonZeroTargets.every(t => t === nonZeroTargets[0]);
-          const divisor = nonZeroTargets.length || 1;
-          
-          target = allIdentical ? (rawTarget / divisor) : rawTarget;
         }
         
         // Sum Actuals
@@ -1842,10 +1809,11 @@ export default function App() {
           const units = Math.max(toNumber(row.Number ?? row.number ?? row.qty), 0);
           
           const text = normalizeText(`${categoryName} ${subCategory} ${productName}`);
+          const rowCat = getCategory(row);
           
-          if (text.includes("iphone")) iphoneCount += units;
-          if (text.includes("mac") || text.includes("macbook") || text.includes("imac") || text.includes("desktop") || text.includes("notebook")) macCount += units;
-          if (text.includes("ipad")) ipadCount += units;
+          if (rowCat === "iPhone") iphoneCount += units;
+          if (rowCat === "Mac") macCount += units;
+          if (rowCat === "iPad") ipadCount += units;
           
           if (text.includes("trade") || text.includes("เทรด")) {
             tradeInCount += units;
@@ -1856,16 +1824,16 @@ export default function App() {
           if (text.includes("ufund") || text.includes("personal")) {
             ufundCount += units;
           }
-          if (text.includes("sim")) {
+          if (rowCat === "SIM" || text.includes("sim")) {
             simCount += units;
           }
-          if (text.includes("pencil")) {
+          if (productName.toLowerCase().includes("pencil") || text.includes("pencil")) {
             pencilCount += units;
           }
-          if ((text.includes("applecare") || text.includes("care")) && (text.includes("mac") || text.includes("macbook") || text.includes("imac"))) {
+          if ((text.includes("applecare") || text.includes("care")) && rowCat === "Mac") {
             macAppCount += units;
           }
-          if (text.includes("case") && (text.includes("iphone") || text.includes("ipad"))) {
+          if (text.includes("case") && (productName.toLowerCase().includes("iphone") || productName.toLowerCase().includes("ipad") || text.includes("iphone") || text.includes("ipad"))) {
             caseCount += units;
           }
         });
@@ -2229,16 +2197,28 @@ export default function App() {
     const hasData = uploadedFiles.current.length > 0;
 
     const getCategorySales = (categories: string[]) => {
-      return sumSales(uploadedFiles.current, (cat, prod, sub) => {
-        const text = `${cat} ${prod} ${sub}`.toLowerCase();
-        return categories.some(c => text.includes(c.toLowerCase()));
+      let sum = 0;
+      uploadedFiles.current.forEach((row) => {
+        const rowCat = getCategory(row);
+        const match = categories.some(c => {
+          if (c === "btb apple" || c === "btb(apple)") return rowCat === "BTB(Apple)";
+          return rowCat.toLowerCase() === c.toLowerCase();
+        });
+        if (match) {
+          sum += getCategoryValue(row);
+        }
       });
+      return sum;
     };
 
     const getCategoryTarget = (categories: string[]) => {
       let sum = 0;
       parsedReport.categories.forEach(c => {
-        if (categories.some(cat => c.category.toLowerCase().includes(cat.toLowerCase()))) {
+        const match = categories.some(cat => {
+          if (cat === "btb apple" || cat === "btb(apple)") return c.category === "BTB(Apple)";
+          return c.category.toLowerCase() === cat.toLowerCase();
+        });
+        if (match) {
           sum += c.target;
         }
       });
