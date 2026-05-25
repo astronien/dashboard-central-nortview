@@ -202,6 +202,7 @@ async function handler(req, res) {
             clean = clean.replace(/dotlife/g, "");
             clean = clean.replace(/banana\s*it/g, "");
             clean = clean.replace(/banana/g, "");
+            clean = clean.replace(/plaza/g, "");
             clean = clean.replace(/[^a-z0-9ก-๙]/gi, "");
             return clean.trim();
           };
