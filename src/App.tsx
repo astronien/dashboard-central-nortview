@@ -435,6 +435,16 @@ const cleanBranchForMatching = (val: unknown): string => {
   clean = clean.replace(/[^a-z0-9ก-๙]/gi, "");
   return clean.trim();
 };
+const filterRowsByBranch = (rows: any[], branch: string) => {
+  if (!rows || !rows.length) return [];
+  const normParam = cleanBranchForMatching(branch);
+  if (!normParam) return rows;
+  return rows.filter((row) => {
+    const rowBranchVal = row["Branch (Name)"] || row["BRANCH NAME"] || row.branch_name || row.shop_name || "";
+    const normRow = cleanBranchForMatching(rowBranchVal);
+    return normRow && normParam && (normRow.includes(normParam) || normParam.includes(normRow));
+  });
+};
 const toNumber = (value: unknown) => Number(String(value ?? "").replace(/[^\d.-]/g, "")) || 0;
 const cleanOfficerName = (name: string) => {
   const aliases: Record<string, string> = { "แพวนภา": "แพรวนภา" };
@@ -2766,11 +2776,16 @@ export default function App() {
     nextUploads: UploadState,
     options?: { skipPersist?: boolean; changedKinds?: UploadKind[] },
   ) => {
+    const filteredTarget = filterRowsByBranch(nextUploads.target, selectedBranch);
+    const filteredCurrent = filterRowsByBranch(nextUploads.current, selectedBranch);
+    const filteredLastMonth = filterRowsByBranch(nextUploads.lastMonth, selectedBranch);
+    const filteredLastYear = filterRowsByBranch(nextUploads.lastYear, selectedBranch);
+
     const report = buildReport(
-      nextUploads.target,
-      nextUploads.current,
-      nextUploads.lastMonth,
-      nextUploads.lastYear,
+      filteredTarget,
+      filteredCurrent,
+      filteredLastMonth,
+      filteredLastYear,
       nextUploads.categoryMaster,
       "uploaded-data",
     );
@@ -2907,6 +2922,12 @@ export default function App() {
     }
   }, [parsedStoreHeader.name]);
 
+  useEffect(() => {
+    if (uploadedFiles && hasUploadData(uploadedFiles)) {
+      rebuildReport(uploadedFiles, { skipPersist: true });
+    }
+  }, [selectedBranch]);
+
 
   const handleStaffPhotoUpload = async (
     entry: { staffId: string; officerKey: string; name: string; branch: string },
@@ -2994,11 +3015,16 @@ export default function App() {
         nextUploads[detectedKind] = rows;
         changedKinds.add(detectedKind);
       }
+      const filteredTarget = filterRowsByBranch(nextUploads.target, selectedBranch);
+      const filteredCurrent = filterRowsByBranch(nextUploads.current, selectedBranch);
+      const filteredLastMonth = filterRowsByBranch(nextUploads.lastMonth, selectedBranch);
+      const filteredLastYear = filterRowsByBranch(nextUploads.lastYear, selectedBranch);
+
       const report = buildReport(
-        nextUploads.target,
-        nextUploads.current,
-        nextUploads.lastMonth,
-        nextUploads.lastYear,
+        filteredTarget,
+        filteredCurrent,
+        filteredLastMonth,
+        filteredLastYear,
         nextUploads.categoryMaster,
         "uploaded-data",
       );
