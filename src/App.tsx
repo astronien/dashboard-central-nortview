@@ -1399,6 +1399,7 @@ export default function App() {
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isSyncingSheets, setIsSyncingSheets] = useState(false);
   const [syncResult, setSyncResult] = useState<any>(null);
+  const [sheetBranches, setSheetBranches] = useState<string[]>([]);
   const [selectedBranch, setSelectedBranch] = useState<string>(() => {
     try {
       return window.localStorage.getItem("dashboard-selected-branch") || "Mega Bangna";
@@ -2902,11 +2903,31 @@ export default function App() {
     void (async () => {
       setIsInitialLoading(true);
       await refreshTursoStats();
-      const [persisted, photos] = await Promise.all([
+      const [persisted, photos, branchesRes] = await Promise.all([
         loadPersistedUploads(),
         fetchStaffPhotos(),
+        fetch("/api/branches").then(r => r.ok ? r.json() : null).catch(() => null)
       ]);
       if (photos) setStaffPhotos(photos);
+      if (branchesRes && branchesRes.ok && Array.isArray(branchesRes.branches)) {
+        setSheetBranches(branchesRes.branches);
+        
+        // Auto-match current selectedBranch to the sheet branch format
+        const saved = window.localStorage.getItem("dashboard-selected-branch") || "Mega Bangna";
+        const savedNorm = cleanBranchForMatching(saved);
+        const matched = branchesRes.branches.find((b: string) => {
+          const bNorm = cleanBranchForMatching(b);
+          return bNorm && savedNorm && (bNorm.includes(savedNorm) || savedNorm.includes(bNorm));
+        });
+        if (matched) {
+          setSelectedBranch(matched);
+          try {
+            window.localStorage.setItem("dashboard-selected-branch", matched);
+          } catch {
+            // ignore
+          }
+        }
+      }
       if (persisted && hasUploadData(persisted)) {
         setUploadedFiles(persisted);
         rebuildReport(persisted, { skipPersist: true });
@@ -5789,7 +5810,7 @@ export default function App() {
                       onChange={(e) => handleBranchChange(e.target.value)}
                       className="w-full bg-[#051710] border border-white/15 rounded-xl px-4 py-3 text-white text-sm font-semibold focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400 transition-all cursor-pointer shadow-lg"
                     >
-                      {[
+                      {(sheetBranches.length > 0 ? sheetBranches : [
                         "Mega Bangna",
                         "Central World",
                         "Central Rama 9",
@@ -5798,19 +5819,11 @@ export default function App() {
                         "Central Plaza Rayong",
                         "Central Chiangmai Airport",
                         "Central Plaza Westgate",
-                        ...staffBranchesList.filter(b => b !== "All Branches" && ![
-                          "Mega Bangna",
-                          "Central World",
-                          "Central Rama 9",
-                          "Iconsiam",
-                          "Central Phitsanulok",
-                          "Central Plaza Rayong",
-                          "Central Chiangmai Airport",
-                          "Central Plaza Westgate"
-                        ].some(def => b.toLowerCase().includes(def.toLowerCase())))
-                      ].map((br) => (
+                      ]).map((br) => (
                         <option key={br} value={br} className="bg-[#051710] text-white">
-                          {br.startsWith("iStudio") || br.startsWith("Studio 7") ? br : `iStudio ${br}`}
+                          {br.includes(":") 
+                            ? br.replace(/^ID\d+\s*:\s*/, "") 
+                            : (br.startsWith("iStudio") || br.startsWith("Studio 7") ? br : `iStudio ${br}`)}
                         </option>
                       ))}
                     </select>
