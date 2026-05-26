@@ -141,6 +141,31 @@ export function StaffSection({
       ? activeOfficer7WondersPerformance
       : activeOfficerCategoryPerformance;
 
+  const topAttachSummary = React.useMemo(() => {
+    const matched = staffLeaderboard.find((item) =>
+      activeOfficer ? attachMatchesOfficer(item.name, activeOfficer.name) : false,
+    );
+    if (!matched) return null;
+
+    const best = Object.entries(matched.attachMap)
+      .map(([key, value]) => ({ key, rate: value?.rate ?? 0, units: value?.units ?? 0 }))
+      .sort((a, b) => b.rate - a.rate)[0];
+
+    return best ?? null;
+  }, [staffLeaderboard, activeOfficer, attachMatchesOfficer]);
+
+  const focusKpiSummary = React.useMemo(() => {
+    const rows = activeOfficerCategoryPerformance.filter((row) => row.category !== "Total" && row.category !== "Average");
+    if (!rows.length) return null;
+    return [...rows].sort((a, b) => b.achDayPercent - a.achDayPercent)[0] ?? null;
+  }, [activeOfficerCategoryPerformance]);
+
+  const todayTarget = activeOfficer
+    ? Math.round(activeOfficer.target / 30)
+    : Number(currentStaff.stats.target) || 0;
+  const todayAchPercent = todayTarget > 0 ? (todaySalesTotal / todayTarget) * 100 : 0;
+  const todayGap = todayTarget - todaySalesTotal;
+
   return (
               <motion.div
                 key="staff"
@@ -406,19 +431,11 @@ export function StaffSection({
                         className="bg-white/10 backdrop-blur-md border border-white/10 rounded-full px-2 lg:px-4 py-2.5 text-center overflow-hidden min-w-0 flex flex-col items-center justify-center transition-colors duration-200"
                       >
                         <div className="text-[9px] uppercase tracking-wider text-white/60 mb-0.5 w-full truncate">
-                          Role
+                          Target Today
                         </div>
-                        <AnimatePresence mode="wait">
-                          <motion.div
-                            key={dynamicRole}
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="text-[10px] lg:text-xs font-semibold w-full truncate"
-                          >
-                            {dynamicRole}
-                          </motion.div>
-                        </AnimatePresence>
+                        <div className="text-[10px] lg:text-xs font-semibold w-full truncate">
+                          ฿{fmtSalesNum(Math.round((monthlySalesTarget ?? 0) / 30))}
+                        </div>
                       </motion.div>
                       <motion.div
                         initial={{ opacity: 0, scale: 0.9 }}
@@ -428,19 +445,11 @@ export function StaffSection({
                         className="bg-white/10 backdrop-blur-md border border-white/10 rounded-full px-2 lg:px-4 py-2.5 text-center overflow-hidden min-w-0 flex flex-col items-center justify-center transition-colors duration-200"
                       >
                         <div className="text-[9px] uppercase tracking-wider text-white/60 mb-0.5 w-full truncate">
-                          Experience
+                          Today Ach%
                         </div>
-                        <AnimatePresence mode="wait">
-                          <motion.div
-                            key={dynamicExperience}
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="text-[10px] lg:text-xs font-semibold w-full truncate"
-                          >
-                            {dynamicExperience}
-                          </motion.div>
-                        </AnimatePresence>
+                        <div className="text-[10px] lg:text-xs font-semibold w-full truncate">
+                          {fmtSalesPct(monthlySalesPct)}
+                        </div>
                       </motion.div>
                       <motion.div
                         initial={{ opacity: 0, scale: 0.9 }}
@@ -450,19 +459,11 @@ export function StaffSection({
                         className="bg-white/10 backdrop-blur-md border border-white/10 rounded-full px-2 lg:px-4 py-2.5 text-center overflow-hidden min-w-0 flex flex-col items-center justify-center transition-colors duration-200"
                       >
                         <div className="text-[9px] uppercase tracking-wider text-white/60 mb-0.5 w-full truncate">
-                          Expertise
+                          Top Attach / Focus KPI
                         </div>
-                        <AnimatePresence mode="wait">
-                          <motion.div
-                            key={dynamicExpertise}
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="text-[10px] lg:text-xs font-semibold w-full truncate"
-                          >
-                            {dynamicExpertise}
-                          </motion.div>
-                        </AnimatePresence>
+                        <div className="text-[10px] lg:text-xs font-semibold w-full truncate">
+                          {topAttachSummary ? `${topAttachSummary.key} ${Math.round(topAttachSummary.rate)}%` : "—"}
+                        </div>
                       </motion.div>
                       <motion.div
                         initial={{ opacity: 0, scale: 0.9 }}
