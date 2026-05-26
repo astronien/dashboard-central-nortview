@@ -2194,13 +2194,17 @@ export default function App() {
     const btbRate = btbTotalSales > 0 ? (btbSales / btbTotalSales) * 100 : 12.61;
     
     // Card 11: Mac Growth YoY
-    const currentMacSales = hasData ? sumSales(displayUploads.current, (cat) => cat.includes("mac")) : 5160000;
+    const currentMacSales = hasData
+      ? parsedReport.categories.find((c) => c.category.toLowerCase() === "mac")?.actual ?? sumSales(displayUploads.current, (cat) => cat.includes("mac"))
+      : 5160000;
     const lastYearMacSales = hasData ? sumSales(displayUploads.lastYear, (cat) => cat.includes("mac")) : 0;
     const macYoYRate = lastYearMacSales > 0 ? ((currentMacSales - lastYearMacSales) / lastYearMacSales) * 100 : 0.00;
     
-    // Card 12: Total Sales Growth YoY
+    // Card 12: Total Sales Growth YoY (same buildReport aggregation as totalSales)
     const currentTotalSales = totalSales;
-    const lastYearTotalSales = hasData ? sumSales(displayUploads.lastYear, () => true) : 0;
+    const lastYearTotalSales = hasData
+      ? parsedReport.branches.reduce((sum, b) => sum + (b.lastYear || 0), 0)
+      : 0;
     const totalSalesYoYRate = lastYearTotalSales > 0 ? ((currentTotalSales - lastYearTotalSales) / lastYearTotalSales) * 100 : 0.00;
 
     return {

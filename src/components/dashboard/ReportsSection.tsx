@@ -117,10 +117,30 @@ export function ReportsSection({
         >
           <div className="font-semibold text-white mb-1">{syncResult.message}</div>
           {syncResult.summary ? (
-            <div className="text-xs font-mono text-white/70 mt-1">
-              {Object.entries(syncResult.summary)
-                .map(([kind, count]) => `${kind}: ${count.toLocaleString()} rows`)
-                .join(" • ")}
+            <div className="text-xs font-mono text-white/70 mt-1 space-y-1">
+              {Object.entries(syncResult.summary).map(([kind, entry]) => {
+                const saved =
+                  typeof entry === "number"
+                    ? entry
+                    : typeof entry === "object" && entry && "saved" in entry
+                      ? Number((entry as { saved: number }).saved)
+                      : 0;
+                const dates =
+                  typeof entry === "object" && entry && "dates" in entry
+                    ? (entry as { dates?: { uniqueDays?: number; minDay?: string; maxDay?: string } }).dates
+                    : undefined;
+                const dayHint =
+                  dates && dates.uniqueDays === 1
+                    ? ` (วันเดียว ${dates.minDay})`
+                    : dates && dates.uniqueDays
+                      ? ` (${dates.uniqueDays} วัน: ${dates.minDay}–${dates.maxDay})`
+                      : "";
+                return (
+                  <div key={kind}>
+                    {kind}: {saved.toLocaleString()} rows{dayHint}
+                  </div>
+                );
+              })}
             </div>
           ) : null}
           {syncResult.errors?.length ? (

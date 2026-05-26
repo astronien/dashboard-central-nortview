@@ -1,4 +1,5 @@
 const { saveUploadKind, isUploadKind, UPLOAD_KINDS } = require("./turso");
+const { parseCSV, summarizeDocDates } = require("./csvParse");
 
 const SHEET_URLS = {
   target: "https://docs.google.com/spreadsheets/d/18zsazWoy2DrItbc4c6FeVqD8X1DAUljdjBOG02lXM5I/gviz/tq?tqx=out:csv&gid=731299113",
@@ -20,60 +21,7 @@ const applyCors = (res) => {
   });
 };
 
-function parseCSV(text) {
-  const lines = [];
-  let row = [""];
-  let inQuotes = false;
-  
-  for (let i = 0; i < text.length; i++) {
-    const char = text[i];
-    const nextChar = text[i + 1];
-    
-    if (char === '"') {
-      if (inQuotes && nextChar === '"') {
-        row[row.length - 1] += '"';
-        i++;
-      } else {
-        inQuotes = !inQuotes;
-      }
-    } else if (char === ',') {
-      if (inQuotes) {
-        row[row.length - 1] += ',';
-      } else {
-        row.push('');
-      }
-    } else if (char === '\n' || char === '\r') {
-      if (inQuotes) {
-        row[row.length - 1] += char;
-      } else {
-        if (char === '\r' && nextChar === '\n') {
-          i++;
-        }
-        lines.push(row);
-        row = [''];
-      }
-    } else {
-      row[row.length - 1] += char;
-    }
-  }
-  if (row.length > 1 || row[0] !== '') {
-    lines.push(row);
-  }
-  
-  if (lines.length < 2) return [];
-  const headers = lines[0].map(h => h.trim());
-  const results = [];
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i];
-    if (line.length !== headers.length) continue;
-    const obj = {};
-    for (let j = 0; j < headers.length; j++) {
-      obj[headers[j]] = line[j];
-    }
-    results.push(obj);
-  }
-  return results;
-}
+const TRANSACTION_KINDS = new Set(["current", "lastMonth", "lastYear"]);
 
 // แปลงฟิลด์จาก Google Sheets ให้เข้ากับโครงสร้าง db schema ของเรา
 function normalizeSheetRows(rows, kind) {
@@ -176,10 +124,16 @@ async function handler(req, res) {
         }
 
         const csvText = await fetchRes.text();
-        const rawRows = parseCSV(csvText);
+        const { rows: rawRows, stats: parseStats } = parseCSV(csvText);
 
         if (!rawRows.length) {
           throw new Error("No data found or failed to parse CSV.");
+        }
+
+        if (parseStats.paddedRows || parseStats.truncatedRows) {
+          console.warn(
+            `[Sync] ${kind}: CSV ragged rows padded=${parseStats.paddedRows} truncated=${parseStats.truncatedRows}`,
+          );
         }
 
         const normalizedRows = normalizeSheetRows(rawRows, kind);
@@ -190,10 +144,19 @@ async function handler(req, res) {
           );
         }
 
-        console.log(`[Sync] Saving ${normalizedRows.length} rows to Turso DB for: ${kind}`);
+        console.log(
+          `[Sync] ${kind}: raw=${parseStats.rawDataLines} parsed=${parseStats.parsedRows} saved=${normalizedRows.length}`,
+        );
         await saveUploadKind(kind, normalizedRows);
 
-        summary[kind] = normalizedRows.length;
+        const kindSummary = {
+          saved: normalizedRows.length,
+          parse: parseStats,
+        };
+        if (TRANSACTION_KINDS.has(kind)) {
+          kindSummary.dates = summarizeDocDates(rawRows);
+        }
+        summary[kind] = kindSummary;
       } catch (err) {
         console.error(`[Sync Error] Failed to sync ${kind}:`, err);
         errors.push({ kind, error: err instanceof Error ? err.message : String(err) });
