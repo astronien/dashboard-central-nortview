@@ -38,7 +38,7 @@ export type OfficerData = {
   name: string;
   actual: number;
   target: number;
-  achPercent: number;
+  achPercent?: number;
   forecast: number;
   branch?: string;
 };
@@ -109,6 +109,26 @@ export function StaffSection({
   overallAttachRate: (item: StaffLeaderboardItem) => number;
   onSetActiveStaffId: (id: string) => void;
 }) {
+  const monthlySalesActual = activeOfficer
+    ? Math.round(activeOfficer.actual)
+    : Number(currentStaff.stats.sales) || 0;
+  const monthlySalesTarget = activeOfficer
+    ? Math.round(activeOfficer.target)
+    : null;
+  const monthlySalesPct =
+    activeOfficer?.achPercent ??
+    (monthlySalesTarget && monthlySalesTarget > 0
+      ? (monthlySalesActual / monthlySalesTarget) * 100
+      : (() => {
+          const targetStr = String(currentStaff.stats.target);
+          const pctMatch = targetStr.match(/([\d.]+)\s*%/);
+          return pctMatch ? Number(pctMatch[1]) : 0;
+        })());
+
+  const fmtSalesNum = (n: number) => n.toLocaleString();
+  const fmtSalesPct = (n: number) =>
+    `${n >= 100 ? Math.round(n) : n.toFixed(1)}%`;
+
   return (
               <motion.div
                 key="staff"
@@ -153,18 +173,19 @@ export function StaffSection({
                   </div>
 
                   {/* Center Column - Radar Chart */}
-                  <div className="lg:w-[28%] relative flex items-center justify-center py-4 lg:py-0 z-40">
+                  <div className="lg:w-[28%] relative flex items-center justify-center py-4 lg:py-0 z-40 overflow-visible">
                     <motion.div
                       initial={{ opacity: 0, scale: 0.8, rotate: -10 }}
                       animate={{ opacity: 1, scale: 1, rotate: 0 }}
                       transition={{ duration: 0.65, type: "spring", bounce: 0.25, delay: 0.15 }}
-                      className="w-full max-w-[260px] h-[260px] min-h-[260px] relative text-xs"
+                      className="w-full max-w-[300px] h-[300px] min-h-[300px] relative text-xs overflow-visible [&_.recharts-wrapper]:!overflow-visible [&_svg]:!overflow-visible"
                     >
-                      <ResponsiveContainer width="100%" height={260} minWidth={0}>
+                      <ResponsiveContainer width="100%" height={300} minWidth={0}>
                         <RadarChart
                           cx="50%"
                           cy="50%"
-                          outerRadius="65%"
+                          outerRadius="52%"
+                          margin={{ top: 28, right: 36, bottom: 28, left: 36 }}
                           data={dynamicRadarData}
                         >
                           <PolarGrid
@@ -256,31 +277,42 @@ export function StaffSection({
                         transition={{ type: "spring", stiffness: 120, damping: 14, delay: 0.1 }}
                         whileHover={{ scale: 1.05, y: -4, boxShadow: "0px 10px 25px rgba(16, 185, 129, 0.2)" }}
                         whileTap={{ scale: 0.95 }}
-                        className={`rounded-2xl px-2 py-4 w-28 sm:w-32 text-center border shadow-lg transition-all duration-200 ${activeStat === "sales" ? "bg-[#0c3123] border-white/30 ring-1 ring-emerald-500/50" : "bg-black/20 border-white/5 hover:bg-black/30"}`}
+                        className={`rounded-2xl px-2 py-3 w-28 sm:w-32 min-h-[104px] text-center border shadow-lg transition-all duration-200 overflow-visible ${activeStat === "sales" ? "bg-[#0c3123] border-white/30 ring-1 ring-emerald-500/50" : "bg-black/20 border-white/5 hover:bg-black/30"}`}
                       >
                         <ShoppingBag
-                          className={`w-5 h-5 mx-auto mb-2 ${activeStat === "sales" ? "text-white" : "text-white/60"}`}
+                          className={`w-5 h-5 mx-auto mb-1.5 shrink-0 ${activeStat === "sales" ? "text-white" : "text-white/60"}`}
                         />
-                        <div className="text-[10px] text-white/70 mb-1 font-medium">
+                        <div className="text-[10px] text-white/70 mb-1.5 font-medium leading-tight">
                           Monthly Sales
                         </div>
                         <AnimatePresence mode="wait">
                           <motion.div
-                            key={activeOfficer ? Math.round(activeOfficer.actual) : currentStaff.stats.sales}
+                            key={`${monthlySalesActual}-${monthlySalesTarget}-${monthlySalesPct}`}
                             initial={{ opacity: 0, y: 5 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -5 }}
-                            className={`font-bold transition-all ${
-                              (activeOfficer 
-                                ? Math.round(activeOfficer.actual).toLocaleString() 
-                                : currentStaff.stats.sales
-                              ).length > 7 ? "text-base sm:text-lg lg:text-xl tracking-tighter" : "text-xl lg:text-2xl"
-                            }`}
+                            className="w-full space-y-1 text-[9px] leading-snug overflow-visible"
                           >
-                            {activeOfficer 
-                              ? Math.round(activeOfficer.actual).toLocaleString() 
-                              : Number(currentStaff.stats.sales).toLocaleString()
-                            }
+                            <div className="flex items-baseline justify-between gap-1 min-w-0">
+                              <span className="text-white/55 shrink-0">ยอดจริง</span>
+                              <span className="font-bold text-white tabular-nums truncate">
+                                {fmtSalesNum(monthlySalesActual)}
+                              </span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-1 min-w-0">
+                              <span className="text-white/55 shrink-0">เป้า</span>
+                              <span className="font-semibold text-white/85 tabular-nums truncate">
+                                {monthlySalesTarget != null
+                                  ? fmtSalesNum(monthlySalesTarget)
+                                  : "—"}
+                              </span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-1 min-w-0">
+                              <span className="text-white/55 shrink-0">ถึงเป้า</span>
+                              <span className="font-bold text-emerald-300 tabular-nums">
+                                {fmtSalesPct(monthlySalesPct)}
+                              </span>
+                            </div>
                           </motion.div>
                         </AnimatePresence>
                       </motion.button>

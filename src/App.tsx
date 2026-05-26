@@ -341,47 +341,71 @@ const getAttachCategoryOptions = (rows: RawRow[]) => {
   return ["all", ...Array.from(keys).sort((a, b) => a.localeCompare(b))];
 };
 
+const parseRadarTickPayload = (raw: string) => {
+  const pipeIdx = raw.indexOf("|");
+  const fullName = pipeIdx >= 0 ? raw.slice(0, pipeIdx) : raw;
+  const val = pipeIdx >= 0 ? raw.slice(pipeIdx + 1) : "";
+  const name = fullName.replace(/^\d+\.\s*/, "").trim();
+  return { name, val };
+};
+
+const breakRadarLabelLines = (text: string, maxLen = 13): string[] => {
+  if (text.length <= maxLen) return [text];
+  const breakAt = (idx: number) => {
+    if (idx <= 0 || idx >= text.length) return -1;
+    const ch = text[idx];
+    return ch === " " || ch === "+" || ch === "(" ? idx : -1;
+  };
+  let split = -1;
+  for (let i = Math.min(maxLen, text.length - 1); i >= Math.floor(maxLen * 0.55); i--) {
+    split = breakAt(i);
+    if (split > 0) break;
+  }
+  if (split <= 0) split = maxLen;
+  const first = text.slice(0, split).trim();
+  const rest = text.slice(split).trim();
+  if (!rest) return [first];
+  if (rest.length <= maxLen) return [first, rest];
+  return [first, ...breakRadarLabelLines(rest, maxLen)];
+};
+
 const renderCustomTick = ({ payload, x, y, textAnchor }: any) => {
-  const [name, val] = payload.value.split("|");
-  const words = name.split(" ");
-  const dyTop = words.length > 1 ? -10 : -4;
+  const { name, val } = parseRadarTickPayload(String(payload?.value ?? ""));
+  const lines = breakRadarLabelLines(name);
+  const lineHeight = 11;
+  const nameStartDy = lines.length > 1 ? -(lineHeight * (lines.length - 1)) / 2 - 4 : -4;
+  const valDy = nameStartDy + lines.length * lineHeight + 6;
+  const fontSize = name.length > 16 ? 9 : 10;
+
   return (
-    <g transform={`translate(${x},${y})`}>
-      {words.length > 1 && (
+    <g transform={`translate(${x},${y})`} style={{ overflow: "visible" }}>
+      {lines.map((line, i) => (
+        <text
+          key={`${line}-${i}`}
+          x={0}
+          y={0}
+          dy={nameStartDy + i * lineHeight}
+          textAnchor={textAnchor}
+          fill="rgba(255,255,255,0.9)"
+          fontSize={fontSize}
+          fontWeight="600"
+        >
+          {line}
+        </text>
+      ))}
+      {val ? (
         <text
           x={0}
           y={0}
-          dy={-16}
+          dy={valDy}
           textAnchor={textAnchor}
-          fill="rgba(255,255,255,0.9)"
-          fontSize={11}
-          fontWeight="600"
+          fill="#34d399"
+          fontSize={12}
+          fontWeight="bold"
         >
-          {words[0]}
+          {val}
         </text>
-      )}
-      <text
-        x={0}
-        y={0}
-        dy={words.length > 1 ? 0 : -4}
-        textAnchor={textAnchor}
-        fill="rgba(255,255,255,0.9)"
-        fontSize={11}
-        fontWeight="600"
-      >
-        {words.length > 1 ? words.slice(1).join(" ") : words[0]}
-      </text>
-      <text
-        x={0}
-        y={0}
-        dy={16}
-        textAnchor={textAnchor}
-        fill="#34d399"
-        fontSize={14}
-        fontWeight="bold"
-      >
-        {val}
-      </text>
+      ) : null}
     </g>
   );
 };
@@ -2000,9 +2024,10 @@ export default function App() {
         const rawActual = row.actual;
         const rawTarget = row.target;
         const scaledVal = scale(rawActual, rawTarget);
-        
+        const label = row.category.replace(/^\d+\.\s*/, "").trim();
+
         return {
-          subject: `${row.category}|${Math.round(rawActual)}%`,
+          subject: `${label}|${Math.round(rawActual)}%`,
           value: scaledVal,
           fullMark: 100
         };
