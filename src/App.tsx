@@ -1813,8 +1813,23 @@ export default function App() {
     return [...rows, totalRow];
   }, [activeOfficer, displayUploads, parsedReport, getCategory]);
 
+  const activeOfficerTodaySales = useMemo(() => {
+    if (!activeOfficer) return 0;
+    const total = activeOfficerCategoryPerformance.find((r) => r.category === "Total");
+    if (total) return Math.round(total.actualDay);
+    return Math.round(activeOfficer.actualDay ?? 0);
+  }, [activeOfficer, activeOfficerCategoryPerformance]);
+
   const categoryPerformanceHint = useMemo(() => {
-    if (!displayUploads.current.length || activeStat === "csat") return null;
+    if (activeStat === "csat") return null;
+    if (activeStat === "target") {
+      if (todayStats.dateStr) {
+        return `แสดงยอดขายวัน ${todayStats.dateStr} (วันล่าสุดในไฟล์ current)`;
+      }
+      if (!displayUploads.current.length) return null;
+      return "ไม่พบยอดขายวันนี้ในไฟล์ current";
+    }
+    if (!displayUploads.current.length) return null;
     if (displayUploads.categoryMaster.length > 0) return null;
     const totalRow = activeOfficerCategoryPerformance.find((r) => r.category === "Total");
     if (totalRow && totalRow.actual > 0) return null;
@@ -1824,6 +1839,7 @@ export default function App() {
     displayUploads.categoryMaster.length,
     activeOfficerCategoryPerformance,
     activeStat,
+    todayStats.dateStr,
   ]);
 
   const activeOfficer7WondersPerformance = useMemo<CategoryPerformanceRow[]>(() => {
@@ -2035,6 +2051,20 @@ export default function App() {
           subject: `${label}|${Math.round(rawActual)}%`,
           value: scaledVal,
           fullMark: 100
+        };
+      });
+    } else if (activeStat === "target") {
+      const catRows = activeOfficerCategoryPerformance.filter(
+        (r) => r.category !== "Total" && r.category !== "Average",
+      );
+
+      return catRows.map((row) => {
+        const ach = Math.round(row.achDayPercent);
+
+        return {
+          subject: `${row.category}|${ach}%`,
+          value: Math.min(Math.max(ach, 0), 100),
+          fullMark: 100,
         };
       });
     } else {
@@ -3124,6 +3154,8 @@ export default function App() {
                 dynamicLanguages={dynamicLanguages}
                 activeOfficer7WondersPerformance={activeOfficer7WondersPerformance}
                 activeOfficerCategoryPerformance={activeOfficerCategoryPerformance}
+                todaySalesTotal={activeOfficerTodaySales}
+                todayDateLabel={todayStats.dateStr}
                 categoryPerformanceHint={categoryPerformanceHint}
                 activeTab={activeTab}
                 onSetActiveTab={setActiveTab}

@@ -73,6 +73,8 @@ export function StaffSection({
   dynamicLanguages,
   activeOfficer7WondersPerformance,
   activeOfficerCategoryPerformance,
+  todaySalesTotal,
+  todayDateLabel,
   categoryPerformanceHint,
   activeTab,
   onSetActiveTab,
@@ -102,6 +104,8 @@ export function StaffSection({
   dynamicLanguages: string;
   activeOfficer7WondersPerformance: PerformanceRow[];
   activeOfficerCategoryPerformance: PerformanceRow[];
+  todaySalesTotal: number;
+  todayDateLabel?: string;
   categoryPerformanceHint?: string | null;
   activeTab: string;
   onSetActiveTab: (tab: string) => void;
@@ -130,6 +134,12 @@ export function StaffSection({
   const fmtSalesNum = (n: number) => n.toLocaleString();
   const fmtSalesPct = (n: number) =>
     `${n >= 100 ? Math.round(n) : n.toFixed(1)}%`;
+  const isTodayView = activeStat === "target";
+  const tableRows = isTodayView
+    ? activeOfficerCategoryPerformance
+    : activeStat === "csat"
+      ? activeOfficer7WondersPerformance
+      : activeOfficerCategoryPerformance;
 
   return (
               <motion.div
@@ -360,26 +370,27 @@ export function StaffSection({
                         <Star
                           className={`w-5 h-5 mx-auto mb-2 relative z-10 ${activeStat === "target" ? "text-emerald-200 fill-emerald-200" : "text-white/60"}`}
                         />
-                        <div className="text-[10px] relative z-10 text-emerald-100 mb-1 font-medium">
-                          Target Hit
+                        <div className="text-[10px] relative z-10 text-emerald-100 mb-0.5 font-medium">
+                          ยอดวันนี้
                         </div>
+                        {todayDateLabel ? (
+                          <div className="text-[8px] relative z-10 text-white/45 mb-1 leading-tight px-0.5">
+                            {todayDateLabel}
+                          </div>
+                        ) : null}
                         <AnimatePresence mode="wait">
                           <motion.div
-                            key={activeOfficer ? Math.round(activeOfficer.target) : currentStaff.stats.target}
+                            key={todaySalesTotal}
                             initial={{ opacity: 0, y: 5 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -5 }}
                             className={`font-bold text-white relative z-10 transition-all ${
-                              (activeOfficer 
-                                ? Math.round(activeOfficer.target).toLocaleString() 
-                                : currentStaff.stats.target
-                              ).length > 7 ? "text-base sm:text-lg lg:text-xl tracking-tighter" : "text-xl lg:text-2xl"
+                              fmtSalesNum(todaySalesTotal).length > 7
+                                ? "text-base sm:text-lg lg:text-xl tracking-tighter"
+                                : "text-xl lg:text-2xl"
                             }`}
                           >
-                            {activeOfficer 
-                              ? Math.round(activeOfficer.target).toLocaleString() 
-                              : currentStaff.stats.target
-                            }
+                            {fmtSalesNum(todaySalesTotal)}
                           </motion.div>
                         </AnimatePresence>
                       </motion.button>
@@ -508,19 +519,30 @@ export function StaffSection({
                       </div>
                       <div>
                         <h2 className="text-base font-bold tracking-tight text-white">
-                          {activeStat === "csat" ? "7 Wonders Attach Rates" : "Category Performance vs. Target"}
+                          {activeStat === "csat"
+                            ? "7 Wonders Attach Rates"
+                            : isTodayView
+                              ? "ยอดขายวันนี้ตามหมวด"
+                              : "Category Performance vs. Target"}
                         </h2>
                         <p className="text-[10px] text-white/50">
-                          {activeStat === "csat" 
+                          {activeStat === "csat"
                             ? `Attach rate breakdown for ${activeOfficer?.name ?? currentStaff.name} against KPI targets`
-                            : `Performance breakdown for ${activeOfficer?.name ?? currentStaff.name} by product category`
-                          }
+                            : isTodayView
+                              ? `ยอดขายของวันปัจจุบัน — ${activeOfficer?.name ?? currentStaff.name}${todayDateLabel ? ` • ${todayDateLabel}` : ""}`
+                              : `Performance breakdown for ${activeOfficer?.name ?? currentStaff.name} by product category`}
                         </p>
                       </div>
                     </div>
 
                     {categoryPerformanceHint && activeStat !== "csat" ? (
-                      <p className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200/90">
+                      <p
+                        className={`mb-3 rounded-lg border px-3 py-2 text-[11px] ${
+                          isTodayView
+                            ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-100/90"
+                            : "border-amber-500/30 bg-amber-500/10 text-amber-200/90"
+                        }`}
+                      >
                         {categoryPerformanceHint}
                       </p>
                     ) : null}
@@ -532,19 +554,38 @@ export function StaffSection({
                             <th className="py-2.5 px-3 font-bold uppercase tracking-wider">
                               {activeStat === "csat" ? "Attach Category" : "Group Category"}
                             </th>
-                            <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Target</th>
-                            <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Actual</th>
-                            <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-center">Ach. %</th>
-                            <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Forecast</th>
-                            <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-center">%Forecast</th>
-                            <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Last Month</th>
-                            <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-center">% MoM</th>
-                            <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Last Year</th>
-                            <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-center">% YoY</th>
-                            <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Target Day</th>
-                            <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Actual Day</th>
-                            <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Diff Day</th>
-                            <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-center">% Ach Day</th>
+                            {isTodayView ? (
+                              <>
+                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">
+                                  เป้าวัน
+                                </th>
+                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">
+                                  ยอดวันนี้
+                                </th>
+                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">
+                                  ส่วนต่าง
+                                </th>
+                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-center">
+                                  % ถึงเป้า
+                                </th>
+                              </>
+                            ) : (
+                              <>
+                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Target</th>
+                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Actual</th>
+                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-center">Ach. %</th>
+                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Forecast</th>
+                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-center">%Forecast</th>
+                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Last Month</th>
+                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-center">% MoM</th>
+                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Last Year</th>
+                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-center">% YoY</th>
+                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Target Day</th>
+                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Actual Day</th>
+                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Diff Day</th>
+                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-center">% Ach Day</th>
+                              </>
+                            )}
                           </tr>
                         </thead>
                         <AnimatePresence mode="wait">
@@ -556,7 +597,7 @@ export function StaffSection({
                             transition={{ duration: 0.25 }}
                             className="divide-y divide-emerald-500/10 bg-[#052b20]/60"
                           >
-                            {(activeStat === "csat" ? activeOfficer7WondersPerformance : activeOfficerCategoryPerformance).map((row, idx) => {
+                            {tableRows.map((row, idx) => {
                               const isCsat = activeStat === "csat";
                               const isTotal = row.category === "Total" || row.category === "Average";
                               const fmtNum = (val: number) => isCsat ? `${val.toFixed(2)}%` : val.toLocaleString();
@@ -578,6 +619,31 @@ export function StaffSection({
                                 if (isCsat) return `${diff > 0 ? "+" : ""}${diff.toFixed(2)}%`;
                                 return diff > 0 ? `+${diff.toLocaleString()}` : diff.toLocaleString();
                               };
+
+                              if (isTodayView) {
+                                return (
+                                  <tr
+                                    key={idx}
+                                    className={`hover:bg-white/5 transition-colors duration-150 text-white/90 ${isTotal ? "bg-[#0c3123]/90 font-bold border-t border-emerald-500/30" : ""}`}
+                                  >
+                                    <td className="py-2.5 px-3 font-bold">{row.category}</td>
+                                    <td className={`py-2.5 px-3 text-right ${isTotal ? "text-white" : "text-white/60"}`}>
+                                      {fmtNum(row.targetDay)}
+                                    </td>
+                                    <td className="py-2.5 px-3 text-right font-bold">{fmtNum(row.actualDay)}</td>
+                                    <td className="py-2.5 px-3 text-right">
+                                      <span className={getDiffClass(row.diffDay)}>
+                                        {getDiffText(row.diffDay)}
+                                      </span>
+                                    </td>
+                                    <td className="py-2.5 px-3 text-center">
+                                      <span className={getBadgeClass(row.achDayPercent)}>
+                                        {fmtPct(row.achDayPercent)}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                );
+                              }
 
                               return (
                                 <tr 
