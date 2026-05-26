@@ -62,6 +62,37 @@ export function StaffOverviewSection(props: {
     { label: "Selected Officers", value: selectedAttachOfficers.length ? selectedAttachOfficers.length.toLocaleString() : "All", hint: "ผู้ถูกกรอง", icon: Check },
   ], [parsedOfficers.length, staffBaseCategories.length, staffAttachGroups.length, selectedAttachOfficers.length]);
 
+  const topStaff = useMemo(() => {
+    const ranked = [...parsedOfficers].sort((a, b) => b.actual - a.actual);
+    const top = ranked[0];
+    if (!top) return null;
+
+    const dailyTarget = top.target > 0 ? top.target / 30 : 0;
+    const dailyActual = top.actual > 0 ? top.actual / 30 : 0;
+    const dailyGap = dailyTarget - dailyActual;
+    const todayAch = dailyTarget > 0 ? (dailyActual / dailyTarget) * 100 : 0;
+
+    const topAttach = staffAttachMatrix.find((row) => matchesOfficer(row.name, top.name));
+    const focusAttach = topAttach
+      ? Object.entries(topAttach.attachMap)
+          .map(([key, value]) => ({ key, rate: value?.rate ?? 0, units: value?.units ?? 0 }))
+          .sort((a, b) => b.rate - a.rate)[0]
+      : null;
+
+    return {
+      ...top,
+      rank: 1,
+      rankLabel: "🥇",
+      shortBranch: top.branch || "Unknown Branch",
+      avatar: topAttach?.avatar ?? "/staff1.png",
+      todayTarget: dailyTarget,
+      todayActual: dailyActual,
+      todayGap: dailyGap,
+      todayAch,
+      focusAttach,
+    };
+  }, [parsedOfficers, staffAttachMatrix, matchesOfficer]);
+
   const branchSummaryRows = useMemo(() => {
     const map = new Map<string, { branch: string; officers: number; actual: number; target: number; ach: number; forecast: number }>();
     parsedOfficers.forEach((officer) => {
@@ -96,8 +127,71 @@ export function StaffOverviewSection(props: {
       .slice(0, 7);
   }, [staffAttachMatrix]);
 
+  const kpiRadarData = useMemo(() => {
+    const totalTarget = parsedOfficers.reduce((sum, officer) => sum + officer.target, 0);
+    const totalActual = parsedOfficers.reduce((sum, officer) => sum + officer.actual, 0);
+    const avgRate = parsedOfficers.length ? parsedOfficers.reduce((sum, officer) => sum + officer.rate, 0) / parsedOfficers.length : 0;
+    const topBranchAch = branchSummaryRows[0]?.ach ?? 0;
+    const topCategoryRevenue = categorySummaryRows[0]?.revenue ?? 0;
+    return [
+      { subject: "Avg Staff", value: Math.min(Math.round(avgRate), 100), fullMark: 100 },
+      { subject: "Top Branch", value: Math.min(Math.round(topBranchAch), 100), fullMark: 100 },
+      { subject: "Sales/Target", value: Math.min(totalTarget ? Math.round((totalActual / totalTarget) * 100) : 0, 100), fullMark: 100 },
+      { subject: "Category Mix", value: Math.min(Math.round(topCategoryRevenue / Math.max(totalActual, 1) * 100), 100), fullMark: 100 },
+      { subject: "Attach Breadth", value: Math.min(Math.round((categorySummaryRows.length / Math.max(staffAttachGroups.length, 1)) * 100), 100), fullMark: 100 },
+    ];
+  }, [parsedOfficers, branchSummaryRows, categorySummaryRows, staffAttachGroups.length]);
+
   return (
     <motion.div key="staff_overview" initial={{ opacity: 0, scale: 0.96, filter: "blur(8px)" }} animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }} exit={{ opacity: 0, scale: 1.04, filter: "blur(8px)" }} transition={{ duration: 0.4, ease: "easeOut" }} className="flex flex-col gap-6 w-full h-full">
+      {topStaff && (
+        <div className="relative overflow-hidden rounded-[2rem] border border-emerald-400/30 bg-gradient-to-br from-emerald-500/25 via-white/10 to-cyan-500/20 p-6 shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(52,211,153,0.22),transparent_35%),radial-gradient(circle_at_left,rgba(45,212,191,0.18),transparent_30%)] pointer-events-none" />
+          <div className="relative flex flex-col lg:flex-row items-start lg:items-center gap-5">
+            <div className="relative shrink-0">
+              <div className="absolute -inset-1 rounded-full bg-emerald-400/40 blur-lg" />
+              <div className="relative w-24 h-24 rounded-full overflow-hidden border-4 border-white/20 shadow-2xl bg-white/10">
+                <img
+                  src={topStaff.avatar}
+                  alt={topStaff.name}
+                  className="w-full h-full object-cover object-top"
+                />
+              </div>
+              <div className="absolute -bottom-2 -right-2 bg-[#0c3123] border border-emerald-400/30 text-emerald-300 text-[11px] font-black px-3 py-1.5 rounded-full shadow-lg">
+                {topStaff.rankLabel} TOP STAFF
+              </div>
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold text-white/80 border border-white/10">#1 Rank</span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-3 py-1 text-[11px] font-bold text-emerald-100 border border-emerald-400/20">Highest Actual Sales</span>
+              </div>
+              <h2 className="text-3xl lg:text-4xl font-black tracking-tight text-white drop-shadow-sm truncate">{topStaff.name}</h2>
+              <p className="text-sm text-white/75 mt-1 truncate">{topStaff.shortBranch}</p>
+              <div className="mt-4 grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+                <div className="rounded-2xl bg-white/10 border border-white/10 px-4 py-3 backdrop-blur-md">
+                  <div className="text-[10px] uppercase tracking-widest text-white/50">Target Today</div>
+                  <div className="text-lg font-black text-white">฿{Math.round(topStaff.todayTarget).toLocaleString()}</div>
+                </div>
+                <div className="rounded-2xl bg-white/10 border border-white/10 px-4 py-3 backdrop-blur-md">
+                  <div className="text-[10px] uppercase tracking-widest text-white/50">Today Ach%</div>
+                  <div className="text-lg font-black text-emerald-300">{topStaff.todayAch.toFixed(1)}%</div>
+                </div>
+                <div className="rounded-2xl bg-white/10 border border-white/10 px-4 py-3 backdrop-blur-md">
+                  <div className="text-[10px] uppercase tracking-widest text-white/50">Top Attach / Focus KPI</div>
+                  <div className="text-lg font-black text-cyan-200">{topStaff.focusAttach ? `${topStaff.focusAttach.key} ${Math.round(topStaff.focusAttach.rate)}%` : "—"}</div>
+                </div>
+                <div className="rounded-2xl bg-white/10 border border-white/10 px-4 py-3 backdrop-blur-md">
+                  <div className="text-[10px] uppercase tracking-widest text-white/50">Today Gap</div>
+                  <div className={`text-lg font-black ${topStaff.todayGap <= 0 ? "text-emerald-300" : "text-rose-300"}`}>฿{Math.abs(Math.round(topStaff.todayGap)).toLocaleString()} {topStaff.todayGap <= 0 ? "ahead" : "need"}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col gap-4 bg-white/10 backdrop-blur-md rounded-2xl p-5 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)] relative z-20 animate-none">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
@@ -130,6 +224,29 @@ export function StaffOverviewSection(props: {
             </div>
           );
         })}
+      </div>
+
+      <div className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-base font-bold text-white tracking-tight">Performance Radar</h3>
+            <p className="text-xs text-white/50">ภาพรวมจาก staff / branch / category</p>
+          </div>
+          <div className="text-xs text-white/50">derived benchmark</div>
+        </div>
+        <ResponsiveContainer width="100%" height={320}>
+          <RadarChart data={kpiRadarData}>
+            <PolarGrid stroke="rgba(255,255,255,0.1)" />
+            <PolarAngleAxis dataKey="subject" tick={{ fill: "rgba(255,255,255,0.75)", fontSize: 12, fontWeight: 600 }} />
+            <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 10 }} />
+            <Radar name="Score" dataKey="value" stroke="#34d399" fill="#34d399" fillOpacity={0.35} />
+            <RechartsTooltip content={({ active, payload }) => {
+              if (!active || !payload?.length) return null;
+              const item = payload[0].payload as { subject: string; value: number };
+              return <div className="rounded-xl border border-white/10 bg-[#0c3123]/95 px-3 py-2 text-xs shadow-xl text-white">{item.subject}: {item.value}%</div>;
+            }} />
+          </RadarChart>
+        </ResponsiveContainer>
       </div>
 
       {tab === "attach_builder" ? (
