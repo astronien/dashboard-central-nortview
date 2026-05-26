@@ -11,6 +11,7 @@ const {
 const UPLOAD_KINDS = [
   "target",
   "current",
+  "today",
   "lastMonth",
   "lastYear",
   "categoryMaster",

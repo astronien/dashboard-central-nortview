@@ -2,15 +2,15 @@ const { saveUploadKind, loadUploadKind, isUploadKind, UPLOAD_KINDS } = require("
 const { parseCSV, summarizeDocDates } = require("./csvParse");
 const { normalizeCategoryMasterRows } = require("./categoryMasterNormalize");
 
-// current = MTD (through yesterday) + today (same split as live GSheets mtd/today tabs)
-const CURRENT_SHEET_URLS = [
-  "https://docs.google.com/spreadsheets/d/1YPmLE4CPk0aFnv24bx7ZiVHt7dYlq4HzXstYGIeIzFA/gviz/tq?tqx=out:csv&gid=713310919",
-  "https://docs.google.com/spreadsheets/d/1eVsLLW7xXV2nd633I0IS4zoQ6YxeQj8FJiqh5VXQCyU/gviz/tq?tqx=out:csv&gid=2048343587",
-];
+// current = MTD only; today = Today tab (gid 2048343587)
+const TODAY_SHEET_URL =
+  "https://docs.google.com/spreadsheets/d/1eVsLLW7xXV2nd633I0IS4zoQ6YxeQj8FJiqh5VXQCyU/gviz/tq?tqx=out:csv&gid=2048343587";
 
 const SHEET_URLS = {
   target: "https://docs.google.com/spreadsheets/d/18zsazWoy2DrItbc4c6FeVqD8X1DAUljdjBOG02lXM5I/gviz/tq?tqx=out:csv&gid=731299113",
-  current: CURRENT_SHEET_URLS,
+  current:
+    "https://docs.google.com/spreadsheets/d/1YPmLE4CPk0aFnv24bx7ZiVHt7dYlq4HzXstYGIeIzFA/gviz/tq?tqx=out:csv&gid=713310919",
+  today: TODAY_SHEET_URL,
   lastMonth: "https://docs.google.com/spreadsheets/d/1ljPZiplQMv29Su_MRE0wPFPnnzy5w_yvkdi1EqqHr30/gviz/tq?tqx=out:csv&gid=120695055",
   lastYear: "https://docs.google.com/spreadsheets/d/16IK1QoGbrLAnzQjQUbpwwJ3dPoNDcFqRkwoR3kXYOMw/gviz/tq?tqx=out:csv&gid=1489791190",
   // Set when a tab with columns "Cat & Sub Cat" + "CAT Daily" exists (see Category MasterFeb.xlsx)
@@ -29,7 +29,7 @@ const applyCors = (res) => {
   });
 };
 
-const TRANSACTION_KINDS = new Set(["current", "lastMonth", "lastYear"]);
+const TRANSACTION_KINDS = new Set(["current", "today", "lastMonth", "lastYear"]);
 
 function sheetUrlsForKind(kind) {
   const entry = SHEET_URLS[kind];

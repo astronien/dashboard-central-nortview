@@ -96,7 +96,7 @@ export function ReportsSection({
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mt-5">
-          {(["target", "current", "lastMonth", "lastYear", "categoryMaster"] as UploadKind[]).map((kind) => {
+          {(["target", "current", "today", "lastMonth", "lastYear", "categoryMaster"] as UploadKind[]).map((kind) => {
             const label = kind.replace(/([A-Z])/g, " $1");
             const rowCount = uploadedFiles[kind].length;
             const isLoaded = rowCount > 0;
@@ -219,7 +219,7 @@ export function ReportsSection({
       <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/70">
         <div className="font-semibold text-white mb-2">Sync status</div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-2 text-xs">
-          {(["target", "current", "lastMonth", "lastYear", "categoryMaster"] as UploadKind[]).map((kind) => (
+          {(["target", "current", "today", "lastMonth", "lastYear", "categoryMaster"] as UploadKind[]).map((kind) => (
             <div key={kind} className={`rounded-xl px-3 py-2 border ${uploadedFiles[kind].length ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200" : "border-white/10 bg-white/5 text-white/50"}`}>
               {kind.replace(/([A-Z])/g, " $1")}: {uploadedFiles[kind].length ? `${uploadedFiles[kind].length} loaded` : "missing"}
             </div>
@@ -242,14 +242,14 @@ export function ReportsSection({
           </motion.div>
           <div className="text-xs text-white/50 text-right max-w-md">
             {isSavingTurso ? "กำลังบันทึกลง Turso..." : `Loaded ${uploadStats.branches} branches • ${uploadStats.categories} categories • ${uploadStats.officers} officers`}
-            <div className="mt-1 text-[11px] text-white/40">Sheets: Target {uploadedFiles.target.length} • Current {uploadedFiles.current.length} • Last Month {uploadedFiles.lastMonth.length} • Last Year {uploadedFiles.lastYear.length} • Category Master {uploadedFiles.categoryMaster.length}</div>
+            <div className="mt-1 text-[11px] text-white/40">Sheets: Target {uploadedFiles.target.length} • Current {uploadedFiles.current.length} • Today {uploadedFiles.today.length} • Last Month {uploadedFiles.lastMonth.length} • Last Year {uploadedFiles.lastYear.length} • Category Master {uploadedFiles.categoryMaster.length}</div>
             {tursoDatabase ? (
               <motion.div className="mt-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-[11px] text-left text-emerald-100">
                 <div className="font-medium text-emerald-200">Turso DB: {tursoDatabase}</div>
                 <div className="text-white/70">ดูใน Turso Dashboard: <span className="font-mono">data_sales</span>, <span className="font-mono">data_targets</span>, <span className="font-mono">data_categories</span></div>
                 {tursoStats ? (
                   <div className="font-mono text-[10px] text-white/60 mt-1">
-                    rows — target {tursoStats.target?.rowCount ?? 0} • current {tursoStats.current?.rowCount ?? 0} • lastMonth {tursoStats.lastMonth?.rowCount ?? 0} • lastYear {tursoStats.lastYear?.rowCount ?? 0} • category {tursoStats.categoryMaster?.rowCount ?? 0}
+                    rows — target {tursoStats.target?.rowCount ?? 0} • current {tursoStats.current?.rowCount ?? 0} • today {tursoStats.today?.rowCount ?? 0} • lastMonth {tursoStats.lastMonth?.rowCount ?? 0} • lastYear {tursoStats.lastYear?.rowCount ?? 0} • category {tursoStats.categoryMaster?.rowCount ?? 0}
                   </div>
                 ) : null}
               </motion.div>

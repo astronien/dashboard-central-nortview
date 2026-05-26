@@ -457,7 +457,7 @@ type ParsedReport = {
   officers: Array<OfficerPerformance>;
   fileName: string;
 };
-type UploadKind = "target" | "current" | "lastMonth" | "lastYear" | "categoryMaster";
+type UploadKind = "target" | "current" | "today" | "lastMonth" | "lastYear" | "categoryMaster";
 
 const normalizeText = (value: unknown) => String(value ?? "").toLowerCase().replace(/\s+/g, " ").replace(/[^a-z0-9ก-๙ ]/gi, "").trim();
 const cleanBranchForMatching = (val: unknown): string => {
@@ -629,7 +629,7 @@ const CHOSEN_DUPLICATE_KEYS = new Set<string>([
   "528,160||JTLEGEND Casing for iPhone 17Pro Max (6.9) Glitter Hybrid Cushion Mag (Camera Control Button) Crystal Clear with Orange Magnetic||690.00||NULL||พ. 20/05/2026 19:54:33"
 ]);
 
-const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows: RawRow[], lastYearRows: RawRow[], categoryRows: RawRow[], fileName: string): ParsedReport => {
+const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows: RawRow[], lastYearRows: RawRow[], categoryRows: RawRow[], fileName: string, todayRows: RawRow[] = []): ParsedReport => {
   const categoryMap = new Map<string, string>();
   categoryRows.forEach((row) => {
     const key = normalizeText(row["Cat & Sub Cat"] ?? row["Category (Name)"] ?? row.SubCategory);
@@ -811,35 +811,45 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
   mergeSales(lastMonthRows, "lastMonth"); 
   mergeSales(lastYearRows, "lastYear");
 
-  // Find maximum date in currentRows for daily actual calculation
+  // Daily actual: prefer dedicated today sheet; else last day in current (legacy)
   let maxDateStr = "";
   let maxDateTime = 0;
-  currentRows.forEach((row) => {
-    const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
-    if (!rawDate) return;
-    const parsed = Date.parse(rawDate.replace(/^\S+\.\s*/, ""));
-    if (parsed && parsed > maxDateTime) {
-      maxDateTime = parsed;
-      maxDateStr = rawDate;
-    }
-  });
-
-  const officerDailyActual = new Map<string, number>();
-  if (maxDateStr || maxDateTime > 0) {
+  if (!todayRows.length) {
     currentRows.forEach((row) => {
       const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
+      if (!rawDate) return;
       const parsed = Date.parse(rawDate.replace(/^\S+\.\s*/, ""));
-      if ((maxDateStr && rawDate === maxDateStr) || (parsed && parsed === maxDateTime)) {
-        const officerName = String(row["Officer (Name)"] ?? "").trim();
-        if (officerName) {
-          const matchedKey = [...officerSummary.keys()].find(k => matchesOfficer(officerSummary.get(k)!.name, officerName));
-          if (matchedKey) {
-            officerDailyActual.set(matchedKey, (officerDailyActual.get(matchedKey) ?? 0) + getCategoryValue(row));
-          }
-        }
+      if (parsed && parsed > maxDateTime) {
+        maxDateTime = parsed;
+        maxDateStr = rawDate;
       }
     });
   }
+
+  const officerDailyActual = new Map<string, number>();
+  const dailySourceRows = todayRows.length
+    ? todayRows
+    : maxDateStr || maxDateTime > 0
+      ? currentRows.filter((row) => {
+          const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
+          const parsed = Date.parse(rawDate.replace(/^\S+\.\s*/, ""));
+          return (maxDateStr && rawDate === maxDateStr) || (parsed && parsed === maxDateTime);
+        })
+      : [];
+
+  dailySourceRows.forEach((row) => {
+    const officerName = String(row["Officer (Name)"] ?? "").trim();
+    if (!officerName) return;
+    const matchedKey = [...officerSummary.keys()].find((k) =>
+      matchesOfficer(officerSummary.get(k)!.name, officerName),
+    );
+    if (matchedKey) {
+      officerDailyActual.set(
+        matchedKey,
+        (officerDailyActual.get(matchedKey) ?? 0) + getCategoryValue(row),
+      );
+    }
+  });
 
   let maxCurrentDay = 22;
   let maxTotalDays = 31;
@@ -1184,7 +1194,7 @@ export default function App() {
     "home" | "staff" | "staff_overview" | "settings" | "reports"
   >("home");
   const [parsedReport, setParsedReport] = useState<ParsedReport>(fallbackReport);
-  const [uploadedFiles, setUploadedFiles] = useState<Record<UploadKind, RawRow[]>>({ target: [], current: [], lastMonth: [], lastYear: [], categoryMaster: [] });
+  const [uploadedFiles, setUploadedFiles] = useState<Record<UploadKind, RawRow[]>>({ target: [], current: [], today: [], lastMonth: [], lastYear: [], categoryMaster: [] });
   const [selectedBranch, setSelectedBranch] = useState<string>(() => {
     try {
       return window.localStorage.getItem("dashboard-selected-branch") || "Mega Bangna";
@@ -1206,6 +1216,7 @@ export default function App() {
     () => ({
       target: filterRowsByBranch(uploadedFiles.target, selectedBranch),
       current: filterRowsByBranch(uploadedFiles.current, selectedBranch),
+      today: filterRowsByBranch(uploadedFiles.today ?? [], selectedBranch),
       lastMonth: filterRowsByBranch(uploadedFiles.lastMonth, selectedBranch),
       lastYear: filterRowsByBranch(uploadedFiles.lastYear, selectedBranch),
       categoryMaster: uploadedFiles.categoryMaster,
@@ -1251,6 +1262,7 @@ export default function App() {
   };
 
   const todayRows = useMemo(() => {
+    if (displayUploads.today.length) return displayUploads.today;
     if (!displayUploads.current.length) return [];
     let maxDateStr = "";
     let maxDateTime = 0;
@@ -1264,8 +1276,10 @@ export default function App() {
       }
     });
     if (!maxDateStr) return [];
-    return displayUploads.current.filter(row => String(row["Doc Date"] ?? "").trim() === maxDateStr.trim());
-  }, [displayUploads.current]);
+    return displayUploads.current.filter(
+      (row) => String(row["Doc Date"] ?? "").trim() === maxDateStr.trim(),
+    );
+  }, [displayUploads.today, displayUploads.current]);
 
   const todayStats = useMemo(() => {
     if (!todayRows.length) return { revenue: 0, units: 0, target: 0, ach: 0, mom: 0, yoy: 0, categories: [], dateStr: "" };
@@ -1648,10 +1662,10 @@ export default function App() {
       totalDays = Math.max(totalDays, b.totalDays || 31);
     });
     
-    // 2. Find max date in currentRows for daily actual calculation
+    const todaySourceRows = todayRows.length ? todayRows : [];
     let maxDateStr = "";
     let maxDateTime = 0;
-    if (hasData) {
+    if (!todaySourceRows.length && hasData) {
       displayUploads.current.forEach((row) => {
         const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
         if (!rawDate) return;
@@ -1662,7 +1676,7 @@ export default function App() {
         }
       });
     }
-    
+
     // 3. For each category, compute target, actual, forecast, lastMonth, lastYear, actualDay
     const rows: CategoryPerformanceRow[] = categoriesList.map((catName) => {
       let target = 0;
@@ -1691,7 +1705,8 @@ export default function App() {
         lastMonth = kpi.lastMonth;
         lastYear = kpi.lastYear;
 
-        displayUploads.current.forEach((row) => {
+        const dailyRows = todaySourceRows.length ? todaySourceRows : displayUploads.current;
+        dailyRows.forEach((row) => {
           const rowOfficerId = String(row["STAFF ID"] ?? row.emp_id ?? "").trim();
           const officer = String(row["Officer (Name)"] ?? "").trim();
           const officerMatch =
@@ -1699,16 +1714,16 @@ export default function App() {
             matchesOfficer(officer, activeOfficer.name);
           if (!officerMatch) return;
           const rowCat = getCategory(row);
-          if (rowCat === catName) {
+          if (rowCat !== catName) return;
+          if (!todaySourceRows.length) {
             const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
             const parsed = Date.parse(rawDate.replace(/^\S+\.\s*/, ""));
-            if ((maxDateStr && rawDate === maxDateStr) || (parsed && parsed === maxDateTime)) {
-              actualDay +=
-                kpi.measureType === "quantity"
-                  ? toNumber(row.Number ?? row.number ?? row.qty ?? 0)
-                  : getCategoryValue(row);
-            }
+            if (!((maxDateStr && rawDate === maxDateStr) || (parsed && parsed === maxDateTime))) return;
           }
+          actualDay +=
+            kpi.measureType === "quantity"
+              ? toNumber(row.Number ?? row.number ?? row.qty ?? 0)
+              : getCategoryValue(row);
         });
       } else if (!hasData) {
         // Fallback/Mock distribution matching activeOfficer total values!
@@ -1811,7 +1826,7 @@ export default function App() {
     };
     
     return [...rows, totalRow];
-  }, [activeOfficer, displayUploads, parsedReport, getCategory]);
+  }, [activeOfficer, displayUploads, parsedReport, getCategory, todayRows]);
 
   const activeOfficerTodaySales = useMemo(() => {
     if (!activeOfficer) return 0;
@@ -1824,10 +1839,11 @@ export default function App() {
     if (activeStat === "csat") return null;
     if (activeStat === "target") {
       if (todayStats.dateStr) {
-        return `แสดงยอดขายวัน ${todayStats.dateStr} (วันล่าสุดในไฟล์ current)`;
+        const source = displayUploads.today.length ? "Today sheet" : "current (วันล่าสุด)";
+        return `แสดงยอดขายวัน ${todayStats.dateStr} — ${source}`;
       }
-      if (!displayUploads.current.length) return null;
-      return "ไม่พบยอดขายวันนี้ในไฟล์ current";
+      if (!displayUploads.today.length && !displayUploads.current.length) return null;
+      return "ไม่พบยอดขายวันนี้ — ซิงก์ Today sheet";
     }
     if (!displayUploads.current.length) return null;
     if (displayUploads.categoryMaster.length > 0) return null;
@@ -2292,10 +2308,17 @@ export default function App() {
       buildCategorySnapshots({
         targetRows: displayUploads.target,
         currentRows: displayUploads.current,
+        todayRows: displayUploads.today,
         lastMonthRows: displayUploads.lastMonth,
         lastYearRows: displayUploads.lastYear,
       }),
-    [displayUploads.target, displayUploads.current, displayUploads.lastMonth, displayUploads.lastYear],
+    [
+      displayUploads.target,
+      displayUploads.current,
+      displayUploads.today,
+      displayUploads.lastMonth,
+      displayUploads.lastYear,
+    ],
   );
 
   const salesTrendData = useMemo(() => {
@@ -2641,8 +2664,16 @@ export default function App() {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (!raw) return null;
-      const parsed = JSON.parse(raw) as UploadState;
-      return hasUploadData(parsed) ? parsed : null;
+      const parsed = JSON.parse(raw) as Partial<UploadState>;
+      const merged: UploadState = {
+        target: parsed.target ?? [],
+        current: parsed.current ?? [],
+        today: parsed.today ?? [],
+        lastMonth: parsed.lastMonth ?? [],
+        lastYear: parsed.lastYear ?? [],
+        categoryMaster: parsed.categoryMaster ?? [],
+      };
+      return hasUploadData(merged) ? merged : null;
     } catch {
       return null;
     }
@@ -2696,6 +2727,7 @@ export default function App() {
   ) => {
     const filteredTarget = filterRowsByBranch(nextUploads.target, selectedBranch);
     const filteredCurrent = filterRowsByBranch(nextUploads.current, selectedBranch);
+    const filteredToday = filterRowsByBranch(nextUploads.today ?? [], selectedBranch);
     const filteredLastMonth = filterRowsByBranch(nextUploads.lastMonth, selectedBranch);
     const filteredLastYear = filterRowsByBranch(nextUploads.lastYear, selectedBranch);
 
@@ -2706,6 +2738,7 @@ export default function App() {
       filteredLastYear,
       nextUploads.categoryMaster,
       "uploaded-data",
+      filteredToday,
     );
     setParsedReport(report);
     if (!options?.skipPersist) {
@@ -2744,6 +2777,7 @@ export default function App() {
   const emptyUploadState = (): UploadState => ({
     target: [],
     current: [],
+    today: [],
     lastMonth: [],
     lastYear: [],
     categoryMaster: [],
@@ -2790,7 +2824,7 @@ export default function App() {
     try {
       const kindsToSync: UploadKind[] = kind 
         ? [kind as UploadKind] 
-        : ["target", "categoryMaster", "current", "lastMonth", "lastYear"];
+        : ["target", "categoryMaster", "current", "today", "lastMonth", "lastYear"];
         
       let combinedSummary: Record<string, number> = {};
       let combinedErrors: any[] = [];

@@ -130,10 +130,11 @@ function periodActual(
 export function buildCategorySnapshots(params: {
   targetRows: RawRow[];
   currentRows: RawRow[];
+  todayRows?: RawRow[];
   lastMonthRows: RawRow[];
   lastYearRows: RawRow[];
 }): CategorySnapshotItem[] {
-  const { targetRows, currentRows, lastMonthRows, lastYearRows } = params;
+  const { targetRows, currentRows, todayRows = [], lastMonthRows, lastYearRows } = params;
   const hasData = currentRows.length > 0;
   const { startDate, endDate, currentDay, totalDays } = getMonthPeriod();
   const targets: TargetRecord[] = rawTargetRowsToRecords(targetRows);
@@ -189,7 +190,14 @@ export function buildCategorySnapshots(params: {
 
     const forecast = calcForecastByDays(actual, currentDay, totalDays);
     const targetDay = totalDays ? (target / totalDays) * currentDay : 0;
-    const today = kpiKey ? sumTodayActual(currentRows, kpiKey) : sumTodayActual(currentRows);
+    const today =
+      todayRows.length > 0
+        ? kpiKey
+          ? sumKpiActualFromRows(todayRows, kpiKey)
+          : periodActual(todayRows)
+        : kpiKey
+          ? sumTodayActual(currentRows, kpiKey)
+          : sumTodayActual(currentRows);
 
     const mom =
       lastMonthActual > 0 ? ((actual - lastMonthActual) / lastMonthActual) * 100 : "New";

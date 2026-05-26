@@ -1,4 +1,4 @@
-const SALES_KINDS = ["current", "lastMonth", "lastYear"];
+const SALES_KINDS = ["current", "today", "lastMonth", "lastYear"];
 
 const pick = (row, keys) => {
   for (const key of keys) {

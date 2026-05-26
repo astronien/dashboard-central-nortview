@@ -3,6 +3,7 @@ import { compressJson } from "./compress";
 export type UploadKind =
   | "target"
   | "current"
+  | "today"
   | "lastMonth"
   | "lastYear"
   | "categoryMaster";
@@ -14,6 +15,7 @@ const UPLOADS_URL = "/api/uploads";
 const UPLOAD_KINDS: UploadKind[] = [
   "target",
   "current",
+  "today",
   "lastMonth",
   "lastYear",
   "categoryMaster",

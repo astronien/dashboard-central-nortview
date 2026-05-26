@@ -1,6 +1,6 @@
 import { cleanOfficerName as sharedCleanOfficerName, matchesOfficer as sharedMatchesOfficer, normalizeText as sharedNormalizeText, toNumber as sharedToNumber, getSalesDate as sharedGetSalesDate, type RawRow } from "./dashboardUtils";
 
-export type UploadKind = "target" | "current" | "lastMonth" | "lastYear" | "categoryMaster";
+export type UploadKind = "target" | "current" | "today" | "lastMonth" | "lastYear" | "categoryMaster";
 
 export const normalizeText = sharedNormalizeText;
 export const toNumber = sharedToNumber;
