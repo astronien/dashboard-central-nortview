@@ -3229,6 +3229,18 @@ export default function App() {
                 />
               </motion.div>
             )}
+          </AnimatePresence>
+        </main>
+      </div>
+    </div>
+  );
+}
+          </AnimatePresence>
+        </main>
+      </div>
+    </div>
+  );
+}
             {currentView === "staff_overview" && (
               <StaffOverviewSection
                 staffCategoryTree={staffCategoryTree}
@@ -3340,3 +3352,9 @@ export default function App() {
                 />
               </motion.div>
             )}
+          </AnimatePresence>
+        </main>
+      </div>
+    </div>
+  );
+}
