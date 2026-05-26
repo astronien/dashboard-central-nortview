@@ -1,12 +1,20 @@
-const { saveUploadKind, isUploadKind, UPLOAD_KINDS } = require("./turso");
+const { saveUploadKind, loadUploadKind, isUploadKind, UPLOAD_KINDS } = require("./turso");
 const { parseCSV, summarizeDocDates } = require("./csvParse");
+const { normalizeCategoryMasterRows } = require("./categoryMasterNormalize");
+
+// current = MTD (through yesterday) + today (same split as live GSheets mtd/today tabs)
+const CURRENT_SHEET_URLS = [
+  "https://docs.google.com/spreadsheets/d/1YPmLE4CPk0aFnv24bx7ZiVHt7dYlq4HzXstYGIeIzFA/gviz/tq?tqx=out:csv&gid=713310919",
+  "https://docs.google.com/spreadsheets/d/1eVsLLW7xXV2nd633I0IS4zoQ6YxeQj8FJiqh5VXQCyU/gviz/tq?tqx=out:csv&gid=2048343587",
+];
 
 const SHEET_URLS = {
   target: "https://docs.google.com/spreadsheets/d/18zsazWoy2DrItbc4c6FeVqD8X1DAUljdjBOG02lXM5I/gviz/tq?tqx=out:csv&gid=731299113",
-  current: "https://docs.google.com/spreadsheets/d/1eVsLLW7xXV2nd633I0IS4zoQ6YxeQj8FJiqh5VXQCyU/gviz/tq?tqx=out:csv&gid=2048343587",
+  current: CURRENT_SHEET_URLS,
   lastMonth: "https://docs.google.com/spreadsheets/d/1ljPZiplQMv29Su_MRE0wPFPnnzy5w_yvkdi1EqqHr30/gviz/tq?tqx=out:csv&gid=120695055",
   lastYear: "https://docs.google.com/spreadsheets/d/16IK1QoGbrLAnzQjQUbpwwJ3dPoNDcFqRkwoR3kXYOMw/gviz/tq?tqx=out:csv&gid=1489791190",
-  categoryMaster: "https://docs.google.com/spreadsheets/d/1YPmLE4CPk0aFnv24bx7ZiVHt7dYlq4HzXstYGIeIzFA/gviz/tq?tqx=out:csv&gid=713310919"
+  // Set when a tab with columns "Cat & Sub Cat" + "CAT Daily" exists (see Category MasterFeb.xlsx)
+  categoryMaster: null,
 };
 
 const corsHeaders = {
@@ -22,6 +30,21 @@ const applyCors = (res) => {
 };
 
 const TRANSACTION_KINDS = new Set(["current", "lastMonth", "lastYear"]);
+
+function sheetUrlsForKind(kind) {
+  const entry = SHEET_URLS[kind];
+  if (!entry) return [];
+  return Array.isArray(entry) ? entry : [entry];
+}
+
+async function fetchSheetRows(url) {
+  const fetchRes = await fetch(url);
+  if (!fetchRes.ok) {
+    throw new Error(`Google Sheets fetch failed with status ${fetchRes.status}`);
+  }
+  const csvText = await fetchRes.text();
+  return parseCSV(csvText);
+}
 
 // แปลงฟิลด์จาก Google Sheets ให้เข้ากับโครงสร้าง db schema ของเรา
 function normalizeSheetRows(rows, kind) {
@@ -45,23 +68,10 @@ function normalizeSheetRows(rows, kind) {
   }
 
   if (kind === "categoryMaster") {
-    const seen = new Set();
-    const unique = [];
-    rows.forEach((r) => {
-      const catSubCat = String(r["Cat & Sub Cat"] || r.cat_sub_cat || r["Sub Category"] || r.SubCategory || "").trim();
-      const catDaily = String(r["CAT Daily"] || r.cat_daily || r["Category (Name)"] || "").trim();
-      if (!catSubCat || !catDaily) return;
-      
-      const key = `${catSubCat.toLowerCase()}||${catDaily.toLowerCase()}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        unique.push({
-          "Cat & Sub Cat": catSubCat,
-          "CAT Daily": catDaily
-        });
-      }
-    });
-    console.log(`[Sync] Deduplicated categoryMaster: from ${rows.length} to ${unique.length} unique rows.`);
+    const unique = normalizeCategoryMasterRows(rows);
+    console.log(
+      `[Sync] Deduplicated categoryMaster: from ${rows.length} to ${unique.length} unique rows.`,
+    );
     return unique;
   }
 
@@ -94,6 +104,8 @@ async function handler(req, res) {
   }
 
   const kindParam = req.query?.kind;
+  const forceCategoryMaster =
+    req.query?.force === "1" || req.query?.force === "true";
   const kindsToSync = kindParam 
     ? (Array.isArray(kindParam) ? kindParam : [kindParam])
     : UPLOAD_KINDS;
@@ -110,21 +122,63 @@ async function handler(req, res) {
 
   try {
     for (const kind of kindsToSync) {
-      const url = SHEET_URLS[kind];
-      if (!url) {
+      const urls = sheetUrlsForKind(kind);
+
+      if (kind === "categoryMaster") {
+        if (!urls.length) {
+          const existing = await loadUploadKind("categoryMaster");
+          summary[kind] = {
+            saved: existing.length,
+            skipped: true,
+            reason: "manual_upload_only",
+          };
+          console.log(
+            `[Sync] categoryMaster: no Google Sheet URL — kept ${existing.length} uploaded row(s).`,
+          );
+          continue;
+        }
+
+        if (!forceCategoryMaster) {
+          const existing = await loadUploadKind("categoryMaster");
+          if (existing.length) {
+            summary[kind] = {
+              saved: existing.length,
+              skipped: true,
+              reason: "preserved_existing",
+            };
+            console.log(
+              `[Sync] categoryMaster: preserved ${existing.length} uploaded row(s); use ?force=1 to overwrite.`,
+            );
+            continue;
+          }
+        }
+      }
+
+      if (!urls.length) {
         errors.push({ kind, error: "No URL configured for this kind." });
         continue;
       }
 
       try {
-        console.log(`[Sync] Fetching Google Sheet for: ${kind}...`);
-        const fetchRes = await fetch(url);
-        if (!fetchRes.ok) {
-          throw new Error(`Google Sheets fetch failed with status ${fetchRes.status}`);
-        }
+        console.log(`[Sync] Fetching Google Sheet for: ${kind} (${urls.length} tab(s))...`);
+        let rawRows = [];
+        const parseStats = {
+          rawDataLines: 0,
+          parsedRows: 0,
+          skippedEmpty: 0,
+          paddedRows: 0,
+          truncatedRows: 0,
+        };
 
-        const csvText = await fetchRes.text();
-        const { rows: rawRows, stats: parseStats } = parseCSV(csvText);
+        for (const url of urls) {
+          const part = await fetchSheetRows(url);
+          rawRows = rawRows.concat(part.rows);
+          parseStats.rawDataLines += part.stats.rawDataLines;
+          parseStats.parsedRows += part.stats.parsedRows;
+          parseStats.skippedEmpty += part.stats.skippedEmpty;
+          parseStats.paddedRows += part.stats.paddedRows;
+          parseStats.truncatedRows += part.stats.truncatedRows;
+        }
 
         if (!rawRows.length) {
           throw new Error("No data found or failed to parse CSV.");
@@ -152,6 +206,7 @@ async function handler(req, res) {
         const kindSummary = {
           saved: normalizedRows.length,
           parse: parseStats,
+          sources: urls.length > 1 ? urls.length : undefined,
         };
         if (TRANSACTION_KINDS.has(kind)) {
           kindSummary.dates = summarizeDocDates(rawRows);

@@ -1,10 +1,17 @@
-import { Activity, PieChart, Rocket } from "lucide-react";
+import type { ChangeEvent } from "react";
+import { Activity, PieChart, Rocket, Upload } from "lucide-react";
 import { motion } from "framer-motion";
 import type { UploadKind } from "../../lib/dashboardHelpers";
 import type { RawRow } from "../../lib/dashboardUtils";
 
 export type ReportStats = { branches: number; categories: number; officers: number };
-export type TursoStats = { target?: { rowCount: number }; current?: { rowCount: number }; lastMonth?: { rowCount: number }; lastYear?: { rowCount: number }; categoryMaster?: { rowCount: number } };
+export type TursoStats = {
+  target?: { rowCount: number; updatedAt?: string };
+  current?: { rowCount: number; updatedAt?: string };
+  lastMonth?: { rowCount: number; updatedAt?: string };
+  lastYear?: { rowCount: number; updatedAt?: string };
+  categoryMaster?: { rowCount: number; updatedAt?: string };
+};
 
 export type ParsedReport = {
   branches: { label: string; target: number; actual: number; lastMonth: number; lastYear: number }[];
@@ -33,6 +40,8 @@ export function ReportsSection({
   onExportCsv,
   onClearAll,
   onRemoveFile,
+  onUploadCategoryMaster,
+  isUploadingCategoryMaster,
   parsedReport,
 }: {
   uploadedFiles: Record<UploadKind, RawRow[]>;
@@ -48,8 +57,12 @@ export function ReportsSection({
   onExportCsv: () => void;
   onClearAll: () => void;
   onRemoveFile: (kind: UploadKind) => void;
+  onUploadCategoryMaster: (event: ChangeEvent<HTMLInputElement>) => void;
+  isUploadingCategoryMaster: boolean;
   parsedReport: ParsedReport;
 }) {
+  const categoryMasterRows = uploadedFiles.categoryMaster.length;
+  const categoryMasterUpdatedAt = tursoStats?.categoryMaster?.updatedAt;
   return (
     <>
       <div className="text-xs font-semibold tracking-wider text-teal-400/80 uppercase mb-1">Google Sheets Live Sync</div>
@@ -103,8 +116,56 @@ export function ReportsSection({
         </div>
       </div>
 
+      <div className="rounded-2xl border border-teal-500/20 bg-teal-500/[0.04] p-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="text-sm font-semibold text-white">อัปโหลด Category Master</div>
+            <p className="text-xs text-white/60 mt-1 max-w-xl">
+              ไฟล์ .xlsx / .csv ต้องมีคอลัมน์ <span className="font-mono text-teal-200/90">Cat &amp; Sub Cat</span> และ{" "}
+              <span className="font-mono text-teal-200/90">CAT Daily</span> — บันทึกลง Turso แทน Google Sheets (ซิงก์ sales ยังใช้ Live Sync ตามเดิม)
+            </p>
+            <div className="mt-2 text-[11px] text-white/50">
+              {categoryMasterRows > 0
+                ? `${categoryMasterRows.toLocaleString()} แถวในระบบ`
+                : "ยังไม่มี Category Master — อัปโหลดก่อนดูรายงาน category ให้ถูก"}
+              {categoryMasterUpdatedAt ? (
+                <span className="ml-2 text-white/40">
+                  • อัปเดตล่าสุด {new Date(categoryMasterUpdatedAt).toLocaleString("th-TH")}
+                </span>
+              ) : null}
+            </div>
+          </div>
+          <label
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold border transition-all shrink-0 ${
+              isUploadingCategoryMaster
+                ? "border-white/10 bg-white/5 text-white/40 cursor-not-allowed"
+                : "border-teal-400/30 bg-teal-500/15 text-teal-100 hover:bg-teal-500/25 cursor-pointer"
+            }`}
+          >
+            {isUploadingCategoryMaster ? (
+              <>
+                <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                กำลังอัปโหลด...
+              </>
+            ) : (
+              <>
+                <Upload className="w-3.5 h-3.5" />
+                เลือกไฟล์
+              </>
+            )}
+            <input
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              className="hidden"
+              disabled={isUploadingCategoryMaster}
+              onChange={onUploadCategoryMaster}
+            />
+          </label>
+        </div>
+      </div>
+
       <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/70">
-        ข้อมูลโหลดผ่าน Google Sheets sync เท่านั้น — ไม่รองรับอัปโหลดไฟล์ Excel/CSV แล้ว
+        Target / Current / Last Month / Last Year โหลดผ่าน Google Sheets Live Sync — Category Master อัปโหลดเองด้านบน
       </div>
 
       {syncResult ? (

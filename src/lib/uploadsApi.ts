@@ -136,7 +136,7 @@ export const clearAllUploads = async (): Promise<boolean> => {
 
 export type TursoHealthStats = Record<
   UploadKind,
-  { rowCount: number; storage?: string }
+  { rowCount: number; storage?: string; updatedAt?: string }
 >;
 
 export const fetchTursoStats = async (): Promise<{

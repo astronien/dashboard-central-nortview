@@ -275,10 +275,33 @@ const syncAllRelationalTables = async () => {
 };
 
 const getUploadStats = async () => {
+  const metaByKind = {};
+  try {
+    const metaResult = await tursoExecute(
+      "SELECT kind, row_count, updated_at FROM upload_meta",
+    );
+    for (const row of metaResult.rows ?? []) {
+      const [kind, rowCount, updatedAt] = rowValues(row);
+      if (kind) {
+        metaByKind[kind] = {
+          rowCount: Number(rowCount) || 0,
+          updatedAt: updatedAt ? String(updatedAt) : undefined,
+        };
+      }
+    }
+  } catch {
+    // upload_meta may not exist on older DBs
+  }
+
   const stats = {};
   for (const kind of UPLOAD_KINDS) {
     const rowCount = await countRowsInTurso(kind, tursoExecute, rowValues);
-    stats[kind] = { rowCount, storage: "turso_tables" };
+    const meta = metaByKind[kind];
+    stats[kind] = {
+      rowCount: rowCount || meta?.rowCount || 0,
+      storage: "turso_tables",
+      updatedAt: meta?.updatedAt,
+    };
   }
   return stats;
 };

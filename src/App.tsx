@@ -35,7 +35,8 @@ import {
 import CategoryTreePicker from "./components/CategoryTreePicker";
 import AttachTargetGroupEditor from "./components/AttachTargetGroupEditor";
 import { AnimatePresence, motion } from "motion/react";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { parseCategoryMasterFile } from "./lib/categoryMasterUpload";
 import {
   clearAllUploads,
   fetchTursoStats,
@@ -1423,6 +1424,7 @@ export default function App() {
   const [isSavingTurso, setIsSavingTurso] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isSyncingSheets, setIsSyncingSheets] = useState(false);
+  const [isUploadingCategoryMaster, setIsUploadingCategoryMaster] = useState(false);
   const [syncResult, setSyncResult] = useState<any>(null);
   const [sheetBranches, setSheetBranches] = useState<string[]>([]);
 
@@ -2687,6 +2689,40 @@ export default function App() {
     categoryMaster: [],
   });
 
+  const handleCategoryMasterUpload = async (
+    event: ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploadError(null);
+    setIsUploadingCategoryMaster(true);
+    try {
+      const rows = await parseCategoryMasterFile(file);
+      const nextUploads: UploadState = {
+        ...uploadedFiles,
+        categoryMaster: rows,
+      };
+      setUploadedFiles(nextUploads);
+      rebuildReport(nextUploads, { changedKinds: ["categoryMaster"] });
+      setSyncResult({
+        ok: true,
+        message: `อัปโหลด Category Master สำเร็จ — ${rows.length.toLocaleString()} แถว`,
+        summary: { categoryMaster: rows.length },
+      });
+      await refreshTursoStats();
+    } catch (error) {
+      setUploadError(
+        error instanceof Error
+          ? error.message
+          : "อัปโหลด Category Master ไม่สำเร็จ",
+      );
+    } finally {
+      setIsUploadingCategoryMaster(false);
+      event.target.value = "";
+    }
+  };
+
   const handleSyncSheets = async (kind?: string) => {
     setIsSyncingSheets(true);
     setUploadError(null);
@@ -2714,11 +2750,23 @@ export default function App() {
         }
       }
       
+      const categoryMasterSummary = combinedSummary.categoryMaster;
+      const categorySkipped =
+        categoryMasterSummary &&
+        typeof categoryMasterSummary === "object" &&
+        "skipped" in categoryMasterSummary;
+      const categoryPreserved =
+        categorySkipped &&
+        (categoryMasterSummary as { reason?: string }).reason ===
+          "preserved_existing";
+
       setSyncResult({
         ok: combinedErrors.length === 0,
         message:
           combinedErrors.length === 0
-            ? "ซิงก์สำเร็จ — บันทึกทุกสาขาแล้ว"
+            ? categoryPreserved
+              ? "ซิงก์สำเร็จ — เก็บ Category Master ที่อัปโหลดไว้แล้ว"
+              : "ซิงก์สำเร็จ — บันทึกทุกสาขาแล้ว"
             : "ซิงก์บางส่วนสำเร็จ — ดูรายละเอียดด้านล่าง",
         summary: combinedSummary,
         errors: combinedErrors.length ? combinedErrors : undefined,
@@ -3078,6 +3126,10 @@ export default function App() {
                   onExportCsv={exportCsv}
                   onClearAll={() => void clearAllUploadData()}
                   onRemoveFile={removeUploadedFile}
+                  onUploadCategoryMaster={(event) => {
+                    void handleCategoryMasterUpload(event);
+                  }}
+                  isUploadingCategoryMaster={isUploadingCategoryMaster}
                   parsedReport={parsedReport}
                 />
               </motion.div>
