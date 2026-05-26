@@ -73,6 +73,7 @@ export function StaffSection({
   dynamicLanguages,
   activeOfficer7WondersPerformance,
   activeOfficerCategoryPerformance,
+  categoryPerformanceHint,
   activeTab,
   onSetActiveTab,
   staffLeaderboard,
@@ -101,6 +102,7 @@ export function StaffSection({
   dynamicLanguages: string;
   activeOfficer7WondersPerformance: PerformanceRow[];
   activeOfficerCategoryPerformance: PerformanceRow[];
+  categoryPerformanceHint?: string | null;
   activeTab: string;
   onSetActiveTab: (tab: string) => void;
   staffLeaderboard: StaffLeaderboardItem[];
@@ -516,6 +518,12 @@ export function StaffSection({
                         </p>
                       </div>
                     </div>
+
+                    {categoryPerformanceHint && activeStat !== "csat" ? (
+                      <p className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200/90">
+                        {categoryPerformanceHint}
+                      </p>
+                    ) : null}
                     
                     <div className="flex-1 overflow-x-auto rounded-xl border border-emerald-500/10">
                       <table className="w-full text-left border-collapse text-[11px]">

@@ -47,14 +47,16 @@ import {
   type UploadState,
 } from "./lib/uploadsApi";
 import { buildCategorySnapshots } from "./lib/categorySnapshotBuilder";
+import type { KpiCategoryKey } from "./lib/kpiCategoryAdapter";
 import {
-  getKpiTargetResult,
-  type KpiCategoryKey,
-} from "./lib/kpiCategoryAdapter";
+  getOfficerCategoryKpi,
+  resolveOfficerId,
+} from "./lib/officerCategoryKpi";
 import {
   calcAchievementPct,
   calcForecastByDays,
   calculateMetrics,
+  normalizeId,
   rawTargetRowsToRecords,
 } from "./lib/targetAggregations";
 import {
@@ -1630,9 +1632,13 @@ export default function App() {
       const name = `${row.NAME ?? ""} ${row.SURNAME ?? ""}`.trim();
       return matchesOfficer(name, activeOfficer.name);
     });
-    const officerId = String(
-      officerTargetRow?.emp_id ?? officerTargetRow?.["Staff ID"] ?? officerTargetRow?.staff_id ?? "",
-    ).trim();
+    const officerId = resolveOfficerId(
+      activeOfficer.name,
+      displayUploads.target,
+      targetRecords,
+      displayUploads.current,
+      matchesOfficer,
+    );
     
     // 1. Get currentDay and totalDays
     let currentDay = 22;
@@ -1665,24 +1671,32 @@ export default function App() {
       let lastYear = 0;
       let actualDay = 0;
       
-      if (hasData && officerId) {
-        const kpi = getKpiTargetResult(
-          targetRecords,
-          displayUploads.current,
+      if (hasData) {
+        const kpi = getOfficerCategoryKpi({
+          category: catName,
+          officerName: activeOfficer.name,
           officerId,
-          "officer",
-          catName,
+          officerTargetRow,
+          targetRecords,
+          currentRows: displayUploads.current,
+          lastMonthRows: displayUploads.lastMonth,
+          lastYearRows: displayUploads.lastYear,
           periodStart,
           periodEnd,
-        );
+          getCategory,
+          matchesOfficer,
+        });
         target = kpi.target;
         actual = kpi.actual;
+        lastMonth = kpi.lastMonth;
+        lastYear = kpi.lastYear;
 
         displayUploads.current.forEach((row) => {
           const rowOfficerId = String(row["STAFF ID"] ?? row.emp_id ?? "").trim();
           const officer = String(row["Officer (Name)"] ?? "").trim();
           const officerMatch =
-            (rowOfficerId && rowOfficerId === officerId) || matchesOfficer(officer, activeOfficer.name);
+            (officerId && rowOfficerId && normalizeId(rowOfficerId) === normalizeId(officerId)) ||
+            matchesOfficer(officer, activeOfficer.name);
           if (!officerMatch) return;
           const rowCat = getCategory(row);
           if (rowCat === catName) {
@@ -1696,28 +1710,6 @@ export default function App() {
             }
           }
         });
-
-        const lastMonthKpi = getKpiTargetResult(
-          targetRecords,
-          displayUploads.lastMonth,
-          officerId,
-          "officer",
-          catName,
-          periodStart,
-          periodEnd,
-        );
-        lastMonth = lastMonthKpi.actual;
-
-        const lastYearKpi = getKpiTargetResult(
-          targetRecords,
-          displayUploads.lastYear,
-          officerId,
-          "officer",
-          catName,
-          periodStart,
-          periodEnd,
-        );
-        lastYear = lastYearKpi.actual;
       } else if (!hasData) {
         // Fallback/Mock distribution matching activeOfficer total values!
         const targetRates: Record<string, number> = {
@@ -1820,6 +1812,19 @@ export default function App() {
     
     return [...rows, totalRow];
   }, [activeOfficer, displayUploads, parsedReport, getCategory]);
+
+  const categoryPerformanceHint = useMemo(() => {
+    if (!displayUploads.current.length || activeStat === "csat") return null;
+    if (displayUploads.categoryMaster.length > 0) return null;
+    const totalRow = activeOfficerCategoryPerformance.find((r) => r.category === "Total");
+    if (totalRow && totalRow.actual > 0) return null;
+    return "อัปโหลด Category Master (Reports) เพื่อจัดกลุ่มยอดขายตามหมวด — ตอนนี้ยอด Actual อาจไม่ตรงหมวด";
+  }, [
+    displayUploads.current.length,
+    displayUploads.categoryMaster.length,
+    activeOfficerCategoryPerformance,
+    activeStat,
+  ]);
 
   const activeOfficer7WondersPerformance = useMemo<CategoryPerformanceRow[]>(() => {
     if (!activeOfficer) return [];
@@ -3119,6 +3124,7 @@ export default function App() {
                 dynamicLanguages={dynamicLanguages}
                 activeOfficer7WondersPerformance={activeOfficer7WondersPerformance}
                 activeOfficerCategoryPerformance={activeOfficerCategoryPerformance}
+                categoryPerformanceHint={categoryPerformanceHint}
                 activeTab={activeTab}
                 onSetActiveTab={setActiveTab}
                 staffLeaderboard={staffLeaderboard}
