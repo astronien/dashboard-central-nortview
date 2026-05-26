@@ -3167,6 +3167,14 @@ export default function App() {
                 onBranchChange={setStaffFilterBranch}
                 onSetKpi={setStaffKpiForCategory}
                 onToggleOfficer={toggleAttachOfficer}
+                onOpenStaffProfile={(name) => {
+                  const officerIndex = parsedReport.officers.findIndex((officer) =>
+                    attachMatchesOfficer(officer.name, name),
+                  );
+                  if (officerIndex < 0) return;
+                  setActiveStaffId(String(officerIndex + 1));
+                  setCurrentView("staff");
+                }}
                 formatOfficerShortName={formatOfficerShortName}
                 matchesOfficer={attachMatchesOfficer}
               />
