@@ -61,16 +61,7 @@ export const mapTargetCategoryKey = (category: string, subCategory = "", product
   return category || "Other";
 };
 
-export const calculateMetrics = (target: number, actual: number, currentDay: number, totalDays: number, lastMonth: number, lastYear: number) => {
-  const achPercent = target ? (actual / target) * 100 : 0;
-  const forecast = currentDay ? (actual / currentDay) * totalDays : 0;
-  const forecastPercent = target ? (forecast / target) * 100 : 0;
-  const momPercent = lastMonth ? ((actual - lastMonth) / lastMonth) * 100 : 0;
-  const yoyPercent = lastYear ? ((actual - lastYear) / lastYear) * 100 : 0;
-  const targetPerDay = totalDays ? (target / totalDays) * currentDay : 0;
-  const diffPerDay = actual - targetPerDay;
-  return { achPercent, forecast, forecastPercent, momPercent, yoyPercent, targetPerDay, diffPerDay };
-};
+export { calculateMetrics } from "./targetAggregations";
 
 export const getRowKey = (row: RawRow) => [
   String(row["Doc No"] ?? "").trim(),

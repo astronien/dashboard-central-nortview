@@ -1,3 +1,4 @@
+import { calcAchievementPct, calcForecastByDays, calculateMetrics } from "./targetAggregations";
 import { getCategoryValue, matchesOfficer, type RawRow } from "./salesAggregations";
 
 export type OfficerPerformance = {
@@ -55,17 +56,6 @@ const cleanOfficerName = (name: string) => {
     if (cleaned.includes(normalizeText(from))) cleaned = cleaned.replace(normalizeText(from), normalizeText(to));
   });
   return cleaned;
-};
-
-const calculateMetrics = (target: number, actual: number, currentDay: number, totalDays: number, lastMonth: number, lastYear: number) => {
-  const achPercent = target ? (actual / target) * 100 : 0;
-  const forecast = currentDay ? (actual / currentDay) * totalDays : 0;
-  const forecastPercent = target ? (forecast / target) * 100 : 0;
-  const momPercent = lastMonth ? ((actual - lastMonth) / lastMonth) * 100 : 0;
-  const yoyPercent = lastYear ? ((actual - lastYear) / lastYear) * 100 : 0;
-  const targetPerDay = totalDays ? (target / totalDays) * currentDay : 0;
-  const diffPerDay = actual - targetPerDay;
-  return { achPercent, forecast, forecastPercent, momPercent, yoyPercent, targetPerDay, diffPerDay };
 };
 
 const getSalesDate = (row: RawRow) => {
@@ -267,10 +257,10 @@ export function buildReport(targetRows: RawRow[], currentRows: RawRow[], lastMon
   });
 
   officerSummary.forEach((state, officerKey) => {
-    state.achPercent = state.target ? (state.actual / state.target) * 100 : 0;
+    state.achPercent = calcAchievementPct(state.actual, state.target);
     state.rate = Math.round(state.achPercent);
-    state.forecast = maxCurrentDay ? Math.round((state.actual / maxCurrentDay) * maxTotalDays) : state.actual;
-    state.forecastPercent = state.target ? (state.forecast / state.target) * 100 : 0;
+    state.forecast = calcForecastByDays(state.actual, maxCurrentDay, maxTotalDays);
+    state.forecastPercent = calcAchievementPct(state.forecast, state.target);
     state.momPercent = state.lastMonth > 0 ? ((state.actual - state.lastMonth) / state.lastMonth) * 100 : "New";
     state.yoyPercent = state.lastYear > 0 ? ((state.actual - state.lastYear) / state.lastYear) * 100 : "New";
     state.targetDay = Math.round(state.target / (maxTotalDays || 30));

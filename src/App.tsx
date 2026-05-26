@@ -36,7 +36,6 @@ import CategoryTreePicker from "./components/CategoryTreePicker";
 import AttachTargetGroupEditor from "./components/AttachTargetGroupEditor";
 import { AnimatePresence, motion } from "motion/react";
 import React, { useEffect, useMemo, useState } from "react";
-import * as XLSX from "xlsx";
 import {
   clearAllUploads,
   fetchTursoStats,
@@ -46,6 +45,17 @@ import {
   type TursoHealthStats,
   type UploadState,
 } from "./lib/uploadsApi";
+import { buildCategorySnapshots } from "./lib/categorySnapshotBuilder";
+import {
+  getKpiTargetResult,
+  type KpiCategoryKey,
+} from "./lib/kpiCategoryAdapter";
+import {
+  calcAchievementPct,
+  calcForecastByDays,
+  calculateMetrics,
+  rawTargetRowsToRecords,
+} from "./lib/targetAggregations";
 import {
   buildStaffRoster,
   getStaffAvatar,
@@ -531,12 +541,6 @@ const sumSales = (
   });
   return sum;
 };
-const getUploadKind = (headers: string[]): UploadKind => {
-  const normalized = headers.map(normalizeText);
-  if (normalized.some((h) => h.includes("cat & sub cat") || h.includes("cat daily"))) return "categoryMaster";
-  if (normalized.some((h) => h.includes("staff id") || h.includes("branch name"))) return "target";
-  return "current";
-};
 const mapTargetCategoryKey = (category: string, subCategory = "", productName = "") => {
   const text = normalizeText(`${category} ${subCategory} ${productName}`);
   
@@ -554,17 +558,6 @@ const mapTargetCategoryKey = (category: string, subCategory = "", productName = 
   if (text.includes("smartphone")) return "Smartphone";
   return category || "Other";
 };
-const calculateMetrics = (target: number, actual: number, currentDay: number, totalDays: number, lastMonth: number, lastYear: number) => {
-  const achPercent = target ? (actual / target) * 100 : 0;
-  const forecast = currentDay ? (actual / currentDay) * totalDays : 0;
-  const forecastPercent = target ? (forecast / target) * 100 : 0;
-  const momPercent = lastMonth ? ((actual - lastMonth) / lastMonth) * 100 : 0;
-  const yoyPercent = lastYear ? ((actual - lastYear) / lastYear) * 100 : 0;
-  const targetPerDay = totalDays ? (target / totalDays) * currentDay : 0;
-  const diffPerDay = actual - targetPerDay;
-  return { achPercent, forecast, forecastPercent, momPercent, yoyPercent, targetPerDay, diffPerDay };
-};
-
 const getRowKey = (row: RawRow) => {
   return [
     String(row["Doc No"] ?? "").trim(),
@@ -830,11 +823,10 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
 
   // Post-calculate all officer performance metrics dynamically
   officerSummary.forEach((state, officerKey) => {
-    state.achPercent = state.target ? (state.actual / state.target) * 100 : 0;
+    state.achPercent = calcAchievementPct(state.actual, state.target);
     state.rate = Math.round(state.achPercent);
-    
-    state.forecast = maxCurrentDay ? Math.round((state.actual / maxCurrentDay) * maxTotalDays) : state.actual;
-    state.forecastPercent = state.target ? (state.forecast / state.target) * 100 : 0;
+    state.forecast = calcForecastByDays(state.actual, maxCurrentDay, maxTotalDays);
+    state.forecastPercent = calcAchievementPct(state.forecast, state.target);
     
     if (state.lastMonth > 0) {
       state.momPercent = ((state.actual - state.lastMonth) / state.lastMonth) * 100;
@@ -1401,7 +1393,6 @@ export default function App() {
   const [selectedAttachOfficers, setSelectedAttachOfficers] = useState<string[]>([]);
   const [isAttachDropdownOpen, setIsAttachDropdownOpen] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [isParsing, setIsParsing] = useState(false);
   const [isSavingTurso, setIsSavingTurso] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isSyncingSheets, setIsSyncingSheets] = useState(false);
@@ -1588,8 +1579,23 @@ export default function App() {
   const activeOfficerCategoryPerformance = useMemo<CategoryPerformanceRow[]>(() => {
     if (!activeOfficer) return [];
     
-    const categoriesList = ["Mac", "iPad", "iPhone", "Apple Watch", "BTB", "BTB(Apple)"];
+    const categoriesList: KpiCategoryKey[] = ["Mac", "iPad", "iPhone", "Apple Watch", "BTB", "BTB(Apple)"];
     const hasData = uploadedFiles.current.length > 0;
+    const targetRecords = rawTargetRowsToRecords(uploadedFiles.target);
+    const now = new Date();
+    const periodYear = now.getFullYear();
+    const periodMonth = now.getMonth();
+    const periodTotalDays = new Date(periodYear, periodMonth + 1, 0).getDate();
+    const periodMonthStr = String(periodMonth + 1).padStart(2, "0");
+    const periodStart = `${periodYear}-${periodMonthStr}-01`;
+    const periodEnd = `${periodYear}-${periodMonthStr}-${String(periodTotalDays).padStart(2, "0")}`;
+    const officerTargetRow = uploadedFiles.target.find((row) => {
+      const name = `${row.NAME ?? ""} ${row.SURNAME ?? ""}`.trim();
+      return matchesOfficer(name, activeOfficer.name);
+    });
+    const officerId = String(
+      officerTargetRow?.emp_id ?? officerTargetRow?.["Staff ID"] ?? officerTargetRow?.staff_id ?? "",
+    ).trim();
     
     // 1. Get currentDay and totalDays
     let currentDay = 22;
@@ -1622,68 +1628,60 @@ export default function App() {
       let lastYear = 0;
       let actualDay = 0;
       
-      if (hasData) {
-        // Sum Target
-        const targetRow = uploadedFiles.target.find((row) => {
-          const name = `${row.NAME ?? ""} ${row.SURNAME ?? ""}`.trim();
-          return matchesOfficer(name, activeOfficer.name);
-        });
-        if (targetRow) {
-          if (catName === "BTB(Apple)") {
-            const btbAppleVal = targetRow["BTB(Apple)"] ?? 
-                                targetRow["BTB (Apple)"] ?? 
-                                targetRow["BTB Apple"] ?? 
-                                targetRow["btb(apple)"] ?? 
-                                targetRow["btb (apple)"] ?? 
-                                targetRow["btb apple"] ?? 
-                                targetRow["BTB_Apple"] ?? 
-                                targetRow["btb_apple"];
-            target = toNumber(btbAppleVal);
-          } else {
-            target = toNumber(targetRow[catName] ?? targetRow[catName.toLowerCase()]);
-          }
-        }
-        
-        // Sum Actuals
+      if (hasData && officerId) {
+        const kpi = getKpiTargetResult(
+          targetRecords,
+          uploadedFiles.current,
+          officerId,
+          "officer",
+          catName,
+          periodStart,
+          periodEnd,
+        );
+        target = kpi.target;
+        actual = kpi.actual;
+
         uploadedFiles.current.forEach((row) => {
+          const rowOfficerId = String(row["STAFF ID"] ?? row.emp_id ?? "").trim();
           const officer = String(row["Officer (Name)"] ?? "").trim();
-          if (matchesOfficer(officer, activeOfficer.name)) {
-            const rowCat = getCategory(row);
-            if (rowCat === catName) {
-              actual += getCategoryValue(row);
-              
-              // Check if daily
-              const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
-              const parsed = Date.parse(rawDate.replace(/^\S+\.\s*/, ""));
-              if ((maxDateStr && rawDate === maxDateStr) || (parsed && parsed === maxDateTime)) {
-                actualDay += getCategoryValue(row);
-              }
+          const officerMatch =
+            (rowOfficerId && rowOfficerId === officerId) || matchesOfficer(officer, activeOfficer.name);
+          if (!officerMatch) return;
+          const rowCat = getCategory(row);
+          if (rowCat === catName) {
+            const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
+            const parsed = Date.parse(rawDate.replace(/^\S+\.\s*/, ""));
+            if ((maxDateStr && rawDate === maxDateStr) || (parsed && parsed === maxDateTime)) {
+              actualDay +=
+                kpi.measureType === "quantity"
+                  ? toNumber(row.Number ?? row.number ?? row.qty ?? 0)
+                  : getCategoryValue(row);
             }
           }
         });
-        
-        // Sum Last Month Actuals
-        uploadedFiles.lastMonth.forEach((row) => {
-          const officer = String(row["Officer (Name)"] ?? "").trim();
-          if (matchesOfficer(officer, activeOfficer.name)) {
-            const rowCat = getCategory(row);
-            if (rowCat === catName) {
-              lastMonth += getCategoryValue(row);
-            }
-          }
-        });
-        
-        // Sum Last Year Actuals
-        uploadedFiles.lastYear.forEach((row) => {
-          const officer = String(row["Officer (Name)"] ?? "").trim();
-          if (matchesOfficer(officer, activeOfficer.name)) {
-            const rowCat = getCategory(row);
-            if (rowCat === catName) {
-              lastYear += getCategoryValue(row);
-            }
-          }
-        });
-      } else {
+
+        const lastMonthKpi = getKpiTargetResult(
+          targetRecords,
+          uploadedFiles.lastMonth,
+          officerId,
+          "officer",
+          catName,
+          periodStart,
+          periodEnd,
+        );
+        lastMonth = lastMonthKpi.actual;
+
+        const lastYearKpi = getKpiTargetResult(
+          targetRecords,
+          uploadedFiles.lastYear,
+          officerId,
+          "officer",
+          catName,
+          periodStart,
+          periodEnd,
+        );
+        lastYear = lastYearKpi.actual;
+      } else if (!hasData) {
         // Fallback/Mock distribution matching activeOfficer total values!
         const targetRates: Record<string, number> = {
           "iPhone": 0.54,
@@ -1709,9 +1707,9 @@ export default function App() {
         actualDay = Math.round(activeOfficer.actualDay * (actualRates[catName] ?? 0.1));
       }
       
-      const achPercent = target ? (actual / target) * 100 : 0;
-      const forecast = currentDay ? Math.round((actual / currentDay) * totalDays) : actual;
-      const forecastPercent = target ? (forecast / target) * 100 : 0;
+      const achPercent = calcAchievementPct(actual, target);
+      const forecast = calcForecastByDays(actual, currentDay, totalDays);
+      const forecastPercent = calcAchievementPct(forecast, target);
       
       let momPercent: number | string = "New";
       if (lastMonth > 0) {
@@ -2147,7 +2145,7 @@ export default function App() {
     // Card 2: Actual Sales
     const totalSales = parsedReport.branches.reduce((sum, b) => sum + b.actual, 0);
     const totalTarget = parsedReport.branches.reduce((sum, b) => sum + b.target, 0);
-    const salesAchRate = totalTarget ? (totalSales / totalTarget) * 100 : 0;
+    const salesAchRate = calcAchievementPct(totalSales, totalTarget);
     
     // Card 3: True Sim
     const simCount = hasData ? countRows(uploadedFiles.current, (cat) => cat.includes("sim")) : 153;
@@ -2212,182 +2210,16 @@ export default function App() {
     };
   }, [uploadedFiles, parsedReport, attachOfficerRows]);
 
-  const categorySnapshotData = useMemo(() => {
-    const hasData = uploadedFiles.current.length > 0;
-
-    const getCategorySales = (categories: string[]) => {
-      let sum = 0;
-      uploadedFiles.current.forEach((row) => {
-        const rowCat = getCategory(row);
-        const match = categories.some(c => {
-          if (c === "btb apple" || c === "btb(apple)") return rowCat === "BTB(Apple)";
-          return rowCat.toLowerCase() === c.toLowerCase();
-        });
-        if (match) {
-          sum += getCategoryValue(row);
-        }
-      });
-      return sum;
-    };
-
-    const getCategoryTarget = (categories: string[]) => {
-      let sum = 0;
-      parsedReport.categories.forEach(c => {
-        const match = categories.some(cat => {
-          if (cat === "btb apple" || cat === "btb(apple)") return c.category === "BTB(Apple)";
-          return c.category.toLowerCase() === cat.toLowerCase();
-        });
-        if (match) {
-          sum += c.target;
-        }
-      });
-      return sum;
-    };
-
-    const getSimCount = () => {
-      return countRows(uploadedFiles.current, (cat) => cat.includes("sim"));
-    };
-
-    const snapshotDefs = [
-      {
-        category: "Total Sales",
-        icon: DollarSign,
-        defaultActual: 54305081,
-        defaultTarget: 86221775,
-        defaultForecast: 76520796,
-        defaultTargetDay: 3546299,
-        defaultToday: 1228696,
-        categories: ["all"],
-      },
-      {
-        category: "Mac",
-        icon: Laptop,
-        defaultActual: 5158197,
-        defaultTarget: 9275095,
-        defaultForecast: 7268369,
-        defaultTargetDay: 457433,
-        defaultToday: 109000,
-        categories: ["mac"],
-      },
-      {
-        category: "iPad",
-        icon: Tablet,
-        defaultActual: 10980713,
-        defaultTarget: 15123152,
-        defaultForecast: 15472823,
-        defaultTargetDay: 460271,
-        defaultToday: 298275,
-        categories: ["ipad"],
-      },
-      {
-        category: "iPhone",
-        icon: Smartphone,
-        defaultActual: 28662705,
-        defaultTarget: 46857322,
-        defaultForecast: 40388357,
-        defaultTargetDay: 2021624,
-        defaultToday: 562275,
-        categories: ["iphone"],
-      },
-      {
-        category: "Apple Watch",
-        icon: Watch,
-        defaultActual: 2653850,
-        defaultTarget: 4166500,
-        defaultForecast: 3739516,
-        defaultTargetDay: 168072,
-        defaultToday: 77290,
-        categories: ["watch", "clock"],
-      },
-      {
-        category: "BTB(Apple)",
-        icon: Building2,
-        defaultActual: 4066982,
-        defaultTarget: 5684752,
-        defaultForecast: 5730747,
-        defaultTargetDay: 179752,
-        defaultToday: 103620,
-        categories: ["btb apple", "btb(apple)"],
-      },
-      {
-        category: "BTB",
-        icon: Building,
-        defaultActual: 2782486,
-        defaultTarget: 5114754,
-        defaultForecast: 3920776,
-        defaultTargetDay: 259141,
-        defaultToday: 78233,
-        categories: ["btb"],
-      },
-      {
-        category: "SIM",
-        icon: CreditCard,
-        defaultActual: 148,
-        defaultTarget: 199,
-        defaultForecast: 209,
-        defaultTargetDay: 6,
-        defaultToday: 3,
-        categories: ["sim"],
-      }
-    ];
-
-    return snapshotDefs.map(def => {
-      let actual = def.defaultActual;
-      let target = def.defaultTarget;
-      let forecast = def.defaultForecast;
-      let targetDay = def.defaultTargetDay;
-      let today = def.defaultToday;
-
-      if (hasData) {
-        if (def.category === "Total Sales") {
-          actual = parsedReport.branches.reduce((sum, b) => sum + b.actual, 0) || def.defaultActual;
-          target = parsedReport.branches.reduce((sum, b) => sum + b.target, 0) || def.defaultTarget;
-          const scale = actual / def.defaultActual;
-          forecast = Math.round(def.defaultForecast * scale);
-          targetDay = Math.round(def.defaultTargetDay * scale);
-          today = Math.round(sumSales(uploadedFiles.current, () => true) / 30) || def.defaultToday;
-        } else if (def.category === "SIM") {
-          actual = getSimCount() || def.defaultActual;
-          target = def.defaultTarget;
-          const scale = actual / def.defaultActual;
-          forecast = Math.round(def.defaultForecast * scale);
-          targetDay = def.defaultTargetDay;
-          today = Math.max(1, Math.round(actual / 30));
-        } else {
-          const matchedSales = getCategorySales(def.categories);
-          const matchedTarget = getCategoryTarget(def.categories);
-
-          actual = matchedSales || def.defaultActual;
-          target = matchedTarget || def.defaultTarget;
-          const scale = actual / def.defaultActual;
-          forecast = Math.round(def.defaultForecast * scale);
-          targetDay = Math.round(def.defaultTargetDay * scale);
-          today = Math.round(actual / 30) || def.defaultToday;
-        }
-      }
-
-      target = target || 1;
-      const achieveRate = (actual / target) * 100;
-      const forecastRate = (forecast / target) * 100;
-      targetDay = targetDay || 1;
-      const todayAchieveRate = (today / targetDay) * 100;
-
-      return {
-        category: def.category,
-        icon: def.icon,
-        actual,
-        target,
-        forecast,
-        achieveRate,
-        forecastRate,
-        mom: "New",
-        yoy: "New",
-        targetDay,
-        today,
-        todayAchieveRate
-      };
-    });
-  }, [uploadedFiles, parsedReport]);
+  const categorySnapshotData = useMemo(
+    () =>
+      buildCategorySnapshots({
+        targetRows: uploadedFiles.target,
+        currentRows: uploadedFiles.current,
+        lastMonthRows: uploadedFiles.lastMonth,
+        lastYearRows: uploadedFiles.lastYear,
+      }),
+    [uploadedFiles.target, uploadedFiles.current, uploadedFiles.lastMonth, uploadedFiles.lastYear],
+  );
 
   const salesTrendData = useMemo(() => {
     if (!uploadedFiles.current.length) {
@@ -3015,61 +2847,6 @@ export default function App() {
     }
   };
 
-  const acceptDetected = (fileName: string, kind: UploadKind): UploadKind => {
-    const n = fileName.toLowerCase();
-    if (n.includes("staff")) return "target";
-    if (n.includes("current")) return "current";
-    if (n.includes("last mom")) return "lastMonth";
-    if (n.includes("last yoy") || n.includes("yoy")) return "lastYear";
-    if (n.includes("category")) return "categoryMaster";
-    return kind;
-  };
-
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, forcedKind?: UploadKind) => {
-    const files = Array.from(event.target.files ?? []);
-    if (!files.length) return;
-    setUploadError(null);
-    setIsParsing(true);
-    try {
-      const nextUploads: Record<UploadKind, RawRow[]> = { ...uploadedFiles };
-      const changedKinds = new Set<UploadKind>();
-      for (const file of files) {
-        const f = file as File;
-        const buffer = await f.arrayBuffer();
-        const workbook = XLSX.read(buffer, { type: "array" });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        if (!sheet) continue;
-        const rows = XLSX.utils.sheet_to_json<RawRow>(sheet, { defval: "", raw: false });
-        const detectedKind = forcedKind ?? acceptDetected(f.name, getUploadKind(Object.keys(rows[0] ?? {})));
-        nextUploads[detectedKind] = rows;
-        changedKinds.add(detectedKind);
-      }
-      const filteredTarget = filterRowsByBranch(nextUploads.target, selectedBranch);
-      const filteredCurrent = filterRowsByBranch(nextUploads.current, selectedBranch);
-      const filteredLastMonth = filterRowsByBranch(nextUploads.lastMonth, selectedBranch);
-      const filteredLastYear = filterRowsByBranch(nextUploads.lastYear, selectedBranch);
-
-      const report = buildReport(
-        filteredTarget,
-        filteredCurrent,
-        filteredLastMonth,
-        filteredLastYear,
-        nextUploads.categoryMaster,
-        "uploaded-data",
-      );
-      setUploadedFiles(nextUploads);
-      setParsedReport(report);
-      await persistUploads(nextUploads, [...changedKinds]);
-      setCurrentView("reports");
-    } catch (error) {
-      setUploadError(error instanceof Error ? error.message : "อ่านไฟล์ไม่สำเร็จ");
-      setParsedReport(emptyReport);
-    } finally {
-      setIsParsing(false);
-      event.target.value = "";
-    }
-  };
-
   return (
     <div className="min-h-screen bg-[#1c2722] p-4 font-sans text-white md:p-8 flex flex-col items-center">
       <div className="w-full max-w-[1440px] h-auto min-h-[90vh] bg-gradient-to-br from-[#1b5d44] to-[#123627] rounded-[2rem] border border-white/10 shadow-2xl flex flex-col relative overflow-hidden">
@@ -3207,6 +2984,7 @@ export default function App() {
                 <HomeDashboardSection
                   derivedHomeStats={derivedHomeStats}
                   monthlyPerformance={monthlyPerformance}
+                  categorySnapshots={categorySnapshotData}
                 />
               </motion.div>
             )}
@@ -3271,11 +3049,9 @@ export default function App() {
               >
                 <ReportsSection
                   uploadedFiles={uploadedFiles}
-                  onFileUpload={handleFileUpload}
                   onSyncSheets={() => void handleSyncSheets()}
                   onSyncKind={(kind) => void handleSyncSheets(kind)}
                   isSyncingSheets={isSyncingSheets}
-                  isParsing={isParsing}
                   isSavingTurso={isSavingTurso}
                   uploadStats={uploadStats}
                   tursoDatabase={tursoDatabase}

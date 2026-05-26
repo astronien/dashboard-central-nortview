@@ -14,11 +14,9 @@ export type ParsedReport = {
 
 export function ReportsSection({
   uploadedFiles,
-  onFileUpload,
   onSyncSheets,
   onSyncKind,
   isSyncingSheets,
-  isParsing,
   isSavingTurso,
   uploadStats,
   tursoDatabase,
@@ -30,11 +28,9 @@ export function ReportsSection({
   parsedReport,
 }: {
   uploadedFiles: Record<UploadKind, RawRow[]>;
-  onFileUpload: (e: React.ChangeEvent<HTMLInputElement>, kind: UploadKind) => void;
   onSyncSheets: () => void;
   onSyncKind: (kind: UploadKind) => void;
   isSyncingSheets: boolean;
-  isParsing: boolean;
   isSavingTurso: boolean;
   uploadStats: ReportStats;
   tursoDatabase: string | null;
@@ -47,28 +43,7 @@ export function ReportsSection({
 }) {
   return (
     <>
-      <div className="text-xs font-semibold tracking-wider text-white/45 uppercase mb-1">Option A: Manual Excel Upload (.xlsx) • ระบบสำรองแมนนวล</div>
-      <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
-        {(["target", "current", "lastMonth", "lastYear", "categoryMaster"] as UploadKind[]).map((kind) => {
-          const fileCount = uploadedFiles[kind].length;
-          const kindLabel = kind.replace(/([A-Z])/g, " $1");
-          return (
-            <label key={kind} className={`group flex min-h-[120px] cursor-pointer flex-col justify-between rounded-2xl border border-dashed p-4 transition-colors ${fileCount > 0 ? "border-emerald-400/40 bg-emerald-400/10 hover:bg-emerald-400/15" : "border-white/20 bg-white/5 hover:bg-white/10"}`}>
-              <input type="file" multiple={kind === "current"} accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => onFileUpload(e, kind)} />
-              <div>
-                <div className="text-sm font-semibold text-white capitalize">{kindLabel}</div>
-                <div className="mt-1 text-xs text-white/50">Drop or click to upload</div>
-              </div>
-              <div className="text-xs text-emerald-300">
-                {fileCount} file(s)
-                {fileCount > 0 && <div className="mt-1 text-[11px] text-white/60 truncate max-w-full">{fileCount === 1 ? "Ready" : "Multiple files loaded"}</div>}
-              </div>
-            </label>
-          );
-        })}
-      </div>
-
-      <div className="text-xs font-semibold tracking-wider text-teal-400/80 uppercase mt-2 mb-1">Option B: Google Sheets Live Sync • ระบบดึงสดแบบพรีเมียม</div>
+      <div className="text-xs font-semibold tracking-wider text-teal-400/80 uppercase mb-1">Google Sheets Live Sync</div>
       <div className="bg-white/10 backdrop-blur-md rounded-[2rem] p-6 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
           <div className="flex items-center gap-4">
@@ -77,7 +52,7 @@ export function ReportsSection({
             </div>
             <div>
               <h3 className="text-lg font-bold tracking-tight text-white">Live Data Synchronization</h3>
-              <p className="text-xs text-white/60 mt-0.5">ดึงข้อมูลและยอดขายล่าสุดแบบเรียลไทม์จาก Google Sheets ของ ASM MASTER บันทึกลงฐานข้อมูล Turso DB</p>
+              <p className="text-xs text-white/60 mt-0.5">ดึงข้อมูลและยอดขายล่าสุดจาก Google Sheets บันทึกลง Turso DB</p>
             </div>
           </div>
           <button
@@ -119,10 +94,12 @@ export function ReportsSection({
         </div>
       </div>
 
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/70">Upload จุดเดียวอยู่ที่หน้า Reports แล้ว ส่วนไอคอนแว่นขยายด้านบนเป็นทางลัดไปหน้า Reports เท่านั้น</div>
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/70">
+        ข้อมูลโหลดผ่าน Google Sheets sync เท่านั้น — ไม่รองรับอัปโหลดไฟล์ Excel/CSV แล้ว
+      </div>
 
       <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/70">
-        <div className="font-semibold text-white mb-2">Upload status</div>
+        <div className="font-semibold text-white mb-2">Sync status</div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-2 text-xs">
           {(["target", "current", "lastMonth", "lastYear", "categoryMaster"] as UploadKind[]).map((kind) => (
             <div key={kind} className={`rounded-xl px-3 py-2 border ${uploadedFiles[kind].length ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200" : "border-white/10 bg-white/5 text-white/50"}`}>
@@ -146,12 +123,12 @@ export function ReportsSection({
             <button type="button" onClick={() => void onClearAll()} className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-100 hover:bg-red-500/20 transition-colors">ลบข้อมูลทั้งหมด</button>
           </motion.div>
           <div className="text-xs text-white/50 text-right max-w-md">
-            {isParsing ? "กำลังอ่านไฟล์ Excel..." : isSavingTurso ? "กำลังบันทึกลง Turso..." : `Loaded ${uploadStats.branches} branches • ${uploadStats.categories} categories • ${uploadStats.officers} officers`}
-            <div className="mt-1 text-[11px] text-white/40">Files: Target {uploadedFiles.target.length} • Current {uploadedFiles.current.length} • Last Month {uploadedFiles.lastMonth.length} • Last Year {uploadedFiles.lastYear.length} • Category Master {uploadedFiles.categoryMaster.length}</div>
+            {isSavingTurso ? "กำลังบันทึกลง Turso..." : `Loaded ${uploadStats.branches} branches • ${uploadStats.categories} categories • ${uploadStats.officers} officers`}
+            <div className="mt-1 text-[11px] text-white/40">Sheets: Target {uploadedFiles.target.length} • Current {uploadedFiles.current.length} • Last Month {uploadedFiles.lastMonth.length} • Last Year {uploadedFiles.lastYear.length} • Category Master {uploadedFiles.categoryMaster.length}</div>
             {tursoDatabase ? (
               <motion.div className="mt-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-[11px] text-left text-emerald-100">
                 <div className="font-medium text-emerald-200">Turso DB: {tursoDatabase}</div>
-                <div className="text-white/70">ดูใน Turso Dashboard: <span className="font-mono">data_sales</span>, <span className="font-mono">data_targets</span>, <span className="font-mono">data_categories</span> (ไม่ใช่ upload_*_chunks)</div>
+                <div className="text-white/70">ดูใน Turso Dashboard: <span className="font-mono">data_sales</span>, <span className="font-mono">data_targets</span>, <span className="font-mono">data_categories</span></div>
                 {tursoStats ? (
                   <div className="font-mono text-[10px] text-white/60 mt-1">
                     rows — target {tursoStats.target?.rowCount ?? 0} • current {tursoStats.current?.rowCount ?? 0} • lastMonth {tursoStats.lastMonth?.rowCount ?? 0} • lastYear {tursoStats.lastYear?.rowCount ?? 0} • category {tursoStats.categoryMaster?.rowCount ?? 0}
@@ -213,8 +190,8 @@ export function ReportsSection({
           <h3 className="text-lg font-semibold tracking-tight mb-5">Report Logic Rules</h3>
           <div className="space-y-4 text-sm text-white/80">
             <div className="rounded-2xl bg-white/5 border border-white/5 p-4">
-              <div className="font-semibold text-white mb-1">File flow</div>
-              <p>Upload 4–5 files → detect type → map headers → compute target/current/last month/last year.</p>
+              <div className="font-semibold text-white mb-1">Data flow</div>
+              <p>Google Sheets sync → map headers → compute target/current/last month/last year.</p>
             </div>
             <div className="rounded-2xl bg-white/5 border border-white/5 p-4">
               <div className="font-semibold text-white mb-1">Category rule</div>

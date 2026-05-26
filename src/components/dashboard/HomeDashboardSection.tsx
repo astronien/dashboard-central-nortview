@@ -1,5 +1,7 @@
 import { Activity, DollarSign, Laptop, PenTool, Rocket, ShieldCheck, Smartphone, Star, Tablet, TrendingUp, TrendingDown, Building, Building2 } from "lucide-react";
+import type { CategorySnapshotItem } from "../../lib/categorySnapshotBuilder";
 import type { DerivedHomeStat } from "./dashboardTypes";
+import { CategorySnapshotSection } from "./CategorySnapshotSection";
 import { KpiCard } from "./KpiCard";
 
 export type MonthlyPerformance = {
@@ -22,9 +24,11 @@ export type MonthlyPerformance = {
 export function HomeDashboardSection({
   derivedHomeStats,
   monthlyPerformance,
+  categorySnapshots,
 }: {
   derivedHomeStats: DerivedHomeStat[];
   monthlyPerformance: MonthlyPerformance;
+  categorySnapshots?: CategorySnapshotItem[];
 }) {
   const gradeColor =
     monthlyPerformance.overallScore.grade === "A"
@@ -53,6 +57,10 @@ export function HomeDashboardSection({
           </div>
         ))}
       </div>
+
+      {categorySnapshots && categorySnapshots.length > 0 ? (
+        <CategorySnapshotSection items={categorySnapshots} />
+      ) : null}
 
       <div className="flex items-center gap-3 mt-4">
         <div className="p-2 bg-emerald-500/20 rounded-xl border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.2)]"><Rocket className="w-5 h-5 text-emerald-400 animate-pulse" /></div>
