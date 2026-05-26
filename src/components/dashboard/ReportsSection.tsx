@@ -12,6 +12,13 @@ export type ParsedReport = {
   officers: { name: string; branch: string; actual: number; target: number; rate: number; achPercent?: number; forecast?: number }[];
 };
 
+export type SyncResult = {
+  ok: boolean;
+  message: string;
+  summary?: Record<string, number>;
+  errors?: Array<{ kind: string; error: string }>;
+};
+
 export function ReportsSection({
   uploadedFiles,
   onSyncSheets,
@@ -22,6 +29,7 @@ export function ReportsSection({
   tursoDatabase,
   tursoStats,
   uploadError,
+  syncResult,
   onExportCsv,
   onClearAll,
   onRemoveFile,
@@ -36,6 +44,7 @@ export function ReportsSection({
   tursoDatabase: string | null;
   tursoStats: TursoStats | null;
   uploadError: string | null;
+  syncResult: SyncResult | null;
   onExportCsv: () => void;
   onClearAll: () => void;
   onRemoveFile: (kind: UploadKind) => void;
@@ -52,7 +61,7 @@ export function ReportsSection({
             </div>
             <div>
               <h3 className="text-lg font-bold tracking-tight text-white">Live Data Synchronization</h3>
-              <p className="text-xs text-white/60 mt-0.5">ดึงข้อมูลและยอดขายล่าสุดจาก Google Sheets บันทึกลง Turso DB</p>
+              <p className="text-xs text-white/60 mt-0.5">ดึงข้อมูลทุกสาขาจาก Google Sheets บันทึกลง Turso — กรองสาขาใน Settings</p>
             </div>
           </div>
           <button
@@ -97,6 +106,34 @@ export function ReportsSection({
       <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/70">
         ข้อมูลโหลดผ่าน Google Sheets sync เท่านั้น — ไม่รองรับอัปโหลดไฟล์ Excel/CSV แล้ว
       </div>
+
+      {syncResult ? (
+        <div
+          className={`rounded-2xl border p-4 text-sm ${
+            syncResult.ok && !syncResult.errors?.length
+              ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-100"
+              : "border-amber-400/30 bg-amber-400/10 text-amber-100"
+          }`}
+        >
+          <div className="font-semibold text-white mb-1">{syncResult.message}</div>
+          {syncResult.summary ? (
+            <div className="text-xs font-mono text-white/70 mt-1">
+              {Object.entries(syncResult.summary)
+                .map(([kind, count]) => `${kind}: ${count.toLocaleString()} rows`)
+                .join(" • ")}
+            </div>
+          ) : null}
+          {syncResult.errors?.length ? (
+            <ul className="mt-2 text-xs space-y-1 list-disc list-inside text-amber-200/90">
+              {syncResult.errors.map((entry) => (
+                <li key={entry.kind}>
+                  {entry.kind}: {entry.error}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/70">
         <div className="font-semibold text-white mb-2">Sync status</div>

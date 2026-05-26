@@ -1158,18 +1158,45 @@ export default function App() {
   >("home");
   const [parsedReport, setParsedReport] = useState<ParsedReport>(fallbackReport);
   const [uploadedFiles, setUploadedFiles] = useState<Record<UploadKind, RawRow[]>>({ target: [], current: [], lastMonth: [], lastYear: [], categoryMaster: [] });
+  const [selectedBranch, setSelectedBranch] = useState<string>(() => {
+    try {
+      return window.localStorage.getItem("dashboard-selected-branch") || "Mega Bangna";
+    } catch {
+      return "Mega Bangna";
+    }
+  });
+
+  const handleBranchChange = (newBranch: string) => {
+    setSelectedBranch(newBranch);
+    try {
+      window.localStorage.setItem("dashboard-selected-branch", newBranch);
+    } catch {
+      // ignore
+    }
+  };
+
+  const displayUploads = useMemo<Record<UploadKind, RawRow[]>>(
+    () => ({
+      target: filterRowsByBranch(uploadedFiles.target, selectedBranch),
+      current: filterRowsByBranch(uploadedFiles.current, selectedBranch),
+      lastMonth: filterRowsByBranch(uploadedFiles.lastMonth, selectedBranch),
+      lastYear: filterRowsByBranch(uploadedFiles.lastYear, selectedBranch),
+      categoryMaster: uploadedFiles.categoryMaster,
+    }),
+    [uploadedFiles, selectedBranch],
+  );
 
   const categoryMap = useMemo(() => {
     const map = new Map<string, string>();
-    if (uploadedFiles.categoryMaster) {
-      uploadedFiles.categoryMaster.forEach((row) => {
+    if (displayUploads.categoryMaster) {
+      displayUploads.categoryMaster.forEach((row) => {
         const key = normalizeText(row["Cat & Sub Cat"] ?? row["Category (Name)"] ?? row.SubCategory);
         const value = String(row["CAT Daily"] ?? row["Category (Name)"] ?? "Other").trim();
         if (key) map.set(key, value);
       });
     }
     return map;
-  }, [uploadedFiles.categoryMaster]);
+  }, [displayUploads.categoryMaster]);
 
   const getCategory = (row: RawRow): string => {
     const cat = String(row["Category (Name)"] ?? row.category_name ?? row.Category ?? "").trim();
@@ -1197,10 +1224,10 @@ export default function App() {
   };
 
   const todayRows = useMemo(() => {
-    if (!uploadedFiles.current.length) return [];
+    if (!displayUploads.current.length) return [];
     let maxDateStr = "";
     let maxDateTime = 0;
-    uploadedFiles.current.forEach((row) => {
+    displayUploads.current.forEach((row) => {
       const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
       if (!rawDate) return;
       const parsed = Date.parse(rawDate.replace(/^\S+\.\s*/, ""));
@@ -1210,8 +1237,8 @@ export default function App() {
       }
     });
     if (!maxDateStr) return [];
-    return uploadedFiles.current.filter(row => String(row["Doc Date"] ?? "").trim() === maxDateStr.trim());
-  }, [uploadedFiles.current]);
+    return displayUploads.current.filter(row => String(row["Doc Date"] ?? "").trim() === maxDateStr.trim());
+  }, [displayUploads.current]);
 
   const todayStats = useMemo(() => {
     if (!todayRows.length) return { revenue: 0, units: 0, target: 0, ach: 0, mom: 0, yoy: 0, categories: [], dateStr: "" };
@@ -1303,7 +1330,7 @@ export default function App() {
   }, [todayRows, parsedReport, getCategory, getCategoryValue]);
 
   const staffAttachMatrix = useMemo(() => {
-    if (!uploadedFiles.current.length || !uploadedFiles.target.length) return [];
+    if (!displayUploads.current.length || !displayUploads.target.length) return [];
     const groups: AttachTargetGroup[] = [
       { id: "Cover+", label: "Cover+", members: ["Cover+"] },
       { id: "AppleCare+", label: "AC+", members: ["Apple Care", "AppleCare+"] },
@@ -1314,9 +1341,9 @@ export default function App() {
       { id: "UFD", label: "UFD", members: ["UFD", "UFUND"] }
     ];
     return computeAttachRateRows({
-      currentRows: uploadedFiles.current,
-      targetRows: uploadedFiles.target,
-      categoryMaster: uploadedFiles.categoryMaster,
+      currentRows: displayUploads.current,
+      targetRows: displayUploads.target,
+      categoryMaster: displayUploads.categoryMaster,
       baseCategories: ["iPhone", "iPad", "Mac", "Apple Watch"],
       attachCategories: groups.map(g => g.label),
       attachGroups: groups,
@@ -1330,10 +1357,10 @@ export default function App() {
         "UFD": 5
       }
     });
-  }, [uploadedFiles.current, uploadedFiles.target, uploadedFiles.categoryMaster]);
+  }, [displayUploads.current, displayUploads.target, displayUploads.categoryMaster]);
 
   const pcZoneStats = useMemo(() => {
-    if (!uploadedFiles.current.length) return [];
+    if (!displayUploads.current.length) return [];
     
     const distributors = [
       { name: "SUPER SALES", brands: ["BLUE BOX", "TECHPRO", "QPLUS", "TITANV", "MCDODO"] },
@@ -1346,7 +1373,7 @@ export default function App() {
       let distUnits = 0;
       const brandMap = new Map<string, { revenue: number, units: number }>();
       
-      uploadedFiles.current.forEach(row => {
+      displayUploads.current.forEach(row => {
         const brand = String(row["Brand"] ?? row.brand ?? "").toUpperCase().trim();
         const cat = String(row["Category (Name)"] ?? "").toLowerCase();
         const matchesBrand = dist.brands.some(b => brand.includes(b));
@@ -1376,7 +1403,7 @@ export default function App() {
         topBrands
       };
     });
-  }, [uploadedFiles.current, getCategoryValue]);
+  }, [displayUploads.current, getCategoryValue]);
 
   const [activeTab, setActiveTab] = useState("Store");
   const [activeStat, setActiveStat] = useState<"sales" | "csat" | "target">(
@@ -1398,22 +1425,6 @@ export default function App() {
   const [isSyncingSheets, setIsSyncingSheets] = useState(false);
   const [syncResult, setSyncResult] = useState<any>(null);
   const [sheetBranches, setSheetBranches] = useState<string[]>([]);
-  const [selectedBranch, setSelectedBranch] = useState<string>(() => {
-    try {
-      return window.localStorage.getItem("dashboard-selected-branch") || "Mega Bangna";
-    } catch {
-      return "Mega Bangna";
-    }
-  });
-
-  const handleBranchChange = (newBranch: string) => {
-    setSelectedBranch(newBranch);
-    try {
-      window.localStorage.setItem("dashboard-selected-branch", newBranch);
-    } catch {
-      // ignore
-    }
-  };
 
   const [homeTab, setHomeTab] = useState<"monthly" | "today">("monthly");
   const [staffViewTab, setStaffViewTab] = useState<"leaderboard" | "attach_builder" | "pc_zone">("leaderboard");
@@ -1477,11 +1488,11 @@ export default function App() {
   }, [staffAttachGroups, staffKpiTargets]);
 
   const attachOfficerRows = useMemo<AttachOfficerRow[]>(() => {
-    if (!uploadedFiles.current.length) return [];
+    if (!displayUploads.current.length) return [];
     return computeAttachRateRows({
-      currentRows: uploadedFiles.current,
-      targetRows: uploadedFiles.target,
-      categoryMaster: uploadedFiles.categoryMaster,
+      currentRows: displayUploads.current,
+      targetRows: displayUploads.target,
+      categoryMaster: displayUploads.categoryMaster,
       baseCategories: attachBaseCategories,
       attachCategories: attachTargetCategories,
       attachGroups:
@@ -1492,9 +1503,9 @@ export default function App() {
       filterBranch: attachFilterBranch,
     });
   }, [
-    uploadedFiles.current,
-    uploadedFiles.target,
-    uploadedFiles.categoryMaster,
+    displayUploads.current,
+    displayUploads.target,
+    displayUploads.categoryMaster,
     attachBaseCategories,
     attachTargetCategories,
     staffAttachGroups,
@@ -1506,7 +1517,7 @@ export default function App() {
 
 
   const dynamicLanguages = useMemo(() => {
-    if (!uploadedFiles.current.length && Number(activeStaffId) <= 3) {
+    if (!displayUploads.current.length && Number(activeStaffId) <= 3) {
       return currentStaff.languages;
     }
     const branch = activeOfficer?.branch ?? "";
@@ -1514,37 +1525,37 @@ export default function App() {
       return (activeOfficerIndex % 2 === 0) ? "TH / EN / CN" : "TH / EN / JP";
     }
     return "TH / EN";
-  }, [uploadedFiles.current, activeOfficer, activeOfficerIndex, activeStaffId, currentStaff]);
+  }, [displayUploads.current, activeOfficer, activeOfficerIndex, activeStaffId, currentStaff]);
 
   const dynamicExperience = useMemo(() => {
-    if (!uploadedFiles.current.length && Number(activeStaffId) <= 3) {
+    if (!displayUploads.current.length && Number(activeStaffId) <= 3) {
       return currentStaff.experience;
     }
     const target = activeOfficer?.target ?? 0;
     if (target > 1500000) return "5+ Years";
     if (target > 800000) return "3-5 Years";
     return "1-2 Years";
-  }, [uploadedFiles.current, activeOfficer, activeStaffId, currentStaff]);
+  }, [displayUploads.current, activeOfficer, activeStaffId, currentStaff]);
 
   const dynamicRole = useMemo(() => {
-    if (!uploadedFiles.current.length && Number(activeStaffId) <= 3) {
+    if (!displayUploads.current.length && Number(activeStaffId) <= 3) {
       return currentStaff.role;
     }
     const target = activeOfficer?.target ?? 0;
     if (target > 1500000) return "Senior Sales Spec.";
     if (target > 800000) return "Sales Specialist";
     return "Sales Associate";
-  }, [uploadedFiles.current, activeOfficer, activeStaffId, currentStaff]);
+  }, [displayUploads.current, activeOfficer, activeStaffId, currentStaff]);
 
   const dynamicExpertise = useMemo(() => {
-    if (!uploadedFiles.current.length && Number(activeStaffId) <= 3) {
+    if (!displayUploads.current.length && Number(activeStaffId) <= 3) {
       return currentStaff.expertise;
     }
-    if (!uploadedFiles.current.length || !activeOfficer) {
+    if (!displayUploads.current.length || !activeOfficer) {
       return "All Products";
     }
     const catSales = new Map<string, number>();
-    uploadedFiles.current.forEach((row) => {
+    displayUploads.current.forEach((row) => {
       const officerName = String(row["Officer (Name)"] ?? row.Officer ?? "");
       if (attachMatchesOfficer(officerName, activeOfficer.name)) {
         const cat = String(row["Category (Name)"] ?? row.category ?? "Other").trim();
@@ -1574,14 +1585,14 @@ export default function App() {
     if (lower.includes("sim")) return "SIM & Services Spec.";
     if (lower.includes("btb")) return "Corporate Sales Spec.";
     return `${maxCat} Specialist`;
-  }, [uploadedFiles.current, activeOfficer, activeStaffId, currentStaff]);
+  }, [displayUploads.current, activeOfficer, activeStaffId, currentStaff]);
 
   const activeOfficerCategoryPerformance = useMemo<CategoryPerformanceRow[]>(() => {
     if (!activeOfficer) return [];
     
     const categoriesList: KpiCategoryKey[] = ["Mac", "iPad", "iPhone", "Apple Watch", "BTB", "BTB(Apple)"];
-    const hasData = uploadedFiles.current.length > 0;
-    const targetRecords = rawTargetRowsToRecords(uploadedFiles.target);
+    const hasData = displayUploads.current.length > 0;
+    const targetRecords = rawTargetRowsToRecords(displayUploads.target);
     const now = new Date();
     const periodYear = now.getFullYear();
     const periodMonth = now.getMonth();
@@ -1589,7 +1600,7 @@ export default function App() {
     const periodMonthStr = String(periodMonth + 1).padStart(2, "0");
     const periodStart = `${periodYear}-${periodMonthStr}-01`;
     const periodEnd = `${periodYear}-${periodMonthStr}-${String(periodTotalDays).padStart(2, "0")}`;
-    const officerTargetRow = uploadedFiles.target.find((row) => {
+    const officerTargetRow = displayUploads.target.find((row) => {
       const name = `${row.NAME ?? ""} ${row.SURNAME ?? ""}`.trim();
       return matchesOfficer(name, activeOfficer.name);
     });
@@ -1609,7 +1620,7 @@ export default function App() {
     let maxDateStr = "";
     let maxDateTime = 0;
     if (hasData) {
-      uploadedFiles.current.forEach((row) => {
+      displayUploads.current.forEach((row) => {
         const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
         if (!rawDate) return;
         const parsed = Date.parse(rawDate.replace(/^\S+\.\s*/, ""));
@@ -1631,7 +1642,7 @@ export default function App() {
       if (hasData && officerId) {
         const kpi = getKpiTargetResult(
           targetRecords,
-          uploadedFiles.current,
+          displayUploads.current,
           officerId,
           "officer",
           catName,
@@ -1641,7 +1652,7 @@ export default function App() {
         target = kpi.target;
         actual = kpi.actual;
 
-        uploadedFiles.current.forEach((row) => {
+        displayUploads.current.forEach((row) => {
           const rowOfficerId = String(row["STAFF ID"] ?? row.emp_id ?? "").trim();
           const officer = String(row["Officer (Name)"] ?? "").trim();
           const officerMatch =
@@ -1662,7 +1673,7 @@ export default function App() {
 
         const lastMonthKpi = getKpiTargetResult(
           targetRecords,
-          uploadedFiles.lastMonth,
+          displayUploads.lastMonth,
           officerId,
           "officer",
           catName,
@@ -1673,7 +1684,7 @@ export default function App() {
 
         const lastYearKpi = getKpiTargetResult(
           targetRecords,
-          uploadedFiles.lastYear,
+          displayUploads.lastYear,
           officerId,
           "officer",
           catName,
@@ -1782,7 +1793,7 @@ export default function App() {
     };
     
     return [...rows, totalRow];
-  }, [activeOfficer, uploadedFiles, parsedReport, getCategory]);
+  }, [activeOfficer, displayUploads, parsedReport, getCategory]);
 
   const activeOfficer7WondersPerformance = useMemo<CategoryPerformanceRow[]>(() => {
     if (!activeOfficer) return [];
@@ -1798,10 +1809,10 @@ export default function App() {
     let macAppVal = 12 + (officerIndex % 3) * 2;
     let caseVal = 46 + (officerIndex % 5) * 2;
     
-    const hasData = uploadedFiles.current.length > 0;
+    const hasData = displayUploads.current.length > 0;
     
     if (hasData) {
-      const officerRows = uploadedFiles.current.filter((row) => {
+      const officerRows = displayUploads.current.filter((row) => {
         const officer = String(row["Officer (Name)"] ?? "").trim();
         return matchesOfficer(officer, officerName);
       });
@@ -1952,10 +1963,10 @@ export default function App() {
     };
     
     return [...rows, totalRow];
-  }, [activeOfficer, uploadedFiles, parsedReport, activeOfficerIndex]);
+  }, [activeOfficer, displayUploads, parsedReport, activeOfficerIndex]);
 
   const sevenWondersScore = useMemo(() => {
-    if (!uploadedFiles.current.length && Number(activeStaffId) <= 3) {
+    if (!displayUploads.current.length && Number(activeStaffId) <= 3) {
       return currentStaff.score;
     }
     const wondersRows = activeOfficer7WondersPerformance.filter(r => r.category !== "Average" && r.category !== "Total");
@@ -1968,10 +1979,10 @@ export default function App() {
     
     const sum = wondersRows.reduce((acc, row) => acc + scale(row.actual, row.target), 0);
     return Math.round(sum / wondersRows.length);
-  }, [activeOfficer7WondersPerformance, uploadedFiles.current, activeStaffId, currentStaff]);
+  }, [activeOfficer7WondersPerformance, displayUploads.current, activeStaffId, currentStaff]);
 
   const dynamicRadarData = useMemo(() => {
-    if (!uploadedFiles.current.length && Number(activeStaffId) <= 3 && activeStat === "csat") {
+    if (!displayUploads.current.length && Number(activeStaffId) <= 3 && activeStat === "csat") {
       return currentStaff.radar;
     }
     
@@ -2011,23 +2022,23 @@ export default function App() {
     activeStat,
     activeOfficerCategoryPerformance,
     activeOfficer7WondersPerformance,
-    uploadedFiles.current,
+    displayUploads.current,
     activeStaffId,
     currentStaff
   ]);
 
   const dynamicScore = useMemo(() => {
-    if (!uploadedFiles.current.length && Number(activeStaffId) <= 3 && activeStat === "csat") {
+    if (!displayUploads.current.length && Number(activeStaffId) <= 3 && activeStat === "csat") {
       return currentStaff.score;
     }
     if (dynamicRadarData.length === 0) return 0;
     const sum = dynamicRadarData.reduce((acc, curr) => acc + curr.value, 0);
     return Math.round(sum / dynamicRadarData.length);
-  }, [dynamicRadarData, uploadedFiles.current, activeStaffId, currentStaff, activeStat]);
+  }, [dynamicRadarData, displayUploads.current, activeStaffId, currentStaff, activeStat]);
 
   const staffRoster = useMemo(
-    () => buildStaffRoster(uploadedFiles.target, parsedReport.officers, cleanOfficerName),
-    [uploadedFiles.target, parsedReport.officers],
+    () => buildStaffRoster(displayUploads.target, parsedReport.officers, cleanOfficerName),
+    [displayUploads.target, parsedReport.officers],
   );
 
   const uploadStats = useMemo(() => {
@@ -2082,7 +2093,7 @@ export default function App() {
   }, [parsedReport]);
 
   const monthlyPerformance = useMemo(() => {
-    const hasData = uploadedFiles.current.length > 0;
+    const hasData = displayUploads.current.length > 0;
     
     // Dynamic calculations or fallback mock values matching user's image exactly!
     
@@ -2148,48 +2159,48 @@ export default function App() {
     const salesAchRate = calcAchievementPct(totalSales, totalTarget);
     
     // Card 3: True Sim
-    const simCount = hasData ? countRows(uploadedFiles.current, (cat) => cat.includes("sim")) : 153;
-    const iphoneCount = hasData ? countRows(uploadedFiles.current, (cat) => cat.includes("iphone")) : 744;
+    const simCount = hasData ? countRows(displayUploads.current, (cat) => cat.includes("sim")) : 153;
+    const iphoneCount = hasData ? countRows(displayUploads.current, (cat) => cat.includes("iphone")) : 744;
     const simRate = iphoneCount > 0 ? (simCount / iphoneCount) * 100 : 20.56;
     
     // Card 4: Case iPhone
-    const caseCount = hasData ? countRows(uploadedFiles.current, (cat, prod, sub) => cat.includes("case") || prod.includes("case") || sub.includes("case")) : 353;
+    const caseCount = hasData ? countRows(displayUploads.current, (cat, prod, sub) => cat.includes("case") || prod.includes("case") || sub.includes("case")) : 353;
     const caseRate = iphoneCount > 0 ? (caseCount / iphoneCount) * 100 : 47.45;
     
     // Card 5: UFUND PERSONAL
-    const ufundCount = hasData ? countRows(uploadedFiles.current, (cat, prod) => cat.includes("ufund") || prod.includes("ufund") || cat.includes("personal") || prod.includes("personal")) : 47;
+    const ufundCount = hasData ? countRows(displayUploads.current, (cat, prod) => cat.includes("ufund") || prod.includes("ufund") || cat.includes("personal") || prod.includes("personal")) : 47;
     const ufundRate = iphoneCount > 0 ? (ufundCount / iphoneCount) * 100 : 6.32;
     
     // Card 6: COVER + (solid card)
-    const coverCount = hasData ? countRows(uploadedFiles.current, (cat, prod) => cat.includes("cover") || cat.includes("care") || prod.includes("cover") || prod.includes("care")) : 104;
+    const coverCount = hasData ? countRows(displayUploads.current, (cat, prod) => cat.includes("cover") || cat.includes("care") || prod.includes("cover") || prod.includes("care")) : 104;
     const coverRate = iphoneCount > 0 ? (coverCount / iphoneCount) * 100 : 13.98;
     
     // Card 7: KPIs Pencil 85%
-    const pencilCount = hasData ? countRows(uploadedFiles.current, (cat, prod) => prod.includes("pencil") || prod.includes("pen")) : 325;
-    const ipadCount = hasData ? countRows(uploadedFiles.current, (cat) => cat.includes("ipad")) : 471;
+    const pencilCount = hasData ? countRows(displayUploads.current, (cat, prod) => prod.includes("pencil") || prod.includes("pen")) : 325;
+    const ipadCount = hasData ? countRows(displayUploads.current, (cat) => cat.includes("ipad")) : 471;
     const pencilRate = ipadCount > 0 ? (pencilCount / ipadCount) * 100 : 69.00;
     
     // Card 8: KPIs Mac 10%
-    const macCount = hasData ? countRows(uploadedFiles.current, (cat) => cat.includes("mac")) : 119;
+    const macCount = hasData ? countRows(displayUploads.current, (cat) => cat.includes("mac")) : 119;
     const macRate = iphoneCount > 0 ? (macCount / iphoneCount) * 100 : 15.99;
     
     // Card 9: KPIs iPad 30%
-    const ipadAttachCount = hasData ? countRows(uploadedFiles.current, (cat) => cat.includes("ipad")) : 471;
+    const ipadAttachCount = hasData ? countRows(displayUploads.current, (cat) => cat.includes("ipad")) : 471;
     const ipadRate = iphoneCount > 0 ? (ipadAttachCount / iphoneCount) * 100 : 63.31;
     
     // Card 10: KPIs BTB Mix 10%
-    const btbSales = hasData ? sumSales(uploadedFiles.current, (cat) => cat.includes("btb")) : 6850000;
+    const btbSales = hasData ? sumSales(displayUploads.current, (cat) => cat.includes("btb")) : 6850000;
     const btbTotalSales = totalSales || 54300000;
     const btbRate = btbTotalSales > 0 ? (btbSales / btbTotalSales) * 100 : 12.61;
     
     // Card 11: Mac Growth YoY
-    const currentMacSales = hasData ? sumSales(uploadedFiles.current, (cat) => cat.includes("mac")) : 5160000;
-    const lastYearMacSales = hasData ? sumSales(uploadedFiles.lastYear, (cat) => cat.includes("mac")) : 0;
+    const currentMacSales = hasData ? sumSales(displayUploads.current, (cat) => cat.includes("mac")) : 5160000;
+    const lastYearMacSales = hasData ? sumSales(displayUploads.lastYear, (cat) => cat.includes("mac")) : 0;
     const macYoYRate = lastYearMacSales > 0 ? ((currentMacSales - lastYearMacSales) / lastYearMacSales) * 100 : 0.00;
     
     // Card 12: Total Sales Growth YoY
     const currentTotalSales = totalSales;
-    const lastYearTotalSales = hasData ? sumSales(uploadedFiles.lastYear, () => true) : 0;
+    const lastYearTotalSales = hasData ? sumSales(displayUploads.lastYear, () => true) : 0;
     const totalSalesYoYRate = lastYearTotalSales > 0 ? ((currentTotalSales - lastYearTotalSales) / lastYearTotalSales) * 100 : 0.00;
 
     return {
@@ -2208,26 +2219,26 @@ export default function App() {
       gradeDist,
       lowForecast: lowForecastCount,
     };
-  }, [uploadedFiles, parsedReport, attachOfficerRows]);
+  }, [displayUploads, parsedReport, attachOfficerRows]);
 
   const categorySnapshotData = useMemo(
     () =>
       buildCategorySnapshots({
-        targetRows: uploadedFiles.target,
-        currentRows: uploadedFiles.current,
-        lastMonthRows: uploadedFiles.lastMonth,
-        lastYearRows: uploadedFiles.lastYear,
+        targetRows: displayUploads.target,
+        currentRows: displayUploads.current,
+        lastMonthRows: displayUploads.lastMonth,
+        lastYearRows: displayUploads.lastYear,
       }),
-    [uploadedFiles.target, uploadedFiles.current, uploadedFiles.lastMonth, uploadedFiles.lastYear],
+    [displayUploads.target, displayUploads.current, displayUploads.lastMonth, displayUploads.lastYear],
   );
 
   const salesTrendData = useMemo(() => {
-    if (!uploadedFiles.current.length) {
+    if (!displayUploads.current.length) {
       return [];
     }
 
     const dailySales = new Map<string, number>();
-    uploadedFiles.current.forEach((row) => {
+    displayUploads.current.forEach((row) => {
       const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
       if (!rawDate) return;
       
@@ -2254,15 +2265,15 @@ export default function App() {
       sales: Math.round((dailySales.get(date) ?? 0) / 1000),
       index,
     }));
-  }, [uploadedFiles.current, parsedReport.branches]);
+  }, [displayUploads.current, parsedReport.branches]);
 
   const topPerformingProducts = useMemo(() => {
-    if (!uploadedFiles.current.length) {
+    if (!displayUploads.current.length) {
       return [];
     }
 
     const productSales = new Map<string, number>();
-    uploadedFiles.current.forEach((row) => {
+    displayUploads.current.forEach((row) => {
       const name = String(row["Product (Name)"] ?? row["Category (Name)"] ?? "Other").trim();
       if (!name || name === "Other") return;
       const val = getCategoryValue(row);
@@ -2281,9 +2292,9 @@ export default function App() {
       value: Math.round((sales / maxVal) * 100),
       color: colors[index] ?? "bg-white/20",
     }));
-  }, [uploadedFiles.current]);
+  }, [displayUploads.current]);
 
-  const attachCategoryOptions = useMemo(() => getAttachCategoryOptions(uploadedFiles.categoryMaster), [uploadedFiles.categoryMaster]);
+  const attachCategoryOptions = useMemo(() => getAttachCategoryOptions(displayUploads.categoryMaster), [displayUploads.categoryMaster]);
 
   const toggleAttachCategory = (value: string) => {
     setSelectedAttachCategories((prev) =>
@@ -2298,27 +2309,27 @@ export default function App() {
   };
 
   const staffBranchesList = useMemo(() => {
-    if (!uploadedFiles.target.length) {
+    if (!displayUploads.target.length) {
       const fromReport = [
         ...new Set(parsedReport.officers.map((o) => o.branch).filter(Boolean)),
       ].sort();
       return ["All Branches", ...fromReport];
     }
     const branches = new Set(
-      uploadedFiles.target
+      displayUploads.target
         .map((t) => String(t["BRANCH NAME"] ?? "").trim())
         .filter(Boolean),
     );
     return ["All Branches", ...Array.from(branches).sort()];
-  }, [uploadedFiles.target, parsedReport.officers]);
+  }, [displayUploads.target, parsedReport.officers]);
 
   const staffCategoryTree = useMemo(
     () =>
       buildCategoryTree(
-        uploadedFiles.current,
-        uploadedFiles.categoryMaster,
+        displayUploads.current,
+        displayUploads.categoryMaster,
       ),
-    [uploadedFiles.current, uploadedFiles.categoryMaster],
+    [displayUploads.current, displayUploads.categoryMaster],
   );
 
   const setStaffKpiForCategory = (cat: string, value: number) => {
@@ -2490,7 +2501,7 @@ export default function App() {
 
   const activeOfficerInteractions = useMemo(() => {
     const officerName = activeOfficer?.name ?? currentStaff.name;
-    if (!uploadedFiles.current.length) return interactionsData;
+    if (!displayUploads.current.length) return interactionsData;
 
     const formatDocDate = (raw: unknown) => {
       const text = String(raw ?? "").replace(/^\S+\.\s*/, "");
@@ -2510,7 +2521,7 @@ export default function App() {
       return amount ? amount.toLocaleString() : "-";
     };
 
-    const rows = uploadedFiles.current
+    const rows = displayUploads.current
       .filter((row) =>
         attachMatchesOfficer(
           String(row["Officer (Name)"] ?? row.Officer ?? ""),
@@ -2550,7 +2561,7 @@ export default function App() {
       csat: rows,
       target: rows,
     };
-  }, [uploadedFiles.current, activeOfficer?.name, currentStaff.name]);
+  }, [displayUploads.current, activeOfficer?.name, currentStaff.name]);
 
   const persistUploadsLocal = (nextUploads: UploadState) => {
     try {
@@ -2685,8 +2696,7 @@ export default function App() {
       let combinedErrors: any[] = [];
       
       for (const k of kindsToSync) {
-        const branchName = parsedStoreHeader.name || "Mega Bangna";
-        const url = `/api/sync-sheets?kind=${k}&branch=${encodeURIComponent(branchName)}`;
+        const url = `/api/sync-sheets?kind=${encodeURIComponent(k)}`;
         const res = await fetch(url, { method: "POST" });
         const data = await res.json();
         if (!res.ok) {
@@ -2701,10 +2711,13 @@ export default function App() {
       }
       
       setSyncResult({
-        ok: true,
-        message: "Sync completed.",
+        ok: combinedErrors.length === 0,
+        message:
+          combinedErrors.length === 0
+            ? "ซิงก์สำเร็จ — บันทึกทุกสาขาแล้ว"
+            : "ซิงก์บางส่วนสำเร็จ — ดูรายละเอียดด้านล่าง",
         summary: combinedSummary,
-        errors: combinedErrors.length ? combinedErrors : undefined
+        errors: combinedErrors.length ? combinedErrors : undefined,
       });
       
       const nextUploads = await fetchUploads();
@@ -3057,6 +3070,7 @@ export default function App() {
                   tursoDatabase={tursoDatabase}
                   tursoStats={tursoStats}
                   uploadError={uploadError}
+                  syncResult={syncResult}
                   onExportCsv={exportCsv}
                   onClearAll={() => void clearAllUploadData()}
                   onRemoveFile={removeUploadedFile}

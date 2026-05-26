@@ -39,7 +39,7 @@ export function SettingsSection({
           <div className="p-3 bg-emerald-500/20 rounded-xl text-emerald-400"><Building2 className="w-6 h-6" /></div>
           <div>
             <h2 className="text-xl font-bold tracking-tight">เลือกสาขาประจำแดชบอร์ด</h2>
-            <p className="text-sm text-white/60 mt-1">เลือกสาขาประจำร้านของคุณ เมื่อทำการกดดึงข้อมูลสด (Live Sync) ระบบจะดึงและบันทึกข้อมูลเฉพาะของสาขานี้เพื่อความรวดเร็ว</p>
+            <p className="text-sm text-white/60 mt-1">เลือกสาขาที่ต้องการดูบนแดชบอร์ด Live Sync ดึงข้อมูลทุกสาขาลงฐานข้อมูล — การเลือกสาขานี้กรองเฉพาะการแสดงผล</p>
           </div>
         </div>
         <div className="w-full lg:w-72 shrink-0">

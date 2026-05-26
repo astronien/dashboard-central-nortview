@@ -146,7 +146,6 @@ async function handler(req, res) {
   }
 
   const kindParam = req.query?.kind;
-  const branchParam = req.query?.branch;
   const kindsToSync = kindParam 
     ? (Array.isArray(kindParam) ? kindParam : [kindParam])
     : UPLOAD_KINDS;
@@ -183,40 +182,14 @@ async function handler(req, res) {
           throw new Error("No data found or failed to parse CSV.");
         }
 
-        let normalizedRows = normalizeSheetRows(rawRows, kind);
-        
-        if (branchParam && (kind === "current" || kind === "lastMonth" || kind === "lastYear" || kind === "target")) {
-          const cleanBranchForMatching = (val) => {
-            if (!val) return "";
-            let clean = String(val).toLowerCase();
-            clean = clean.replace(/id\s*:?\s*\d+/g, "");
-            clean = clean.replace(/istudio\s*by\s*spvi/g, "");
-            clean = clean.replace(/istudio/g, "");
-            clean = clean.replace(/studio\s*7/g, "");
-            clean = clean.replace(/studio7/g, "");
-            clean = clean.replace(/studio/g, "");
-            clean = clean.replace(/spvi/g, "");
-            clean = clean.replace(/uficon/g, "");
-            clean = clean.replace(/copperwired/g, "");
-            clean = clean.replace(/iserve/g, "");
-            clean = clean.replace(/dotlife/g, "");
-            clean = clean.replace(/banana\s*it/g, "");
-            clean = clean.replace(/banana/g, "");
-            clean = clean.replace(/plaza/g, "");
-            clean = clean.replace(/[^a-z0-9ก-๙]/gi, "");
-            return clean.trim();
-          };
-              
-          const normParam = cleanBranchForMatching(branchParam);
-          
-          normalizedRows = normalizedRows.filter(row => {
-            const rowBranchVal = row["Branch (Name)"] || row["BRANCH NAME"] || "";
-            const normRow = cleanBranchForMatching(rowBranchVal);
-            return normRow && normParam && (normRow.includes(normParam) || normParam.includes(normRow));
-          });
-          console.log(`[Sync] Filtered rows for branch "${branchParam}" (norm: "${normParam}"): ${normalizedRows.length} rows remaining.`);
+        const normalizedRows = normalizeSheetRows(rawRows, kind);
+
+        if (!normalizedRows.length) {
+          throw new Error(
+            "No rows to save after normalization; existing Turso data was not modified.",
+          );
         }
-        
+
         console.log(`[Sync] Saving ${normalizedRows.length} rows to Turso DB for: ${kind}`);
         await saveUploadKind(kind, normalizedRows);
 
