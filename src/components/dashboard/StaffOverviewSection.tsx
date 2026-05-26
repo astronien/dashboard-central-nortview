@@ -1,0 +1,512 @@
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, Legend } from "recharts";
+import { Check, ChevronDown, SlidersHorizontal, Target } from "lucide-react";
+import { CategoryTreePicker } from "./CategoryTreePicker";
+import { AttachTargetGroupEditor } from "./AttachTargetGroupEditor";
+
+const DEFAULT_ATTACH_CATEGORIES = ["Cover+", "AC+", "Pencil", "Case", "SIM"];
+const ATTACH_CHART_COLORS = ["#34d399", "#2dd4bf", "#818cf8", "#f472b6", "#fbbf24"];
+
+type AttachGroup = { id: string; label: string; categories: string[] };
+type AttachMatrixRow = {
+  id: string;
+  name: string;
+  staffId: string;
+  branch: string;
+  avatar: string;
+  baseUnits: number;
+  rates: Record<string, number>;
+  units: Record<string, number>;
+  isHit: Record<string, boolean>;
+  attachMap: Record<string, { rate: number; units: number }>;
+};
+type AttachMatrixDisplayRow = {
+  name: string;
+  branch: string;
+  baseUnits: number;
+  rates: Record<string, number>;
+  units: Record<string, number>;
+  isHit: Record<string, boolean>;
+  shortName: string;
+};
+type PcZoneStat = { name: string; units: number; revenue: number; topBrands: { name: string; units: number; revenue: number }[] };
+type OfficerReport = { name: string; branch: string; actual: number; target: number; rate: number; achPercent: number; forecast: number };
+type CategoryTreeMap = Record<string, string[]>;
+
+export function StaffOverviewSection({
+  staffCategoryTree,
+  staffBaseCategories,
+  staffAttachGroups,
+  staffFilterBranch,
+  staffBranchesList,
+  staffKpiTargets,
+  selectedAttachOfficers,
+  attachOverviewChartData,
+  attachTargetCategories,
+  attachOverviewRows,
+  pcZoneStats,
+  staffAttachMatrix,
+  parsedOfficers,
+  onToggleStaffCategory,
+  onAttachGroupsChange,
+  onBranchChange,
+  onSetKpi,
+  onToggleOfficer,
+  formatOfficerShortName,
+  matchesOfficer,
+}: {
+  staffCategoryTree: CategoryTreeMap;
+  staffBaseCategories: string[];
+  staffAttachGroups: AttachGroup[];
+  staffFilterBranch: string;
+  staffBranchesList: string[];
+  staffKpiTargets: Record<string, number>;
+  selectedAttachOfficers: string[];
+  attachOverviewChartData: AttachMatrixDisplayRow[];
+  attachTargetCategories: string[];
+  attachOverviewRows: AttachMatrixRow[];
+  pcZoneStats: PcZoneStat[];
+  staffAttachMatrix: AttachMatrixRow[];
+  parsedOfficers: OfficerReport[];
+  onToggleStaffCategory: (cat: string, isBase: boolean) => void;
+  onAttachGroupsChange: (groups: AttachGroup[]) => void;
+  onBranchChange: (branch: string) => void;
+  onSetKpi: (label: string, value: number) => void;
+  onToggleOfficer: (name: string) => void;
+  formatOfficerShortName: (name: string) => string;
+  matchesOfficer: (a: string, b: string) => boolean;
+}) {
+  const [tab, setTab] = useState<"leaderboard" | "attach_builder" | "pc_zone">("leaderboard");
+  const [builderOpen, setBuilderOpen] = useState(false);
+
+  return (
+    <motion.div
+      key="staff_overview"
+      initial={{ opacity: 0, scale: 0.96, filter: "blur(8px)" }}
+      animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+      exit={{ opacity: 0, scale: 1.04, filter: "blur(8px)" }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
+      className="flex flex-col gap-6 w-full h-full"
+    >
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white/10 backdrop-blur-md rounded-2xl p-5 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)] relative z-20 animate-none">
+        <div>
+          <h2 className="text-xl font-bold tracking-tight text-white">Staff Attach Rate & PC Performance</h2>
+          <p className="text-xs text-white/60 mt-1">วิเคราะห์เปรียบเทียบคะแนนแนบพนักงาน ยอดขายพีซี และแบรนด์อุปกรณ์เสริมภายนอก</p>
+        </div>
+        <div className="flex items-center bg-black/20 border border-white/5 rounded-xl p-1 text-xs font-semibold self-stretch md:self-auto justify-center">
+          {(["leaderboard", "attach_builder", "pc_zone"] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`px-3.5 py-2 rounded-lg transition-all duration-200 cursor-pointer ${tab === t ? "bg-emerald-500 text-white shadow-lg font-bold" : "text-white/60 hover:text-white"}`}
+            >
+              {t === "leaderboard" ? "🏅 Staff Leaderboard" : t === "attach_builder" ? "🛠️ Attach Builder (เดิม)" : "💼 PC Zone Performance"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {tab === "attach_builder" ? (
+        <AttachBuilderTab
+          staffCategoryTree={staffCategoryTree}
+          staffBaseCategories={staffBaseCategories}
+          staffAttachGroups={staffAttachGroups}
+          staffFilterBranch={staffFilterBranch}
+          staffBranchesList={staffBranchesList}
+          staffKpiTargets={staffKpiTargets}
+          selectedAttachOfficers={selectedAttachOfficers}
+          attachOverviewChartData={attachOverviewChartData}
+          attachTargetCategories={attachTargetCategories}
+          attachOverviewRows={attachOverviewRows}
+          builderOpen={builderOpen}
+          onToggleBuilder={() => setBuilderOpen((v) => !v)}
+          onToggleStaffCategory={onToggleStaffCategory}
+          onAttachGroupsChange={onAttachGroupsChange}
+          onBranchChange={onBranchChange}
+          onSetKpi={onSetKpi}
+          onToggleOfficer={onToggleOfficer}
+          parsedOfficers={parsedOfficers}
+        />
+      ) : tab === "pc_zone" ? (
+        <PcZoneTab pcZoneStats={pcZoneStats} />
+      ) : (
+        <LeaderboardTab
+          staffAttachMatrix={staffAttachMatrix}
+          parsedOfficers={parsedOfficers}
+          formatOfficerShortName={formatOfficerShortName}
+          matchesOfficer={matchesOfficer}
+        />
+      )}
+    </motion.div>
+  );
+}
+
+function AttachBuilderTab({
+  staffCategoryTree,
+  staffBaseCategories,
+  staffAttachGroups,
+  staffFilterBranch,
+  staffBranchesList,
+  staffKpiTargets,
+  selectedAttachOfficers,
+  attachOverviewChartData,
+  attachTargetCategories,
+  attachOverviewRows,
+  builderOpen,
+  onToggleBuilder,
+  onToggleStaffCategory,
+  onAttachGroupsChange,
+  onBranchChange,
+  onSetKpi,
+  onToggleOfficer,
+  parsedOfficers,
+}: {
+  staffCategoryTree: CategoryTreeMap;
+  staffBaseCategories: string[];
+  staffAttachGroups: AttachGroup[];
+  staffFilterBranch: string;
+  staffBranchesList: string[];
+  staffKpiTargets: Record<string, number>;
+  selectedAttachOfficers: string[];
+  attachOverviewChartData: AttachMatrixDisplayRow[];
+  attachTargetCategories: string[];
+  attachOverviewRows: AttachMatrixRow[];
+  builderOpen: boolean;
+  onToggleBuilder: () => void;
+  onToggleStaffCategory: (cat: string, isBase: boolean) => void;
+  onAttachGroupsChange: (groups: AttachGroup[]) => void;
+  onBranchChange: (branch: string) => void;
+  onSetKpi: (label: string, value: number) => void;
+  onToggleOfficer: (name: string) => void;
+  parsedOfficers: OfficerReport[];
+}) {
+  return (
+    <>
+      <div className="relative z-40">
+        <button
+          type="button"
+          onClick={onToggleBuilder}
+          className="w-full flex items-center justify-between gap-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 px-5 py-3.5 hover:bg-white/[0.14] transition-colors shadow-[0_8px_32px_rgba(0,0,0,0.12)]"
+        >
+          <span className="flex items-center gap-2 text-sm font-semibold">
+            <Target className="w-4 h-4 text-emerald-400" />
+            Custom Attach Builder
+          </span>
+          <span className="flex items-center gap-3 text-xs text-white/60">
+            {staffBaseCategories.length} base · {staffAttachGroups.length} attach
+            {staffAttachGroups.length > 0 ? ` · KPI ${staffAttachGroups.map((g) => `${staffKpiTargets[g.label] ?? 20}%`).join(" / ")}` : ""}
+            <ChevronDown className={`w-4 h-4 transition-transform ${builderOpen ? "rotate-180" : ""}`} />
+          </span>
+        </button>
+        <AnimatePresence>
+          {builderOpen && (
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+              <div className="mt-3 bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-5 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+                <div className="flex flex-col xl:flex-row gap-5">
+                  <div className="flex-1 grid md:grid-cols-2 gap-4">
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                      <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest block mb-3">1. Base Target (ตัวหาร)</span>
+                      <CategoryTreePicker treeMap={staffCategoryTree} selected={staffBaseCategories} toggle={(cat) => onToggleStaffCategory(cat, true)} variant="base" />
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                      <span className="text-[10px] font-bold text-teal-400 uppercase tracking-widest block mb-3">2. Attach Target (ตัวแนบ)</span>
+                      <AttachTargetGroupEditor treeMap={staffCategoryTree} groups={staffAttachGroups} onGroupsChange={onAttachGroupsChange} />
+                    </div>
+                  </div>
+                  <div className="xl:w-56 flex flex-col gap-4 shrink-0">
+                    <div>
+                      <label className="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-1.5 block">Branch</label>
+                      <select value={staffFilterBranch} onChange={(e) => onBranchChange(e.target.value)} className="w-full text-sm bg-white/10 border border-white/20 text-white rounded-xl px-3 py-2 outline-none focus:border-emerald-500">
+                        {staffBranchesList.map((b) => (
+                          <option key={b} value={b} className="text-gray-900">{b.replace(/^ID\d+ : /, "")}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-bold text-teal-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+                        <SlidersHorizontal className="w-3 h-3" />
+                        Target KPI ต่อหมวด Attach
+                      </div>
+                      {staffAttachGroups.length === 0 ? (
+                        <p className="text-xs text-white/50">เลือกหมวดหรือสร้างกลุ่ม Attach ก่อน</p>
+                      ) : (
+                        <div className="space-y-3 max-h-40 overflow-y-auto pr-1">
+                          {staffAttachGroups.map((group) => {
+                            const kpi = staffKpiTargets[group.label] ?? 20;
+                            return (
+                              <div key={group.id}>
+                                <label className="flex items-center justify-between gap-2 text-xs mb-1">
+                                  <span className="text-white/80 truncate">{group.label}</span>
+                                  <span className="bg-teal-500/20 text-teal-200 px-1.5 rounded tabular-nums shrink-0">{kpi}%</span>
+                                </label>
+                                <input type="range" min={0} max={100} step={1} value={kpi} onChange={(e) => onSetKpi(group.label, Number(e.target.value))} className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-teal-500" />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-2">Officer</div>
+                      <div className="max-h-28 overflow-y-auto flex flex-col gap-1 pr-1">
+                        <label className="flex items-center gap-2 p-1.5 hover:bg-white/10 rounded-lg cursor-pointer">
+                          <input type="checkbox" className="hidden" checked={selectedAttachOfficers.length === 0} onChange={() => onToggleOfficer("")} />
+                          <div className={`w-4 h-4 rounded border flex items-center justify-center ${selectedAttachOfficers.length === 0 ? "bg-emerald-500 border-emerald-500" : "border-white/40"}`}>
+                            {selectedAttachOfficers.length === 0 && <Check className="w-3 h-3 text-white" />}
+                          </div>
+                          <span className="text-xs text-white/90">All Officers</span>
+                        </label>
+                        {parsedOfficers.map((officer, idx) => (
+                          <label key={`${officer.name}-${idx}`} className="flex items-center gap-2 p-1.5 hover:bg-white/10 rounded-lg cursor-pointer">
+                            <input type="checkbox" className="hidden" checked={selectedAttachOfficers.includes(officer.name)} onChange={() => onToggleOfficer(officer.name)} />
+                            <div className={`w-4 h-4 rounded border flex items-center justify-center ${selectedAttachOfficers.includes(officer.name) ? "bg-emerald-500 border-emerald-500" : "border-white/40"}`}>
+                              {selectedAttachOfficers.includes(officer.name) && <Check className="w-3 h-3 text-white" />}
+                            </div>
+                            <span className="text-xs text-white/90 truncate">{officer.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      <div className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 flex flex-col shadow-[0_8px_32px_rgba(0,0,0,0.12)] min-h-[450px] relative z-10 w-full shrink-0 min-w-0">
+        {staffAttachGroups.length === 0 || staffBaseCategories.length === 0 ? (
+          <p className="text-sm text-white/60 py-8 text-center">เลือกอย่างน้อย 1 หมวดใน Base และ Attach จาก Custom Attach Builder</p>
+        ) : attachOverviewChartData.length === 0 ? (
+          <p className="text-sm text-white/60 py-8 text-center">ไม่มีข้อมูลตามเงื่อนไขที่เลือก — ลองอัปโหลดไฟล์หรือเปลี่ยน Branch / Officer</p>
+        ) : (
+          <div className="overflow-x-auto pb-2 -mx-1 px-1">
+            <BarChart width={Math.max(attachOverviewChartData.length * 88, 640)} height={400} data={attachOverviewChartData} margin={{ top: 16, right: 24, left: 8, bottom: 88 }} barGap={4} barCategoryGap="18%">
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+              <XAxis dataKey="shortName" stroke="rgba(255,255,255,0.3)" interval={0} angle={-42} textAnchor="end" height={88} tick={{ fill: "rgba(255,255,255,0.75)", fontSize: 11, fontWeight: 500 }} axisLine={false} tickLine={false} />
+              <YAxis stroke="rgba(255,255,255,0.3)" tick={{ fill: "rgba(255,255,255,0.6)", fontSize: 12 }} axisLine={false} tickLine={false} dx={-8} tickFormatter={(value) => `${value}%`} />
+              <RechartsTooltip
+                cursor={{ fill: "rgba(255,255,255,0.05)" }}
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const row = payload[0].payload as AttachMatrixDisplayRow;
+                  const cats = attachTargetCategories.length > 0 ? attachTargetCategories : DEFAULT_ATTACH_CATEGORIES;
+                  return (
+                    <div className="rounded-xl border border-white/10 bg-[#0c3123]/95 px-3 py-2 text-xs shadow-xl max-w-[260px]">
+                      <p className="font-semibold text-white mb-1">{row.name}</p>
+                      <p className="text-white/60 mb-2">Base: {row.baseUnits.toLocaleString()} U{row.branch ? ` · ${row.branch}` : ""}</p>
+                      {cats.map((cat) => (
+                        <div key={cat} className="flex justify-between gap-3 text-white/80">
+                          <span>{cat}</span>
+                          <span className={row.isHit[cat] ? "text-emerald-400 font-bold" : ""}>{(row.rates[cat] ?? 0).toFixed(1)}% ({row.units[cat] ?? 0} U)</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                }}
+              />
+              <Legend wrapperStyle={{ paddingTop: "8px" }} />
+              {(attachTargetCategories.length > 0 ? attachTargetCategories : DEFAULT_ATTACH_CATEGORIES).map((cat, index) => (
+                <Bar key={cat} dataKey={cat} name={cat} fill={ATTACH_CHART_COLORS[index % ATTACH_CHART_COLORS.length]} radius={[5, 5, 0, 0]} maxBarSize={48} />
+              ))}
+            </BarChart>
+          </div>
+        )}
+      </div>
+
+      <div className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+        <h3 className="text-lg font-semibold mb-4 tracking-tight">Staff Performance Details</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-[640px]">
+            <thead>
+              <tr className="border-b border-white/10 text-white/50 text-sm">
+                <th className="pb-3 font-medium px-4 sticky left-0 bg-[#1a4431]/95">Staff Name</th>
+                <th className="pb-3 font-medium px-4 text-right">Base (U)</th>
+                {(attachTargetCategories.length > 0 ? attachTargetCategories : DEFAULT_ATTACH_CATEGORIES).map((cat) => (
+                  <th key={cat} className="pb-3 font-medium px-4 text-right whitespace-nowrap">
+                    <span className="block">{cat}</span>
+                    <span className="text-[10px] font-normal text-white/40">Rate · U · KPI ≥{staffKpiTargets[cat] ?? 20}%</span>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {attachOverviewRows.length === 0 ? (
+                <tr>
+                  <td colSpan={2 + (attachTargetCategories.length > 0 ? attachTargetCategories.length : DEFAULT_ATTACH_CATEGORIES.length)} className="py-8 text-center text-white/50 text-sm">
+                    ไม่มีข้อมูล — ปรับ Custom Attach Builder หรืออัปโหลดไฟล์
+                  </td>
+                </tr>
+              ) : (
+                attachOverviewRows.map((staff) => (
+                  <tr key={staff.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                    <td className="py-3 px-4 flex items-center gap-3 sticky left-0 bg-[#123627]/95">
+                      <img src={staff.avatar} alt={staff.name} className="w-8 h-8 rounded-full bg-white/20 object-cover" />
+                      <span className="font-medium text-white/90 whitespace-nowrap">{staff.name}</span>
+                    </td>
+                    <td className="py-3 px-4 text-right text-white/70 tabular-nums">{staff.baseUnits.toLocaleString()}</td>
+                    {(attachTargetCategories.length > 0 ? attachTargetCategories : DEFAULT_ATTACH_CATEGORIES).map((cat, catIndex) => {
+                      const rate = Math.round(staff.rates[cat] ?? 0);
+                      const attachUnits = staff.units[cat] ?? 0;
+                      const color = ATTACH_CHART_COLORS[catIndex % ATTACH_CHART_COLORS.length];
+                      return (
+                        <td key={cat} className="py-3 px-4 text-white/80">
+                          <div className="flex items-center justify-end gap-2">
+                            <span className="text-[11px] text-white/45 tabular-nums w-10 text-right shrink-0">{attachUnits.toLocaleString()} U</span>
+                            <span className={`w-14 text-sm text-right tabular-nums shrink-0 ${staff.isHit[cat] ? "text-emerald-400 font-semibold" : ""}`}>{rate}%</span>
+                            <div className="w-20 h-1.5 bg-white/10 rounded-full overflow-hidden shrink-0">
+                              <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(rate, 100)}%`, backgroundColor: color }} />
+                            </div>
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function PcZoneTab({ pcZoneStats }: { pcZoneStats: PcZoneStat[] }) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {pcZoneStats.map((dist) => (
+        <div key={dist.name} className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+          <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-4">
+            <div>
+              <h4 className="text-base font-bold text-teal-300 tracking-tight">{dist.name}</h4>
+              <span className="text-[10px] text-white/50">Accessories managed group</span>
+            </div>
+            <span className="text-xs bg-teal-500/20 text-teal-300 px-2 py-0.5 rounded font-extrabold">{dist.units} Units</span>
+          </div>
+          <div className="space-y-3.5">
+            {dist.topBrands.length === 0 ? (
+              <p className="text-xs text-white/40 text-center py-4">ไม่มีข้อมูลยอดขายในกลุ่มนี้</p>
+            ) : (
+              dist.topBrands.map((brand, idx) => (
+                <div key={idx} className="flex justify-between items-center text-xs">
+                  <span className="text-white/80 font-medium truncate max-w-[120px]">{idx + 1}. {brand.name}</span>
+                  <span className="font-extrabold text-white">฿{Math.round(brand.revenue).toLocaleString()} ({brand.units} U)</span>
+                </div>
+              ))
+            )}
+          </div>
+          <div className="mt-4 pt-3 border-t border-white/5 flex justify-between items-center text-xs">
+            <span className="text-white/40">Total Revenue</span>
+            <span className="font-bold text-white">฿{Math.round(dist.revenue).toLocaleString()}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function LeaderboardTab({
+  staffAttachMatrix,
+  parsedOfficers,
+  formatOfficerShortName,
+  matchesOfficer,
+}: {
+  staffAttachMatrix: AttachMatrixRow[];
+  parsedOfficers: OfficerReport[];
+  formatOfficerShortName: (name: string) => string;
+  matchesOfficer: (a: string, b: string) => boolean;
+}) {
+  return (
+    <>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { title: "🛡️ Cover+ tgt25%", key: "Cover+", threshold: 25 },
+          { title: "🍎 AC+ tgt20%", key: "AC+", threshold: 20 },
+          { title: "✏️ Pencil tgt85%", key: "Pencil", threshold: 85 },
+          { title: "📱 Case tgt60%", key: "Case", threshold: 60 },
+        ].map((board) => (
+          <div key={board.key} className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+            <span className="text-xs font-bold text-white/50 uppercase tracking-widest block mb-3 border-b border-white/5 pb-2">{board.title}</span>
+            <div className="space-y-2.5">
+              {staffAttachMatrix
+                .map((row) => ({ name: row.name, rate: row.attachMap[board.key]?.rate || 0 }))
+                .sort((a, b) => b.rate - a.rate)
+                .slice(0, 5)
+                .map((p, idx) => (
+                  <div key={idx} className="flex justify-between items-center text-xs">
+                    <span className="text-white/80 font-medium truncate max-w-[120px]">
+                      {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx + 1}`} {formatOfficerShortName(p.name)}
+                    </span>
+                    <span className={`font-bold ${p.rate >= board.threshold ? "text-emerald-400" : "text-white"}`}>{Math.round(p.rate)}%</span>
+                  </div>
+                ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)] overflow-hidden">
+        <div className="flex justify-between items-center mb-5">
+          <h3 className="text-base font-bold text-white tracking-tight">ตารางเปรียบเทียบผลงานพนักงาน (Staff Performance Matrix)</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="border-b border-white/10 text-white/50">
+                <th className="py-3 pr-4 font-bold text-center">#</th>
+                <th className="py-3 px-3 font-bold">Staff</th>
+                <th className="py-3 px-3 font-bold text-right">Target</th>
+                <th className="py-3 px-3 font-bold text-right">Actual</th>
+                <th className="py-3 px-3 font-bold text-center">Ach%</th>
+                <th className="py-3 px-3 font-bold text-right">Forecast</th>
+                <th className="py-3 px-3 font-bold text-center">C+ (25%)</th>
+                <th className="py-3 px-3 font-bold text-center">AC+ (20%)</th>
+                <th className="py-3 px-3 font-bold text-center">Pen (85%)</th>
+                <th className="py-3 px-3 font-bold text-center">Case (60%)</th>
+                <th className="py-3 px-3 font-bold text-center">SIM</th>
+              </tr>
+            </thead>
+            <tbody>
+              {staffAttachMatrix.map((staff, idx) => {
+                const officerState = parsedOfficers.find((o) => matchesOfficer(o.name, staff.name));
+                const target = officerState?.target || 0;
+                const actual = officerState?.actual || 0;
+                const achPercent = officerState?.achPercent || 0;
+                const forecast = officerState?.forecast || 0;
+                const coverPlusRate = Math.round(staff.attachMap["Cover+"]?.rate || 0);
+                const acRate = Math.round(staff.attachMap["AC+"]?.rate || 0);
+                const penRate = Math.round(staff.attachMap["Pencil"]?.rate || 0);
+                const caseRate = Math.round(staff.attachMap["Case"]?.rate || 0);
+                const simUnits = staff.attachMap["SIM"]?.units || 0;
+                const rankEmoji = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx + 1}`;
+                return (
+                  <tr key={staff.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                    <td className="py-3.5 pr-4 text-center font-bold text-sm">{rankEmoji}</td>
+                    <td className="py-3.5 px-3">
+                      <div className="font-semibold text-white/95">{staff.name}</div>
+                      <div className="text-[10px] text-white/45">ID: {staff.staffId} · {staff.branch || "Unknown Branch"}</div>
+                    </td>
+                    <td className="py-3.5 px-3 text-right font-medium text-white/70">฿{Math.round(target).toLocaleString()}</td>
+                    <td className="py-3.5 px-3 text-right font-bold text-white">฿{Math.round(actual).toLocaleString()}</td>
+                    <td className="py-3.5 px-3 text-center">
+                      <span className={`px-2 py-0.5 rounded font-bold text-[10px] ${achPercent >= 100 ? "bg-emerald-500/20 text-emerald-400" : "bg-white/10 text-white/70"}`}>{achPercent.toFixed(1)}%</span>
+                    </td>
+                    <td className="py-3.5 px-3 text-right font-medium text-white/60">฿{Math.round(forecast).toLocaleString()}</td>
+                    <td className="py-3.5 px-3 text-center"><span className={`font-semibold ${coverPlusRate >= 25 ? "text-emerald-400" : "text-white/60"}`}>{coverPlusRate}%</span></td>
+                    <td className="py-3.5 px-3 text-center"><span className={`font-semibold ${acRate >= 20 ? "text-emerald-400" : "text-white/60"}`}>{acRate}%</span></td>
+                    <td className="py-3.5 px-3 text-center"><span className={`font-semibold ${penRate >= 85 ? "text-emerald-400" : "text-white/60"}`}>{penRate}%</span></td>
+                    <td className="py-3.5 px-3 text-center"><span className={`font-semibold ${caseRate >= 60 ? "text-emerald-400" : "text-white/60"}`}>{caseRate}%</span></td>
+                    <td className="py-3.5 px-3 text-center"><span className="font-bold text-teal-300">{simUnits} Unit</span></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  );
+}
