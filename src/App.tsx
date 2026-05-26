@@ -3205,27 +3205,8 @@ export default function App() {
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
                 <HomeDashboardSection
-                  selectedBranch={selectedBranch}
-                  dateLabel={dateLabel}
-                  selectedFilter={selectedFilter}
-                  activeTab={activeTab}
-                  setActiveTab={setActiveTab}
-                  dailyRevenueChart={dailyRevenueChart}
-                  categoryChart={categoryChart}
-                  officerChart={officerChart}
-                  leaderboard={leaderboard}
                   derivedHomeStats={derivedHomeStats}
-                  hasCurrent={hasCurrent}
-                  overall={overall}
-                  today={today}
-                  setToday={setToday}
-                  showTargetBreakdown={showTargetBreakdown}
-                  setShowTargetBreakdown={setShowTargetBreakdown}
-                  setCurrentView={setCurrentView}
-                  selectedBranchStats={selectedBranchStats}
-                  categoryStats={categoryStats}
-                  dailyTab={dailyTab}
-                  setDailyTab={setDailyTab}
+                  monthlyPerformance={monthlyPerformance}
                 />
               </motion.div>
             )}
