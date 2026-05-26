@@ -3226,7 +3226,7 @@ export default function App() {
                 staffAttachMatrix={attachOfficerRows}
                 parsedOfficers={parsedReport.officers}
                 onToggleStaffCategory={toggleStaffCategory}
-                onAttachGroupsChange={setAttachGroups}
+                onAttachGroupsChange={handleAttachGroupsChange}
                 onBranchChange={setStaffFilterBranch}
                 onSetKpi={setStaffKpiForCategory}
                 onToggleOfficer={toggleAttachOfficer}
