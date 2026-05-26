@@ -2,8 +2,8 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, Legend } from "recharts";
 import { Check, ChevronDown, SlidersHorizontal, Target } from "lucide-react";
-import { CategoryTreePicker } from "./CategoryTreePicker";
-import { AttachTargetGroupEditor } from "./AttachTargetGroupEditor";
+import CategoryTreePicker from "../CategoryTreePicker";
+import AttachTargetGroupEditor from "../AttachTargetGroupEditor";
 
 const DEFAULT_ATTACH_CATEGORIES = ["Cover+", "AC+", "Pencil", "Case", "SIM"];
 const ATTACH_CHART_COLORS = ["#34d399", "#2dd4bf", "#818cf8", "#f472b6", "#fbbf24"];

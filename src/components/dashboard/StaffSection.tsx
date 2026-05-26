@@ -109,6 +109,9 @@ export function StaffSection({
   overallAttachRate: (item: StaffLeaderboardItem) => number;
   onSetActiveStaffId: (id: string) => void;
 }) {
+  return (
+              <motion.div
+                key="staff"
                 initial={{ opacity: 0, scale: 0.96, filter: "blur(8px)" }}
                 animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
                 exit={{ opacity: 0, scale: 1.04, filter: "blur(8px)" }}
@@ -704,4 +707,5 @@ export function StaffSection({
                   </motion.div>
                 </div>
               </motion.div>
+  );
 }

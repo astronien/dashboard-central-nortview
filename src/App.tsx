@@ -3210,6 +3210,114 @@ export default function App() {
                 />
               </motion.div>
             )}
+            {currentView === "staff_overview" && (
+              <StaffOverviewSection
+                staffCategoryTree={staffCategoryTree}
+                staffBaseCategories={staffBaseCategories}
+                staffAttachGroups={staffAttachGroups}
+                staffFilterBranch={staffFilterBranch}
+                staffBranchesList={staffBranchesList}
+                staffKpiTargets={staffKpiTargets}
+                selectedAttachOfficers={selectedAttachOfficers}
+                attachOverviewChartData={attachOverviewChartData}
+                attachTargetCategories={attachTargetCategories}
+                attachOverviewRows={attachOverviewRows}
+                pcZoneStats={pcZoneStats}
+                staffAttachMatrix={attachOfficerRows}
+                parsedOfficers={parsedReport.officers}
+                onToggleStaffCategory={toggleStaffCategory}
+                onAttachGroupsChange={setAttachGroups}
+                onBranchChange={setStaffFilterBranch}
+                onSetKpi={setStaffKpiForCategory}
+                onToggleOfficer={toggleAttachOfficer}
+                formatOfficerShortName={formatOfficerShortName}
+                matchesOfficer={attachMatchesOfficer}
+              />
+            )}
+            {currentView === "staff" && (
+              <StaffSection
+                displayStaffAvatar={displayStaffAvatar}
+                activeOfficer={activeOfficer}
+                currentStaff={currentStaff}
+                dynamicRadarData={dynamicRadarData}
+                renderCustomTick={renderCustomTick}
+                dynamicScore={dynamicScore}
+                activeStat={activeStat}
+                onSetActiveStat={setActiveStat}
+                sevenWondersScore={sevenWondersScore}
+                dynamicRole={dynamicRole}
+                dynamicExperience={dynamicExperience}
+                dynamicExpertise={dynamicExpertise}
+                dynamicLanguages={dynamicLanguages}
+                activeOfficer7WondersPerformance={activeOfficer7WondersPerformance}
+                activeOfficerCategoryPerformance={activeOfficerCategoryPerformance}
+                activeTab={activeTab}
+                onSetActiveTab={setActiveTab}
+                staffLeaderboard={staffLeaderboard}
+                parsedOfficers={parsedReport.officers}
+                attachMatchesOfficer={attachMatchesOfficer}
+                overallAttachRate={overallAttachRate}
+                onSetActiveStaffId={setActiveStaffId}
+              />
+            )}
+            {currentView === "reports" && (
+              <motion.div
+                key="reports"
+                initial={{ opacity: 0, scale: 0.96, filter: "blur(8px)" }}
+                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+                exit={{ opacity: 0, scale: 1.04, filter: "blur(8px)" }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+                className="flex flex-col gap-6 w-full h-full relative z-20"
+              >
+                <ReportsSection
+                  uploadedFiles={uploadedFiles}
+                  onFileUpload={handleFileUpload}
+                  onSyncSheets={() => void handleSyncSheets()}
+                  onSyncKind={(kind) => void handleSyncSheets(kind)}
+                  isSyncingSheets={isSyncingSheets}
+                  isParsing={isParsing}
+                  isSavingTurso={isSavingTurso}
+                  uploadStats={uploadStats}
+                  tursoDatabase={tursoDatabase}
+                  tursoStats={tursoStats}
+                  uploadError={uploadError}
+                  onExportCsv={exportCsv}
+                  onClearAll={() => void clearAllUploadData()}
+                  onRemoveFile={removeUploadedFile}
+                  parsedReport={parsedReport}
+                />
+              </motion.div>
+            )}
+            {currentView === "settings" && (
+              <motion.div
+                key="settings"
+                initial={{ opacity: 0, scale: 0.96, filter: "blur(8px)" }}
+                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+                exit={{ opacity: 0, scale: 1.04, filter: "blur(8px)" }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+                className="flex flex-col gap-6 w-full h-full relative z-20"
+              >
+                <SettingsSection
+                  selectedBranch={selectedBranch}
+                  onBranchChange={handleBranchChange}
+                  sheetBranches={sheetBranches}
+                  staffRoster={staffRoster}
+                  staffPhotos={Object.fromEntries(
+                    Object.entries(staffPhotos).map(([id, record]) => [id, record.photoUrl]),
+                  )}
+                  uploadingPhotoId={uploadingPhotoId}
+                  staffPhotoError={staffPhotoError}
+                  getStaffAvatar={getStaffAvatar}
+                  onPhotoUpload={(entry, file) => {
+                    void handleStaffPhotoUpload(entry, file);
+                  }}
+                  onPhotoRemove={(staffId) => {
+                    void handleStaffPhotoRemove(staffId);
+                  }}
+                  onNavigateToReports={() => setCurrentView("reports")}
+                />
+              </motion.div>
+            )}
           </AnimatePresence>
         </main>
       </div>
