@@ -106,6 +106,7 @@ import { HomeDashboardSection } from "./components/dashboard/HomeDashboardSectio
 
 import { StaffOverviewSection } from "./components/dashboard/StaffOverviewSection";
 import { StaffSection } from "./components/dashboard/StaffSection";
+import { loadWonderConfigs, saveWonderConfigs, type WonderItemConfig } from "./lib/wonderConfig";
 import { ReportsSection } from "./components/dashboard/ReportsSection";
 import { SettingsSection } from "./components/dashboard/SettingsSection";
 import type { DerivedHomeStat } from "./components/dashboard/dashboardTypes";
@@ -1490,6 +1491,7 @@ export default function App() {
   const [staffBuilderOpen, setStaffBuilderOpen] = useState(false);
   const [staffPhotos, setStaffPhotos] = useState<StaffPhotosMap>({});
   const [staffPhotoError, setStaffPhotoError] = useState<string | null>(null);
+  const [wonderConfigs, setWonderConfigs] = useState<WonderItemConfig[]>(loadWonderConfigs);
   const [uploadingPhotoId, setUploadingPhotoId] = useState<string | null>(null);
 
   const STORAGE_KEY = "dashboard-upload-state-v1";
@@ -1858,21 +1860,27 @@ export default function App() {
     todayStats.dateStr,
   ]);
 
+  const handleWonderConfigsChange = React.useCallback((newConfigs: WonderItemConfig[]) => {
+    setWonderConfigs(newConfigs);
+    saveWonderConfigs(newConfigs);
+  }, []);
+
   const activeOfficer7WondersPerformance = useMemo<CategoryPerformanceRow[]>(() => {
     if (!activeOfficer) return [];
     
     const officerName = activeOfficer?.name ?? currentStaff.name;
     const officerIndex = activeOfficerIndex;
-    
-    let tradeInVal = 45 + (officerIndex % 3) * 3;
-    let coverPlusVal = 22 + (officerIndex % 5) * 1.5;
-    let ufundVal = 5.5 + (officerIndex % 4) * 0.3;
-    let simVal = 13 + (officerIndex % 3) * 1.5;
-    let pencilVal = 78 + (officerIndex % 3) * 4;
-    let macAppVal = 12 + (officerIndex % 3) * 2;
-    let caseVal = 46 + (officerIndex % 5) * 2;
-    
     const hasData = displayUploads.current.length > 0;
+    
+    // Count base units by product category
+    let iphoneCount = 0;
+    let ipadCount = 0;
+    let macCount = 0;
+    let allUnitsCount = 0;
+    
+    // Count wonder-specific units using config matchKeywords
+    const wonderCounts = new Map<string, number>();
+    wonderConfigs.forEach((w) => wonderCounts.set(w.id, 0));
     
     if (hasData) {
       const officerRows = displayUploads.current.filter((row) => {
@@ -1881,18 +1889,6 @@ export default function App() {
       });
       
       if (officerRows.length > 0) {
-        let iphoneCount = 0;
-        let ipadCount = 0;
-        let macCount = 0;
-        
-        let coverPlusCount = 0;
-        let ufundCount = 0;
-        let simCount = 0;
-        let pencilCount = 0;
-        let macAppCount = 0;
-        let caseCount = 0;
-        let tradeInCount = 0;
-        
         officerRows.forEach((row) => {
           const categoryName = String(row["Category (Name)"] ?? "Other").trim();
           const subCategory = String(row["Sub Category"] ?? "").trim();
@@ -1905,108 +1901,72 @@ export default function App() {
           if (rowCat === "iPhone") iphoneCount += units;
           if (rowCat === "Mac") macCount += units;
           if (rowCat === "iPad") ipadCount += units;
+          allUnitsCount += units;
           
-          if (text.includes("trade") || text.includes("เทรด")) {
-            tradeInCount += units;
-          }
-          if (productName.toUpperCase().includes("COVER+") || text.includes("cover+")) {
-            coverPlusCount += units;
-          }
-          if (text.includes("ufund") || text.includes("personal")) {
-            ufundCount += units;
-          }
-          if (rowCat === "SIM" || text.includes("sim")) {
-            simCount += units;
-          }
-          if (productName.toLowerCase().includes("pencil") || text.includes("pencil")) {
-            pencilCount += units;
-          }
-          if ((text.includes("applecare") || text.includes("care")) && rowCat === "Mac") {
-            macAppCount += units;
-          }
-          if (text.includes("case") && (productName.toLowerCase().includes("iphone") || productName.toLowerCase().includes("ipad") || text.includes("iphone") || text.includes("ipad"))) {
-            caseCount += units;
-          }
+          // Match against each wonder's keywords
+          wonderConfigs.forEach((w) => {
+            const matched = w.matchKeywords.some((kw) => {
+              const kwLower = kw.toLowerCase();
+              return text.includes(kwLower) || productName.toUpperCase().includes(kw.toUpperCase());
+            });
+            if (matched) {
+              wonderCounts.set(w.id, (wonderCounts.get(w.id) ?? 0) + units);
+            }
+          });
         });
-        
-        if (iphoneCount > 0) {
-          tradeInVal = (tradeInCount / iphoneCount) * 100;
-          coverPlusVal = (coverPlusCount / iphoneCount) * 100;
-          ufundVal = (ufundCount / iphoneCount) * 100;
-          simVal = (simCount / iphoneCount) * 100;
-        } else {
-          tradeInVal = 0;
-          coverPlusVal = 0;
-          ufundVal = 0;
-          simVal = 0;
-        }
-        
-        if (ipadCount > 0) {
-          pencilVal = (pencilCount / ipadCount) * 100;
-        } else {
-          pencilVal = 0;
-        }
-        
-        if (macCount > 0) {
-          macAppVal = (macAppCount / macCount) * 100;
-        } else {
-          macAppVal = 0;
-        }
-        
-        const phoneAndTabletCount = iphoneCount + ipadCount;
-        if (phoneAndTabletCount > 0) {
-          caseVal = (caseCount / phoneAndTabletCount) * 100;
-        } else {
-          caseVal = 0;
-        }
       }
     }
     
-    const wondersList = [
-      { name: "1. Trade In", actual: tradeInVal, target: 50 },
-      { name: "2. Cover Plus", actual: coverPlusVal, target: 25 },
-      { name: "3. UFUND Personal", actual: ufundVal, target: 6 },
-      { name: "4. SIM Attach", actual: simVal, target: 15 },
-      { name: "5. Pencil Attach", actual: pencilVal, target: 85 },
-      { name: "6. Mac APP (APP=15%)", actual: macAppVal, target: 15 },
-      { name: "7. Case iPhone+iPad", actual: caseVal, target: 50 },
-    ];
+    // Helper to get divisor count
+    const getDivisorCount = (divisor: string): number => {
+      switch (divisor) {
+        case "iPhone": return iphoneCount;
+        case "iPad": return ipadCount;
+        case "Mac": return macCount;
+        case "iPhone+iPad": return iphoneCount + ipadCount;
+        case "All Units": return allUnitsCount;
+        default: return iphoneCount;
+      }
+    };
     
-    const rows = wondersList.map((w) => {
-      const achPercent = w.target ? (w.actual / w.target) * 100 : 0;
-      const forecast = w.actual;
-      const forecastPercent = achPercent;
-      const lastMonth = 0;
-      const momPercent = "New";
-      const lastYear = 0;
-      const yoyPercent = "New";
+    const rows: CategoryPerformanceRow[] = wonderConfigs.map((w, idx) => {
+      let actualVal: number;
       
-      const targetDay = w.target;
-      const actualDay = w.actual;
-      const diffDay = actualDay - targetDay;
-      const achDayPercent = achPercent;
+      if (hasData) {
+        const numerator = wonderCounts.get(w.id) ?? 0;
+        const denominator = getDivisorCount(w.divisor);
+        actualVal = denominator > 0 ? (numerator / denominator) * 100 : 0;
+      } else {
+        // Fallback mock values for demo
+        const mockBase = [45, 22, 5.5, 13, 78, 12, 46];
+        const mockOffset = [(officerIndex % 3) * 3, (officerIndex % 5) * 1.5, (officerIndex % 4) * 0.3, (officerIndex % 3) * 1.5, (officerIndex % 3) * 4, (officerIndex % 3) * 2, (officerIndex % 5) * 2];
+        actualVal = (mockBase[idx % mockBase.length] ?? 30) + (mockOffset[idx % mockOffset.length] ?? 0);
+      }
+      
+      const target = w.targetPercent;
+      const achPercent = target ? (actualVal / target) * 100 : 0;
       
       return {
-        category: w.name,
-        target: w.target,
-        actual: w.actual,
+        category: `${idx + 1}. ${w.name}`,
+        target,
+        actual: actualVal,
         achPercent,
-        forecast,
-        forecastPercent,
-        lastMonth,
-        momPercent,
-        lastYear,
-        yoyPercent,
-        targetDay,
-        actualDay,
-        diffDay,
-        achDayPercent,
+        forecast: actualVal,
+        forecastPercent: achPercent,
+        lastMonth: 0,
+        momPercent: "New",
+        lastYear: 0,
+        yoyPercent: "New",
+        targetDay: target,
+        actualDay: actualVal,
+        diffDay: actualVal - target,
+        achDayPercent: achPercent,
       };
     });
     
-    const totalTarget = rows.reduce((s, r) => s + r.target, 0) / 7;
-    const totalActual = rows.reduce((s, r) => s + r.actual, 0) / 7;
-    const totalAchPercent = rows.reduce((s, r) => s + r.achPercent, 0) / 7;
+    const totalTarget = rows.reduce((s, r) => s + r.target, 0) / (rows.length || 1);
+    const totalActual = rows.reduce((s, r) => s + r.actual, 0) / (rows.length || 1);
+    const totalAchPercent = rows.reduce((s, r) => s + r.achPercent, 0) / (rows.length || 1);
     
     const totalRow: CategoryPerformanceRow = {
       category: "Average",
@@ -2026,7 +1986,7 @@ export default function App() {
     };
     
     return [...rows, totalRow];
-  }, [activeOfficer, displayUploads, parsedReport, activeOfficerIndex]);
+  }, [activeOfficer, displayUploads, parsedReport, activeOfficerIndex, wonderConfigs]);
 
   const sevenWondersScore = useMemo(() => {
     if (!displayUploads.current.length && Number(activeStaffId) <= 3) {
@@ -3177,6 +3137,17 @@ export default function App() {
                 }}
                 formatOfficerShortName={formatOfficerShortName}
                 matchesOfficer={attachMatchesOfficer}
+                wonderConfigs={wonderConfigs}
+                onWonderConfigsChange={handleWonderConfigsChange}
+                onOpenStaffProfileWithWonders={(name) => {
+                  const officerIndex = parsedReport.officers.findIndex((officer) =>
+                    attachMatchesOfficer(officer.name, name),
+                  );
+                  if (officerIndex < 0) return;
+                  setActiveStaffId(String(officerIndex + 1));
+                  setActiveStat("csat");
+                  setCurrentView("staff");
+                }}
               />
             )}
             {currentView === "staff" && (
