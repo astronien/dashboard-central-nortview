@@ -14,14 +14,30 @@ export type WonderDivisor =
   | "iPad"
   | "Mac"
   | "iPhone+iPad"
-  | "All Units";
+  | "All Units"
+  | "Target iPhone"
+  | "Target iPad"
+  | "Target Mac"
+  | "Target Apple Watch"
+  | "Target SIM"
+  | "Target BTB"
+  | "Target Smartphone"
+  | "Target Total";
 
 export const WONDER_DIVISOR_OPTIONS: { value: WonderDivisor; label: string }[] = [
-  { value: "iPhone", label: "iPhone" },
-  { value: "iPad", label: "iPad" },
-  { value: "Mac", label: "Mac" },
-  { value: "iPhone+iPad", label: "iPhone + iPad" },
-  { value: "All Units", label: "All Units" },
+  { value: "iPhone", label: "ยอดขาย iPhone" },
+  { value: "iPad", label: "ยอดขาย iPad" },
+  { value: "Mac", label: "ยอดขาย Mac" },
+  { value: "iPhone+iPad", label: "ยอดขาย iPhone + iPad" },
+  { value: "All Units", label: "ยอดขายทุกอุปกรณ์ (All Units)" },
+  { value: "Target iPhone", label: "เป้าหมาย iPhone (จาก DB)" },
+  { value: "Target iPad", label: "เป้าหมาย iPad (จาก DB)" },
+  { value: "Target Mac", label: "เป้าหมาย Mac (จาก DB)" },
+  { value: "Target Apple Watch", label: "เป้าหมาย Apple Watch (จาก DB)" },
+  { value: "Target SIM", label: "เป้าหมาย SIM (จาก DB)" },
+  { value: "Target BTB", label: "เป้าหมาย BTB (จาก DB)" },
+  { value: "Target Smartphone", label: "เป้าหมาย Smartphone (จาก DB)" },
+  { value: "Target Total", label: "เป้าหมายรวมยอดขาย (จาก DB)" },
 ];
 
 export type WonderItemConfig = {
@@ -32,6 +48,8 @@ export type WonderItemConfig = {
   matchKeywords?: string[];
   baseCategories?: string[]; // list of "Category||Sub Category"
   divisorCategories?: string[]; // list of "Category||Sub Category"
+  divisorColumn?: string; // column header name in sales file
+  divisorValue?: string; // matching value in that column
 };
 
 export const DEFAULT_WONDER_CONFIGS: WonderItemConfig[] = [
@@ -114,6 +132,8 @@ export function loadWonderConfigs(): WonderItemConfig[] {
       ...item,
       baseCategories: Array.isArray(item.baseCategories) ? item.baseCategories : [],
       divisorCategories: Array.isArray(item.divisorCategories) ? item.divisorCategories : [],
+      divisorColumn: item.divisorColumn ?? "",
+      divisorValue: item.divisorValue ?? "",
     }));
   } catch {
     return DEFAULT_WONDER_CONFIGS;
@@ -139,7 +159,9 @@ export async function fetchWonderConfigs(): Promise<WonderItemConfig[]> {
         baseCategories: Array.isArray(c.baseCategories) ? c.baseCategories : [],
         divisorCategories: Array.isArray(c.divisorCategories) ? c.divisorCategories : [],
         matchKeywords: Array.isArray(c.matchKeywords) ? c.matchKeywords : [],
-        divisor: c.divisor || "iPhone"
+        divisor: c.divisor || "iPhone",
+        divisorColumn: c.divisorColumn ?? "",
+        divisorValue: c.divisorValue ?? "",
       }));
       // Cache to localStorage
       saveWonderConfigs(mapped);

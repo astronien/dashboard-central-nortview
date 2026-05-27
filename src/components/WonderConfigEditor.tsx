@@ -19,6 +19,7 @@ type Props = {
   onChange: (configs: WonderItemConfig[]) => void;
   uniqueCombos: { cat: string; sub: string; label: string }[];
   staffCategoryTree?: Map<string, Set<string>>;
+  salesHeaders?: string[];
 };
 
 export default function WonderConfigEditor({
@@ -26,6 +27,7 @@ export default function WonderConfigEditor({
   onChange,
   uniqueCombos,
   staffCategoryTree,
+  salesHeaders,
 }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -36,7 +38,11 @@ export default function WonderConfigEditor({
   const [editDivisorCategories, setEditDivisorCategories] = useState<string[]>([]);
   const [editDivisor, setEditDivisor] = useState<WonderDivisor>("iPhone");
   const [editMatchKeywords, setEditMatchKeywords] = useState<string[]>([]);
-  const [useDivisorPreset, setUseDivisorPreset] = useState(true);
+  
+  // Three-way selector mode: "preset" | "tree" | "column"
+  const [useDivisorMode, setUseDivisorMode] = useState<"preset" | "tree" | "column">("preset");
+  const [editDivisorColumn, setEditDivisorColumn] = useState("");
+  const [editDivisorValue, setEditDivisorValue] = useState("");
 
   // Add Form state variables
   const [showAddForm, setShowAddForm] = useState(false);
@@ -46,7 +52,10 @@ export default function WonderConfigEditor({
   const [newDivisorCategories, setNewDivisorCategories] = useState<string[]>([]);
   const [newDivisor, setNewDivisor] = useState<WonderDivisor>("iPhone");
   const [newKeywords, setNewKeywords] = useState("");
-  const [newUseDivisorPreset, setNewUseDivisorPreset] = useState(true);
+  
+  const [newDivisorMode, setNewDivisorMode] = useState<"preset" | "tree" | "column">("preset");
+  const [newDivisorColumn, setNewDivisorColumn] = useState("");
+  const [newDivisorValue, setNewDivisorValue] = useState("");
 
   // Reusable Category Tree Map builder with robust fallback
   const categoryTree = useMemo(() => {
@@ -65,6 +74,27 @@ export default function WonderConfigEditor({
     return tree;
   }, [staffCategoryTree, uniqueCombos]);
 
+  // Unified available headers list (Dynamic or Mapped Fallback)
+  const availableHeaders = useMemo(() => {
+    if (salesHeaders && salesHeaders.length > 0) {
+      return salesHeaders;
+    }
+    return [
+      "Product (Code)",
+      "Product (Name)",
+      "Category (Name)",
+      "Sub Category",
+      "Branch (Name)",
+      "Officer (Name)",
+      "Doc No",
+      "Doc Date",
+      "Total Price",
+      "ราคาขายตามบิล",
+      "Number",
+      "Customer (Name)",
+    ];
+  }, [salesHeaders]);
+
   // Start editing a row
   const startEdit = (item: WonderItemConfig) => {
     setEditingId(item.id);
@@ -74,7 +104,20 @@ export default function WonderConfigEditor({
     setEditDivisorCategories(item.divisorCategories || []);
     setEditDivisor(item.divisor || "iPhone");
     setEditMatchKeywords(item.matchKeywords || []);
-    setUseDivisorPreset(!item.divisorCategories || item.divisorCategories.length === 0);
+    
+    if (item.divisorColumn && item.divisorValue) {
+      setUseDivisorMode("column");
+      setEditDivisorColumn(item.divisorColumn);
+      setEditDivisorValue(item.divisorValue);
+    } else if (item.divisorCategories && item.divisorCategories.length > 0) {
+      setUseDivisorMode("tree");
+      setEditDivisorColumn("");
+      setEditDivisorValue("");
+    } else {
+      setUseDivisorMode("preset");
+      setEditDivisorColumn("");
+      setEditDivisorValue("");
+    }
   };
 
   // Toggle base categories in editing mode
@@ -107,6 +150,8 @@ export default function WonderConfigEditor({
 
   const saveEdit = (id: string) => {
     if (!editName.trim()) return;
+    const resolvedDivCol = editDivisorColumn || availableHeaders[0];
+
     onChange(
       configs.map((c) =>
         c.id === id
@@ -115,8 +160,10 @@ export default function WonderConfigEditor({
               name: editName.trim(),
               targetPercent: editTargetPercent,
               baseCategories: editBaseCategories,
-              divisorCategories: useDivisorPreset ? [] : editDivisorCategories,
-              divisor: editDivisor,
+              divisorCategories: useDivisorMode === "tree" ? editDivisorCategories : [],
+              divisor: useDivisorMode === "preset" ? editDivisor : undefined,
+              divisorColumn: useDivisorMode === "column" ? resolvedDivCol : undefined,
+              divisorValue: useDivisorMode === "column" ? editDivisorValue : undefined,
               matchKeywords: editMatchKeywords,
             }
           : c
@@ -153,6 +200,8 @@ export default function WonderConfigEditor({
       .map((k) => k.trim().toLowerCase())
       .filter(Boolean);
 
+    const resolvedDivCol = newDivisorColumn || availableHeaders[0];
+
     onChange([
       ...configs,
       {
@@ -160,8 +209,10 @@ export default function WonderConfigEditor({
         name: newName.trim(),
         targetPercent: newTarget,
         baseCategories: newBaseCategories,
-        divisorCategories: newUseDivisorPreset ? [] : newDivisorCategories,
-        divisor: newDivisor,
+        divisorCategories: newDivisorMode === "tree" ? newDivisorCategories : [],
+        divisor: newDivisorMode === "preset" ? newDivisor : undefined,
+        divisorColumn: newDivisorMode === "column" ? resolvedDivCol : undefined,
+        divisorValue: newDivisorMode === "column" ? newDivisorValue : undefined,
         matchKeywords:
           keywords.length > 0 ? keywords : [newName.trim().toLowerCase()],
       },
@@ -175,7 +226,9 @@ export default function WonderConfigEditor({
     setNewDivisorCategories([]);
     setNewDivisor("iPhone");
     setNewKeywords("");
-    setNewUseDivisorPreset(true);
+    setNewDivisorMode("preset");
+    setNewDivisorColumn("");
+    setNewDivisorValue("");
   };
 
   // Format category badge label intelligently
@@ -195,7 +248,7 @@ export default function WonderConfigEditor({
             <span className="text-lg">⚙️</span> 7 Wonder Config Editor (Turso DB)
           </h3>
           <p className="text-xs text-white/50 mt-0.5">
-            ปรับเป้าหมาย % หรือเลือกหมวดหมู่สินค้าของตัวตั้งและตัวหารได้อย่างอิสระเหมือนระบบ Attach Builder
+            ปรับเป้าหมาย % เลือกหมวดหมู่ของตัวตั้ง หรือเลือกกรองหัวตารางในไฟล์ยอดขายเป็นตัวหารได้อย่างอิสระ
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -321,32 +374,43 @@ export default function WonderConfigEditor({
                     📊 2. DIVISOR TARGET (ตัวหาร / Denominator)
                   </label>
 
-                  <div className="flex items-center justify-between mb-1">
+                  <div className="flex flex-wrap gap-1.5 mb-1.5">
                     <button
                       type="button"
-                      onClick={() => setNewUseDivisorPreset(true)}
+                      onClick={() => setNewDivisorMode("preset")}
                       className={`text-[10px] px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer ${
-                        newUseDivisorPreset
+                        newDivisorMode === "preset"
                           ? "bg-[#10b981] text-white font-bold"
                           : "bg-white/5 text-white/50 hover:bg-white/10"
                       }`}
                     >
-                      ใช้กลุ่มสำเร็จรูป (Preset)
+                      Preset
                     </button>
                     <button
                       type="button"
-                      onClick={() => setNewUseDivisorPreset(false)}
+                      onClick={() => setNewDivisorMode("tree")}
                       className={`text-[10px] px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer ${
-                        !newUseDivisorPreset
+                        newDivisorMode === "tree"
                           ? "bg-[#10b981] text-white font-bold"
                           : "bg-white/5 text-white/50 hover:bg-white/10"
                       }`}
                     >
-                      เลือกหมวดหมู่ย่อยเอง
+                      เลือกหมวดหมู่ย่อย
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewDivisorMode("column")}
+                      className={`text-[10px] px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                        newDivisorMode === "column"
+                          ? "bg-[#10b981] text-white font-bold"
+                          : "bg-white/5 text-white/50 hover:bg-white/10"
+                      }`}
+                    >
+                      หัวตารางยอดขาย (Column Filter)
                     </button>
                   </div>
 
-                  {newUseDivisorPreset ? (
+                  {newDivisorMode === "preset" && (
                     <div className="space-y-2 py-4">
                       <label className="text-[10px] text-white/40 block">เลือกกลุ่มสินค้าหลักสำเร็จรูป</label>
                       <select
@@ -361,7 +425,9 @@ export default function WonderConfigEditor({
                         ))}
                       </select>
                     </div>
-                  ) : (
+                  )}
+
+                  {newDivisorMode === "tree" && (
                     <>
                       <CategoryTreePicker
                         treeMap={categoryTree}
@@ -399,6 +465,36 @@ export default function WonderConfigEditor({
                         )}
                       </div>
                     </>
+                  )}
+
+                  {newDivisorMode === "column" && (
+                    <div className="space-y-3 py-2">
+                      <div>
+                        <label className="text-[10px] text-white/50 block mb-1">เลือกหัวตารางในไฟล์ยอดขาย</label>
+                        <select
+                          value={newDivisorColumn || availableHeaders[0]}
+                          onChange={(e) => setNewDivisorColumn(e.target.value)}
+                          className="w-full text-xs bg-[#0b291d] border border-white/10 text-white rounded-xl px-3 py-2.5 outline-none focus:border-teal-400"
+                        >
+                          {availableHeaders.map((h) => (
+                            <option key={h} value={h} className="bg-[#052b20] text-white">
+                              {h}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] text-white/50 block mb-1">ค่าในตารางแถวนั้นต้องเป็นคำว่า (Matching Value)</label>
+                        <input
+                          type="text"
+                          value={newDivisorValue}
+                          onChange={(e) => setNewDivisorValue(e.target.value)}
+                          placeholder="เช่น ufund หรือ true sim หรือ dtac"
+                          className="w-full text-xs bg-white/5 border border-white/10 text-white rounded-xl px-3 py-2 outline-none focus:border-teal-400 placeholder:text-white/20"
+                        />
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
@@ -523,6 +619,10 @@ export default function WonderConfigEditor({
                     {isEditing ? (
                       <span className="text-[10px] text-white/40">
                         แก้ไขข้อมูลหมวดหมู่ในพาเนลด้านล่าง
+                      </span>
+                    ) : item.divisorColumn && item.divisorValue ? (
+                      <span className="text-[10px] text-teal-300 font-bold bg-teal-500/15 border border-teal-500/20 px-2.5 py-1 rounded-md">
+                        หัวตาราง: {item.divisorColumn} = "{item.divisorValue}"
                       </span>
                     ) : hasCustomDiv ? (
                       <div className="flex flex-wrap gap-1 max-w-[200px]">
@@ -665,32 +765,43 @@ export default function WonderConfigEditor({
                         📊 2. DIVISOR TARGET (ตัวหาร / Denominator)
                       </label>
 
-                      <div className="flex items-center justify-between mb-1">
+                      <div className="flex flex-wrap gap-1.5 mb-1.5">
                         <button
                           type="button"
-                          onClick={() => setUseDivisorPreset(true)}
+                          onClick={() => setUseDivisorMode("preset")}
                           className={`text-[10px] px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer ${
-                            useDivisorPreset
+                            useDivisorMode === "preset"
                               ? "bg-[#10b981] text-white font-bold"
                               : "bg-white/5 text-white/50 hover:bg-white/10"
                           }`}
                         >
-                          ใช้กลุ่มสำเร็จรูป (Preset)
+                          Preset
                         </button>
                         <button
                           type="button"
-                          onClick={() => setUseDivisorPreset(false)}
+                          onClick={() => setUseDivisorMode("tree")}
                           className={`text-[10px] px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer ${
-                            !useDivisorPreset
+                            useDivisorMode === "tree"
                               ? "bg-[#10b981] text-white font-bold"
                               : "bg-white/5 text-white/50 hover:bg-white/10"
                           }`}
                         >
-                          เลือกหมวดหมู่ย่อยเอง
+                          เลือกหมวดหมู่ย่อย
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setUseDivisorMode("column")}
+                          className={`text-[10px] px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                            useDivisorMode === "column"
+                              ? "bg-[#10b981] text-white font-bold"
+                              : "bg-white/5 text-white/50 hover:bg-white/10"
+                          }`}
+                        >
+                          หัวตารางยอดขาย (Column Filter)
                         </button>
                       </div>
 
-                      {useDivisorPreset ? (
+                      {useDivisorMode === "preset" && (
                         <div className="space-y-2 py-6">
                           <label className="text-[10px] text-white/40 block">เลือกกลุ่มสินค้าหลักสำเร็จรูป</label>
                           <select
@@ -708,7 +819,9 @@ export default function WonderConfigEditor({
                             * Preset จะดึงยอดขายจากสูตรคำนวณพื้นฐาน (เช่น iPhone = นับเครื่องไอโฟนทั้งหมด)
                           </p>
                         </div>
-                      ) : (
+                      )}
+
+                      {useDivisorMode === "tree" && (
                         <>
                           <CategoryTreePicker
                             treeMap={categoryTree}
@@ -746,6 +859,36 @@ export default function WonderConfigEditor({
                             )}
                           </div>
                         </>
+                      )}
+
+                      {useDivisorMode === "column" && (
+                        <div className="space-y-3 py-2">
+                          <div>
+                            <label className="text-[10px] text-white/50 block mb-1">เลือกหัวตารางในไฟล์ยอดขาย</label>
+                            <select
+                              value={editDivisorColumn || availableHeaders[0]}
+                              onChange={(e) => setEditDivisorColumn(e.target.value)}
+                              className="w-full text-xs bg-[#0b291d] border border-white/10 text-white rounded-xl px-3 py-2.5 outline-none focus:border-teal-400 text-white"
+                            >
+                              {availableHeaders.map((h) => (
+                                <option key={h} value={h} className="bg-[#052b20] text-white">
+                                  {h}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] text-white/50 block mb-1">ค่าในตารางแถวนั้นต้องเป็นคำว่า (Matching Value)</label>
+                            <input
+                              type="text"
+                              value={editDivisorValue}
+                              onChange={(e) => setEditDivisorValue(e.target.value)}
+                              placeholder="เช่น ufund หรือ true sim หรือ dtac"
+                              className="w-full text-xs bg-white/5 border border-white/10 text-white rounded-xl px-3 py-2 outline-none focus:border-teal-400 placeholder:text-white/20"
+                            />
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>

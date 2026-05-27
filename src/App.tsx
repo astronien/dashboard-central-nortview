@@ -1601,6 +1601,41 @@ export default function App() {
     return Array.from(combos.values()).sort((a, b) => a.label.localeCompare(b.label));
   }, [displayUploads.current, displayUploads.categoryMaster]);
 
+  const salesHeaders = useMemo<string[]>(() => {
+    const headers = new Set<string>();
+    if (displayUploads.current && displayUploads.current.length > 0) {
+      displayUploads.current.slice(0, 100).forEach((row) => {
+        Object.keys(row).forEach((key) => {
+          if (
+            key !== "id" &&
+            key !== "period" &&
+            key !== "extra_json" &&
+            !key.startsWith("r_")
+          ) {
+            headers.add(key);
+          }
+        });
+      });
+    }
+    if (headers.size === 0) {
+      return [
+        "Product (Code)",
+        "Product (Name)",
+        "Category (Name)",
+        "Sub Category",
+        "Branch (Name)",
+        "Officer (Name)",
+        "Doc No",
+        "Doc Date",
+        "Total Price",
+        "ราคาขายตามบิล",
+        "Number",
+        "Customer (Name)",
+      ];
+    }
+    return Array.from(headers).sort();
+  }, [displayUploads.current]);
+
   const STORAGE_KEY = "dashboard-upload-state-v1";
 
   const toggleAttachFilter = (id: string) => {
@@ -2012,13 +2047,34 @@ export default function App() {
 
     // Helper to get divisor count
     const getDivisorCount = (divisor?: string): number => {
+      if (!divisor) return iphoneCount;
+      
       switch (divisor) {
         case "iPhone": return iphoneCount;
         case "iPad": return ipadCount;
         case "Mac": return macCount;
         case "iPhone+iPad": return iphoneCount + ipadCount;
         case "All Units": return allUnitsCount;
-        default: return iphoneCount;
+        default: {
+          if (divisor.startsWith("Target ")) {
+            const targetCol = divisor.replace("Target ", "");
+            const targetRow = displayUploads.target.find((row) => {
+              const name = `${row.NAME ?? ""} ${row.SURNAME ?? ""}`.trim();
+              return matchesOfficer(name, officerName);
+            });
+            if (targetRow) {
+              if (targetCol === "Total") {
+                return toNumber(targetRow.Total);
+              }
+              for (const [key, val] of Object.entries(targetRow)) {
+                if (key.toLowerCase() === targetCol.toLowerCase() || normalizeText(key) === normalizeText(targetCol)) {
+                  return toNumber(val);
+                }
+              }
+            }
+          }
+          return iphoneCount;
+        }
       }
     };
     
@@ -2058,7 +2114,17 @@ export default function App() {
 
         // Calculate denominator
         let denominator = 0;
-        if (w.divisorCategories && w.divisorCategories.length > 0) {
+        if (w.divisorColumn && w.divisorValue) {
+          officerRows.forEach((row) => {
+            const val = String(row[w.divisorColumn!] ?? "").trim();
+            const matchVal = String(w.divisorValue!).trim();
+            const units = Math.max(toNumber(row.Number ?? row.number ?? row.qty), 0);
+            
+            if (val.toLowerCase() === matchVal.toLowerCase() || normalizeText(val) === normalizeText(matchVal)) {
+              denominator += units;
+            }
+          });
+        } else if (w.divisorCategories && w.divisorCategories.length > 0) {
           officerRows.forEach((row) => {
             const cat = String(row["Category (Name)"] ?? "Other").trim();
             const sub = String(row["Sub Category"] ?? "").trim();
@@ -3278,6 +3344,7 @@ export default function App() {
                 wonderConfigs={wonderConfigs}
                 onWonderConfigsChange={handleWonderConfigsChange}
                 uniqueCombos={uniqueCombos}
+                salesHeaders={salesHeaders}
                 onOpenStaffProfileWithWonders={(name) => {
                   const officerIndex = parsedReport.officers.findIndex((officer) =>
                     attachMatchesOfficer(officer.name, name),

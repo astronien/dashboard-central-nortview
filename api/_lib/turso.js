@@ -355,17 +355,19 @@ const deleteStaffPhoto = async (execute, staffId) => {
 const loadWonderConfigsDb = async (execute = tursoExecute) => {
   await ensureRelationalSchema(execute);
   const result = await execute(
-    `SELECT id, name, target_percent, base_categories, divisor_categories
+    `SELECT id, name, target_percent, base_categories, divisor_categories, divisor_column, divisor_value
      FROM wonder_configs ORDER BY id ASC`,
   );
   return (result.rows ?? []).map((row) => {
-    const [id, name, targetPercent, baseCategories, divisorCategories] = rowValues(row);
+    const [id, name, targetPercent, baseCategories, divisorCategories, divisorColumn, divisorValue] = rowValues(row);
     return {
       id: id ?? "",
       name: name ?? "",
       targetPercent: Number(targetPercent) || 0,
       baseCategories: baseCategories ? JSON.parse(String(baseCategories)) : [],
       divisorCategories: divisorCategories ? JSON.parse(String(divisorCategories)) : [],
+      divisorColumn: divisorColumn ?? "",
+      divisorValue: divisorValue ?? "",
     };
   });
 };
@@ -375,14 +377,16 @@ const saveWonderConfigsDb = async (execute, configs) => {
   await execute("DELETE FROM wonder_configs");
   for (const w of configs) {
     await execute(
-      `INSERT INTO wonder_configs (id, name, target_percent, base_categories, divisor_categories)
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO wonder_configs (id, name, target_percent, base_categories, divisor_categories, divisor_column, divisor_value)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         w.id,
         w.name,
         w.targetPercent,
         JSON.stringify(w.baseCategories || []),
         JSON.stringify(w.divisorCategories || []),
+        w.divisorColumn ?? "",
+        w.divisorValue ?? "",
       ],
     );
   }

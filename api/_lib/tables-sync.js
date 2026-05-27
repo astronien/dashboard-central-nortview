@@ -256,7 +256,9 @@ const RELATIONAL_DDL = [
     name TEXT NOT NULL,
     target_percent REAL NOT NULL DEFAULT 0.0,
     base_categories TEXT,
-    divisor_categories TEXT
+    divisor_categories TEXT,
+    divisor_column TEXT,
+    divisor_value TEXT
   )`,
 ];
 
@@ -299,6 +301,16 @@ const CATEGORY_COLUMNS = ["cat_sub_cat", "cat_daily", "extra_json"];
 const ensureRelationalSchema = async (tursoExecute) => {
   for (const sql of RELATIONAL_DDL) {
     await tursoExecute(sql);
+  }
+  try {
+    await tursoExecute("ALTER TABLE wonder_configs ADD COLUMN divisor_column TEXT");
+  } catch (e) {
+    // Ignore if column already exists
+  }
+  try {
+    await tursoExecute("ALTER TABLE wonder_configs ADD COLUMN divisor_value TEXT");
+  } catch (e) {
+    // Ignore if column already exists
   }
 };
 
