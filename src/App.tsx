@@ -538,16 +538,75 @@ const getSalesDate = (row: RawRow) => {
   const parsed = Date.parse(raw.replace(/^\S+\.\s*/, ""));
   return Number.isFinite(parsed) ? parsed : 0;
 };
+const isUfundRow = (row: any): boolean => {
+  if (!row) return false;
+  
+  const keys = [
+    "customerCodes", 
+    "customer_codes", 
+    "Customer Code", 
+    "CustomerCode", 
+    "Customer (Name)", 
+    "customer_name"
+  ];
+  
+  for (const key of keys) {
+    const val = row[key];
+    if (val) {
+      if (Array.isArray(val)) {
+        if (val.some(v => String(v).toUpperCase().includes("UFUND PERSONAL"))) {
+          return true;
+        }
+      } else {
+        if (String(val).toUpperCase().includes("UFUND PERSONAL")) {
+          return true;
+        }
+      }
+    }
+  }
+
+  if (row.extra_json) {
+    try {
+      const extra = JSON.parse(row.extra_json);
+      for (const key of Object.keys(extra)) {
+        if (key.toLowerCase().includes("customer") && key.toLowerCase().includes("code")) {
+          const val = extra[key];
+          if (Array.isArray(val)) {
+            if (val.some(v => String(v).toUpperCase().includes("UFUND PERSONAL"))) return true;
+          } else {
+            if (String(val).toUpperCase().includes("UFUND PERSONAL")) return true;
+          }
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  const cat = String(row["Category (Name)"] ?? row.category ?? "").toLowerCase();
+  const prod = String(row["Product (Name)"] ?? row.product ?? "").toLowerCase();
+  const sub = String(row["Sub Category"] ?? "").toLowerCase();
+  
+  return (
+    cat.includes("ufund") ||
+    prod.includes("ufund") ||
+    cat.includes("personal") ||
+    prod.includes("personal") ||
+    sub.includes("ufund") ||
+    sub.includes("personal")
+  );
+};
+
 const countRows = (
   rows: RawRow[], 
-  filterFn: (cat: string, prod: string, sub: string) => boolean
+  filterFn: (cat: string, prod: string, sub: string, row?: RawRow) => boolean
 ) => {
   let count = 0;
   rows.forEach(row => {
     const cat = String(row["Category (Name)"] ?? row.category ?? "").toLowerCase();
     const prod = String(row["Product (Name)"] ?? row.product ?? "").toLowerCase();
     const sub = String(row["Sub Category"] ?? "").toLowerCase();
-    if (filterFn(cat, prod, sub)) {
+    if (filterFn(cat, prod, sub, row)) {
       if (cat.includes("sim")) {
         count += toNumber(row.Number ?? row.number ?? row.qty ?? 1);
       } else {
@@ -1980,6 +2039,10 @@ export default function App() {
             if (isAttachMemberMatched(gc, sub, w.baseCategories)) {
               numerator += units;
             }
+          } else if (w.id === "w3" || w.name.toLowerCase().includes("ufund")) {
+            if (isUfundRow(row)) {
+              numerator += units;
+            }
           } else if (Array.isArray(w.matchKeywords)) {
             // Fallback keywords
             const text = normalizeText(`${cat} ${sub} ${prod}`);
@@ -2281,7 +2344,7 @@ export default function App() {
     const caseRate = iphoneCount > 0 ? (caseCount / iphoneCount) * 100 : 47.45;
     
     // Card 5: UFUND PERSONAL
-    const ufundCount = hasData ? countRows(displayUploads.current, (cat, prod) => cat.includes("ufund") || prod.includes("ufund") || cat.includes("personal") || prod.includes("personal")) : 47;
+    const ufundCount = hasData ? countRows(displayUploads.current, (cat, prod, sub, row) => isUfundRow(row)) : 47;
     const ufundRate = iphoneCount > 0 ? (ufundCount / iphoneCount) * 100 : 6.32;
     
     // Card 6: COVER + (solid card)
