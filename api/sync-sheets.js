@@ -50,6 +50,7 @@ async function fetchSheetRows(url) {
 function normalizeSheetRows(rows, kind) {
   if (kind === "target") {
     return rows.map((r) => ({
+      ...r,
       "BRANCH NAME": r.shop_name || r.emp_shop_code || r["BRANCH NAME"] || "",
       "STAFF ID": r.emp_id || r["STAFF ID"] || "",
       NAME: r.emp_name || r.NAME || "",
@@ -61,7 +62,7 @@ function normalizeSheetRows(rows, kind) {
       iPad: r.iPad || "0",
       "Apple Watch": r.Apple_Watch || r["Apple Watch"] || "0",
       SIM: r.SIM || "0",
-      BTB: r.BTB || "0",
+      "BTB": r.BTB || "0",
       "BTB(Apple)": r.BTB_Apple || r["BTB(Apple)"] || r.BTB_Apple || "0",
       Smartphone: r.Smartphone || "0",
     }));
@@ -77,6 +78,7 @@ function normalizeSheetRows(rows, kind) {
 
   // สำหรับกลุ่ม transactions (current, lastMonth, lastYear)
   return rows.map((r) => ({
+    ...r,
     "Product (Code)": r["Product (Code)"] || r.Product_Code || r.product_code || "",
     "Product (Name)": r["Product (Name)"] || r.Product_Name || r.product_name || "",
     "Category (Name)": r["Category (Name)"] || r.Category_Name || r.category_name || "",

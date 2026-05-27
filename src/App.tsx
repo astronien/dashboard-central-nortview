@@ -1631,6 +1631,8 @@ export default function App() {
         "ราคาขายตามบิล",
         "Number",
         "Customer (Name)",
+        "customerCodes",
+        "Customer Code",
       ];
     }
     return Array.from(headers).sort();
