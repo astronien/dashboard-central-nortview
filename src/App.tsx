@@ -84,6 +84,9 @@ import {
   type AttachMatrixDisplayRow,
   type AttachOfficerRow,
   type AttachTargetGroup,
+  getGroupCategory,
+  buildCategoryLookup,
+  matchesAttachMember,
 } from "./lib/attachRate";
 import {
   PolarAngleAxis,
@@ -1941,6 +1944,13 @@ export default function App() {
       });
     }
 
+    const categoryLookup = buildCategoryLookup(displayUploads.categoryMaster);
+    
+    const isAttachMemberMatched = (gc: string, subCategory: string, selectedList?: string[]): boolean => {
+      if (!selectedList || selectedList.length === 0) return false;
+      return selectedList.some((member) => matchesAttachMember(gc, subCategory, member));
+    };
+
     // Helper to get divisor count
     const getDivisorCount = (divisor?: string): number => {
       switch (divisor) {
@@ -1964,9 +1974,10 @@ export default function App() {
           const sub = String(row["Sub Category"] ?? "").trim();
           const prod = String(row["Product (Name)"] ?? "").trim();
           const units = Math.max(toNumber(row.Number ?? row.number ?? row.qty), 0);
+          const gc = getGroupCategory(cat, sub, categoryLookup, prod);
           
           if (w.baseCategories && w.baseCategories.length > 0) {
-            if (isCategoryMatched(cat, sub, w.baseCategories)) {
+            if (isAttachMemberMatched(gc, sub, w.baseCategories)) {
               numerator += units;
             }
           } else if (Array.isArray(w.matchKeywords)) {
@@ -1988,8 +1999,10 @@ export default function App() {
           officerRows.forEach((row) => {
             const cat = String(row["Category (Name)"] ?? "Other").trim();
             const sub = String(row["Sub Category"] ?? "").trim();
+            const prod = String(row["Product (Name)"] ?? "").trim();
             const units = Math.max(toNumber(row.Number ?? row.number ?? row.qty), 0);
-            if (isCategoryMatched(cat, sub, w.divisorCategories)) {
+            const gc = getGroupCategory(cat, sub, categoryLookup, prod);
+            if (isAttachMemberMatched(gc, sub, w.divisorCategories)) {
               denominator += units;
             }
           });

@@ -279,7 +279,7 @@ export function StaffOverviewSection(props: {
         <PcZoneTab pcZoneStats={pcZoneStats} />
       ) : tab === "wonder_config" ? (
         wonderConfigs && onWonderConfigsChange ? (
-          <WonderConfigEditor configs={wonderConfigs} onChange={onWonderConfigsChange} uniqueCombos={uniqueCombos ?? []} />
+          <WonderConfigEditor configs={wonderConfigs} onChange={onWonderConfigsChange} uniqueCombos={uniqueCombos ?? []} staffCategoryTree={staffCategoryTree} />
         ) : (
           <div className="text-sm text-white/50 text-center py-8">Wonder config is not available</div>
         )
