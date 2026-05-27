@@ -1,4 +1,4 @@
-const { syncAllRelationalTables } = require("./turso");
+const { syncAllRelationalTables } = require("./_lib/turso");
 
 /** ย้ายข้อมูลเก่าจาก *_chunks → ตาราง data_* (ใช้ครั้งเดียวถ้ามีข้อมูลเก่า) */
 module.exports = async function handler(req, res) {

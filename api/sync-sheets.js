@@ -1,6 +1,6 @@
-const { saveUploadKind, loadUploadKind, isUploadKind, UPLOAD_KINDS } = require("./turso");
-const { parseCSV, summarizeDocDates } = require("./csvParse");
-const { normalizeCategoryMasterRows } = require("./categoryMasterNormalize");
+const { saveUploadKind, loadUploadKind, isUploadKind, UPLOAD_KINDS } = require("./_lib/turso");
+const { parseCSV, summarizeDocDates } = require("./_lib/csvParse");
+const { normalizeCategoryMasterRows } = require("./_lib/categoryMasterNormalize");
 
 // current = MTD only; today = Today tab (gid 2048343587)
 const TODAY_SHEET_URL =

@@ -1,4 +1,4 @@
-const { initDatabase } = require("./turso");
+const { initDatabase } = require("./_lib/turso");
 
 /** สร้างตาราง data_* ใน Turso (CREATE TABLE IF NOT EXISTS) — ไม่ต้องสร้างมือใน Dashboard */
 module.exports = async function handler(req, res) {

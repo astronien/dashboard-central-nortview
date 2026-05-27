@@ -1,4 +1,4 @@
-const { clearAllUploads } = require("./turso");
+const { clearAllUploads } = require("./_lib/turso");
 
 module.exports = async function handler(req, res) {
   if (req.method !== "POST" && req.method !== "DELETE") {

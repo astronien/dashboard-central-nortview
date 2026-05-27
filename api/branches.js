@@ -1,4 +1,4 @@
-const { parseCSV } = require("./csvParse");
+const { parseCSV } = require("./_lib/csvParse");
 
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/18zsazWoy2DrItbc4c6FeVqD8X1DAUljdjBOG02lXM5I/gviz/tq?tqx=out:csv&gid=731299113";
 

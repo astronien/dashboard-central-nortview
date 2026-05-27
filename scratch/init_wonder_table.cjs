@@ -1,6 +1,6 @@
 require("dotenv").config({ path: "/Users/astronien/Desktop/dashboard new version/.env" });
-const { ensureRelationalSchema } = require("../api/tables-sync");
-const { tursoExecute } = require("../api/turso");
+const { ensureRelationalSchema } = require("../api/_lib/tables-sync");
+const { tursoExecute } = require("../api/_lib/turso");
 
 async function main() {
   try {

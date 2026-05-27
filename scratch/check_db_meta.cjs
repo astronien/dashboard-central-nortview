@@ -1,5 +1,5 @@
 require("dotenv").config({ path: "/Users/astronien/Desktop/dashboard new version/.env" });
-const { tursoExecute } = require("../api/turso");
+const { tursoExecute } = require("../api/_lib/turso");
 
 const cellValue = (cell) => {
   if (cell == null) return null;

@@ -7,7 +7,7 @@ const {
   loadUploadKind,
   saveUploadKind,
   saveUploadKindChunk,
-} = require("./turso");
+} = require("./_lib/turso");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

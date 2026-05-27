@@ -1,4 +1,4 @@
-const { getTursoConfig, getUploadStats, listTables } = require("./turso");
+const { getTursoConfig, getUploadStats, listTables } = require("./_lib/turso");
 
 module.exports = async function handler(req, res) {
   try {

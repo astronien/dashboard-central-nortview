@@ -1,10 +1,10 @@
-const { ensureRelationalSchema } = require("./tables-sync");
+const { ensureRelationalSchema } = require("./_lib/tables-sync");
 const {
   getTursoConfig,
   loadWonderConfigsDb,
   saveWonderConfigsDb,
   tursoExecute,
-} = require("./turso");
+} = require("./_lib/turso");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
