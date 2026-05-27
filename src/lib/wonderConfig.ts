@@ -28,8 +28,10 @@ export type WonderItemConfig = {
   id: string;
   name: string;
   targetPercent: number;
-  divisor: WonderDivisor;
-  matchKeywords: string[];
+  divisor?: WonderDivisor;
+  matchKeywords?: string[];
+  baseCategories?: string[]; // list of "Category||Sub Category"
+  divisorCategories?: string[]; // list of "Category||Sub Category"
 };
 
 export const DEFAULT_WONDER_CONFIGS: WonderItemConfig[] = [
@@ -39,6 +41,8 @@ export const DEFAULT_WONDER_CONFIGS: WonderItemConfig[] = [
     targetPercent: 50,
     divisor: "iPhone",
     matchKeywords: ["trade", "เทรด"],
+    baseCategories: [],
+    divisorCategories: [],
   },
   {
     id: "w2",
@@ -46,6 +50,8 @@ export const DEFAULT_WONDER_CONFIGS: WonderItemConfig[] = [
     targetPercent: 25,
     divisor: "iPhone",
     matchKeywords: ["cover+"],
+    baseCategories: [],
+    divisorCategories: [],
   },
   {
     id: "w3",
@@ -53,6 +59,8 @@ export const DEFAULT_WONDER_CONFIGS: WonderItemConfig[] = [
     targetPercent: 6,
     divisor: "iPhone",
     matchKeywords: ["ufund", "personal"],
+    baseCategories: [],
+    divisorCategories: [],
   },
   {
     id: "w4",
@@ -60,6 +68,8 @@ export const DEFAULT_WONDER_CONFIGS: WonderItemConfig[] = [
     targetPercent: 15,
     divisor: "iPhone",
     matchKeywords: ["sim"],
+    baseCategories: [],
+    divisorCategories: [],
   },
   {
     id: "w5",
@@ -67,6 +77,8 @@ export const DEFAULT_WONDER_CONFIGS: WonderItemConfig[] = [
     targetPercent: 85,
     divisor: "iPad",
     matchKeywords: ["pencil"],
+    baseCategories: [],
+    divisorCategories: [],
   },
   {
     id: "w6",
@@ -74,6 +86,8 @@ export const DEFAULT_WONDER_CONFIGS: WonderItemConfig[] = [
     targetPercent: 15,
     divisor: "Mac",
     matchKeywords: ["applecare", "care"],
+    baseCategories: [],
+    divisorCategories: [],
   },
   {
     id: "w7",
@@ -81,6 +95,8 @@ export const DEFAULT_WONDER_CONFIGS: WonderItemConfig[] = [
     targetPercent: 50,
     divisor: "iPhone+iPad",
     matchKeywords: ["case"],
+    baseCategories: [],
+    divisorCategories: [],
   },
 ];
 
@@ -94,7 +110,11 @@ export function loadWonderConfigs(): WonderItemConfig[] {
     // Basic validation
     if (!Array.isArray(parsed) || parsed.length === 0) return DEFAULT_WONDER_CONFIGS;
     if (!parsed[0].id || !parsed[0].name) return DEFAULT_WONDER_CONFIGS;
-    return parsed;
+    return parsed.map((item) => ({
+      ...item,
+      baseCategories: Array.isArray(item.baseCategories) ? item.baseCategories : [],
+      divisorCategories: Array.isArray(item.divisorCategories) ? item.divisorCategories : [],
+    }));
   } catch {
     return DEFAULT_WONDER_CONFIGS;
   }
@@ -105,5 +125,44 @@ export function saveWonderConfigs(configs: WonderItemConfig[]): void {
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(configs));
   } catch {
     // silently fail
+  }
+}
+
+export async function fetchWonderConfigs(): Promise<WonderItemConfig[]> {
+  try {
+    const res = await fetch("/api/wonder-configs");
+    if (!res.ok) throw new Error("HTTP error");
+    const data = await res.json();
+    if (data && Array.isArray(data.configs) && data.configs.length > 0) {
+      const mapped = data.configs.map((c: any) => ({
+        ...c,
+        baseCategories: Array.isArray(c.baseCategories) ? c.baseCategories : [],
+        divisorCategories: Array.isArray(c.divisorCategories) ? c.divisorCategories : [],
+        matchKeywords: Array.isArray(c.matchKeywords) ? c.matchKeywords : [],
+        divisor: c.divisor || "iPhone"
+      }));
+      // Cache to localStorage
+      saveWonderConfigs(mapped);
+      return mapped;
+    }
+  } catch (err) {
+    console.warn("Failed to fetch wonder configs from Turso, falling back to localStorage:", err);
+  }
+  return loadWonderConfigs();
+}
+
+export async function updateWonderConfigs(configs: WonderItemConfig[]): Promise<boolean> {
+  // Always update local cache immediately
+  saveWonderConfigs(configs);
+  try {
+    const res = await fetch("/api/wonder-configs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(configs),
+    });
+    return res.ok;
+  } catch (err) {
+    console.error("Failed to save wonder configs to Turso:", err);
+    return false;
   }
 }

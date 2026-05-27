@@ -352,6 +352,42 @@ const deleteStaffPhoto = async (execute, staffId) => {
   await execute("DELETE FROM staff_photos WHERE staff_id = ?", [staffId]);
 };
 
+const loadWonderConfigsDb = async (execute = tursoExecute) => {
+  await ensureRelationalSchema(execute);
+  const result = await execute(
+    `SELECT id, name, target_percent, base_categories, divisor_categories
+     FROM wonder_configs ORDER BY id ASC`,
+  );
+  return (result.rows ?? []).map((row) => {
+    const [id, name, targetPercent, baseCategories, divisorCategories] = rowValues(row);
+    return {
+      id: id ?? "",
+      name: name ?? "",
+      targetPercent: Number(targetPercent) || 0,
+      baseCategories: baseCategories ? JSON.parse(String(baseCategories)) : [],
+      divisorCategories: divisorCategories ? JSON.parse(String(divisorCategories)) : [],
+    };
+  });
+};
+
+const saveWonderConfigsDb = async (execute, configs) => {
+  await ensureRelationalSchema(execute);
+  await execute("DELETE FROM wonder_configs");
+  for (const w of configs) {
+    await execute(
+      `INSERT INTO wonder_configs (id, name, target_percent, base_categories, divisor_categories)
+       VALUES (?, ?, ?, ?, ?)`,
+      [
+        w.id,
+        w.name,
+        w.targetPercent,
+        JSON.stringify(w.baseCategories || []),
+        JSON.stringify(w.divisorCategories || []),
+      ],
+    );
+  }
+};
+
 const initDatabase = async () => {
   await ensureRelationalSchema(tursoExecute);
   const tables = await listTables();
@@ -383,4 +419,6 @@ module.exports = {
   saveUploadKindChunk,
   syncAllRelationalTables,
   tursoExecute,
+  loadWonderConfigsDb,
+  saveWonderConfigsDb,
 };

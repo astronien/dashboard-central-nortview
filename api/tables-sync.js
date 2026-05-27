@@ -251,6 +251,13 @@ const RELATIONAL_DDL = [
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   )`,
   `CREATE INDEX IF NOT EXISTS idx_staff_photos_officer_key ON staff_photos(officer_key)`,
+  `CREATE TABLE IF NOT EXISTS wonder_configs (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    target_percent REAL NOT NULL DEFAULT 0.0,
+    base_categories TEXT,
+    divisor_categories TEXT
+  )`,
 ];
 
 const SALES_COLUMNS = [

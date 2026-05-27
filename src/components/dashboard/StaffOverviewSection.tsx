@@ -57,8 +57,9 @@ export function StaffOverviewSection(props: {
   wonderConfigs?: WonderItemConfig[];
   onWonderConfigsChange?: (configs: WonderItemConfig[]) => void;
   onOpenStaffProfileWithWonders?: (name: string) => void;
+  uniqueCombos?: { cat: string; sub: string; label: string }[];
 }) {
-  const { staffCategoryTree, staffBaseCategories, staffAttachGroups, staffFilterBranch, staffBranchesList, staffKpiTargets, selectedAttachOfficers, attachOverviewChartData, attachTargetCategories, attachOverviewRows, pcZoneStats, staffAttachMatrix, parsedOfficers, onToggleStaffCategory, onAttachGroupsChange, onBranchChange, onSetKpi, onToggleOfficer, onOpenStaffProfile, formatOfficerShortName, matchesOfficer, wonderConfigs, onWonderConfigsChange, onOpenStaffProfileWithWonders } = props;
+  const { staffCategoryTree, staffBaseCategories, staffAttachGroups, staffFilterBranch, staffBranchesList, staffKpiTargets, selectedAttachOfficers, attachOverviewChartData, attachTargetCategories, attachOverviewRows, pcZoneStats, staffAttachMatrix, parsedOfficers, onToggleStaffCategory, onAttachGroupsChange, onBranchChange, onSetKpi, onToggleOfficer, onOpenStaffProfile, formatOfficerShortName, matchesOfficer, wonderConfigs, onWonderConfigsChange, onOpenStaffProfileWithWonders, uniqueCombos } = props;
   const [tab, setTab] = useState<"leaderboard" | "attach_builder" | "pc_zone" | "wonder_config">("leaderboard");
   const [builderOpen, setBuilderOpen] = useState(false);
 
@@ -278,7 +279,7 @@ export function StaffOverviewSection(props: {
         <PcZoneTab pcZoneStats={pcZoneStats} />
       ) : tab === "wonder_config" ? (
         wonderConfigs && onWonderConfigsChange ? (
-          <WonderConfigEditor configs={wonderConfigs} onChange={onWonderConfigsChange} />
+          <WonderConfigEditor configs={wonderConfigs} onChange={onWonderConfigsChange} uniqueCombos={uniqueCombos ?? []} />
         ) : (
           <div className="text-sm text-white/50 text-center py-8">Wonder config is not available</div>
         )

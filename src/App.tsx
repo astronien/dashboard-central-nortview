@@ -106,7 +106,7 @@ import { HomeDashboardSection } from "./components/dashboard/HomeDashboardSectio
 
 import { StaffOverviewSection } from "./components/dashboard/StaffOverviewSection";
 import { StaffSection } from "./components/dashboard/StaffSection";
-import { loadWonderConfigs, saveWonderConfigs, type WonderItemConfig } from "./lib/wonderConfig";
+import { loadWonderConfigs, saveWonderConfigs, type WonderItemConfig, fetchWonderConfigs, updateWonderConfigs } from "./lib/wonderConfig";
 import { ReportsSection } from "./components/dashboard/ReportsSection";
 import { SettingsSection } from "./components/dashboard/SettingsSection";
 import type { DerivedHomeStat } from "./components/dashboard/dashboardTypes";
@@ -585,6 +585,15 @@ const mapTargetCategoryKey = (category: string, subCategory = "", productName = 
   if (text.includes("accessory") || text.includes("apple acc") || text.includes("care") || text.includes("service") || text.includes("insurance") || text.includes("smile")) return "BTB";
   if (text.includes("smartphone")) return "Smartphone";
   return category || "Other";
+};
+
+const isCategoryMatched = (rowCat: string, rowSub: string, selectedList?: string[]): boolean => {
+  if (!selectedList || selectedList.length === 0) return false;
+  const c = rowCat.trim();
+  const s = rowSub.trim();
+  const targetCombo = `${c}||${s}`;
+  const targetWholeCat = `${c}||`;
+  return selectedList.includes(targetCombo) || selectedList.includes(targetWholeCat);
 };
 const getRowKey = (row: RawRow) => {
   return [
@@ -1494,6 +1503,42 @@ export default function App() {
   const [wonderConfigs, setWonderConfigs] = useState<WonderItemConfig[]>(loadWonderConfigs);
   const [uploadingPhotoId, setUploadingPhotoId] = useState<string | null>(null);
 
+  const uniqueCombos = useMemo(() => {
+    const combos = new Map<string, { cat: string; sub: string; label: string }>();
+    const addCombo = (cat: string, sub: string) => {
+      const trimmedCat = cat.trim();
+      const trimmedSub = sub.trim();
+      if (!trimmedCat) return;
+      const key = `${trimmedCat}||${trimmedSub}`;
+      if (!combos.has(key)) {
+        combos.set(key, {
+          cat: trimmedCat,
+          sub: trimmedSub,
+          label: trimmedSub ? `${trimmedCat} > ${trimmedSub}` : trimmedCat,
+        });
+      }
+    };
+
+    displayUploads.current.forEach((row) => {
+      const cat = String(row["Category (Name)"] ?? row.category ?? "").trim();
+      const sub = String(row["Sub Category"] ?? row.subcategory ?? "").trim();
+      addCombo(cat, sub);
+    });
+
+    displayUploads.categoryMaster.forEach((row) => {
+      const cat = String(row["Cat & Sub Cat"] ?? row["Category (Name)"] ?? row.Category ?? "").trim();
+      const sub = String(row["Sub Category"] ?? row.SubCategory ?? "").trim();
+      if (cat.includes("||")) {
+        const [c, s] = cat.split("||");
+        addCombo(c, s || sub);
+      } else {
+        addCombo(cat, sub);
+      }
+    });
+
+    return Array.from(combos.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [displayUploads.current, displayUploads.categoryMaster]);
+
   const STORAGE_KEY = "dashboard-upload-state-v1";
 
   const toggleAttachFilter = (id: string) => {
@@ -1862,7 +1907,7 @@ export default function App() {
 
   const handleWonderConfigsChange = React.useCallback((newConfigs: WonderItemConfig[]) => {
     setWonderConfigs(newConfigs);
-    saveWonderConfigs(newConfigs);
+    updateWonderConfigs(newConfigs);
   }, []);
 
   const activeOfficer7WondersPerformance = useMemo<CategoryPerformanceRow[]>(() => {
@@ -1872,53 +1917,32 @@ export default function App() {
     const officerIndex = activeOfficerIndex;
     const hasData = displayUploads.current.length > 0;
     
-    // Count base units by product category
+    // Count base units by product category for fallback presets
     let iphoneCount = 0;
     let ipadCount = 0;
     let macCount = 0;
     let allUnitsCount = 0;
     
-    // Count wonder-specific units using config matchKeywords
-    const wonderCounts = new Map<string, number>();
-    wonderConfigs.forEach((w) => wonderCounts.set(w.id, 0));
-    
-    if (hasData) {
-      const officerRows = displayUploads.current.filter((row) => {
-        const officer = String(row["Officer (Name)"] ?? "").trim();
-        return matchesOfficer(officer, officerName);
+    const officerRows = hasData
+      ? displayUploads.current.filter((row) => {
+          const officer = String(row["Officer (Name)"] ?? "").trim();
+          return matchesOfficer(officer, officerName);
+        })
+      : [];
+
+    if (hasData && officerRows.length > 0) {
+      officerRows.forEach((row) => {
+        const units = Math.max(toNumber(row.Number ?? row.number ?? row.qty), 0);
+        const rowCat = getCategory(row);
+        if (rowCat === "iPhone") iphoneCount += units;
+        if (rowCat === "Mac") macCount += units;
+        if (rowCat === "iPad") ipadCount += units;
+        allUnitsCount += units;
       });
-      
-      if (officerRows.length > 0) {
-        officerRows.forEach((row) => {
-          const categoryName = String(row["Category (Name)"] ?? "Other").trim();
-          const subCategory = String(row["Sub Category"] ?? "").trim();
-          const productName = String(row["Product (Name)"] ?? "").trim();
-          const units = Math.max(toNumber(row.Number ?? row.number ?? row.qty), 0);
-          
-          const text = normalizeText(`${categoryName} ${subCategory} ${productName}`);
-          const rowCat = getCategory(row);
-          
-          if (rowCat === "iPhone") iphoneCount += units;
-          if (rowCat === "Mac") macCount += units;
-          if (rowCat === "iPad") ipadCount += units;
-          allUnitsCount += units;
-          
-          // Match against each wonder's keywords
-          wonderConfigs.forEach((w) => {
-            const matched = w.matchKeywords.some((kw) => {
-              const kwLower = kw.toLowerCase();
-              return text.includes(kwLower) || productName.toUpperCase().includes(kw.toUpperCase());
-            });
-            if (matched) {
-              wonderCounts.set(w.id, (wonderCounts.get(w.id) ?? 0) + units);
-            }
-          });
-        });
-      }
     }
-    
+
     // Helper to get divisor count
-    const getDivisorCount = (divisor: string): number => {
+    const getDivisorCount = (divisor?: string): number => {
       switch (divisor) {
         case "iPhone": return iphoneCount;
         case "iPad": return ipadCount;
@@ -1933,8 +1957,46 @@ export default function App() {
       let actualVal: number;
       
       if (hasData) {
-        const numerator = wonderCounts.get(w.id) ?? 0;
-        const denominator = getDivisorCount(w.divisor);
+        // Calculate numerator
+        let numerator = 0;
+        officerRows.forEach((row) => {
+          const cat = String(row["Category (Name)"] ?? "Other").trim();
+          const sub = String(row["Sub Category"] ?? "").trim();
+          const prod = String(row["Product (Name)"] ?? "").trim();
+          const units = Math.max(toNumber(row.Number ?? row.number ?? row.qty), 0);
+          
+          if (w.baseCategories && w.baseCategories.length > 0) {
+            if (isCategoryMatched(cat, sub, w.baseCategories)) {
+              numerator += units;
+            }
+          } else if (Array.isArray(w.matchKeywords)) {
+            // Fallback keywords
+            const text = normalizeText(`${cat} ${sub} ${prod}`);
+            const matched = w.matchKeywords.some((kw) => {
+              const kwLower = kw.toLowerCase();
+              return text.includes(kwLower) || prod.toUpperCase().includes(kw.toUpperCase());
+            });
+            if (matched) {
+              numerator += units;
+            }
+          }
+        });
+
+        // Calculate denominator
+        let denominator = 0;
+        if (w.divisorCategories && w.divisorCategories.length > 0) {
+          officerRows.forEach((row) => {
+            const cat = String(row["Category (Name)"] ?? "Other").trim();
+            const sub = String(row["Sub Category"] ?? "").trim();
+            const units = Math.max(toNumber(row.Number ?? row.number ?? row.qty), 0);
+            if (isCategoryMatched(cat, sub, w.divisorCategories)) {
+              denominator += units;
+            }
+          });
+        } else {
+          denominator = getDivisorCount(w.divisor);
+        }
+
         actualVal = denominator > 0 ? (numerator / denominator) * 100 : 0;
       } else {
         // Fallback mock values for demo
@@ -3139,6 +3201,7 @@ export default function App() {
                 matchesOfficer={attachMatchesOfficer}
                 wonderConfigs={wonderConfigs}
                 onWonderConfigsChange={handleWonderConfigsChange}
+                uniqueCombos={uniqueCombos}
                 onOpenStaffProfileWithWonders={(name) => {
                   const officerIndex = parsedReport.officers.findIndex((officer) =>
                     attachMatchesOfficer(officer.name, name),
