@@ -88,7 +88,20 @@ const getRowKey = (row: RawRow) => [
 
 const CHOSEN_DUPLICATE_KEYS = new Set<string>();
 
-export function buildReport(targetRows: RawRow[], currentRows: RawRow[], lastMonthRows: RawRow[], lastYearRows: RawRow[], categoryRows: RawRow[], fileName: string): ParsedReport {
+/** Merge todayRows into currentRows, skipping rows that already exist in current */
+const deduplicateMerge = (currentRows: RawRow[], todayRows: RawRow[]): RawRow[] => {
+  const existingKeys = new Set<string>();
+  currentRows.forEach((row) => existingKeys.add(getRowKey(row)));
+
+  const newRows = todayRows.filter((row) => !existingKeys.has(getRowKey(row)));
+  return [...currentRows, ...newRows];
+};
+
+export function buildReport(targetRows: RawRow[], currentRows: RawRow[], lastMonthRows: RawRow[], lastYearRows: RawRow[], categoryRows: RawRow[], fileName: string, todayRows: RawRow[] = []): ParsedReport {
+  // Merge today rows into current if provided (today is a subset of the current month)
+  const mergedCurrentRows = todayRows.length > 0
+    ? deduplicateMerge(currentRows, todayRows)
+    : currentRows;
   const categoryMap = new Map<string, string>();
   categoryRows.forEach((row) => {
     const key = normalizeText(row["Cat & Sub Cat"] ?? row["Category (Name)"] ?? row.SubCategory);
@@ -157,13 +170,15 @@ export function buildReport(targetRows: RawRow[], currentRows: RawRow[], lastMon
   });
 
   const mergeSales = (rows: RawRow[], period: "current" | "lastMonth" | "lastYear") => {
-    const seen = new Set<string>();
+    const seen = new Map<string, number>();
     [...rows].sort((a, b) => getSalesDate(b) - getSalesDate(a)).forEach((row) => {
       if (period === "current") {
-        const dupKey = `${row["Doc No"]}_${row["Product (Code)"] ?? row.product_code ?? ""}_${row["ราคาขายตามบิล"] ?? row["Total Price"] ?? row.totalPrice}`;
-        const rowKey = getRowKey(row);
-        if (seen.has(dupKey) && !CHOSEN_DUPLICATE_KEYS.has(rowKey)) return;
-        seen.add(dupKey);
+        // Include quantity in the key to avoid dropping rows that are legitimately different
+        const qty = String(row.Number ?? row.number ?? row.qty ?? "1").trim();
+        const dupKey = `${row["Doc No"]}_${row["Product (Code)"] ?? row.product_code ?? ""}_${row["ราคาขายตามบิล"] ?? row["Total Price"] ?? row.totalPrice}_${qty}`;
+        const count = seen.get(dupKey) ?? 0;
+        if (count > 0 && !CHOSEN_DUPLICATE_KEYS.has(getRowKey(row))) return;
+        seen.set(dupKey, count + 1);
       }
       const branch = String(row["Branch (Name)"] ?? "Unknown Branch").trim();
       const officer = String(row["Officer (Name)"] ?? "Unknown Officer").trim();
@@ -221,13 +236,13 @@ export function buildReport(targetRows: RawRow[], currentRows: RawRow[], lastMon
     });
   };
 
-  mergeSales(currentRows, "current");
+  mergeSales(mergedCurrentRows, "current");
   mergeSales(lastMonthRows, "lastMonth");
   mergeSales(lastYearRows, "lastYear");
 
   let maxDateStr = "";
   let maxDateTime = 0;
-  currentRows.forEach((row) => {
+  mergedCurrentRows.forEach((row) => {
     const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
     if (!rawDate) return;
     const parsed = Date.parse(rawDate.replace(/^\S+\.\s*/, ""));
@@ -236,7 +251,7 @@ export function buildReport(targetRows: RawRow[], currentRows: RawRow[], lastMon
 
   const officerDailyActual = new Map<string, number>();
   if (maxDateStr || maxDateTime > 0) {
-    currentRows.forEach((row) => {
+    mergedCurrentRows.forEach((row) => {
       const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
       const parsed = Date.parse(rawDate.replace(/^\S+\.\s*/, ""));
       if ((maxDateStr && rawDate === maxDateStr) || (parsed && parsed === maxDateTime)) {

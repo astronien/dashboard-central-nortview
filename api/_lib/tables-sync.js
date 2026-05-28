@@ -319,31 +319,37 @@ const textArg = (value) => ({ type: "text", value: value ?? "" });
 const insertBatch = async (tursoPipeline, getExecuteResult, table, columns, rows, batchSize = 200) => {
   if (!rows.length) return;
 
-  const requests = [];
-  requests.push({ type: "execute", stmt: { sql: "BEGIN TRANSACTION" } });
+  // Split into sub-pipelines of max ~500 rows to avoid Turso HTTP body size limits
+  const MAX_ROWS_PER_PIPELINE = 500;
+  
+  for (let pipeStart = 0; pipeStart < rows.length; pipeStart += MAX_ROWS_PER_PIPELINE) {
+    const pipeSlice = rows.slice(pipeStart, pipeStart + MAX_ROWS_PER_PIPELINE);
+    const requests = [];
+    requests.push({ type: "execute", stmt: { sql: "BEGIN TRANSACTION" } });
 
-  for (let offset = 0; offset < rows.length; offset += batchSize) {
-    const slice = rows.slice(offset, offset + batchSize);
-    const placeholders = `(${columns.map(() => "?").join(", ")})`;
-    const sql = `INSERT INTO ${table} (${columns.join(", ")}) VALUES ${slice
-      .map(() => placeholders)
-      .join(", ")}`;
+    for (let offset = 0; offset < pipeSlice.length; offset += batchSize) {
+      const slice = pipeSlice.slice(offset, offset + batchSize);
+      const placeholders = `(${columns.map(() => "?").join(", ")})`;
+      const sql = `INSERT INTO ${table} (${columns.join(", ")}) VALUES ${slice
+        .map(() => placeholders)
+        .join(", ")}`;
 
-    const args = [];
-    for (const row of slice) {
-      for (const col of columns) {
-        args.push(textArg(row[col]));
+      const args = [];
+      for (const row of slice) {
+        for (const col of columns) {
+          args.push(textArg(row[col]));
+        }
       }
+
+      requests.push({ type: "execute", stmt: { sql, args } });
     }
 
-    requests.push({ type: "execute", stmt: { sql, args } });
-  }
+    requests.push({ type: "execute", stmt: { sql: "COMMIT" } });
 
-  requests.push({ type: "execute", stmt: { sql: "COMMIT" } });
-
-  const payload = await tursoPipeline(requests);
-  for (let i = 0; i < requests.length; i += 1) {
-    getExecuteResult(payload, i);
+    const payload = await tursoPipeline(requests);
+    for (let i = 0; i < requests.length; i += 1) {
+      getExecuteResult(payload, i);
+    }
   }
 };
 
