@@ -326,7 +326,7 @@ export default function WonderConfigEditor({
               {/* Add form Category Selections */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
                 {/* Base selection */}
-                <div className="bg-black/20 p-4 rounded-xl border border-white/5 flex flex-col gap-2">
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 flex flex-col gap-2">
                   <label className="text-[10px] text-emerald-400 font-bold block mb-1">
                     🎯 1. BASE TARGET (ตัวตั้ง / ตัวเศษ)
                   </label>
@@ -357,9 +357,9 @@ export default function WonderConfigEditor({
                             <button
                               type="button"
                               onClick={() => toggleNewBaseCategory(member)}
-                              className="hover:text-white text-emerald-400"
+                              className="hover:text-white text-emerald-400 hover:bg-white/10 rounded-full p-0.5 transition-colors"
                             >
-                              <X className="w-3 h-3" />
+                              <X className="w-2.5 h-2.5" />
                             </button>
                           </span>
                         ))}
@@ -369,7 +369,7 @@ export default function WonderConfigEditor({
                 </div>
 
                 {/* Divisor selection */}
-                <div className="bg-black/20 p-4 rounded-xl border border-white/5 flex flex-col gap-2">
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 flex flex-col gap-2">
                   <label className="text-[10px] text-teal-400 font-bold block mb-1">
                     📊 2. DIVISOR TARGET (ตัวหาร / Denominator)
                   </label>
@@ -378,10 +378,10 @@ export default function WonderConfigEditor({
                     <button
                       type="button"
                       onClick={() => setNewDivisorMode("preset")}
-                      className={`text-[10px] px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                      className={`text-[10px] px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer ${
                         newDivisorMode === "preset"
-                          ? "bg-[#10b981] text-white font-bold"
-                          : "bg-white/5 text-white/50 hover:bg-white/10"
+                          ? "bg-teal-500/20 text-teal-300 border-teal-500/30 font-semibold shadow-[0_2px_8px_rgba(20,184,166,0.15)]"
+                          : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white"
                       }`}
                     >
                       Preset
@@ -389,10 +389,10 @@ export default function WonderConfigEditor({
                     <button
                       type="button"
                       onClick={() => setNewDivisorMode("tree")}
-                      className={`text-[10px] px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                      className={`text-[10px] px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer ${
                         newDivisorMode === "tree"
-                          ? "bg-[#10b981] text-white font-bold"
-                          : "bg-white/5 text-white/50 hover:bg-white/10"
+                          ? "bg-teal-500/20 text-teal-300 border-teal-500/30 font-semibold shadow-[0_2px_8px_rgba(20,184,166,0.15)]"
+                          : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white"
                       }`}
                     >
                       เลือกหมวดหมู่ย่อย
@@ -400,10 +400,10 @@ export default function WonderConfigEditor({
                     <button
                       type="button"
                       onClick={() => setNewDivisorMode("column")}
-                      className={`text-[10px] px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                      className={`text-[10px] px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer ${
                         newDivisorMode === "column"
-                          ? "bg-[#10b981] text-white font-bold"
-                          : "bg-white/5 text-white/50 hover:bg-white/10"
+                          ? "bg-teal-500/20 text-teal-300 border-teal-500/30 font-semibold shadow-[0_2px_8px_rgba(20,184,166,0.15)]"
+                          : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white"
                       }`}
                     >
                       หัวตารางยอดขาย (Column Filter)
@@ -416,7 +416,7 @@ export default function WonderConfigEditor({
                       <select
                         value={newDivisor}
                         onChange={(e) => setNewDivisor(e.target.value as WonderDivisor)}
-                        className="w-full text-xs bg-white/5 border border-white/10 text-white rounded-xl px-3 py-2 outline-none focus:border-[#10b981]"
+                        className="w-full text-xs bg-white/5 border border-white/10 text-white rounded-xl px-3 py-2 outline-none focus:border-teal-400 text-gray-900"
                       >
                         {WONDER_DIVISOR_OPTIONS.map((opt) => (
                           <option key={opt.value} value={opt.value} className="text-gray-900">
@@ -455,9 +455,9 @@ export default function WonderConfigEditor({
                                 <button
                                   type="button"
                                   onClick={() => toggleNewDivisorCategory(member)}
-                                  className="hover:text-white text-teal-400"
+                                  className="hover:text-white text-teal-400 hover:bg-white/10 rounded-full p-0.5 transition-colors"
                                 >
-                                  <X className="w-3 h-3" />
+                                  <X className="w-2.5 h-2.5" />
                                 </button>
                               </span>
                             ))}
@@ -717,8 +717,8 @@ export default function WonderConfigEditor({
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Base selection */}
-                    <div className="bg-black/20 p-4 rounded-xl border border-white/5 flex flex-col gap-2">
-                      <label className="text-[10px] text-emerald-300 font-bold block mb-1">
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4 flex flex-col gap-2">
+                      <label className="text-[10px] text-emerald-400 font-bold block mb-1">
                         🎯 1. BASE TARGET (ตัวตั้ง / ตัวเศษ)
                       </label>
 
@@ -748,9 +748,9 @@ export default function WonderConfigEditor({
                                 <button
                                   type="button"
                                   onClick={() => toggleEditBaseCategory(member)}
-                                  className="hover:text-white text-emerald-400"
+                                  className="hover:text-white text-emerald-400 hover:bg-white/10 rounded-full p-0.5 transition-colors"
                                 >
-                                  <X className="w-3 h-3" />
+                                  <X className="w-2.5 h-2.5" />
                                 </button>
                               </span>
                             ))}
@@ -760,8 +760,8 @@ export default function WonderConfigEditor({
                     </div>
 
                     {/* Divisor selection */}
-                    <div className="bg-black/20 p-4 rounded-xl border border-white/5 flex flex-col gap-2">
-                      <label className="text-[10px] text-teal-300 font-bold block mb-1">
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4 flex flex-col gap-2">
+                      <label className="text-[10px] text-teal-400 font-bold block mb-1">
                         📊 2. DIVISOR TARGET (ตัวหาร / Denominator)
                       </label>
 
@@ -769,10 +769,10 @@ export default function WonderConfigEditor({
                         <button
                           type="button"
                           onClick={() => setUseDivisorMode("preset")}
-                          className={`text-[10px] px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                          className={`text-[10px] px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer ${
                             useDivisorMode === "preset"
-                              ? "bg-[#10b981] text-white font-bold"
-                              : "bg-white/5 text-white/50 hover:bg-white/10"
+                              ? "bg-teal-500/20 text-teal-300 border-teal-500/30 font-semibold shadow-[0_2px_8px_rgba(20,184,166,0.15)]"
+                              : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white"
                           }`}
                         >
                           Preset
@@ -780,10 +780,10 @@ export default function WonderConfigEditor({
                         <button
                           type="button"
                           onClick={() => setUseDivisorMode("tree")}
-                          className={`text-[10px] px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                          className={`text-[10px] px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer ${
                             useDivisorMode === "tree"
-                              ? "bg-[#10b981] text-white font-bold"
-                              : "bg-white/5 text-white/50 hover:bg-white/10"
+                              ? "bg-teal-500/20 text-teal-300 border-teal-500/30 font-semibold shadow-[0_2px_8px_rgba(20,184,166,0.15)]"
+                              : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white"
                           }`}
                         >
                           เลือกหมวดหมู่ย่อย
@@ -791,10 +791,10 @@ export default function WonderConfigEditor({
                         <button
                           type="button"
                           onClick={() => setUseDivisorMode("column")}
-                          className={`text-[10px] px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                          className={`text-[10px] px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer ${
                             useDivisorMode === "column"
-                              ? "bg-[#10b981] text-white font-bold"
-                              : "bg-white/5 text-white/50 hover:bg-white/10"
+                              ? "bg-teal-500/20 text-teal-300 border-teal-500/30 font-semibold shadow-[0_2px_8px_rgba(20,184,166,0.15)]"
+                              : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white"
                           }`}
                         >
                           หัวตารางยอดขาย (Column Filter)

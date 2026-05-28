@@ -112,7 +112,7 @@ import { StaffSection } from "./components/dashboard/StaffSection";
 import { loadWonderConfigs, saveWonderConfigs, type WonderItemConfig, fetchWonderConfigs, updateWonderConfigs } from "./lib/wonderConfig";
 import { ReportsSection } from "./components/dashboard/ReportsSection";
 import { SettingsSection } from "./components/dashboard/SettingsSection";
-import type { DerivedHomeStat } from "./components/dashboard/dashboardTypes";
+
 
 type Staff = {
   id: string;
@@ -1602,7 +1602,23 @@ export default function App() {
   }, [displayUploads.current, displayUploads.categoryMaster]);
 
   const salesHeaders = useMemo<string[]>(() => {
-    const headers = new Set<string>();
+    const headers = new Set<string>([
+      "Product (Code)",
+      "Product (Name)",
+      "Category (Name)",
+      "Sub Category",
+      "Branch (Name)",
+      "Officer (Name)",
+      "Doc No",
+      "Doc Date",
+      "Total Price",
+      "ราคาขายตามบิล",
+      "Number",
+      "Customer (Name)",
+      "customerCodes",
+      "Customer Code",
+    ]);
+
     if (displayUploads.current && displayUploads.current.length > 0) {
       displayUploads.current.slice(0, 100).forEach((row) => {
         Object.keys(row).forEach((key) => {
@@ -1616,24 +1632,6 @@ export default function App() {
           }
         });
       });
-    }
-    if (headers.size === 0) {
-      return [
-        "Product (Code)",
-        "Product (Name)",
-        "Category (Name)",
-        "Sub Category",
-        "Branch (Name)",
-        "Officer (Name)",
-        "Doc No",
-        "Doc Date",
-        "Total Price",
-        "ราคาขายตามบิล",
-        "Number",
-        "Customer (Name)",
-        "customerCodes",
-        "Customer Code",
-      ];
     }
     return Array.from(headers).sort();
   }, [displayUploads.current]);
@@ -2992,7 +2990,7 @@ export default function App() {
         ? [kind as UploadKind] 
         : ["target", "categoryMaster", "current", "today", "lastMonth", "lastYear"];
         
-      let combinedSummary: Record<string, number> = {};
+      let combinedSummary: Record<string, any> = {};
       let combinedErrors: any[] = [];
       
       for (const k of kindsToSync) {
@@ -3116,7 +3114,7 @@ export default function App() {
 
 
   const handleStaffPhotoUpload = async (
-    entry: { staffId: string; officerKey: string; name: string; branch: string },
+    entry: { staffId: string; officerKey: string; name: string; branch?: string },
     file: File,
   ) => {
     if (!file.type.startsWith("image/")) {
@@ -3433,7 +3431,7 @@ export default function App() {
                   sheetBranches={sheetBranches}
                   staffRoster={staffRoster}
                   staffPhotos={Object.fromEntries(
-                    Object.entries(staffPhotos).map(([id, record]) => [id, record.photoUrl]),
+                    Object.entries(staffPhotos).map(([id, record]) => [id, (record as any).photoUrl]),
                   )}
                   uploadingPhotoId={uploadingPhotoId}
                   staffPhotoError={staffPhotoError}

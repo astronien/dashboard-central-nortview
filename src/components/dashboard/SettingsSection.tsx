@@ -27,7 +27,7 @@ export function SettingsSection({
   staffPhotos: Record<string, string>;
   uploadingPhotoId: string | null;
   staffPhotoError: string | null;
-  getStaffAvatar: (photos: Record<string, string>, entry: { staffId: string; officerKey: string; fallbackIndex: number }) => string;
+  getStaffAvatar: any;
   onPhotoUpload: (entry: StaffRosterEntry, file: File) => void;
   onPhotoRemove: (staffId: string) => void;
   onNavigateToReports: () => void;

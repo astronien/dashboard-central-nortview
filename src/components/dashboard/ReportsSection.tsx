@@ -8,6 +8,7 @@ export type ReportStats = { branches: number; categories: number; officers: numb
 export type TursoStats = {
   target?: { rowCount: number; updatedAt?: string };
   current?: { rowCount: number; updatedAt?: string };
+  today?: { rowCount: number; updatedAt?: string };
   lastMonth?: { rowCount: number; updatedAt?: string };
   lastYear?: { rowCount: number; updatedAt?: string };
   categoryMaster?: { rowCount: number; updatedAt?: string };
