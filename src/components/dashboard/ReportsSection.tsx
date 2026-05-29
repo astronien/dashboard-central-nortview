@@ -27,6 +27,66 @@ export type SyncResult = {
   errors?: Array<{ kind: string; error: string }>;
 };
 
+const getRowDate = (row: RawRow): Date | null => {
+  const raw = String(row["Doc Date"] ?? row["doc_date"] ?? row["doc date"] ?? "");
+  if (!raw) return null;
+  const cleaned = raw.replace(/^\S+\.\s*/, "").trim();
+  const parsed = Date.parse(cleaned);
+  if (Number.isFinite(parsed)) {
+    return new Date(parsed);
+  }
+  
+  // Try parsing DD/MM/YYYY
+  const dmyMatch = cleaned.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (dmyMatch) {
+    const day = parseInt(dmyMatch[1], 10);
+    const month = parseInt(dmyMatch[2], 10) - 1;
+    const year = parseInt(dmyMatch[3], 10);
+    return new Date(year, month, day);
+  }
+  
+  return null;
+};
+
+const getDateRangeString = (rows: RawRow[]): string | null => {
+  if (!rows || rows.length === 0) return null;
+  let minMs = Infinity;
+  let maxMs = -Infinity;
+  let minDate: Date | null = null;
+  let maxDate: Date | null = null;
+
+  rows.forEach((row) => {
+    const d = getRowDate(row);
+    if (d) {
+      const ms = d.getTime();
+      if (ms < minMs) {
+        minMs = ms;
+        minDate = d;
+      }
+      if (ms > maxMs) {
+        maxMs = ms;
+        maxDate = d;
+      }
+    }
+  });
+
+  if (!minDate || !maxDate) return null;
+
+  const formatDate = (d: Date) => {
+    return d.toLocaleDateString("th-TH", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  if (minDate.getTime() === maxDate.getTime()) {
+    return formatDate(minDate);
+  }
+
+  return `${formatDate(minDate)} - ${formatDate(maxDate)}`;
+};
+
 export function ReportsSection({
   uploadedFiles,
   onSyncSheets,
@@ -101,13 +161,23 @@ export function ReportsSection({
             const label = kind.replace(/([A-Z])/g, " $1");
             const rowCount = uploadedFiles[kind].length;
             const isLoaded = rowCount > 0;
+            const dateRange = (kind === "current" || kind === "today" || kind === "lastMonth" || kind === "lastYear")
+              ? getDateRangeString(uploadedFiles[kind])
+              : null;
             return (
-              <div key={kind} className={`rounded-2xl border p-4 flex flex-col justify-between min-h-[90px] transition-all bg-white/5 ${isLoaded ? "border-teal-500/25 bg-teal-500/[0.02]" : "border-white/5"}`}>
-                <div className="flex justify-between items-start">
-                  <span className="text-[10px] font-bold text-white/50 uppercase tracking-wider">{label}</span>
-                  <span className={`w-2 h-2 rounded-full ${isLoaded ? "bg-teal-400 animate-pulse shadow-[0_0_8px_#2dd4bf]" : "bg-white/10"}`}></span>
+              <div key={kind} className={`rounded-2xl border p-4 flex flex-col justify-between min-h-[110px] transition-all bg-white/5 ${isLoaded ? "border-teal-500/25 bg-teal-500/[0.02]" : "border-white/5"}`}>
+                <div className="flex flex-col gap-1">
+                  <div className="flex justify-between items-start">
+                    <span className="text-[10px] font-bold text-white/50 uppercase tracking-wider">{label}</span>
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${isLoaded ? "bg-teal-400 animate-pulse shadow-[0_0_8px_#2dd4bf]" : "bg-white/10"}`}></span>
+                  </div>
+                  {isLoaded && dateRange && (
+                    <span className="text-[9px] text-teal-300/80 font-medium tracking-wide mt-1">
+                      {dateRange}
+                    </span>
+                  )}
                 </div>
-                <div className="mt-2.5 flex items-end justify-between">
+                <div className="mt-3 flex items-end justify-between">
                   <div className="text-[11px] font-extrabold text-white">{isLoaded ? `${rowCount.toLocaleString()} rows` : "No data"}</div>
                   <button onClick={() => onSyncKind(kind)} disabled={isSyncingSheets} className="text-[9px] bg-white/5 border border-white/10 hover:bg-white/10 hover:border-teal-400/30 active:bg-white/15 rounded px-2.5 py-1.5 text-white font-medium transition-all cursor-pointer">Sync</button>
                 </div>
