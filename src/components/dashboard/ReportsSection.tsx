@@ -28,23 +28,41 @@ export type SyncResult = {
 };
 
 const getRowDate = (row: RawRow): Date | null => {
-  const raw = String(row["Doc Date"] ?? row["doc_date"] ?? row["doc date"] ?? "");
+  const raw = String(row["Doc Date"] ?? row["doc_date"] ?? row["doc date"] ?? "").trim();
   if (!raw) return null;
+
+  // Clean up day-of-week prefix if exists, e.g. "จ. 11/05/2569 10:07:14" -> "11/05/2569 10:07:14"
   const cleaned = raw.replace(/^\S+\.\s*/, "").trim();
-  const parsed = Date.parse(cleaned);
-  if (Number.isFinite(parsed)) {
-    return new Date(parsed);
-  }
-  
-  // Try parsing DD/MM/YYYY
-  const dmyMatch = cleaned.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+
+  // Parse DD/MM/YYYY (with optional trailing HH:mm:ss)
+  // Using match is safer because Date.parse expects MM/DD/YYYY and would swap day and month,
+  // e.g. parsing "11/05/2569" (May 11) as Nov 5.
+  const dmyMatch = cleaned.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
   if (dmyMatch) {
     const day = parseInt(dmyMatch[1], 10);
-    const month = parseInt(dmyMatch[2], 10) - 1;
-    const year = parseInt(dmyMatch[3], 10);
+    const month = parseInt(dmyMatch[2], 10) - 1; // 0-indexed month
+    let year = parseInt(dmyMatch[3], 10);
+
+    // If the year in the sheet is already in Buddhist Era (> 2400),
+    // convert it to Gregorian (CE) so that toLocaleDateString("th-TH") doesn't double-add 543.
+    if (year > 2400) {
+      year -= 543;
+    }
+
     return new Date(year, month, day);
   }
-  
+
+  // Fallback to standard Date.parse for other formats
+  const parsed = Date.parse(cleaned);
+  if (Number.isFinite(parsed)) {
+    const d = new Date(parsed);
+    let year = d.getFullYear();
+    if (year > 2400) {
+      d.setFullYear(year - 543);
+    }
+    return d;
+  }
+
   return null;
 };
 
