@@ -9,6 +9,7 @@ import {
 } from "recharts";
 import { ShoppingBag, Award, Star, TrendingUp, Apple } from "lucide-react";
 import React from "react";
+import { calcTargetToDate, calcTodayAchievementPct } from "../../lib/targetAggregations";
 
 export type StaffLeaderboardItem = {
   id: string;
@@ -160,10 +161,12 @@ export function StaffSection({
     return [...rows].sort((a, b) => b.achDayPercent - a.achDayPercent)[0] ?? null;
   }, [activeOfficerCategoryPerformance]);
 
+  const currentMonthTotalDays = new Date().getDate() ? new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate() : 30;
+  const currentDay = Math.min(new Date().getDate(), currentMonthTotalDays);
   const todayTarget = activeOfficer
-    ? Math.round(activeOfficer.target / 30)
+    ? Math.round(calcTargetToDate(activeOfficer.target, currentDay, currentMonthTotalDays))
     : Number(currentStaff.stats.target) || 0;
-  const todayAchPercent = todayTarget > 0 ? (todaySalesTotal / todayTarget) * 100 : 0;
+  const todayAchPercent = calcTodayAchievementPct(todaySalesTotal, todayTarget);
   const todayGap = todayTarget - todaySalesTotal;
 
   return (

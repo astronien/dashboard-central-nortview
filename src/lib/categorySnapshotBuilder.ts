@@ -2,6 +2,8 @@ import type { RawRow } from "./salesAggregations";
 import {
   calcAchievementPct,
   calcForecastByDays,
+  calcTargetToDate,
+  calcTodayAchievementPct,
   getTargetForPeriod,
   normalizeId,
   rawTargetRowsToRecords,
@@ -56,9 +58,7 @@ function getMonthPeriod() {
 }
 
 function resolveBranchId(targetRows: RawRow[], currentRows: RawRow[]): string {
-  const fromTarget = targetRows.find(
-    (r) => r.emp_shop_code ?? r["emp_shop_code"] ?? r["BRANCH NAME"],
-  );
+  const fromTarget = targetRows.find((r) => r.emp_shop_code ?? r["emp_shop_code"] ?? r["BRANCH NAME"]);
   if (fromTarget) {
     return normalizeId(
       fromTarget.emp_shop_code ??
@@ -67,6 +67,7 @@ function resolveBranchId(targetRows: RawRow[], currentRows: RawRow[]): string {
         "",
     );
   }
+
   const fromCurrent = currentRows[0];
   if (!fromCurrent) return "";
   return normalizeId(
@@ -189,7 +190,7 @@ export function buildCategorySnapshots(params: {
       : periodActual(lastYearRows);
 
     const forecast = calcForecastByDays(actual, currentDay, totalDays);
-    const targetDay = totalDays ? (target / totalDays) * currentDay : 0;
+    const targetToToday = calcTargetToDate(target, currentDay, totalDays);
     const today =
       todayRows.length > 0
         ? kpiKey
@@ -211,9 +212,9 @@ export function buildCategorySnapshots(params: {
       forecast,
       achieveRate: calcAchievementPct(actual, target),
       forecastRate: calcAchievementPct(forecast, target),
-      targetDay,
+      targetDay: targetToDate,
       today,
-      todayAchieveRate: calcAchievementPct(today, targetDay),
+      todayAchieveRate: calcTodayAchievementPct(today, targetToDate),
       mom,
       yoy,
       measureType,

@@ -37,6 +37,15 @@ export interface PeriodMetrics {
   diffPerDay: number;
 }
 
+export function calcTargetToDate(target: number, currentDay: number, totalDays: number): number {
+  if (!totalDays) return 0;
+  return (target / totalDays) * currentDay;
+}
+
+export function calcTodayAchievementPct(actualToday: number, targetToDate: number): number {
+  return calcAchievementPct(actualToday, targetToDate);
+}
+
 const toNumber = (value: unknown) =>
   Number(String(value ?? "").replace(/[^\d.-]/g, "")) || 0;
 

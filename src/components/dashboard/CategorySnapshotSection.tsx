@@ -83,6 +83,9 @@ export function CategorySnapshotSection({ items }: { items: CategorySnapshotItem
               <div className="text-[9px] text-white/40">
                 FC {item.forecastRate.toFixed(0)}% • วันนี้ {item.todayAchieveRate.toFixed(0)}%
               </div>
+              <div className="text-[9px] text-white/35">
+                เป้าถึงวันนี้ {formatTarget({ ...item, target: item.targetDay })}
+              </div>
             </div>
           );
         })}

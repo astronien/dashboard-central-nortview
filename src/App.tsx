@@ -56,6 +56,8 @@ import {
   calcAchievementPct,
   calcForecastByDays,
   calculateMetrics,
+  calcTargetToDate,
+  calcTodayAchievementPct,
   normalizeId,
   rawTargetRowsToRecords,
 } from "./lib/targetAggregations";
@@ -1798,13 +1800,10 @@ export default function App() {
       matchesOfficer,
     );
     
-    // 1. Get currentDay and totalDays
-    let currentDay = 22;
-    let totalDays = 31;
-    parsedReport.branches.forEach((b) => {
-      currentDay = Math.max(currentDay, b.currentDay || 22);
-      totalDays = Math.max(totalDays, b.totalDays || 31);
-    });
+    // Use the actual current day/month length for daily target comparisons
+    const currentMonthTotalDays = new Date(periodYear, periodMonth + 1, 0).getDate();
+    const currentDay = Math.min(new Date().getDate(), currentMonthTotalDays);
+    const totalDays = currentMonthTotalDays;
     
     const todaySourceRows = todayRows.length ? todayRows : [];
     let maxDateStr = "";
@@ -1909,9 +1908,9 @@ export default function App() {
         yoyPercent = ((actual - lastYear) / lastYear) * 100;
       }
       
-      const targetDay = Math.round(target / (totalDays || 30));
+      const targetDay = calcTargetToDate(target, currentDay, totalDays);
       const diffDay = actualDay - targetDay;
-      const achDayPercent = targetDay ? (actualDay / targetDay) * 100 : 0;
+      const achDayPercent = calcTodayAchievementPct(actualDay, targetDay);
       
       return {
         category: catName,
@@ -1950,7 +1949,7 @@ export default function App() {
     const totalTargetDay = rows.reduce((s, r) => s + r.targetDay, 0);
     const totalActualDay = rows.reduce((s, r) => s + r.actualDay, 0);
     const totalDiffDay = totalActualDay - totalTargetDay;
-    const totalAchDayPercent = totalTargetDay ? (totalActualDay / totalTargetDay) * 100 : 0;
+    const totalAchDayPercent = calcTodayAchievementPct(totalActualDay, totalTargetDay);
     
     const totalRow: CategoryPerformanceRow = {
       category: "Total",
