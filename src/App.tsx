@@ -1355,6 +1355,19 @@ export default function App() {
     );
   }, [displayUploads.today, displayUploads.current]);
 
+  const formatTodayDateLabel = (rawDate: string) => {
+    const cleaned = rawDate.replace(/^\S+\.\s*/, "").trim();
+    if (!cleaned) return "";
+    const parsed = Date.parse(cleaned);
+    if (!Number.isFinite(parsed)) return cleaned;
+    const date = new Date(parsed);
+    return date.toLocaleDateString("th-TH", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+  };
+
   const todayStats = useMemo(() => {
     if (!todayRows.length) return { revenue: 0, units: 0, target: 0, ach: 0, mom: 0, yoy: 0, categories: [], dateStr: "" };
     
@@ -1426,11 +1439,7 @@ export default function App() {
     });
     
     const rawDateStr = String(todayRows[0]?.["Doc Date"] ?? "");
-    let dateStr = "";
-    if (rawDateStr) {
-      const parts = rawDateStr.split(/\s+/);
-      dateStr = parts.slice(0, 3).join(" ");
-    }
+    const dateStr = formatTodayDateLabel(rawDateStr);
     
     return {
       revenue: totalRevenue,
@@ -1983,7 +1992,7 @@ export default function App() {
     if (activeStat === "target") {
       if (todayStats.dateStr) {
         const source = displayUploads.today.length ? "Today sheet" : "current (วันล่าสุด)";
-        return `แสดงยอดขายวัน ${todayStats.dateStr} — ${source}`;
+        return `แสดงยอดขายวันที่ ${todayStats.dateStr} — ${source}`;
       }
       if (!displayUploads.today.length && !displayUploads.current.length) return null;
       return "ไม่พบยอดขายวันนี้ — ซิงก์ Today sheet";

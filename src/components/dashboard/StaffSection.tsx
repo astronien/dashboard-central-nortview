@@ -168,6 +168,10 @@ export function StaffSection({
     : Number(currentStaff.stats.target) || 0;
   const todayAchPercent = calcTodayAchievementPct(todaySalesTotal, todayTarget);
   const todayGap = todayTarget - todaySalesTotal;
+  const todayDateDetails = React.useMemo(() => {
+    if (!todayDateLabel) return "";
+    return `วันนี้อ้างอิงจาก ${todayDateLabel}`;
+  }, [todayDateLabel]);
 
   return (
               <motion.div
@@ -404,6 +408,11 @@ export function StaffSection({
                         {todayDateLabel ? (
                           <div className="text-[8px] relative z-10 text-white/45 mb-1 leading-tight px-0.5">
                             {todayDateLabel}
+                          </div>
+                        ) : null}
+                        {todayDateDetails ? (
+                          <div className="text-[8px] relative z-10 text-emerald-200/70 mb-1 leading-tight px-0.5">
+                            {todayDateDetails}
                           </div>
                         ) : null}
                         <AnimatePresence mode="wait">
