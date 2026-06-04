@@ -651,7 +651,6 @@ export default function WonderConfigEditor({
                       <span className="text-white/85 font-medium">{item.baseMode ?? "unit"}</span>
                     )}
                   </td>
-                  </td>
 
                   {/* Base Categories Badge List */}
                   <td className="py-4 px-4">
