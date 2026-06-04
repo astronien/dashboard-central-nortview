@@ -711,6 +711,47 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
     if (key) categoryMap.set(key, value);
   });
 
+  const parseSalesDate = (row: RawRow) => {
+    const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
+    if (!rawDate) return 0;
+    return Date.parse(rawDate.replace(/^\S+\.\s*/, "")) || 0;
+  };
+
+  const monthKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+  const inferCurrentAnchorDate = () => {
+    const sourceRows = todayRows.length ? todayRows : currentRows;
+    let latest = 0;
+    sourceRows.forEach((row) => {
+      const parsed = parseSalesDate(row);
+      if (parsed > latest) latest = parsed;
+    });
+    return latest ? new Date(latest) : new Date();
+  };
+
+  const currentAnchor = inferCurrentAnchorDate();
+  const expectedLastMonthKey = monthKey(new Date(currentAnchor.getFullYear(), currentAnchor.getMonth() - 1, 1));
+  const expectedLastYearKey = monthKey(new Date(currentAnchor.getFullYear() - 1, currentAnchor.getMonth(), 1));
+
+  const rowsMatchMonth = (rows: RawRow[], expectedKey: string) => rows.some((row) => {
+    const parsed = parseSalesDate(row);
+    if (!parsed) return false;
+    return monthKey(new Date(parsed)) === expectedKey;
+  });
+
+  const resolvedLastMonthRows = lastMonthRows.length && rowsMatchMonth(lastMonthRows, expectedLastMonthKey)
+    ? lastMonthRows
+    : currentRows.filter((row) => {
+        const parsed = parseSalesDate(row);
+        return parsed ? monthKey(new Date(parsed)) === expectedLastMonthKey : false;
+      });
+
+  const resolvedLastYearRows = lastYearRows.length && rowsMatchMonth(lastYearRows, expectedLastYearKey)
+    ? lastYearRows
+    : currentRows.filter((row) => {
+        const parsed = parseSalesDate(row);
+        return parsed ? monthKey(new Date(parsed)) === expectedLastYearKey : false;
+      });
+
   const branchTargets = new Map<string, { totalTarget: number; days: number }>();
   const targetByOfficer = new Map<string, RawRow[]>();
   targetRows.forEach((row) => {
@@ -882,8 +923,8 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
   };
 
   mergeSales(currentRows, "current"); 
-  mergeSales(lastMonthRows, "lastMonth"); 
-  mergeSales(lastYearRows, "lastYear");
+  mergeSales(resolvedLastMonthRows, "lastMonth"); 
+  mergeSales(resolvedLastYearRows, "lastYear");
 
   // Daily actual: prefer dedicated today sheet; else last day in current (legacy)
   let maxDateStr = "";
@@ -2054,36 +2095,59 @@ export default function App() {
     };
 
     // Helper to get divisor count
-    const getDivisorCount = (divisor?: string): number => {
-      if (!divisor) return iphoneCount;
-      
-      switch (divisor) {
-        case "iPhone": return iphoneCount;
-        case "iPad": return ipadCount;
-        case "Mac": return macCount;
-        case "iPhone+iPad": return iphoneCount + ipadCount;
-        case "All Units": return allUnitsCount;
-        default: {
-          if (divisor.startsWith("Target ")) {
-            const targetCol = divisor.replace("Target ", "");
-            const targetRow = displayUploads.target.find((row) => {
-              const name = `${row.NAME ?? ""} ${row.SURNAME ?? ""}`.trim();
-              return matchesOfficer(name, officerName);
-            });
-            if (targetRow) {
-              if (targetCol === "Total") {
-                return toNumber(targetRow.Total);
-              }
-              for (const [key, val] of Object.entries(targetRow)) {
-                if (key.toLowerCase() === targetCol.toLowerCase() || normalizeText(key) === normalizeText(targetCol)) {
-                  return toNumber(val);
-                }
-              }
-            }
+    const getDivisorCount = (divisor?: string, divisorBase: "unit" | "revenue" = "unit"): number => {
+      const getTargetRevenue = () => {
+        if (!divisor) return 0;
+        const targetRow = displayUploads.target.find((row) => {
+          const name = `${row.NAME ?? ""} ${row.SURNAME ?? ""}`.trim();
+          return matchesOfficer(name, officerName);
+        });
+        if (!targetRow) return 0;
+        const targetCol = divisor.replace("Target ", "");
+        if (targetCol === "Total") return toNumber(targetRow.Total);
+        for (const [key, val] of Object.entries(targetRow)) {
+          if (key.toLowerCase() === targetCol.toLowerCase() || normalizeText(key) === normalizeText(targetCol)) {
+            return toNumber(val);
           }
-          return iphoneCount;
         }
+        return 0;
+      };
+
+      const getBaseUnits = () => {
+        if (!divisor) return 0;
+        switch (divisor) {
+          case "iPhone": return iphoneCount;
+          case "iPad": return ipadCount;
+          case "Mac": return macCount;
+          case "iPhone+iPad": return iphoneCount + ipadCount;
+          case "All Units": return allUnitsCount;
+          default:
+            if (divisor.startsWith("Target ")) return getTargetRevenue();
+            return iphoneCount;
+        }
+      };
+
+      if (divisorBase === "revenue") {
+        if (!divisor) return 0;
+        if (divisor.startsWith("Target ")) return getTargetRevenue();
+        const divisorLower = divisor.toLowerCase();
+        return officerRows.reduce((sum, row) => {
+          const cat = String(row["Category (Name)"] ?? "Other").trim();
+          const sub = String(row["Sub Category"] ?? "").trim();
+          const prod = String(row["Product (Name)"] ?? "").trim();
+          const text = normalizeText(`${cat} ${sub} ${prod}`);
+          const match =
+            divisorLower === "iphone" ? text.includes("iphone") :
+            divisorLower === "ipad" ? text.includes("ipad") :
+            divisorLower === "mac" ? text.includes("mac") :
+            divisorLower === "iphone+ipad" ? (text.includes("iphone") || text.includes("ipad")) :
+            divisorLower === "all units" ? true :
+            false;
+          return match ? sum + getCategoryValue(row) : sum;
+        }, 0);
       }
+
+      return getBaseUnits();
     };
     
     const rows: CategoryPerformanceRow[] = wonderConfigs.map((w, idx) => {

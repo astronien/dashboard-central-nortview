@@ -37,6 +37,7 @@ export default function WonderConfigEditor({
   const [editBaseCategories, setEditBaseCategories] = useState<string[]>([]);
   const [editDivisorCategories, setEditDivisorCategories] = useState<string[]>([]);
   const [editDivisor, setEditDivisor] = useState<WonderDivisor>("iPhone");
+  const [editDivisorBase, setEditDivisorBase] = useState<"unit" | "revenue">("unit");
   const [editMatchKeywords, setEditMatchKeywords] = useState<string[]>([]);
   
   // Three-way selector mode: "preset" | "tree" | "column"
@@ -51,6 +52,7 @@ export default function WonderConfigEditor({
   const [newBaseCategories, setNewBaseCategories] = useState<string[]>([]);
   const [newDivisorCategories, setNewDivisorCategories] = useState<string[]>([]);
   const [newDivisor, setNewDivisor] = useState<WonderDivisor>("iPhone");
+  const [newDivisorBase, setNewDivisorBase] = useState<"unit" | "revenue">("unit");
   const [newKeywords, setNewKeywords] = useState("");
   
   const [newDivisorMode, setNewDivisorMode] = useState<"preset" | "tree" | "column">("preset");
@@ -103,6 +105,7 @@ export default function WonderConfigEditor({
     setEditBaseCategories(item.baseCategories || []);
     setEditDivisorCategories(item.divisorCategories || []);
     setEditDivisor(item.divisor || "iPhone");
+    setEditDivisorBase(item.divisorBase || "unit");
     setEditMatchKeywords(item.matchKeywords || []);
     
     if (item.divisorColumn && item.divisorValue) {
@@ -162,6 +165,7 @@ export default function WonderConfigEditor({
               baseCategories: editBaseCategories,
               divisorCategories: useDivisorMode === "tree" ? editDivisorCategories : [],
               divisor: useDivisorMode === "preset" ? editDivisor : undefined,
+              divisorBase: useDivisorMode === "preset" ? editDivisorBase : undefined,
               divisorColumn: useDivisorMode === "column" ? resolvedDivCol : undefined,
               divisorValue: useDivisorMode === "column" ? editDivisorValue : undefined,
               matchKeywords: editMatchKeywords,
@@ -211,6 +215,7 @@ export default function WonderConfigEditor({
         baseCategories: newBaseCategories,
         divisorCategories: newDivisorMode === "tree" ? newDivisorCategories : [],
         divisor: newDivisorMode === "preset" ? newDivisor : undefined,
+        divisorBase: newDivisorMode === "preset" ? newDivisorBase : undefined,
         divisorColumn: newDivisorMode === "column" ? resolvedDivCol : undefined,
         divisorValue: newDivisorMode === "column" ? newDivisorValue : undefined,
         matchKeywords:
@@ -411,19 +416,41 @@ export default function WonderConfigEditor({
                   </div>
 
                   {newDivisorMode === "preset" && (
-                    <div className="space-y-2 py-4">
-                      <label className="text-[10px] text-white/40 block">เลือกกลุ่มสินค้าหลักสำเร็จรูป</label>
-                      <select
-                        value={newDivisor}
-                        onChange={(e) => setNewDivisor(e.target.value as WonderDivisor)}
-                        className="w-full text-xs bg-white/5 border border-white/10 text-white rounded-xl px-3 py-2 outline-none focus:border-teal-400 text-gray-900"
-                      >
-                        {WONDER_DIVISOR_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value} className="text-gray-900">
-                            {opt.label}
-                          </option>
-                        ))}
-                      </select>
+                    <div className="space-y-3 py-4">
+                      <div>
+                        <label className="text-[10px] text-white/40 block mb-1">เลือกกลุ่มสินค้าหลักสำเร็จรูป</label>
+                        <select
+                          value={newDivisor}
+                          onChange={(e) => setNewDivisor(e.target.value as WonderDivisor)}
+                          className="w-full text-xs bg-white/5 border border-white/10 text-white rounded-xl px-3 py-2 outline-none focus:border-teal-400 text-gray-900"
+                        >
+                          {WONDER_DIVISOR_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value} className="text-gray-900">
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] text-white/40 block mb-1">ฐานตัวหาร</label>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setNewDivisorBase("unit")}
+                            className={`px-3 py-1.5 rounded-lg text-[10px] border transition-colors ${newDivisorBase === "unit" ? "bg-teal-500/20 border-teal-400/30 text-teal-200" : "bg-white/5 border-white/10 text-white/50 hover:text-white hover:bg-white/10"}`}
+                          >
+                            Unit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setNewDivisorBase("revenue")}
+                            className={`px-3 py-1.5 rounded-lg text-[10px] border transition-colors ${newDivisorBase === "revenue" ? "bg-teal-500/20 border-teal-400/30 text-teal-200" : "bg-white/5 border-white/10 text-white/50 hover:text-white hover:bg-white/10"}`}
+                          >
+                            บาท
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   )}
 
@@ -802,21 +829,44 @@ export default function WonderConfigEditor({
                       </div>
 
                       {useDivisorMode === "preset" && (
-                        <div className="space-y-2 py-6">
-                          <label className="text-[10px] text-white/40 block">เลือกกลุ่มสินค้าหลักสำเร็จรูป</label>
-                          <select
-                            value={editDivisor}
-                            onChange={(e) => setEditDivisor(e.target.value as WonderDivisor)}
-                            className="w-full text-xs bg-white/5 border border-white/10 text-white rounded-xl px-3 py-2.5 outline-none focus:border-emerald-500 text-gray-900"
-                          >
-                            {WONDER_DIVISOR_OPTIONS.map((opt) => (
-                              <option key={opt.value} value={opt.value} className="text-gray-955">
-                                {opt.label}
-                              </option>
-                            ))}
-                          </select>
+                        <div className="space-y-3 py-6">
+                          <div>
+                            <label className="text-[10px] text-white/40 block mb-1">เลือกกลุ่มสินค้าหลักสำเร็จรูป</label>
+                            <select
+                              value={editDivisor}
+                              onChange={(e) => setEditDivisor(e.target.value as WonderDivisor)}
+                              className="w-full text-xs bg-white/5 border border-white/10 text-white rounded-xl px-3 py-2.5 outline-none focus:border-emerald-500 text-gray-900"
+                            >
+                              {WONDER_DIVISOR_OPTIONS.map((opt) => (
+                                <option key={opt.value} value={opt.value} className="text-gray-955">
+                                  {opt.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] text-white/40 block mb-1">ฐานตัวหาร</label>
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setEditDivisorBase("unit")}
+                                className={`px-3 py-1.5 rounded-lg text-[10px] border transition-colors ${editDivisorBase === "unit" ? "bg-teal-500/20 border-teal-400/30 text-teal-200" : "bg-white/5 border-white/10 text-white/50 hover:text-white hover:bg-white/10"}`}
+                              >
+                                Unit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditDivisorBase("revenue")}
+                                className={`px-3 py-1.5 rounded-lg text-[10px] border transition-colors ${editDivisorBase === "revenue" ? "bg-teal-500/20 border-teal-400/30 text-teal-200" : "bg-white/5 border-white/10 text-white/50 hover:text-white hover:bg-white/10"}`}
+                              >
+                                บาท
+                              </button>
+                            </div>
+                          </div>
+
                           <p className="text-[10px] text-white/40 italic mt-1">
-                            * Preset จะดึงยอดขายจากสูตรคำนวณพื้นฐาน (เช่น iPhone = นับเครื่องไอโฟนทั้งหมด)
+                            * Unit = นับจำนวนเครื่อง / บาท = ใช้มูลค่ารวมเป็นฐานคำนวณ
                           </p>
                         </div>
                       )}

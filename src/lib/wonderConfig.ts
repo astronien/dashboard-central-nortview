@@ -40,11 +40,14 @@ export const WONDER_DIVISOR_OPTIONS: { value: WonderDivisor; label: string }[] =
   { value: "Target Total", label: "เป้าหมายรวมยอดขาย (จาก DB)" },
 ];
 
+export type WonderDivisorBase = "unit" | "revenue";
+
 export type WonderItemConfig = {
   id: string;
   name: string;
   targetPercent: number;
   divisor?: WonderDivisor;
+  divisorBase?: WonderDivisorBase;
   matchKeywords?: string[];
   baseCategories?: string[]; // list of "Category||Sub Category"
   divisorCategories?: string[]; // list of "Category||Sub Category"
@@ -132,6 +135,7 @@ export function loadWonderConfigs(): WonderItemConfig[] {
       ...item,
       baseCategories: Array.isArray(item.baseCategories) ? item.baseCategories : [],
       divisorCategories: Array.isArray(item.divisorCategories) ? item.divisorCategories : [],
+      divisorBase: item.divisorBase === "revenue" ? "revenue" : "unit",
       divisorColumn: item.divisorColumn ?? "",
       divisorValue: item.divisorValue ?? "",
     }));
