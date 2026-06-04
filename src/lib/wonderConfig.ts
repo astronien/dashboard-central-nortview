@@ -44,6 +44,8 @@ export type WonderDivisorBase = "unit" | "revenue";
 
 export type WonderBaseMode = "unit" | "revenue";
 
+export type WonderBaseDivisor = "iPhone" | "iPad" | "Mac" | "iPhone+iPad" | "All Units";
+
 export type WonderItemConfig = {
   id: string;
   name: string;
@@ -51,6 +53,7 @@ export type WonderItemConfig = {
   divisor?: WonderDivisor;
   divisorBase?: WonderDivisorBase;
   baseMode?: WonderBaseMode;
+  baseDivisors?: WonderBaseDivisor[];
   matchKeywords?: string[];
   baseCategories?: string[]; // list of "Category||Sub Category"
   divisorCategories?: string[]; // list of "Category||Sub Category"

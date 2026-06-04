@@ -39,6 +39,7 @@ export default function WonderConfigEditor({
   const [editDivisor, setEditDivisor] = useState<WonderDivisor>("iPhone");
   const [editDivisorBase, setEditDivisorBase] = useState<"unit" | "revenue">("unit");
   const [editBaseMode, setEditBaseMode] = useState<"unit" | "revenue">("unit");
+  const [editBaseDivisors, setEditBaseDivisors] = useState<string[]>([]);
   const [editMatchKeywords, setEditMatchKeywords] = useState<string[]>([]);
   
   // Three-way selector mode: "preset" | "tree" | "column"
@@ -55,6 +56,7 @@ export default function WonderConfigEditor({
   const [newDivisor, setNewDivisor] = useState<WonderDivisor>("iPhone");
   const [newDivisorBase, setNewDivisorBase] = useState<"unit" | "revenue">("unit");
   const [newBaseMode, setNewBaseMode] = useState<"unit" | "revenue">("unit");
+  const [newBaseDivisors, setNewBaseDivisors] = useState<string[]>([]);
   const [newKeywords, setNewKeywords] = useState("");
   
   const [newDivisorMode, setNewDivisorMode] = useState<"preset" | "tree" | "column">("preset");
@@ -108,6 +110,8 @@ export default function WonderConfigEditor({
     setEditDivisorCategories(item.divisorCategories || []);
     setEditDivisor(item.divisor || "iPhone");
     setEditDivisorBase(item.divisorBase || "unit");
+    setEditBaseMode(item.baseMode || "unit");
+    setEditBaseDivisors(Array.isArray(item.baseDivisors) ? item.baseDivisors : []);
     setEditMatchKeywords(item.matchKeywords || []);
     
     if (item.divisorColumn && item.divisorValue) {
@@ -219,7 +223,8 @@ export default function WonderConfigEditor({
         divisorCategories: newDivisorMode === "tree" ? newDivisorCategories : [],
         divisor: newDivisorMode === "preset" ? newDivisor : undefined,
         divisorBase: newDivisorMode === "preset" ? newDivisorBase : undefined,
-        baseMode: newDivisorBase,
+        baseMode: newBaseMode,
+        baseDivisors: newBaseDivisors,
         divisorColumn: newDivisorMode === "column" ? resolvedDivCol : undefined,
         divisorValue: newDivisorMode === "column" ? newDivisorValue : undefined,
         matchKeywords:
@@ -453,6 +458,22 @@ export default function WonderConfigEditor({
                           >
                             บาท
                           </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] text-white/40 block mb-1">เลือก base ได้หลายตัว</label>
+                        <div className="flex flex-wrap gap-2">
+                          {["iPhone", "iPad", "Mac", "iPhone+iPad", "All Units"].map((item) => (
+                            <button
+                              key={item}
+                              type="button"
+                              onClick={() => setNewBaseDivisors((prev) => prev.includes(item) ? prev.filter((x) => x !== item) : [...prev, item])}
+                              className={`px-3 py-1.5 rounded-lg text-[10px] border transition-colors ${newBaseDivisors.includes(item) ? "bg-emerald-500/20 border-emerald-400/30 text-emerald-200" : "bg-white/5 border-white/10 text-white/50 hover:text-white hover:bg-white/10"}`}
+                            >
+                              {item}
+                            </button>
+                          ))}
                         </div>
                       </div>
 

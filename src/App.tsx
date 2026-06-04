@@ -542,61 +542,34 @@ const getSalesDate = (row: RawRow) => {
 };
 const isUfundRow = (row: any): boolean => {
   if (!row) return false;
-  
-  const keys = [
-    "customerCodes", 
-    "customer_codes", 
-    "Customer Code", 
-    "CustomerCode", 
-    "Customer (Name)", 
-    "customer_name"
-  ];
-  
-  for (const key of keys) {
-    const val = row[key];
-    if (val) {
-      if (Array.isArray(val)) {
-        if (val.some(v => String(v).toUpperCase().includes("UFUND PERSONAL"))) {
-          return true;
-        }
-      } else {
-        if (String(val).toUpperCase().includes("UFUND PERSONAL")) {
-          return true;
-        }
-      }
-    }
-  }
-
-  if (row.extra_json) {
-    try {
-      const extra = JSON.parse(row.extra_json);
-      for (const key of Object.keys(extra)) {
-        if (key.toLowerCase().includes("customer") && key.toLowerCase().includes("code")) {
-          const val = extra[key];
-          if (Array.isArray(val)) {
-            if (val.some(v => String(v).toUpperCase().includes("UFUND PERSONAL"))) return true;
-          } else {
-            if (String(val).toUpperCase().includes("UFUND PERSONAL")) return true;
-          }
-        }
-      }
-    } catch (e) {
-      // ignore
-    }
-  }
 
   const cat = String(row["Category (Name)"] ?? row.category ?? "").toLowerCase();
   const prod = String(row["Product (Name)"] ?? row.product ?? "").toLowerCase();
   const sub = String(row["Sub Category"] ?? "").toLowerCase();
-  
-  return (
-    cat.includes("ufund") ||
-    prod.includes("ufund") ||
-    cat.includes("personal") ||
-    prod.includes("personal") ||
-    sub.includes("ufund") ||
-    sub.includes("personal")
-  );
+  const text = `${cat} ${sub} ${prod}`.replace(/\s+/g, " ").trim();
+
+  // Match only clear UFUND / personal finance rows from product metadata,
+  // not generic customer fields that can inflate the count.
+  if (text.includes("ufund personal")) return true;
+  if (text.includes("ufund") && text.includes("personal")) return true;
+  if (text.includes("ufund")) return true;
+
+  if (row.extra_json) {
+    try {
+      const extra = JSON.parse(row.extra_json);
+      const extraText = Object.values(extra)
+        .flatMap((val) => (Array.isArray(val) ? val : [val]))
+        .map((val) => String(val).toLowerCase())
+        .join(" ");
+
+      // Keep extra_json as a very strict fallback only.
+      if (extraText.includes("ufund personal")) return true;
+    } catch {
+      // ignore malformed extra_json
+    }
+  }
+
+  return false;
 };
 
 const countRows = (
@@ -2155,6 +2128,34 @@ export default function App() {
       
       if (hasData) {
         const baseMode = w.baseMode ?? "unit";
+        const baseDivisors = Array.isArray(w.baseDivisors) && w.baseDivisors.length > 0 ? w.baseDivisors : ["iPhone"];
+        const matchesBaseDivisor = (row: any): boolean => {
+          const cat = String(row["Category (Name)"] ?? "Other").trim().toLowerCase();
+          const sub = String(row["Sub Category"] ?? "").trim().toLowerCase();
+          const prod = String(row["Product (Name)"] ?? "").trim().toLowerCase();
+          const text = `${cat} ${sub} ${prod}`;
+          return baseDivisors.some((div) => {
+            switch (div) {
+              case "iPhone": return text.includes("iphone");
+              case "iPad": return text.includes("ipad");
+              case "Mac": return text.includes("mac");
+              case "iPhone+iPad": return text.includes("iphone") || text.includes("ipad");
+              case "All Units": return true;
+              default: return false;
+            }
+          });
+        };
+        const matchesOfficerColumn = (row: any): boolean => {
+          const officer = String(row["Officer (Name)"] ?? row.officer_name ?? "").trim();
+          return matchesOfficer(officer, officerName);
+        };
+        const matchesColumnFilter = (row: any): boolean => {
+          if (!w.divisorColumn || !w.divisorValue) return false;
+          const val = String(row[w.divisorColumn] ?? "").trim();
+          const matchVal = String(w.divisorValue).trim();
+          return val.toLowerCase() === matchVal.toLowerCase() || normalizeText(val) === normalizeText(matchVal);
+        };
+        const shouldCountRow = (row: any): boolean => matchesOfficerColumn(row) && (w.divisorColumn && w.divisorValue ? matchesColumnFilter(row) : true);
         // Calculate numerator
         let numerator = 0;
         officerRows.forEach((row) => {
@@ -2164,17 +2165,15 @@ export default function App() {
           const units = Math.max(toNumber(row.Number ?? row.number ?? row.qty), 0);
           const value = baseMode === "revenue" ? getCategoryValue(row) : units;
           const gc = getGroupCategory(cat, sub, categoryLookup, prod);
-          
-          if (w.baseCategories && w.baseCategories.length > 0) {
+          if (!shouldCountRow(row)) return;
+
+          if (w.divisorColumn && w.divisorValue) {
+            numerator += value;
+          } else if (w.baseCategories && w.baseCategories.length > 0) {
             if (isAttachMemberMatched(gc, sub, w.baseCategories)) {
               numerator += value;
             }
-          } else if (w.id === "w3" || w.name.toLowerCase().includes("ufund")) {
-            if (isUfundRow(row)) {
-              numerator += value;
-            }
-          } else if (Array.isArray(w.matchKeywords)) {
-            // Fallback keywords
+          } else if (Array.isArray(w.matchKeywords) && w.matchKeywords.length > 0) {
             const text = normalizeText(`${cat} ${sub} ${prod}`);
             const matched = w.matchKeywords.some((kw) => {
               const kwLower = kw.toLowerCase();
@@ -2488,7 +2487,8 @@ export default function App() {
     
     // Card 5: UFUND PERSONAL
     const ufundCount = hasData ? countRows(displayUploads.current, (cat, prod, sub, row) => isUfundRow(row)) : 47;
-    const ufundRate = iphoneCount > 0 ? (ufundCount / iphoneCount) * 100 : 6.32;
+    const ufundBase = hasData ? countRows(displayUploads.current, (cat) => cat.includes("ufund") || cat.includes("personal")) : iphoneCount;
+    const ufundRate = ufundBase > 0 ? (ufundCount / ufundBase) * 100 : 6.32;
     
     // Card 6: COVER + (solid card)
     const coverCount = hasData ? countRows(displayUploads.current, (cat, prod) => cat.includes("cover") || cat.includes("care") || prod.includes("cover") || prod.includes("care")) : 104;
@@ -2531,7 +2531,7 @@ export default function App() {
       actualSales: { actual: totalSales || 54810000, target: totalTarget || 86220000, rate: salesAchRate || 63.57 },
       trueSim: { count: simCount, base: iphoneCount, rate: simRate, target: 15 },
       caseIphone: { count: caseCount, base: iphoneCount, rate: caseRate, target: 60 },
-      ufundPersonal: { count: ufundCount, base: iphoneCount, rate: ufundRate, target: 7 },
+      ufundPersonal: { count: ufundCount, base: ufundBase, rate: ufundRate, target: 7 },
       coverPlus: { count: coverCount, base: iphoneCount, rate: coverRate, target: 25 },
       pencil: { count: pencilCount, base: ipadCount, rate: pencilRate, target: 85 },
       kpisMac: { count: macCount, base: iphoneCount, rate: macRate, target: 10 },
