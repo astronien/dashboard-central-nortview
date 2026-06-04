@@ -11,8 +11,8 @@ const SHEET_URLS = {
   current:
     "https://docs.google.com/spreadsheets/d/1YPmLE4CPk0aFnv24bx7ZiVHt7dYlq4HzXstYGIeIzFA/gviz/tq?tqx=out:csv&gid=713310919",
   today: TODAY_SHEET_URL,
-  lastMonth: "https://docs.google.com/spreadsheets/d/1ljPZiplQMv29Su_MRE0wPFPnnzy5w_yvkdi1EqqHr30/gviz/tq?tqx=out:csv&gid=120695055",
-  lastYear: "https://docs.google.com/spreadsheets/d/16IK1QoGbrLAnzQjQUbpwwJ3dPoNDcFqRkwoR3kXYOMw/gviz/tq?tqx=out:csv&gid=1489791190",
+  lastMonth: "https://docs.google.com/spreadsheets/d/16IK1QoGbrLAnzQjQUbpwwJ3dPoNDcFqRkwoR3kXYOMw/gviz/tq?tqx=out:csv&gid=1489791190",
+  lastYear: "https://docs.google.com/spreadsheets/d/1ljPZiplQMv29Su_MRE0wPFPnnzy5w_yvkdi1EqqHr30/gviz/tq?tqx=out:csv&gid=120695055",
   // Set when a tab with columns "Cat & Sub Cat" + "CAT Daily" exists (see Category MasterFeb.xlsx)
   categoryMaster: null,
 };
