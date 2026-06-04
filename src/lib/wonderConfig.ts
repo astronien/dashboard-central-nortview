@@ -42,12 +42,15 @@ export const WONDER_DIVISOR_OPTIONS: { value: WonderDivisor; label: string }[] =
 
 export type WonderDivisorBase = "unit" | "revenue";
 
+export type WonderBaseMode = "unit" | "revenue";
+
 export type WonderItemConfig = {
   id: string;
   name: string;
   targetPercent: number;
   divisor?: WonderDivisor;
   divisorBase?: WonderDivisorBase;
+  baseMode?: WonderBaseMode;
   matchKeywords?: string[];
   baseCategories?: string[]; // list of "Category||Sub Category"
   divisorCategories?: string[]; // list of "Category||Sub Category"
@@ -136,6 +139,7 @@ export function loadWonderConfigs(): WonderItemConfig[] {
       baseCategories: Array.isArray(item.baseCategories) ? item.baseCategories : [],
       divisorCategories: Array.isArray(item.divisorCategories) ? item.divisorCategories : [],
       divisorBase: item.divisorBase === "revenue" ? "revenue" : "unit",
+      baseMode: item.baseMode === "revenue" ? "revenue" : "unit",
       divisorColumn: item.divisorColumn ?? "",
       divisorValue: item.divisorValue ?? "",
     }));

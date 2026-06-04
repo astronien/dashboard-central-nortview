@@ -38,6 +38,7 @@ export default function WonderConfigEditor({
   const [editDivisorCategories, setEditDivisorCategories] = useState<string[]>([]);
   const [editDivisor, setEditDivisor] = useState<WonderDivisor>("iPhone");
   const [editDivisorBase, setEditDivisorBase] = useState<"unit" | "revenue">("unit");
+  const [editBaseMode, setEditBaseMode] = useState<"unit" | "revenue">("unit");
   const [editMatchKeywords, setEditMatchKeywords] = useState<string[]>([]);
   
   // Three-way selector mode: "preset" | "tree" | "column"
