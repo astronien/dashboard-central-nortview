@@ -54,6 +54,7 @@ export default function WonderConfigEditor({
   const [newDivisorCategories, setNewDivisorCategories] = useState<string[]>([]);
   const [newDivisor, setNewDivisor] = useState<WonderDivisor>("iPhone");
   const [newDivisorBase, setNewDivisorBase] = useState<"unit" | "revenue">("unit");
+  const [newBaseMode, setNewBaseMode] = useState<"unit" | "revenue">("unit");
   const [newKeywords, setNewKeywords] = useState("");
   
   const [newDivisorMode, setNewDivisorMode] = useState<"preset" | "tree" | "column">("preset");
@@ -419,7 +420,7 @@ export default function WonderConfigEditor({
                   </div>
 
                   {newDivisorMode === "preset" && (
-                    <div className="space-y-3 py-4">
+                    <div className="space-y-4 py-4">
                       <div>
                         <label className="text-[10px] text-white/40 block mb-1">เลือกกลุ่มสินค้าหลักสำเร็จรูป</label>
                         <select
@@ -436,8 +437,28 @@ export default function WonderConfigEditor({
                       </div>
 
                       <div>
+                        <label className="text-[10px] text-white/40 block mb-1">ฐานตัวตั้ง</label>
+                        <div className="flex gap-2 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => setNewBaseMode("unit")}
+                            className={`px-3 py-1.5 rounded-lg text-[10px] border transition-colors ${newBaseMode === "unit" ? "bg-teal-500/20 border-teal-400/30 text-teal-200" : "bg-white/5 border-white/10 text-white/50 hover:text-white hover:bg-white/10"}`}
+                          >
+                            Unit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setNewBaseMode("revenue")}
+                            className={`px-3 py-1.5 rounded-lg text-[10px] border transition-colors ${newBaseMode === "revenue" ? "bg-teal-500/20 border-teal-400/30 text-teal-200" : "bg-white/5 border-white/10 text-white/50 hover:text-white hover:bg-white/10"}`}
+                          >
+                            บาท
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
                         <label className="text-[10px] text-white/40 block mb-1">ฐานตัวหาร</label>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 flex-wrap">
                           <button
                             type="button"
                             onClick={() => setNewDivisorBase("unit")}
@@ -559,6 +580,7 @@ export default function WonderConfigEditor({
               <th className="py-3.5 px-4 font-bold text-center w-10">#</th>
               <th className="py-3.5 px-4 font-bold">ชื่อ Wonder</th>
               <th className="py-3.5 px-4 font-bold text-center w-36">เป้าหมาย Target</th>
+              <th className="py-3.5 px-4 font-bold text-center w-28">Base Mode</th>
               <th className="py-3.5 px-4 font-bold">หมวดหมู่ตัวตั้ง (Base / ตัวเศษ)</th>
               <th className="py-3.5 px-4 font-bold">หมวดหมู่ตัวหาร (Divisor)</th>
               <th className="py-3.5 px-4 font-bold text-center w-24">จัดการ</th>
@@ -618,6 +640,17 @@ export default function WonderConfigEditor({
                         {item.targetPercent}%
                       </span>
                     )}
+                  </td>
+                  <td className="py-4 px-4 text-center">
+                    {isEditing ? (
+                      <div className="flex gap-1 justify-center">
+                        <button type="button" onClick={() => setEditBaseMode("unit")} className={`px-2 py-1 rounded text-[10px] border ${editBaseMode === "unit" ? "bg-teal-500/20 border-teal-400/30 text-teal-200" : "bg-white/5 border-white/10 text-white/50"}`}>Unit</button>
+                        <button type="button" onClick={() => setEditBaseMode("revenue")} className={`px-2 py-1 rounded text-[10px] border ${editBaseMode === "revenue" ? "bg-teal-500/20 border-teal-400/30 text-teal-200" : "bg-white/5 border-white/10 text-white/50"}`}>บาท</button>
+                      </div>
+                    ) : (
+                      <span className="text-white/85 font-medium">{item.baseMode ?? "unit"}</span>
+                    )}
+                  </td>
                   </td>
 
                   {/* Base Categories Badge List */}
@@ -832,7 +865,7 @@ export default function WonderConfigEditor({
                       </div>
 
                       {useDivisorMode === "preset" && (
-                        <div className="space-y-3 py-6">
+                        <div className="space-y-4 py-6">
                           <div>
                             <label className="text-[10px] text-white/40 block mb-1">เลือกกลุ่มสินค้าหลักสำเร็จรูป</label>
                             <select
@@ -849,8 +882,28 @@ export default function WonderConfigEditor({
                           </div>
 
                           <div>
+                            <label className="text-[10px] text-white/40 block mb-1">ฐานตัวตั้ง</label>
+                            <div className="flex gap-2 flex-wrap">
+                              <button
+                                type="button"
+                                onClick={() => setEditBaseMode("unit")}
+                                className={`px-3 py-1.5 rounded-lg text-[10px] border transition-colors ${editBaseMode === "unit" ? "bg-teal-500/20 border-teal-400/30 text-teal-200" : "bg-white/5 border-white/10 text-white/50 hover:text-white hover:bg-white/10"}`}
+                              >
+                                Unit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditBaseMode("revenue")}
+                                className={`px-3 py-1.5 rounded-lg text-[10px] border transition-colors ${editBaseMode === "revenue" ? "bg-teal-500/20 border-teal-400/30 text-teal-200" : "bg-white/5 border-white/10 text-white/50 hover:text-white hover:bg-white/10"}`}
+                              >
+                                บาท
+                              </button>
+                            </div>
+                          </div>
+
+                          <div>
                             <label className="text-[10px] text-white/40 block mb-1">ฐานตัวหาร</label>
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 flex-wrap">
                               <button
                                 type="button"
                                 onClick={() => setEditDivisorBase("unit")}
@@ -929,6 +982,26 @@ export default function WonderConfigEditor({
                                 </option>
                               ))}
                             </select>
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] text-white/50 block mb-1">ฐานตัวตั้ง</label>
+                            <div className="flex gap-2 flex-wrap">
+                              <button
+                                type="button"
+                                onClick={() => setEditBaseMode("unit")}
+                                className={`px-3 py-1.5 rounded-lg text-[10px] border transition-colors ${editBaseMode === "unit" ? "bg-teal-500/20 border-teal-400/30 text-teal-200" : "bg-white/5 border-white/10 text-white/50 hover:text-white hover:bg-white/10"}`}
+                              >
+                                Unit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditBaseMode("revenue")}
+                                className={`px-3 py-1.5 rounded-lg text-[10px] border transition-colors ${editBaseMode === "revenue" ? "bg-teal-500/20 border-teal-400/30 text-teal-200" : "bg-white/5 border-white/10 text-white/50 hover:text-white hover:bg-white/10"}`}
+                              >
+                                บาท
+                              </button>
+                            </div>
                           </div>
 
                           <div>
