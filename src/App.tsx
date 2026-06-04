@@ -2154,6 +2154,7 @@ export default function App() {
       let actualVal: number;
       
       if (hasData) {
+        const baseMode = w.baseMode ?? "unit";
         // Calculate numerator
         let numerator = 0;
         officerRows.forEach((row) => {
@@ -2161,15 +2162,16 @@ export default function App() {
           const sub = String(row["Sub Category"] ?? "").trim();
           const prod = String(row["Product (Name)"] ?? "").trim();
           const units = Math.max(toNumber(row.Number ?? row.number ?? row.qty), 0);
+          const value = baseMode === "revenue" ? getCategoryValue(row) : units;
           const gc = getGroupCategory(cat, sub, categoryLookup, prod);
           
           if (w.baseCategories && w.baseCategories.length > 0) {
             if (isAttachMemberMatched(gc, sub, w.baseCategories)) {
-              numerator += units;
+              numerator += value;
             }
           } else if (w.id === "w3" || w.name.toLowerCase().includes("ufund")) {
             if (isUfundRow(row)) {
-              numerator += units;
+              numerator += value;
             }
           } else if (Array.isArray(w.matchKeywords)) {
             // Fallback keywords
@@ -2179,7 +2181,7 @@ export default function App() {
               return text.includes(kwLower) || prod.toUpperCase().includes(kw.toUpperCase());
             });
             if (matched) {
-              numerator += units;
+              numerator += value;
             }
           }
         });
@@ -2191,9 +2193,11 @@ export default function App() {
             const val = String(row[w.divisorColumn!] ?? "").trim();
             const matchVal = String(w.divisorValue!).trim();
             const units = Math.max(toNumber(row.Number ?? row.number ?? row.qty), 0);
+            const amount = getCategoryValue(row);
+            const compareVal = (w.divisorBase ?? "unit") === "revenue" ? amount : units;
             
             if (val.toLowerCase() === matchVal.toLowerCase() || normalizeText(val) === normalizeText(matchVal)) {
-              denominator += units;
+              denominator += compareVal;
             }
           });
         } else if (w.divisorCategories && w.divisorCategories.length > 0) {
@@ -2202,13 +2206,14 @@ export default function App() {
             const sub = String(row["Sub Category"] ?? "").trim();
             const prod = String(row["Product (Name)"] ?? "").trim();
             const units = Math.max(toNumber(row.Number ?? row.number ?? row.qty), 0);
+            const amount = getCategoryValue(row);
             const gc = getGroupCategory(cat, sub, categoryLookup, prod);
             if (isAttachMemberMatched(gc, sub, w.divisorCategories)) {
-              denominator += units;
+              denominator += (w.divisorBase ?? "unit") === "revenue" ? amount : units;
             }
           });
         } else {
-          denominator = getDivisorCount(w.divisor);
+          denominator = getDivisorCount(w.divisor, w.divisorBase ?? "unit");
         }
 
         actualVal = denominator > 0 ? (numerator / denominator) * 100 : 0;

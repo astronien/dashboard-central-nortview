@@ -167,6 +167,7 @@ export default function WonderConfigEditor({
               divisorCategories: useDivisorMode === "tree" ? editDivisorCategories : [],
               divisor: useDivisorMode === "preset" ? editDivisor : undefined,
               divisorBase: useDivisorMode === "preset" ? editDivisorBase : undefined,
+              baseMode: editBaseMode,
               divisorColumn: useDivisorMode === "column" ? resolvedDivCol : undefined,
               divisorValue: useDivisorMode === "column" ? editDivisorValue : undefined,
               matchKeywords: editMatchKeywords,
@@ -217,6 +218,7 @@ export default function WonderConfigEditor({
         divisorCategories: newDivisorMode === "tree" ? newDivisorCategories : [],
         divisor: newDivisorMode === "preset" ? newDivisor : undefined,
         divisorBase: newDivisorMode === "preset" ? newDivisorBase : undefined,
+        baseMode: newDivisorBase,
         divisorColumn: newDivisorMode === "column" ? resolvedDivCol : undefined,
         divisorValue: newDivisorMode === "column" ? newDivisorValue : undefined,
         matchKeywords:
