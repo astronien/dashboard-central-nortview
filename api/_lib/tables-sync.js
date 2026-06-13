@@ -330,6 +330,10 @@ const TARGET_COLUMNS = [
 
 const CATEGORY_COLUMNS = ["cat_sub_cat", "cat_daily", "extra_json"];
 
+// In-process cache for table column introspection.
+// Cleared whenever ensureRelationalSchema runs an ALTER.
+const columnCache = new Map();
+
 const ensureRelationalSchema = async (tursoExecute) => {
   for (const sql of RELATIONAL_DDL) {
     await tursoExecute(sql);
@@ -360,12 +364,56 @@ const ensureRelationalSchema = async (tursoExecute) => {
       // Ignore if column already exists
     }
   }
+  // Invalidate column cache so subsequent calls re-detect the schema.
+  columnCache.clear();
+};
+
+/**
+ * Return the subset of `desiredColumns` that actually exist on the given
+ * `table`. Used so SELECT/INSERT statements stay valid against older
+ * databases that predate the multi-field Wonder filter columns.
+ */
+const intersectWithExistingColumns = async (
+  tursoExecute,
+  table,
+  desiredColumns,
+) => {
+  const cacheKey = `${table}|${desiredColumns.join(",")}`;
+  if (columnCache.has(cacheKey)) return columnCache.get(cacheKey);
+
+  let existing = new Set(desiredColumns);
+  try {
+    const result = await tursoExecute(`PRAGMA table_info(${table})`);
+    const present = new Set(
+      (result.rows ?? [])
+        .map((row) => rowValues(row)[1])
+        .filter(Boolean)
+        .map((name) => String(name)),
+    );
+    existing = new Set(desiredColumns.filter((c) => present.has(c)));
+  } catch (e) {
+    // If PRAGMA fails (e.g. table missing), keep all desired columns and let
+    // the calling query surface the underlying error.
+  }
+  columnCache.set(cacheKey, existing);
+  return existing;
 };
 
 const textArg = (value) => ({ type: "text", value: value ?? "" });
 
-const insertBatch = async (tursoPipeline, getExecuteResult, table, columns, rows, batchSize = 200) => {
+const insertBatch = async (tursoExecute, tursoPipeline, getExecuteResult, table, columns, rows, batchSize = 200) => {
   if (!rows.length) return;
+
+  // Restrict INSERT to columns that actually exist on the table so legacy
+  // databases without brand/customer_code/model/doc_type still work.
+  const presentColumns = await intersectWithExistingColumns(
+    tursoExecute,
+    table,
+    columns,
+  );
+  if (!presentColumns.size) {
+    throw new Error(`Table ${table} has no matching columns for INSERT.`);
+  }
 
   // Split into sub-pipelines of max ~500 rows to avoid Turso HTTP body size limits
   const MAX_ROWS_PER_PIPELINE = 500;
@@ -377,14 +425,14 @@ const insertBatch = async (tursoPipeline, getExecuteResult, table, columns, rows
 
     for (let offset = 0; offset < pipeSlice.length; offset += batchSize) {
       const slice = pipeSlice.slice(offset, offset + batchSize);
-      const placeholders = `(${columns.map(() => "?").join(", ")})`;
-      const sql = `INSERT INTO ${table} (${columns.join(", ")}) VALUES ${slice
+      const placeholders = `(${presentColumns.map(() => "?").join(", ")})`;
+      const sql = `INSERT INTO ${table} (${Array.from(presentColumns).join(", ")}) VALUES ${slice
         .map(() => placeholders)
         .join(", ")}`;
 
       const args = [];
       for (const row of slice) {
-        for (const col of columns) {
+        for (const col of presentColumns) {
           args.push(textArg(row[col]));
         }
       }
@@ -416,24 +464,24 @@ const clearRelationalKind = async (kind, tursoExecute) => {
 };
 
 const insertMappedRows = async (kind, rows, deps) => {
-  const { tursoPipeline, getExecuteResult } = deps;
+  const { tursoExecute, tursoPipeline, getExecuteResult } = deps;
   if (!rows.length) return;
 
   if (SALES_KINDS.includes(kind)) {
     const mapped = rows.map((row) => mapSalesRow(row, kind));
-    await insertBatch(tursoPipeline, getExecuteResult, "data_sales", SALES_COLUMNS, mapped);
+    await insertBatch(tursoExecute, tursoPipeline, getExecuteResult, "data_sales", SALES_COLUMNS, mapped);
     return;
   }
 
   if (kind === "target") {
     const mapped = rows.map(mapTargetRow);
-    await insertBatch(tursoPipeline, getExecuteResult, "data_targets", TARGET_COLUMNS, mapped);
+    await insertBatch(tursoExecute, tursoPipeline, getExecuteResult, "data_targets", TARGET_COLUMNS, mapped);
     return;
   }
 
   if (kind === "categoryMaster") {
     const mapped = rows.map(mapCategoryRow);
-    await insertBatch(tursoPipeline, getExecuteResult, "data_categories", CATEGORY_COLUMNS, mapped);
+    await insertBatch(tursoExecute, tursoPipeline, getExecuteResult, "data_categories", CATEGORY_COLUMNS, mapped);
   }
 };
 
@@ -454,11 +502,28 @@ const loadRowsFromTurso = async (kind, tursoExecute, rowValues) => {
   await ensureRelationalSchema(tursoExecute);
 
   if (SALES_KINDS.includes(kind)) {
+    const presentColumns = await intersectWithExistingColumns(
+      tursoExecute,
+      "data_sales",
+      SALES_COLUMNS,
+    );
+    const cols = presentColumns.size
+      ? Array.from(presentColumns).join(", ")
+      : "*";
     const result = await tursoExecute(
-      `SELECT ${SALES_COLUMNS.join(", ")} FROM data_sales WHERE period = ? ORDER BY id ASC`,
+      `SELECT ${cols} FROM data_sales WHERE period = ? ORDER BY id ASC`,
       [kind],
     );
-    return (result.rows ?? []).map((row) => toSalesRawRow(rowValues(row)));
+    return (result.rows ?? []).map((row) => {
+      // For legacy DBs missing brand/customer_code/model, fill empty strings
+      // so the frontend gets the full schema it expects.
+      const cells = rowValues(row);
+      const padded = {};
+      SALES_COLUMNS.forEach((c, i) => {
+        padded[c] = cells[i] ?? "";
+      });
+      return toSalesRawRow(Object.values(padded));
+    });
   }
 
   if (kind === "target") {
