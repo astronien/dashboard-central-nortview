@@ -718,6 +718,7 @@ export function rowMatchesFilter(
   );
   const customerCode = rowField(
     row,
+    "Customer (Code)",
     "Customer Code",
     "customerCodes",
     "customer_code",

@@ -37,7 +37,7 @@ const mapSalesRow = (row, period) => {
     ["Category (Name)", "category"],
     ["Sub Category", "subcategory"],
     ["Brand", "brand", "Brands", "Brand Name"],
-    ["Customer Code", "customerCodes", "customer_code", "CustomerCode", "Cust Code", "Customer Code "],
+    ["Customer (Code)", "Customer Code", "customerCodes", "customer_code", "CustomerCode", "Cust Code", "Customer Code "],
     ["Model", "model", "Models", "Model Name"],
     ["Doc Type", "doc_type", "DocType"],
     ["Product Type", "product_type", "ProductType"],
