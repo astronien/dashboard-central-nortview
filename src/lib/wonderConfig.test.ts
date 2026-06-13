@@ -87,7 +87,7 @@ describe("wonderConfig", () => {
     assert.ok(rate > 0 && rate < 100, "rate is a percentage");
   });
 
-  it("attach calc uses quantity (default 1) per row", () => {
+  it("attach calc counts each non-SIM row as 1 (legacy countRows behavior)", () => {
     const w: WonderItemConfig = {
       ...ufundWonder,
       id: "test",
@@ -106,12 +106,54 @@ describe("wonderConfig", () => {
     const rows = [
       iphone({ Number: 2 }),
       iphone({ Number: 3 }),
-      iphone({ Number: 0 }),
+      iphone({ Number: 5 }),
     ];
     const result = calcWonderForRows(rows, w);
-    assert.equal(result.numerator, 6, "numerator sums quantities (2+3+1 fallback for 0)");
-    assert.equal(result.denominator, 6);
+    assert.equal(result.numerator, 3, "each non-SIM row counts as 1, regardless of quantity");
+    assert.equal(result.denominator, 3);
     assert.equal(calcWonderRate(result), 100);
+  });
+
+  it("attach calc uses quantity for SIM rows (legacy countRows behavior)", () => {
+    const w: WonderItemConfig = {
+      id: "test",
+      name: "SIM",
+      targetPercent: 15,
+      calcType: "attach",
+      labelA: "",
+      labelB: "",
+      filtersA: [
+        {
+          categories: ["Promo Operator", "SIM"],
+          subCategories: [],
+          models: [],
+          brands: [],
+          customerCodes: [],
+          productNames: [],
+          docTypes: [],
+          includeNonInventory: true,
+        },
+      ],
+      filtersB: [
+        {
+          categories: ["iPhone"],
+          subCategories: [],
+          models: [],
+          brands: [],
+          customerCodes: [],
+          productNames: [],
+          docTypes: [],
+        },
+      ],
+    };
+    const rows = [
+      simRow({ Number: 5 }),
+      simRow({ Number: 3 }),
+      iphone({ Number: 1 }),
+    ];
+    const result = calcWonderForRows(rows, w);
+    assert.equal(result.numerator, 8, "SIM rows contribute their quantity (5+3)");
+    assert.equal(result.denominator, 1, "iPhone row counted as 1");
   });
 
   it("bahtRate uses revenue not quantity", () => {
@@ -230,7 +272,7 @@ describe("wonderConfig", () => {
     assert.equal(result.numerator, 1, "service row counted when includeNonInventory=true");
   });
 
-  it("migrates legacy matchKeywords UFUND to customerCode filter", () => {
+  it("migrates legacy matchKeywords UFUND to customerCode + productNames filter (2 groups OR'd)", () => {
     const legacy = {
       id: "w3",
       name: "UFUND Personal",
@@ -242,8 +284,21 @@ describe("wonderConfig", () => {
     };
     const migrated = migrateLegacyWonderConfig(legacy);
     assert.equal(migrated.calcType, "attach");
+    // Group 1: customer code match
     assert.equal(migrated.filtersA[0].customerCodes?.[0], "UFUND PERSONAL");
-    assert.deepEqual(migrated.filtersB[0].categories, ["iPhone"]);
+    // Group 2: product name match (legacy isUfundRow fallback)
+    const productNames = (migrated.filtersA[1]?.productNames ?? []) as string[];
+    assert.ok(
+      productNames.includes("ufund"),
+      "ufund productNames fallback included in group 2",
+    );
+    // divisor base now matches iPhone + UFUND/Personal category rows
+    assert.ok(
+      (migrated.filtersB[0].categories ?? []).includes("iPhone"),
+    );
+    assert.ok(
+      (migrated.filtersB[0].categories ?? []).includes("UFUND"),
+    );
   });
 
   it("migrates legacy matchKeywords Pencil to multi-field filter", () => {
@@ -257,9 +312,14 @@ describe("wonderConfig", () => {
       divisorCategories: [],
     };
     const migrated = migrateLegacyWonderConfig(legacy);
-    assert.deepEqual(migrated.filtersA[0].categories, ["Apple Acc for iPad & iPhone"]);
-    assert.deepEqual(migrated.filtersA[0].subCategories, ["APPLE PENCIL AND IPAD MAGIC KEYBOARD"]);
-    assert.deepEqual(migrated.filtersA[0].models, ["Pencil"]);
+    assert.deepEqual(migrated.filtersA[0].categories, [
+      "Apple Acc for iPad & iPhone",
+      "Apple Acc for iPad and iPhone",
+      "Apple Acc",
+      "Accessories",
+    ]);
+    assert.ok(migrated.filtersA[0].productNames?.includes("Apple Pencil"));
+    assert.ok(migrated.filtersA[0].productNames?.includes("Pencil"));
     assert.deepEqual(migrated.filtersB[0].categories, ["iPad"]);
   });
 
@@ -439,6 +499,71 @@ describe("wonderConfig", () => {
     ];
     const result = calcWonderForRows(rows, migrated);
     assert.equal(result.numerator, 1, "only AppleCare rows counted");
+    assert.equal(result.denominator, 3);
+  });
+
+  it("reproduces legacy Trade In countRows behavior: prod contains 'trade' or 'เทรด'", () => {
+    const migrated = migrateLegacyWonderConfig({
+      id: "w1",
+      name: "Trade In",
+      targetPercent: 50,
+      divisor: "iPhone",
+      matchKeywords: ["trade", "เทรด"],
+      baseCategories: [],
+      divisorCategories: [],
+    });
+    const rows = [
+      iphone({ "Product (Name)": "iPhone 16 Pro" }),
+      iphone({ "Product (Name)": "iPhone Trade In 15" }),
+      iphone({ "Product (Name)": "iPhone เทรด 14" }),
+      { ...iphone(), "Category (Name)": "iPad", "Product (Name)": "iPad Pro" },
+    ];
+    const result = calcWonderForRows(rows, migrated);
+    assert.equal(result.numerator, 2, "only rows with 'trade' or 'เทรด' in product name");
+    // base counts iPhone rows = 3 (not iPad)
+    assert.equal(result.denominator, 3);
+  });
+
+  it("reproduces legacy Cover Plus behavior: cat/prod contains 'cover' or 'care'", () => {
+    const migrated = migrateLegacyWonderConfig({
+      id: "w2",
+      name: "Cover Plus",
+      targetPercent: 25,
+      divisor: "iPhone",
+      matchKeywords: ["cover+", "care"],
+      baseCategories: [],
+      divisorCategories: [],
+    });
+    const rows = [
+      iphone({ "Category (Name)": "Smile", "Product (Name)": "COVER+ iPhone 16" }),
+      iphone({ "Category (Name)": "Apple Care", "Product (Name)": "AppleCare+ 1Y" }),
+      iphone({ "Category (Name)": "iPhone", "Product (Name)": "iPhone 16" }),
+    ];
+    const result = calcWonderForRows(rows, migrated);
+    assert.equal(result.numerator, 2, "rows where cat or prod contains cover/care");
+    // base = divisor = iPhone → only 1 row (the iPhone category row)
+    assert.equal(result.denominator, 1);
+  });
+
+  it("reproduces legacy UFUND behavior: customer code UFUND PERSONAL or text contains ufund", () => {
+    const migrated = migrateLegacyWonderConfig({
+      id: "w6",
+      name: "UFUND P",
+      targetPercent: 6,
+      divisor: "iPhone",
+      matchKeywords: ["ufund", "personal"],
+      baseCategories: [],
+      divisorCategories: [],
+    });
+    const rows = [
+      iphone({ "Customer Code": "UFUND PERSONAL", "Product (Name)": "iPhone 16" }),
+      iphone({ "Customer Code": "", "Product (Name)": "iPhone 16 UFUND" }),
+      iphone({ "Customer Code": "STU-PAYATSTORE", "Product (Name)": "iPhone 16" }),
+    ];
+    const result = calcWonderForRows(rows, migrated);
+    assert.equal(result.numerator, 2, "UFUND PERSONAL customer code + ufund in product name");
+    // base = divisor categories: ["iPhone", "UFD", "UFUND", "Personal"]
+    // all 3 rows have Category (Name) = "iPhone" → all 3 match
     assert.equal(result.denominator, 3);
   });
 });

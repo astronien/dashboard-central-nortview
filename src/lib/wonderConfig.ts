@@ -47,31 +47,25 @@ export const DEFAULT_WONDER_CONFIGS: WonderItemConfig[] = [
     targetPercent: 60,
     calcType: "attach",
     labelA:
-      "Smile > Cover+ with Apple Care Services (1+1)/Cover+ with Apple Care Services (2Y)/Cover+ with Apple Care Services (3Y)/COVER PLUS > Product: COVER+ with AppleCare Services for Apple iPhone (1-Year)/COVER+ with AppleCare Services for Apple iPhone (2-Year)...",
+      "Category/Product มีคำว่า 'cover' หรือ 'care' (เช่น COVER+, AppleCare, Cover Plus)",
     labelB: "iPhone",
     filtersA: [
       {
-        categories: ["Smile"],
+        categories: ["Smile", "Cover+", "Cases", "Apple Care"],
         subCategories: [],
-        models: [
-          "Cover+ with Apple Care Services (1+1)",
-          "Cover+ with Apple Care Services (2Y)",
-          "Cover+ with Apple Care Services (3Y)",
-          "COVER PLUS",
-        ],
+        models: [],
         brands: [],
         customerCodes: [],
         productNames: [
-          "COVER+ with AppleCare Services for Apple iPhone (1-Year)",
-          "COVER+ with AppleCare Services for Apple iPhone (2-Year)",
-          "COVER+ with AppleCare Services for Apple iPhone 16e/17e (1-Year)",
-          "COVER+ with AppleCare Services for Apple iPhone 16e/17e (2-Year)",
-          "COVER+ with AppleCare Services for Apple iPhone Air (1-Year)",
-          "COVER+ with AppleCare Services for Apple iPhone Air (2-Year)",
-          "COVER+ with AppleCare Services for Apple iPhone Pro / Pro Max (1-Year)",
-          "COVER+ with AppleCare Services for Apple iPhone Pro / Pro Max (2-Year)",
-          "COVER+ with AppleCare Services for Apple iPhone Pro / Pro Max (3-Year)",
-          "COVER+ with AppleCare Services for Apple iPhone+ with AppleCare Services (1-Year)",
+          "COVER+",
+          "Cover+",
+          "cover+",
+          "Apple Care",
+          "AppleCare",
+          "applecare",
+          "APPLECARE",
+          "APPLE CARE",
+          "Care+",
         ],
         docTypes: [],
         includeNonInventory: false,
@@ -109,16 +103,16 @@ export const DEFAULT_WONDER_CONFIGS: WonderItemConfig[] = [
     name: "SIM",
     targetPercent: 15,
     calcType: "attach",
-    labelA: "Promo Operator",
+    labelA: "Promo Operator / SIM (นับจากจำนวน)",
     labelB: "iPhone",
     filtersA: [
       {
-        categories: ["Promo Operator"],
+        categories: ["Promo Operator", "SIM", "Sim", "sim"],
         subCategories: [],
         models: [],
         brands: [],
         customerCodes: [],
-        productNames: [],
+        productNames: ["sim", "SIM", "Sim", "promo operator", "true sim"],
         docTypes: [],
         includeNonInventory: true,
       },
@@ -156,17 +150,28 @@ export const DEFAULT_WONDER_CONFIGS: WonderItemConfig[] = [
     targetPercent: 85,
     calcType: "attach",
     labelA:
-      "Apple Acc for iPad & iPhone > APPLE PENCIL AND IPAD MAGIC KEYBOARD > Pencil",
+      "Product Name มีคำว่า 'pencil' หรือ 'pen' (เช่น Apple Pencil, Pencil Pro)",
     labelB:
-      "iPad > IPAD 11TH GEN (2025)/IPAD AIR 11 M3 5TH GEN (2025)/IPAD AIR 11 M4 6TH GEN (2026)/IPAD AIR 13 M3 2ND GEN (2025)/IPAD AIR 13 M4 3RD GEN (2026)/IPAD MINI 7 (2024)/IPAD PRO 11 M4 5TH GEN (2024)/IPAD PRO 11 M5 6TH GEN (2025)/IPAD PRO 13 M4 7TH GEN (2024)/IPAD PRO 13 M5 8TH GEN (2025)",
+      "iPad (ทุกรุ่น)",
     filtersA: [
       {
-        categories: ["Apple Acc for iPad & iPhone"],
-        subCategories: ["APPLE PENCIL AND IPAD MAGIC KEYBOARD"],
-        models: ["Pencil"],
+        categories: [
+          "Apple Acc for iPad & iPhone",
+          "Apple Acc for iPad and iPhone",
+          "Apple Acc",
+          "Accessories",
+        ],
+        subCategories: [],
+        models: [],
         brands: [],
         customerCodes: [],
-        productNames: [],
+        productNames: [
+          "Pencil",
+          "Apple Pencil",
+          "Pen",
+          "pencil",
+          "PENCIL",
+        ],
         docTypes: [],
         includeNonInventory: false,
       },
@@ -363,12 +368,15 @@ export const DEFAULT_WONDER_CONFIGS: WonderItemConfig[] = [
     name: "UFUND P",
     targetPercent: 6,
     calcType: "attach",
-    labelA: "ทุกสินค้า",
-    labelB: "iPhone",
+    labelA: "ทุกสินค้า (UFUND PERSONAL)",
+    labelB: "iPhone ที่มี UFUND / Personal ใน Category",
     filtersA: [
+      // Group 1: customer code = UFUND PERSONAL
       {
-        categories: ["iPhone", "iPad", "Mac"],
-        subCategories: [
+        categories: [
+          "iPhone",
+          "iPad",
+          "Mac",
           "CTO",
           "DISPLAY",
           "IMAC",
@@ -413,16 +421,27 @@ export const DEFAULT_WONDER_CONFIGS: WonderItemConfig[] = [
           "MACBOOK NEO",
           "MACBOOK PRO RETINA",
         ],
+        subCategories: [],
         models: [],
         brands: [],
         customerCodes: ["UFUND PERSONAL"],
         productNames: [],
         docTypes: [],
       },
+      // Group 2: product name contains ufund (legacy isUfundRow fallback)
+      {
+        categories: [],
+        subCategories: [],
+        models: [],
+        brands: [],
+        customerCodes: [],
+        productNames: ["ufund personal", "ufund", "UFUND"],
+        docTypes: [],
+      },
     ],
     filtersB: [
       {
-        categories: ["iPhone"],
+        categories: ["iPhone", "UFD", "UFUND", "Personal"],
         subCategories: [],
         models: [],
         brands: [],
@@ -745,6 +764,25 @@ const rowQuantity = (row: Record<string, unknown>): number => {
   return v > 0 ? v : 1;
 };
 
+const rowIsSim = (row: Record<string, unknown>): boolean => {
+  const cat = String(row["Category (Name)"] ?? row.category ?? "").toLowerCase();
+  const sub = String(row["Sub Category"] ?? row.sub_category ?? "").toLowerCase();
+  const prod = String(row["Product (Name)"] ?? row.product_name ?? "").toLowerCase();
+  const text = `${cat} ${sub} ${prod}`;
+  return cat.includes("sim") || text.includes(" sim ") || text.startsWith("sim") || text.endsWith(" sim");
+};
+
+/**
+ * Default per-row unit for "attach" calc.
+ * Mirrors the legacy `countRows` logic in App.tsx:
+ *   - SIM rows contribute their quantity (Number / number / qty)
+ *   - every other row counts as 1 unit, regardless of quantity
+ */
+const rowDefaultUnits = (row: Record<string, unknown>): number => {
+  if (rowIsSim(row)) return rowQuantity(row);
+  return 1;
+};
+
 const rowRevenue = (row: Record<string, unknown>): number =>
   toNumber(
     row["ราคาขายตามบิล"] ??
@@ -779,11 +817,11 @@ export function calcWonderForRows(
       if (matchB) denominator += rowRevenue(row);
     } else {
       if (matchA) {
-        numerator += rowQuantity(row);
+        numerator += rowDefaultUnits(row);
         numeratorRows += 1;
       }
       if (matchB) {
-        denominator += rowQuantity(row);
+        denominator += rowDefaultUnits(row);
         denominatorRows += 1;
       }
     }
@@ -837,19 +875,21 @@ const LEGACY_KEYWORD_TO_FILTER: Record<
   coverplus: {
     name: "Cover Plus",
     filter: {
-      categories: ["Smile"],
+      categories: ["Smile", "Cover+", "Cases", "Apple Care"],
       subCategories: [],
-      models: [
-        "Cover+ with Apple Care Services (1+1)",
-        "Cover+ with Apple Care Services (2Y)",
-        "Cover+ with Apple Care Services (3Y)",
-        "COVER PLUS",
-      ],
+      models: [],
       brands: [],
       customerCodes: [],
       productNames: [
-        "COVER+ with AppleCare Services for Apple iPhone (1-Year)",
-        "COVER+ with AppleCare Services for Apple iPhone (2-Year)",
+        "COVER+",
+        "Cover+",
+        "cover+",
+        "Apple Care",
+        "AppleCare",
+        "applecare",
+        "APPLECARE",
+        "APPLE CARE",
+        "Care+",
       ],
       docTypes: [],
       includeNonInventory: false,
@@ -866,9 +906,57 @@ const LEGACY_KEYWORD_TO_FILTER: Record<
     },
   },
   ufund: {
-    name: "UFUND Personal",
+    name: "UFUND P",
     filter: {
-      categories: ["iPhone", "iPad", "Mac"],
+      // Group 1: customer code = UFUND PERSONAL
+      categories: [
+        "iPhone",
+        "iPad",
+        "Mac",
+        "CTO",
+        "DISPLAY",
+        "IMAC",
+        "IPAD 10TH GEN (2022)",
+        "IPAD 11TH GEN (2025)",
+        "IPAD 9TH GEN (2021)",
+        "IPAD AIR 11 M2 4TH GEN (2024)",
+        "IPAD AIR 11 M3 5TH GEN (2025)",
+        "IPAD AIR 11 M4 6TH GEN (2026)",
+        "IPAD AIR 13 M2 1ST GEN (2024)",
+        "IPAD AIR 13 M3 2ND GEN (2025)",
+        "IPAD AIR 13 M4 3RD GEN (2026)",
+        "IPAD AIR 5TH GEN (2022)",
+        "IPAD MINI 6 (2021)",
+        "IPAD MINI 7 (2024)",
+        "IPAD PRO 11 M4 5TH GEN (2024)",
+        "IPAD PRO 11 M5 6TH GEN (2025)",
+        "IPAD PRO 12.9-INCH 6TH GEN (2022)",
+        "IPAD PRO 13 M4 7TH GEN (2024)",
+        "IPAD PRO 13 M5 8TH GEN (2025)",
+        "IPHONE 13",
+        "IPHONE 14",
+        "IPHONE 14 PLUS",
+        "IPHONE 15",
+        "IPHONE 15 PLUS",
+        "IPHONE 15 PRO",
+        "IPHONE 15 PRO MAX",
+        "IPHONE 16",
+        "IPHONE 16 PLUS",
+        "IPHONE 16 PRO",
+        "IPHONE 16 PRO MAX",
+        "IPHONE 16E",
+        "IPHONE 17",
+        "IPHONE 17 PRO",
+        "IPHONE 17 PRO MAX",
+        "IPHONE 17E",
+        "IPHONE AIR",
+        "IPHONE SE",
+        "MAC MINI",
+        "MAC STUDIO",
+        "MACBOOK AIR",
+        "MACBOOK NEO",
+        "MACBOOK PRO RETINA",
+      ],
       subCategories: [],
       models: [],
       brands: [],
@@ -876,8 +964,30 @@ const LEGACY_KEYWORD_TO_FILTER: Record<
       productNames: [],
       docTypes: [],
     },
+    // Group 2 (stored in a second preset entry merged at migration time)
     divisorFilter: {
-      categories: ["iPhone"],
+      categories: ["iPhone", "UFD", "UFUND", "Personal"],
+      subCategories: [],
+      models: [],
+      brands: [],
+      customerCodes: [],
+      productNames: [],
+      docTypes: [],
+    },
+  },
+  ufund_text_fallback: {
+    name: "UFUND P",
+    filter: {
+      categories: [],
+      subCategories: [],
+      models: [],
+      brands: [],
+      customerCodes: [],
+      productNames: ["ufund personal", "ufund", "UFUND"],
+      docTypes: [],
+    },
+    divisorFilter: {
+      categories: [],
       subCategories: [],
       models: [],
       brands: [],
@@ -889,12 +999,12 @@ const LEGACY_KEYWORD_TO_FILTER: Record<
   sim: {
     name: "SIM Attach",
     filter: {
-      categories: ["Promo Operator"],
+      categories: ["Promo Operator", "SIM", "Sim", "sim"],
       subCategories: [],
       models: [],
       brands: [],
       customerCodes: [],
-      productNames: [],
+      productNames: ["sim", "SIM", "Sim", "promo operator", "true sim"],
       docTypes: [],
       includeNonInventory: true,
     },
@@ -912,12 +1022,17 @@ const LEGACY_KEYWORD_TO_FILTER: Record<
   pencil: {
     name: "Pencil Attach",
     filter: {
-      categories: ["Apple Acc for iPad & iPhone"],
-      subCategories: ["APPLE PENCIL AND IPAD MAGIC KEYBOARD"],
-      models: ["Pencil"],
+      categories: [
+        "Apple Acc for iPad & iPhone",
+        "Apple Acc for iPad and iPhone",
+        "Apple Acc",
+        "Accessories",
+      ],
+      subCategories: [],
+      models: [],
       brands: [],
       customerCodes: [],
-      productNames: ["Pencil", "Apple Pencil"],
+      productNames: ["Pencil", "Apple Pencil", "PENCIL", "pencil", "Pen"],
       docTypes: [],
       includeNonInventory: false,
     },
@@ -998,6 +1113,8 @@ function inferKeywordFromLegacy(item: any): string {
 export function migrateLegacyWonderConfig(item: any): WonderItemConfig {
   const kw = inferKeywordFromLegacy(item);
   const preset = LEGACY_KEYWORD_TO_FILTER[kw];
+  const fallbackPreset =
+    kw === "ufund" ? LEGACY_KEYWORD_TO_FILTER["ufund_text_fallback"] : null;
 
   const filterA: WonderFilter = preset
     ? { ...preset.filter }
@@ -1024,6 +1141,10 @@ export function migrateLegacyWonderConfig(item: any): WonderItemConfig {
         docTypes: [],
         includeNonInventory: false,
       };
+
+  const filterAExtra: WonderFilter | null = fallbackPreset
+    ? { ...fallbackPreset.filter }
+    : null;
 
   const baseCats = Array.isArray(item?.baseCategories) ? item.baseCategories : [];
   if (baseCats.length) {
@@ -1063,7 +1184,7 @@ export function migrateLegacyWonderConfig(item: any): WonderItemConfig {
     calcType: "attach",
     labelA: preset?.name ?? item?.name ?? "ตัวเศษ",
     labelB: kw === "ufund" ? "iPhone" : item?.divisor ?? "iPhone",
-    filtersA: [filterA],
+    filtersA: filterAExtra ? [filterA, filterAExtra] : [filterA],
     filtersB: [filterB],
     color: "green",
   };
