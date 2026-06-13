@@ -10,8 +10,12 @@ import {
   GripVertical,
   Settings,
 } from "lucide-react";
-import type { WonderItemConfig, WonderDivisor } from "../lib/wonderConfig";
-import { DEFAULT_WONDER_CONFIGS, WONDER_DIVISOR_OPTIONS } from "../lib/wonderConfig";
+import type {
+  WonderItemConfig,
+  WonderFilter,
+  WonderCalcType,
+} from "../lib/wonderConfig";
+import { DEFAULT_WONDER_CONFIGS } from "../lib/wonderConfig";
 import CategoryTreePicker from "./CategoryTreePicker";
 
 type Props = {
@@ -22,6 +26,29 @@ type Props = {
   salesHeaders?: string[];
 };
 
+const FILTER_FIELDS: { key: keyof WonderFilter; label: string; chipColor: string }[] = [
+  { key: "categories", label: "Categories", chipColor: "emerald" },
+  { key: "subCategories", label: "Sub Categories", chipColor: "teal" },
+  { key: "models", label: "Models", chipColor: "cyan" },
+  { key: "brands", label: "Brands", chipColor: "indigo" },
+  { key: "customerCodes", label: "Customer Codes", chipColor: "amber" },
+  { key: "productNames", label: "Product Names", chipColor: "rose" },
+  { key: "docTypes", label: "Doc Types", chipColor: "slate" },
+];
+
+const emptyFilter = (): WonderFilter => ({
+  categories: [],
+  subCategories: [],
+  models: [],
+  brands: [],
+  customerCodes: [],
+  productNames: [],
+  docTypes: [],
+  includeNonInventory: false,
+});
+
+const newId = () => `w_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
 export default function WonderConfigEditor({
   configs,
   onChange,
@@ -30,45 +57,26 @@ export default function WonderConfigEditor({
   salesHeaders,
 }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
 
-  // Editing state variables
   const [editName, setEditName] = useState("");
   const [editTargetPercent, setEditTargetPercent] = useState(0);
-  const [editBaseCategories, setEditBaseCategories] = useState<string[]>([]);
-  const [editDivisorCategories, setEditDivisorCategories] = useState<string[]>([]);
-  const [editDivisor, setEditDivisor] = useState<WonderDivisor>("iPhone");
-  const [editDivisorBase, setEditDivisorBase] = useState<"unit" | "revenue">("unit");
-  const [editBaseMode, setEditBaseMode] = useState<"unit" | "revenue">("unit");
-  const [editBaseDivisors, setEditBaseDivisors] = useState<string[]>([]);
-  const [editMatchKeywords, setEditMatchKeywords] = useState<string[]>([]);
-  
-  // Three-way selector mode: "preset" | "tree" | "column"
-  const [useDivisorMode, setUseDivisorMode] = useState<"preset" | "tree" | "column">("preset");
-  const [editDivisorColumn, setEditDivisorColumn] = useState("");
-  const [editDivisorValue, setEditDivisorValue] = useState("");
+  const [editCalcType, setEditCalcType] = useState<WonderCalcType>("attach");
+  const [editFiltersA, setEditFiltersA] = useState<WonderFilter[]>([emptyFilter()]);
+  const [editFiltersB, setEditFiltersB] = useState<WonderFilter[]>([emptyFilter()]);
+  const [editColor, setEditColor] = useState("green");
 
-  // Add Form state variables
-  const [showAddForm, setShowAddForm] = useState(false);
   const [newName, setNewName] = useState("");
   const [newTarget, setNewTarget] = useState(20);
-  const [newBaseCategories, setNewBaseCategories] = useState<string[]>([]);
-  const [newDivisorCategories, setNewDivisorCategories] = useState<string[]>([]);
-  const [newDivisor, setNewDivisor] = useState<WonderDivisor>("iPhone");
-  const [newDivisorBase, setNewDivisorBase] = useState<"unit" | "revenue">("unit");
-  const [newBaseMode, setNewBaseMode] = useState<"unit" | "revenue">("unit");
-  const [newBaseDivisors, setNewBaseDivisors] = useState<string[]>([]);
-  const [newKeywords, setNewKeywords] = useState("");
-  
-  const [newDivisorMode, setNewDivisorMode] = useState<"preset" | "tree" | "column">("preset");
-  const [newDivisorColumn, setNewDivisorColumn] = useState("");
-  const [newDivisorValue, setNewDivisorValue] = useState("");
+  const [newCalcType, setNewCalcType] = useState<WonderCalcType>("attach");
+  const [newFiltersA, setNewFiltersA] = useState<WonderFilter[]>([emptyFilter()]);
+  const [newFiltersB, setNewFiltersB] = useState<WonderFilter[]>([emptyFilter()]);
+  const [newColor, setNewColor] = useState("green");
 
-  // Reusable Category Tree Map builder with robust fallback
   const categoryTree = useMemo(() => {
     if (staffCategoryTree && staffCategoryTree.size > 0) {
       return staffCategoryTree;
     }
-    // Fallback: build Map from uniqueCombos
     const tree = new Map<string, Set<string>>();
     uniqueCombos.forEach((combo) => {
       const cat = combo.cat.trim();
@@ -80,87 +88,24 @@ export default function WonderConfigEditor({
     return tree;
   }, [staffCategoryTree, uniqueCombos]);
 
-  // Unified available headers list (Dynamic or Mapped Fallback)
-  const availableHeaders = useMemo(() => {
-    if (salesHeaders && salesHeaders.length > 0) {
-      return salesHeaders;
-    }
-    return [
-      "Product (Code)",
-      "Product (Name)",
-      "Category (Name)",
-      "Sub Category",
-      "Branch (Name)",
-      "Officer (Name)",
-      "Doc No",
-      "Doc Date",
-      "Total Price",
-      "ราคาขายตามบิล",
-      "Number",
-      "Customer (Name)",
-    ];
-  }, [salesHeaders]);
-
-  // Start editing a row
   const startEdit = (item: WonderItemConfig) => {
     setEditingId(item.id);
     setEditName(item.name);
     setEditTargetPercent(item.targetPercent);
-    setEditBaseCategories(item.baseCategories || []);
-    setEditDivisorCategories(item.divisorCategories || []);
-    setEditDivisor(item.divisor || "iPhone");
-    setEditDivisorBase(item.divisorBase || "unit");
-    setEditBaseMode(item.baseMode || "unit");
-    setEditBaseDivisors(Array.isArray(item.baseDivisors) ? item.baseDivisors : []);
-    setEditMatchKeywords(item.matchKeywords || []);
-    
-    if (item.divisorColumn && item.divisorValue) {
-      setUseDivisorMode("column");
-      setEditDivisorColumn(item.divisorColumn);
-      setEditDivisorValue(item.divisorValue);
-    } else if (item.divisorCategories && item.divisorCategories.length > 0) {
-      setUseDivisorMode("tree");
-      setEditDivisorColumn("");
-      setEditDivisorValue("");
-    } else {
-      setUseDivisorMode("preset");
-      setEditDivisorColumn("");
-      setEditDivisorValue("");
-    }
+    setEditCalcType(item.calcType);
+    setEditFiltersA(
+      item.filtersA.length > 0 ? item.filtersA.map((f) => ({ ...f })) : [emptyFilter()],
+    );
+    setEditFiltersB(
+      item.filtersB.length > 0 ? item.filtersB.map((f) => ({ ...f })) : [emptyFilter()],
+    );
+    setEditColor(item.color ?? "green");
   };
 
-  // Toggle base categories in editing mode
-  const toggleEditBaseCategory = (key: string) => {
-    setEditBaseCategories((prev) =>
-      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
-    );
-  };
-
-  // Toggle divisor categories in editing mode
-  const toggleEditDivisorCategory = (key: string) => {
-    setEditDivisorCategories((prev) =>
-      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
-    );
-  };
-
-  // Toggle base categories in add mode
-  const toggleNewBaseCategory = (key: string) => {
-    setNewBaseCategories((prev) =>
-      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
-    );
-  };
-
-  // Toggle divisor categories in add mode
-  const toggleNewDivisorCategory = (key: string) => {
-    setNewDivisorCategories((prev) =>
-      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
-    );
-  };
+  const cancelEdit = () => setEditingId(null);
 
   const saveEdit = (id: string) => {
     if (!editName.trim()) return;
-    const resolvedDivCol = editDivisorColumn || availableHeaders[0];
-
     onChange(
       configs.map((c) =>
         c.id === id
@@ -168,29 +113,23 @@ export default function WonderConfigEditor({
               ...c,
               name: editName.trim(),
               targetPercent: editTargetPercent,
-              baseCategories: editBaseCategories,
-              divisorCategories: useDivisorMode === "tree" ? editDivisorCategories : [],
-              divisor: useDivisorMode === "preset" ? editDivisor : undefined,
-              divisorBase: useDivisorMode === "preset" ? editDivisorBase : undefined,
-              baseMode: editBaseMode,
-              divisorColumn: useDivisorMode === "column" ? resolvedDivCol : undefined,
-              divisorValue: useDivisorMode === "column" ? editDivisorValue : undefined,
-              matchKeywords: editMatchKeywords,
+              calcType: editCalcType,
+              labelA: deriveLabel(editFiltersA, editCalcType),
+              labelB: deriveLabel(editFiltersB, editCalcType),
+              filtersA: editFiltersA,
+              filtersB: editFiltersB,
+              color: editColor,
             }
-          : c
-      )
+          : c,
+      ),
     );
-    setEditingId(null);
-  };
-
-  const cancelEdit = () => {
     setEditingId(null);
   };
 
   const handleReset = () => {
     if (
       confirm(
-        "คุณต้องการรีเซ็ต 7 Wonders เป็นค่าเริ่มต้นหรือไม่? ข้อมูลที่แก้ไขจะถูกแทนที่ด้วยค่าโรงงาน"
+        "คุณต้องการรีเซ็ต Wonders เป็นค่าเริ่มต้นหรือไม่? ข้อมูลที่แก้ไขจะถูกแทนที่ด้วยค่าโรงงาน",
       )
     ) {
       onChange([...DEFAULT_WONDER_CONFIGS]);
@@ -205,64 +144,38 @@ export default function WonderConfigEditor({
 
   const handleAdd = () => {
     if (!newName.trim()) return;
-    const id = `w${Date.now()}`;
-    const keywords = newKeywords
-      .split(",")
-      .map((k) => k.trim().toLowerCase())
-      .filter(Boolean);
-
-    const resolvedDivCol = newDivisorColumn || availableHeaders[0];
-
     onChange([
       ...configs,
       {
-        id,
+        id: newId(),
         name: newName.trim(),
         targetPercent: newTarget,
-        baseCategories: newBaseCategories,
-        divisorCategories: newDivisorMode === "tree" ? newDivisorCategories : [],
-        divisor: newDivisorMode === "preset" ? newDivisor : undefined,
-        divisorBase: newDivisorMode === "preset" ? newDivisorBase : undefined,
-        baseMode: newBaseMode,
-        baseDivisors: newBaseDivisors,
-        divisorColumn: newDivisorMode === "column" ? resolvedDivCol : undefined,
-        divisorValue: newDivisorMode === "column" ? newDivisorValue : undefined,
-        matchKeywords:
-          keywords.length > 0 ? keywords : [newName.trim().toLowerCase()],
+        calcType: newCalcType,
+        labelA: deriveLabel(newFiltersA, newCalcType),
+        labelB: deriveLabel(newFiltersB, newCalcType),
+        filtersA: newFiltersA,
+        filtersB: newFiltersB,
+        color: newColor,
       },
     ]);
-
-    // Reset Form
     setShowAddForm(false);
     setNewName("");
     setNewTarget(20);
-    setNewBaseCategories([]);
-    setNewDivisorCategories([]);
-    setNewDivisor("iPhone");
-    setNewKeywords("");
-    setNewDivisorMode("preset");
-    setNewDivisorColumn("");
-    setNewDivisorValue("");
-  };
-
-  // Format category badge label intelligently
-  const formatBadgeLabel = (key: string) => {
-    if (categoryTree.has(key)) {
-      return `${key} (ทั้งหมด)`;
-    }
-    return key;
+    setNewCalcType("attach");
+    setNewFiltersA([emptyFilter()]);
+    setNewFiltersB([emptyFilter()]);
+    setNewColor("green");
   };
 
   return (
     <div className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)] text-white">
-      {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
           <h3 className="text-base font-bold tracking-tight flex items-center gap-2">
-            <span className="text-lg">⚙️</span> 7 Wonder Config Editor (Turso DB)
+            <span className="text-lg">⚙️</span> Wonder Config Editor (Turso DB)
           </h3>
           <p className="text-xs text-white/50 mt-0.5">
-            ปรับเป้าหมาย % เลือกหมวดหมู่ของตัวตั้ง หรือเลือกกรองหัวตารางในไฟล์ยอดขายเป็นตัวหารได้อย่างอิสระ
+            กำหนด filter แบบ multi-field (categories, subCategories, models, brands, customerCodes, productNames, docTypes) สำหรับ numerator และ denominator
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -285,7 +198,6 @@ export default function WonderConfigEditor({
         </div>
       </div>
 
-      {/* Add Wonder Form Panel */}
       <AnimatePresence>
         {showAddForm && (
           <motion.div
@@ -298,8 +210,7 @@ export default function WonderConfigEditor({
               <p className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
                 ✨ เพิ่ม Wonder ตัวชี้วัดใหม่
               </p>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="text-[10px] text-white/50 block mb-1">ชื่อตัวชี้วัด</label>
                   <input
@@ -324,251 +235,49 @@ export default function WonderConfigEditor({
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] text-white/50 block mb-1">
-                    คีย์เวิร์ดสำรอง (สำหรับข้อมูลแบบเก่า)
-                  </label>
-                  <input
-                    type="text"
-                    value={newKeywords}
-                    onChange={(e) => setNewKeywords(e.target.value)}
-                    placeholder="เช่น airpods, pro (ใส่จุลภาคคั่น)"
-                    className="w-full text-xs bg-white/5 border border-white/10 text-white rounded-xl px-3 py-2 outline-none focus:border-emerald-500 placeholder:text-white/30"
-                  />
+                  <label className="text-[10px] text-white/50 block mb-1">Calc Type</label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setNewCalcType("attach")}
+                      className={`flex-1 text-xs px-3 py-2 rounded-xl border transition-colors cursor-pointer ${
+                        newCalcType === "attach"
+                          ? "bg-emerald-500/20 border-emerald-400/30 text-emerald-200"
+                          : "bg-white/5 border-white/10 text-white/50 hover:text-white"
+                      }`}
+                    >
+                      Attach (Unit)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewCalcType("bahtRate")}
+                      className={`flex-1 text-xs px-3 py-2 rounded-xl border transition-colors cursor-pointer ${
+                        newCalcType === "bahtRate"
+                          ? "bg-emerald-500/20 border-emerald-400/30 text-emerald-200"
+                          : "bg-white/5 border-white/10 text-white/50 hover:text-white"
+                      }`}
+                    >
+                      BahtRate (Revenue)
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {/* Add form Category Selections */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                {/* Base selection */}
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 flex flex-col gap-2">
-                  <label className="text-[10px] text-emerald-400 font-bold block mb-1">
-                    🎯 1. BASE TARGET (ตัวตั้ง / ตัวเศษ)
-                  </label>
-
-                  <CategoryTreePicker
-                    treeMap={categoryTree}
-                    selected={newBaseCategories}
-                    toggle={toggleNewBaseCategory}
-                    variant="base"
-                  />
-
-                  <div className="mt-2.5">
-                    <div className="text-[10px] font-bold text-emerald-400/80 uppercase tracking-wider flex items-center gap-1 mb-1">
-                      หมวดที่เลือก ({newBaseCategories.length})
-                    </div>
-                    {newBaseCategories.length === 0 ? (
-                      <div className="text-[10px] text-white/40 italic">
-                        ยังไม่ได้เลือก (จะใช้การจับคู่คีย์เวิร์ดสำรองแทน)
-                      </div>
-                    ) : (
-                      <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto pr-1">
-                        {newBaseCategories.map((member) => (
-                          <span
-                            key={member}
-                            className="inline-flex items-center gap-1 text-[10px] bg-emerald-500/15 text-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-500/20"
-                          >
-                            {formatBadgeLabel(member)}
-                            <button
-                              type="button"
-                              onClick={() => toggleNewBaseCategory(member)}
-                              className="hover:text-white text-emerald-400 hover:bg-white/10 rounded-full p-0.5 transition-colors"
-                            >
-                              <X className="w-2.5 h-2.5" />
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Divisor selection */}
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 flex flex-col gap-2">
-                  <label className="text-[10px] text-teal-400 font-bold block mb-1">
-                    📊 2. DIVISOR TARGET (ตัวหาร / Denominator)
-                  </label>
-
-                  <div className="flex flex-wrap gap-1.5 mb-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setNewDivisorMode("preset")}
-                      className={`text-[10px] px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer ${
-                        newDivisorMode === "preset"
-                          ? "bg-teal-500/20 text-teal-300 border-teal-500/30 font-semibold shadow-[0_2px_8px_rgba(20,184,166,0.15)]"
-                          : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white"
-                      }`}
-                    >
-                      Preset
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setNewDivisorMode("tree")}
-                      className={`text-[10px] px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer ${
-                        newDivisorMode === "tree"
-                          ? "bg-teal-500/20 text-teal-300 border-teal-500/30 font-semibold shadow-[0_2px_8px_rgba(20,184,166,0.15)]"
-                          : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white"
-                      }`}
-                    >
-                      เลือกหมวดหมู่ย่อย
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setNewDivisorMode("column")}
-                      className={`text-[10px] px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer ${
-                        newDivisorMode === "column"
-                          ? "bg-teal-500/20 text-teal-300 border-teal-500/30 font-semibold shadow-[0_2px_8px_rgba(20,184,166,0.15)]"
-                          : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white"
-                      }`}
-                    >
-                      หัวตารางยอดขาย (Column Filter)
-                    </button>
-                  </div>
-
-                  {newDivisorMode === "preset" && (
-                    <div className="space-y-4 py-4">
-                      <div>
-                        <label className="text-[10px] text-white/40 block mb-1">เลือกกลุ่มสินค้าหลักสำเร็จรูป</label>
-                        <select
-                          value={newDivisor}
-                          onChange={(e) => setNewDivisor(e.target.value as WonderDivisor)}
-                          className="w-full text-xs bg-white/5 border border-white/10 text-white rounded-xl px-3 py-2 outline-none focus:border-teal-400 text-gray-900"
-                        >
-                          {WONDER_DIVISOR_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value} className="text-gray-900">
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="text-[10px] text-white/40 block mb-1">ฐานตัวตั้ง</label>
-                        <div className="flex gap-2 flex-wrap">
-                          <button
-                            type="button"
-                            onClick={() => setNewBaseMode("unit")}
-                            className={`px-3 py-1.5 rounded-lg text-[10px] border transition-colors ${newBaseMode === "unit" ? "bg-teal-500/20 border-teal-400/30 text-teal-200" : "bg-white/5 border-white/10 text-white/50 hover:text-white hover:bg-white/10"}`}
-                          >
-                            Unit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setNewBaseMode("revenue")}
-                            className={`px-3 py-1.5 rounded-lg text-[10px] border transition-colors ${newBaseMode === "revenue" ? "bg-teal-500/20 border-teal-400/30 text-teal-200" : "bg-white/5 border-white/10 text-white/50 hover:text-white hover:bg-white/10"}`}
-                          >
-                            บาท
-                          </button>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="text-[10px] text-white/40 block mb-1">เลือก base ได้หลายตัว</label>
-                        <div className="flex flex-wrap gap-2">
-                          {["iPhone", "iPad", "Mac", "iPhone+iPad", "All Units"].map((item) => (
-                            <button
-                              key={item}
-                              type="button"
-                              onClick={() => setNewBaseDivisors((prev) => prev.includes(item) ? prev.filter((x) => x !== item) : [...prev, item])}
-                              className={`px-3 py-1.5 rounded-lg text-[10px] border transition-colors ${newBaseDivisors.includes(item) ? "bg-emerald-500/20 border-emerald-400/30 text-emerald-200" : "bg-white/5 border-white/10 text-white/50 hover:text-white hover:bg-white/10"}`}
-                            >
-                              {item}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="text-[10px] text-white/40 block mb-1">ฐานตัวหาร</label>
-                        <div className="flex gap-2 flex-wrap">
-                          <button
-                            type="button"
-                            onClick={() => setNewDivisorBase("unit")}
-                            className={`px-3 py-1.5 rounded-lg text-[10px] border transition-colors ${newDivisorBase === "unit" ? "bg-teal-500/20 border-teal-400/30 text-teal-200" : "bg-white/5 border-white/10 text-white/50 hover:text-white hover:bg-white/10"}`}
-                          >
-                            Unit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setNewDivisorBase("revenue")}
-                            className={`px-3 py-1.5 rounded-lg text-[10px] border transition-colors ${newDivisorBase === "revenue" ? "bg-teal-500/20 border-teal-400/30 text-teal-200" : "bg-white/5 border-white/10 text-white/50 hover:text-white hover:bg-white/10"}`}
-                          >
-                            บาท
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {newDivisorMode === "tree" && (
-                    <>
-                      <CategoryTreePicker
-                        treeMap={categoryTree}
-                        selected={newDivisorCategories}
-                        toggle={toggleNewDivisorCategory}
-                        variant="attach"
-                      />
-
-                      <div className="mt-2.5">
-                        <div className="text-[10px] font-bold text-teal-400/80 uppercase tracking-wider flex items-center gap-1 mb-1">
-                          หมวดที่เลือก ({newDivisorCategories.length})
-                        </div>
-                        {newDivisorCategories.length === 0 ? (
-                          <div className="text-[10px] text-white/40 italic">
-                            ยังไม่ได้เลือกตัวหารแบบกำหนดเอง
-                          </div>
-                        ) : (
-                          <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto pr-1">
-                            {newDivisorCategories.map((member) => (
-                              <span
-                                key={member}
-                                className="inline-flex items-center gap-1 text-[10px] bg-teal-500/15 text-teal-100 px-2.5 py-0.5 rounded-full border border-teal-500/20"
-                              >
-                                {formatBadgeLabel(member)}
-                                <button
-                                  type="button"
-                                  onClick={() => toggleNewDivisorCategory(member)}
-                                  className="hover:text-white text-teal-400 hover:bg-white/10 rounded-full p-0.5 transition-colors"
-                                >
-                                  <X className="w-2.5 h-2.5" />
-                                </button>
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </>
-                  )}
-
-                  {newDivisorMode === "column" && (
-                    <div className="space-y-3 py-2">
-                      <div>
-                        <label className="text-[10px] text-white/50 block mb-1">เลือกหัวตารางในไฟล์ยอดขาย</label>
-                        <select
-                          value={newDivisorColumn || availableHeaders[0]}
-                          onChange={(e) => setNewDivisorColumn(e.target.value)}
-                          className="w-full text-xs bg-[#0b291d] border border-white/10 text-white rounded-xl px-3 py-2.5 outline-none focus:border-teal-400"
-                        >
-                          {availableHeaders.map((h) => (
-                            <option key={h} value={h} className="bg-[#052b20] text-white">
-                              {h}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="text-[10px] text-white/50 block mb-1">ค่าในตารางแถวนั้นต้องเป็นคำว่า (Matching Value)</label>
-                        <input
-                          type="text"
-                          value={newDivisorValue}
-                          onChange={(e) => setNewDivisorValue(e.target.value)}
-                          placeholder="เช่น ufund หรือ true sim หรือ dtac"
-                          className="w-full text-xs bg-white/5 border border-white/10 text-white rounded-xl px-3 py-2 outline-none focus:border-teal-400 placeholder:text-white/20"
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FilterSidePanel
+                  title="🎯 A. NUMERATOR (ตัวเศษ)"
+                  color="emerald"
+                  filters={newFiltersA}
+                  onChange={setNewFiltersA}
+                  categoryTree={categoryTree}
+                />
+                <FilterSidePanel
+                  title="📊 B. DENOMINATOR (ตัวหาร)"
+                  color="teal"
+                  filters={newFiltersB}
+                  onChange={setNewFiltersB}
+                  categoryTree={categoryTree}
+                />
               </div>
 
               <div className="flex justify-end gap-2 pt-2 border-t border-white/5">
@@ -593,40 +302,30 @@ export default function WonderConfigEditor({
         )}
       </AnimatePresence>
 
-      {/* Main Configurations Table */}
       <div className="overflow-x-auto rounded-2xl border border-white/10">
         <table className="w-full text-left text-xs border-collapse">
           <thead>
             <tr className="bg-[#0b291d] border-b border-emerald-500/20 text-white/70">
               <th className="py-3.5 px-4 font-bold text-center w-10">#</th>
               <th className="py-3.5 px-4 font-bold">ชื่อ Wonder</th>
-              <th className="py-3.5 px-4 font-bold text-center w-36">เป้าหมาย Target</th>
-              <th className="py-3.5 px-4 font-bold text-center w-28">Base Mode</th>
-              <th className="py-3.5 px-4 font-bold">หมวดหมู่ตัวตั้ง (Base / ตัวเศษ)</th>
-              <th className="py-3.5 px-4 font-bold">หมวดหมู่ตัวหาร (Divisor)</th>
+              <th className="py-3.5 px-4 font-bold text-center w-28">Calc</th>
+              <th className="py-3.5 px-4 font-bold text-center w-36">Target</th>
+              <th className="py-3.5 px-4 font-bold">A: Numerator</th>
+              <th className="py-3.5 px-4 font-bold">B: Denominator</th>
               <th className="py-3.5 px-4 font-bold text-center w-24">จัดการ</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-emerald-500/10 bg-[#052b20]/40">
             {configs.map((item, idx) => {
               const isEditing = editingId === item.id;
-              const hasCustomBase = item.baseCategories && item.baseCategories.length > 0;
-              const hasCustomDiv = item.divisorCategories && item.divisorCategories.length > 0;
-
               return (
-                <tr
-                  key={item.id}
-                  className="hover:bg-white/5 transition-colors duration-150"
-                >
-                  {/* Table normal / edit row */}
+                <tr key={item.id} className="hover:bg-white/5 transition-colors">
                   <td className="py-4 px-4 text-center text-white/40 font-medium">
                     <div className="flex items-center justify-center gap-1">
                       <GripVertical className="w-3.5 h-3.5 text-white/10 cursor-grab" />
                       {idx + 1}
                     </div>
                   </td>
-
-                  {/* Name column */}
                   <td className="py-4 px-4 font-semibold text-white/95">
                     {isEditing ? (
                       <input
@@ -639,8 +338,26 @@ export default function WonderConfigEditor({
                       item.name
                     )}
                   </td>
-
-                  {/* Target Column */}
+                  <td className="py-4 px-4 text-center">
+                    {isEditing ? (
+                      <select
+                        value={editCalcType}
+                        onChange={(e) => setEditCalcType(e.target.value as WonderCalcType)}
+                        className="text-[10px] bg-white/5 border border-white/10 text-white rounded-lg px-2 py-1 outline-none"
+                      >
+                        <option value="attach" className="text-gray-900">
+                          Attach
+                        </option>
+                        <option value="bahtRate" className="text-gray-900">
+                          BahtRate
+                        </option>
+                      </select>
+                    ) : (
+                      <span className="text-[10px] font-bold text-white/85 bg-white/5 border border-white/10 px-2 py-0.5 rounded-md">
+                        {item.calcType}
+                      </span>
+                    )}
+                  </td>
                   <td className="py-4 px-4 text-center">
                     {isEditing ? (
                       <div className="flex items-center justify-center gap-2">
@@ -662,70 +379,24 @@ export default function WonderConfigEditor({
                       </span>
                     )}
                   </td>
-                  <td className="py-4 px-4 text-center">
-                    {isEditing ? (
-                      <div className="flex gap-1 justify-center">
-                        <button type="button" onClick={() => setEditBaseMode("unit")} className={`px-2 py-1 rounded text-[10px] border ${editBaseMode === "unit" ? "bg-teal-500/20 border-teal-400/30 text-teal-200" : "bg-white/5 border-white/10 text-white/50"}`}>Unit</button>
-                        <button type="button" onClick={() => setEditBaseMode("revenue")} className={`px-2 py-1 rounded text-[10px] border ${editBaseMode === "revenue" ? "bg-teal-500/20 border-teal-400/30 text-teal-200" : "bg-white/5 border-white/10 text-white/50"}`}>บาท</button>
-                      </div>
-                    ) : (
-                      <span className="text-white/85 font-medium">{item.baseMode ?? "unit"}</span>
-                    )}
-                  </td>
-
-                  {/* Base Categories Badge List */}
                   <td className="py-4 px-4">
                     {isEditing ? (
                       <span className="text-[10px] text-white/40">
-                        แก้ไขข้อมูลหมวดหมู่ในพาเนลด้านล่าง
+                        แก้ไขข้อมูลด้านล่าง
                       </span>
-                    ) : hasCustomBase ? (
-                      <div className="flex flex-wrap gap-1 max-w-[250px]">
-                        {item.baseCategories?.map((cat) => (
-                          <span
-                            key={cat}
-                            className="text-[9px] font-medium bg-emerald-500/15 border border-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-md"
-                          >
-                            {formatBadgeLabel(cat)}
-                          </span>
-                        ))}
-                      </div>
                     ) : (
-                      <span className="text-[10px] text-white/40 italic">
-                        คีย์เวิร์ด: {item.matchKeywords?.join(", ")}
-                      </span>
+                      <FilterBadges filter={item.filtersA[0]} />
                     )}
                   </td>
-
-                  {/* Divisor Column */}
                   <td className="py-4 px-4">
                     {isEditing ? (
                       <span className="text-[10px] text-white/40">
-                        แก้ไขข้อมูลหมวดหมู่ในพาเนลด้านล่าง
+                        แก้ไขข้อมูลด้านล่าง
                       </span>
-                    ) : item.divisorColumn && item.divisorValue ? (
-                      <span className="text-[10px] text-teal-300 font-bold bg-teal-500/15 border border-teal-500/20 px-2.5 py-1 rounded-md">
-                        หัวตาราง: {item.divisorColumn} = "{item.divisorValue}"
-                      </span>
-                    ) : hasCustomDiv ? (
-                      <div className="flex flex-wrap gap-1 max-w-[200px]">
-                        {item.divisorCategories?.map((cat) => (
-                          <span
-                            key={cat}
-                            className="text-[9px] font-medium bg-blue-500/15 border border-blue-500/20 text-blue-300 px-2 py-0.5 rounded-md"
-                          >
-                            {formatBadgeLabel(cat)}
-                          </span>
-                        ))}
-                      </div>
                     ) : (
-                      <span className="text-[10px] text-amber-300 font-bold bg-amber-500/15 px-2 py-0.5 rounded-md">
-                        Preset: {item.divisor}
-                      </span>
+                      <FilterBadges filter={item.filtersB[0]} />
                     )}
                   </td>
-
-                  {/* Actions Column */}
                   <td className="py-4 px-4 text-center">
                     {isEditing ? (
                       <div className="flex items-center justify-center gap-1.5">
@@ -774,7 +445,6 @@ export default function WonderConfigEditor({
         </table>
       </div>
 
-      {/* Expanded Accordion Edit panel for editing categories */}
       <AnimatePresence>
         {editingId && (
           <motion.div
@@ -792,254 +462,28 @@ export default function WonderConfigEditor({
                 >
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
-                      <Settings className="w-3.5 h-3.5 animate-spin-slow" />{" "}
-                      แก้ไขการจับคู่ประเภทสินค้า: {editName}
+                      <Settings className="w-3.5 h-3.5 animate-spin-slow" /> แก้ไข: {editName}
                     </p>
                     <span className="text-[10px] text-white/40">ID: {editingId}</span>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Base selection */}
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4 flex flex-col gap-2">
-                      <label className="text-[10px] text-emerald-400 font-bold block mb-1">
-                        🎯 1. BASE TARGET (ตัวตั้ง / ตัวเศษ)
-                      </label>
-
-                      <CategoryTreePicker
-                        treeMap={categoryTree}
-                        selected={editBaseCategories}
-                        toggle={toggleEditBaseCategory}
-                        variant="base"
-                      />
-
-                      <div className="mt-2.5">
-                        <div className="text-[10px] font-bold text-emerald-400/80 uppercase tracking-wider flex items-center gap-1 mb-1">
-                          หมวดที่เลือก ({editBaseCategories.length})
-                        </div>
-                        {editBaseCategories.length === 0 ? (
-                          <div className="text-[10px] text-white/40 italic">
-                            ยังไม่ได้เลือก (จะใช้การจับคู่คีย์เวิร์ดสำรองแทน)
-                          </div>
-                        ) : (
-                          <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto pr-1">
-                            {editBaseCategories.map((member) => (
-                              <span
-                                key={member}
-                                className="inline-flex items-center gap-1 text-[10px] bg-emerald-500/15 text-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-500/20"
-                              >
-                                {formatBadgeLabel(member)}
-                                <button
-                                  type="button"
-                                  onClick={() => toggleEditBaseCategory(member)}
-                                  className="hover:text-white text-emerald-400 hover:bg-white/10 rounded-full p-0.5 transition-colors"
-                                >
-                                  <X className="w-2.5 h-2.5" />
-                                </button>
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Divisor selection */}
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4 flex flex-col gap-2">
-                      <label className="text-[10px] text-teal-400 font-bold block mb-1">
-                        📊 2. DIVISOR TARGET (ตัวหาร / Denominator)
-                      </label>
-
-                      <div className="flex flex-wrap gap-1.5 mb-1.5">
-                        <button
-                          type="button"
-                          onClick={() => setUseDivisorMode("preset")}
-                          className={`text-[10px] px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer ${
-                            useDivisorMode === "preset"
-                              ? "bg-teal-500/20 text-teal-300 border-teal-500/30 font-semibold shadow-[0_2px_8px_rgba(20,184,166,0.15)]"
-                              : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white"
-                          }`}
-                        >
-                          Preset
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setUseDivisorMode("tree")}
-                          className={`text-[10px] px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer ${
-                            useDivisorMode === "tree"
-                              ? "bg-teal-500/20 text-teal-300 border-teal-500/30 font-semibold shadow-[0_2px_8px_rgba(20,184,166,0.15)]"
-                              : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white"
-                          }`}
-                        >
-                          เลือกหมวดหมู่ย่อย
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setUseDivisorMode("column")}
-                          className={`text-[10px] px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer ${
-                            useDivisorMode === "column"
-                              ? "bg-teal-500/20 text-teal-300 border-teal-500/30 font-semibold shadow-[0_2px_8px_rgba(20,184,166,0.15)]"
-                              : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white"
-                          }`}
-                        >
-                          หัวตารางยอดขาย (Column Filter)
-                        </button>
-                      </div>
-
-                      {useDivisorMode === "preset" && (
-                        <div className="space-y-4 py-6">
-                          <div>
-                            <label className="text-[10px] text-white/40 block mb-1">เลือกกลุ่มสินค้าหลักสำเร็จรูป</label>
-                            <select
-                              value={editDivisor}
-                              onChange={(e) => setEditDivisor(e.target.value as WonderDivisor)}
-                              className="w-full text-xs bg-white/5 border border-white/10 text-white rounded-xl px-3 py-2.5 outline-none focus:border-emerald-500 text-gray-900"
-                            >
-                              {WONDER_DIVISOR_OPTIONS.map((opt) => (
-                                <option key={opt.value} value={opt.value} className="text-gray-955">
-                                  {opt.label}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div>
-                            <label className="text-[10px] text-white/40 block mb-1">ฐานตัวตั้ง</label>
-                            <div className="flex gap-2 flex-wrap">
-                              <button
-                                type="button"
-                                onClick={() => setEditBaseMode("unit")}
-                                className={`px-3 py-1.5 rounded-lg text-[10px] border transition-colors ${editBaseMode === "unit" ? "bg-teal-500/20 border-teal-400/30 text-teal-200" : "bg-white/5 border-white/10 text-white/50 hover:text-white hover:bg-white/10"}`}
-                              >
-                                Unit
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setEditBaseMode("revenue")}
-                                className={`px-3 py-1.5 rounded-lg text-[10px] border transition-colors ${editBaseMode === "revenue" ? "bg-teal-500/20 border-teal-400/30 text-teal-200" : "bg-white/5 border-white/10 text-white/50 hover:text-white hover:bg-white/10"}`}
-                              >
-                                บาท
-                              </button>
-                            </div>
-                          </div>
-
-                          <div>
-                            <label className="text-[10px] text-white/40 block mb-1">ฐานตัวหาร</label>
-                            <div className="flex gap-2 flex-wrap">
-                              <button
-                                type="button"
-                                onClick={() => setEditDivisorBase("unit")}
-                                className={`px-3 py-1.5 rounded-lg text-[10px] border transition-colors ${editDivisorBase === "unit" ? "bg-teal-500/20 border-teal-400/30 text-teal-200" : "bg-white/5 border-white/10 text-white/50 hover:text-white hover:bg-white/10"}`}
-                              >
-                                Unit
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setEditDivisorBase("revenue")}
-                                className={`px-3 py-1.5 rounded-lg text-[10px] border transition-colors ${editDivisorBase === "revenue" ? "bg-teal-500/20 border-teal-400/30 text-teal-200" : "bg-white/5 border-white/10 text-white/50 hover:text-white hover:bg-white/10"}`}
-                              >
-                                บาท
-                              </button>
-                            </div>
-                          </div>
-
-                          <p className="text-[10px] text-white/40 italic mt-1">
-                            * Unit = นับจำนวนเครื่อง / บาท = ใช้มูลค่ารวมเป็นฐานคำนวณ
-                          </p>
-                        </div>
-                      )}
-
-                      {useDivisorMode === "tree" && (
-                        <>
-                          <CategoryTreePicker
-                            treeMap={categoryTree}
-                            selected={editDivisorCategories}
-                            toggle={toggleEditDivisorCategory}
-                            variant="attach"
-                          />
-
-                          <div className="mt-2.5">
-                            <div className="text-[10px] font-bold text-teal-400/80 uppercase tracking-wider flex items-center gap-1 mb-1">
-                              หมวดที่เลือก ({editDivisorCategories.length})
-                            </div>
-                            {editDivisorCategories.length === 0 ? (
-                              <div className="text-[10px] text-white/40 italic">
-                                ยังไม่ได้เลือกตัวหารแบบกำหนดเอง
-                              </div>
-                            ) : (
-                              <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto pr-1">
-                                {editDivisorCategories.map((member) => (
-                                  <span
-                                    key={member}
-                                    className="inline-flex items-center gap-1 text-[10px] bg-teal-500/15 text-teal-100 px-2.5 py-0.5 rounded-full border border-teal-500/20"
-                                  >
-                                    {formatBadgeLabel(member)}
-                                    <button
-                                      type="button"
-                                      onClick={() => toggleEditDivisorCategory(member)}
-                                      className="hover:text-white text-teal-400"
-                                    >
-                                      <X className="w-3 h-3" />
-                                    </button>
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </>
-                      )}
-
-                      {useDivisorMode === "column" && (
-                        <div className="space-y-3 py-2">
-                          <div>
-                            <label className="text-[10px] text-white/50 block mb-1">เลือกหัวตารางในไฟล์ยอดขาย</label>
-                            <select
-                              value={editDivisorColumn || availableHeaders[0]}
-                              onChange={(e) => setEditDivisorColumn(e.target.value)}
-                              className="w-full text-xs bg-[#0b291d] border border-white/10 text-white rounded-xl px-3 py-2.5 outline-none focus:border-teal-400 text-white"
-                            >
-                              {availableHeaders.map((h) => (
-                                <option key={h} value={h} className="bg-[#052b20] text-white">
-                                  {h}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div>
-                            <label className="text-[10px] text-white/50 block mb-1">ฐานตัวตั้ง</label>
-                            <div className="flex gap-2 flex-wrap">
-                              <button
-                                type="button"
-                                onClick={() => setEditBaseMode("unit")}
-                                className={`px-3 py-1.5 rounded-lg text-[10px] border transition-colors ${editBaseMode === "unit" ? "bg-teal-500/20 border-teal-400/30 text-teal-200" : "bg-white/5 border-white/10 text-white/50 hover:text-white hover:bg-white/10"}`}
-                              >
-                                Unit
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setEditBaseMode("revenue")}
-                                className={`px-3 py-1.5 rounded-lg text-[10px] border transition-colors ${editBaseMode === "revenue" ? "bg-teal-500/20 border-teal-400/30 text-teal-200" : "bg-white/5 border-white/10 text-white/50 hover:text-white hover:bg-white/10"}`}
-                              >
-                                บาท
-                              </button>
-                            </div>
-                          </div>
-
-                          <div>
-                            <label className="text-[10px] text-white/50 block mb-1">ค่าในตารางแถวนั้นต้องเป็นคำว่า (Matching Value)</label>
-                            <input
-                              type="text"
-                              value={editDivisorValue}
-                              onChange={(e) => setEditDivisorValue(e.target.value)}
-                              placeholder="เช่น ufund หรือ true sim หรือ dtac"
-                              className="w-full text-xs bg-white/5 border border-white/10 text-white rounded-xl px-3 py-2 outline-none focus:border-teal-400 placeholder:text-white/20"
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    <FilterSidePanel
+                      title="🎯 A. NUMERATOR (ตัวเศษ)"
+                      color="emerald"
+                      filters={editFiltersA}
+                      onChange={setEditFiltersA}
+                      categoryTree={categoryTree}
+                    />
+                    <FilterSidePanel
+                      title="📊 B. DENOMINATOR (ตัวหาร)"
+                      color="teal"
+                      filters={editFiltersB}
+                      onChange={setEditFiltersB}
+                      categoryTree={categoryTree}
+                    />
                   </div>
 
-                  {/* Panel footer buttons */}
                   <div className="flex justify-end gap-2 pt-3 border-t border-white/5">
                     <button
                       type="button"
@@ -1062,7 +506,6 @@ export default function WonderConfigEditor({
         )}
       </AnimatePresence>
 
-      {/* Footer */}
       <div className="flex items-center justify-between mt-4 text-[10px] text-white/30">
         <span>
           {configs.length} Wonder{configs.length !== 1 ? "s" : ""} configured
@@ -1074,4 +517,284 @@ export default function WonderConfigEditor({
       </div>
     </div>
   );
+}
+
+function FilterBadges({ filter }: { filter?: WonderFilter }) {
+  if (!filter) return <span className="text-[10px] text-white/40 italic">ไม่มี filter</span>;
+  const chips: { label: string; count: number; color: string }[] = [];
+  FILTER_FIELDS.forEach((f) => {
+    const list = filter[f.key] as string[] | undefined;
+    if (list && list.length > 0) {
+      chips.push({ label: f.label, count: list.length, color: f.chipColor });
+    }
+  });
+  if (filter.includeNonInventory === false) {
+    chips.push({ label: "Inventory only", count: 1, color: "rose" });
+  } else if (filter.includeNonInventory === true) {
+    chips.push({ label: "+Non-inventory", count: 1, color: "rose" });
+  }
+  if (chips.length === 0) {
+    return <span className="text-[10px] text-white/40 italic">ไม่จำกัด (all rows)</span>;
+  }
+  return (
+    <div className="flex flex-wrap gap-1 max-w-[260px]">
+      {chips.map((c) => (
+        <span
+          key={c.label}
+          className="text-[9px] font-medium bg-white/5 border border-white/10 text-white/70 px-2 py-0.5 rounded-md"
+        >
+          {c.label}: {c.count}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function FilterSidePanel({
+  title,
+  color,
+  filters,
+  onChange,
+  categoryTree,
+}: {
+  title: string;
+  color: "emerald" | "teal";
+  filters: WonderFilter[];
+  onChange: (next: WonderFilter[]) => void;
+  categoryTree: Map<string, Set<string>>;
+}) {
+  const accent =
+    color === "emerald"
+      ? "border-emerald-500/30 bg-emerald-500/5"
+      : "border-teal-500/30 bg-teal-500/5";
+  const labelClass = color === "emerald" ? "text-emerald-400" : "text-teal-400";
+
+  const updateFilter = (idx: number, patch: Partial<WonderFilter>) => {
+    onChange(filters.map((f, i) => (i === idx ? { ...f, ...patch } : f)));
+  };
+
+  const removeFilter = (idx: number) => {
+    if (filters.length <= 1) {
+      onChange([emptyFilter()]);
+      return;
+    }
+    onChange(filters.filter((_, i) => i !== idx));
+  };
+
+  const addFilter = () => {
+    onChange([...filters, emptyFilter()]);
+  };
+
+  return (
+    <div className={`rounded-2xl border ${accent} p-4 flex flex-col gap-2`}>
+      <div className="flex items-center justify-between">
+        <label className={`text-[10px] ${labelClass} font-bold block`}>{title}</label>
+        <button
+          type="button"
+          onClick={addFilter}
+          className="text-[10px] text-white/60 hover:text-white bg-white/5 border border-white/10 px-2 py-0.5 rounded-md transition-colors cursor-pointer"
+        >
+          + OR group
+        </button>
+      </div>
+
+      {filters.map((filter, idx) => (
+        <div
+          key={idx}
+          className="rounded-xl border border-white/10 bg-white/5 p-3 flex flex-col gap-2"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-white/50 font-semibold">
+              Group {idx + 1} {idx > 0 ? "(OR)" : ""}
+            </span>
+            <button
+              type="button"
+              onClick={() => removeFilter(idx)}
+              className="text-rose-400/70 hover:text-rose-300 p-0.5 cursor-pointer"
+              title="ลบ group"
+            >
+              <Trash2 className="w-3 h-3" />
+            </button>
+          </div>
+
+          <FilterFieldEditor
+            field="categories"
+            label="Categories"
+            values={filter.categories ?? []}
+            onChange={(v) => updateFilter(idx, { categories: v })}
+            categoryTree={categoryTree}
+          />
+          <FilterFieldEditor
+            field="subCategories"
+            label="Sub Categories"
+            values={filter.subCategories ?? []}
+            onChange={(v) => updateFilter(idx, { subCategories: v })}
+            categoryTree={categoryTree}
+          />
+          <FilterFieldEditor
+            field="brands"
+            label="Brands"
+            values={filter.brands ?? []}
+            onChange={(v) => updateFilter(idx, { brands: v })}
+            categoryTree={categoryTree}
+          />
+          <FilterFieldEditor
+            field="customerCodes"
+            label="Customer Codes"
+            values={filter.customerCodes ?? []}
+            onChange={(v) => updateFilter(idx, { customerCodes: v })}
+            categoryTree={categoryTree}
+          />
+          <FilterFieldEditor
+            field="productNames"
+            label="Product Names"
+            values={filter.productNames ?? []}
+            onChange={(v) => updateFilter(idx, { productNames: v })}
+            categoryTree={categoryTree}
+            isLong
+          />
+          <FilterFieldEditor
+            field="models"
+            label="Models"
+            values={filter.models ?? []}
+            onChange={(v) => updateFilter(idx, { models: v })}
+            categoryTree={categoryTree}
+          />
+          <FilterFieldEditor
+            field="docTypes"
+            label="Doc Types"
+            values={filter.docTypes ?? []}
+            onChange={(v) => updateFilter(idx, { docTypes: v })}
+            categoryTree={categoryTree}
+          />
+
+          <div className="flex items-center gap-2 pt-1">
+            <label className="text-[10px] text-white/50">Product Type:</label>
+            <select
+              value={
+                filter.includeNonInventory === true
+                  ? "all"
+                  : filter.includeNonInventory === false
+                    ? "inventory"
+                    : "all"
+              }
+              onChange={(e) => {
+                const val = e.target.value;
+                updateFilter(idx, {
+                  includeNonInventory: val === "all" ? undefined : val === "inventory",
+                });
+              }}
+              className="text-[10px] bg-white/5 border border-white/10 text-white rounded-md px-2 py-1 outline-none"
+            >
+              <option value="all" className="text-gray-900">
+                All
+              </option>
+              <option value="inventory" className="text-gray-900">
+                Inventory only
+              </option>
+            </select>
+          </div>
+        </div>
+      ))}
+
+      {filters.length === 0 && (
+        <div className="text-[10px] text-white/40 italic">ยังไม่มี filter (จะนับทุก row)</div>
+      )}
+    </div>
+  );
+}
+
+function FilterFieldEditor({
+  field,
+  label,
+  values,
+  onChange,
+  categoryTree,
+  isLong,
+}: {
+  field: keyof WonderFilter;
+  label: string;
+  values: string[];
+  onChange: (next: string[]) => void;
+  categoryTree: Map<string, Set<string>>;
+  isLong?: boolean;
+}) {
+  const [input, setInput] = useState("");
+
+  const addValue = () => {
+    const v = input.trim();
+    if (!v) return;
+    if (values.includes(v)) {
+      setInput("");
+      return;
+    }
+    onChange([...values, v]);
+    setInput("");
+  };
+
+  const removeValue = (v: string) => {
+    onChange(values.filter((x) => x !== v));
+  };
+
+  return (
+    <div>
+      <div className="text-[10px] text-white/50 mb-0.5">{label}</div>
+      <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto pr-1 mb-1">
+        {values.length === 0 ? (
+          <span className="text-[10px] text-white/30 italic">—</span>
+        ) : (
+          values.map((v) => (
+            <span
+              key={v}
+              className="inline-flex items-center gap-1 text-[10px] bg-white/10 text-white/85 px-2 py-0.5 rounded-md border border-white/10"
+            >
+              <span className={isLong ? "max-w-[200px] truncate" : ""}>{v}</span>
+              <button
+                type="button"
+                onClick={() => removeValue(v)}
+                className="hover:text-rose-300 cursor-pointer"
+              >
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </span>
+          ))
+        )}
+      </div>
+      <div className="flex gap-1">
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              addValue();
+            }
+          }}
+          placeholder={`+ เพิ่ม ${label} (กด Enter)`}
+          className="flex-1 text-[10px] bg-white/5 border border-white/10 text-white rounded-md px-2 py-1 outline-none focus:border-white/30 placeholder:text-white/25"
+        />
+        <button
+          type="button"
+          onClick={addValue}
+          className="text-[10px] bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 px-2 py-1 rounded-md cursor-pointer"
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function deriveLabel(filters: WonderFilter[], _calcType: WonderCalcType): string {
+  const first = filters[0];
+  if (!first) return "";
+  const parts: string[] = [];
+  FILTER_FIELDS.forEach((f) => {
+    const list = first[f.key] as string[] | undefined;
+    if (list && list.length > 0) {
+      parts.push(`${f.label}: ${list.slice(0, 3).join(", ")}${list.length > 3 ? "…" : ""}`);
+    }
+  });
+  return parts.join(" / ") || "ทุก row";
 }

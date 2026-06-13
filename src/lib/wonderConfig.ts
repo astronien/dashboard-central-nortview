@@ -1,151 +1,1069 @@
 /**
- * 7 Wonder Config — editable configuration for the 7 Wonders KPI system.
+ * Wonder / KPI Config — structured filter system.
  *
- * Each wonder has:
- *   - id: unique identifier
- *   - name: display name (editable)
- *   - targetPercent: the KPI target percentage (editable)
- *   - divisor: which product count to use as the denominator (editable)
- *   - matchKeywords: keywords to match product rows against (for numerator counting)
+ * Each Wonder has:
+ *   - id, name, targetPercent: basic metadata
+ *   - calcType: "attach" (count-based attach rate A/B) | "bahtRate" (revenue-based rate A/B)
+ *   - labelA / labelB: human-readable summaries of each filter
+ *   - color: UI badge color
+ *   - filtersA / filtersB: array of filter groups (OR within group, AND across groups)
+ *     Each filter has multi-value arrays; a row matches the filter when for every non-empty
+ *     array the row value (normalized) is included in the array.
+ *   - includeNonInventory: if true, include rows whose Product Type is not "Inventory Item"
+ *
+ * Backward compatibility: legacy configs (matchKeywords / baseCategories / divisor / etc.)
+ * are auto-converted to the new schema via `migrateLegacyWonderConfig()`.
  */
 
-export type WonderDivisor =
-  | "iPhone"
-  | "iPad"
-  | "Mac"
-  | "iPhone+iPad"
-  | "All Units"
-  | "Target iPhone"
-  | "Target iPad"
-  | "Target Mac"
-  | "Target Apple Watch"
-  | "Target SIM"
-  | "Target BTB"
-  | "Target Smartphone"
-  | "Target Total";
+export type WonderCalcType = "attach" | "bahtRate";
 
-export const WONDER_DIVISOR_OPTIONS: { value: WonderDivisor; label: string }[] = [
-  { value: "iPhone", label: "ยอดขาย iPhone" },
-  { value: "iPad", label: "ยอดขาย iPad" },
-  { value: "Mac", label: "ยอดขาย Mac" },
-  { value: "iPhone+iPad", label: "ยอดขาย iPhone + iPad" },
-  { value: "All Units", label: "ยอดขายทุกอุปกรณ์ (All Units)" },
-  { value: "Target iPhone", label: "เป้าหมาย iPhone (จาก DB)" },
-  { value: "Target iPad", label: "เป้าหมาย iPad (จาก DB)" },
-  { value: "Target Mac", label: "เป้าหมาย Mac (จาก DB)" },
-  { value: "Target Apple Watch", label: "เป้าหมาย Apple Watch (จาก DB)" },
-  { value: "Target SIM", label: "เป้าหมาย SIM (จาก DB)" },
-  { value: "Target BTB", label: "เป้าหมาย BTB (จาก DB)" },
-  { value: "Target Smartphone", label: "เป้าหมาย Smartphone (จาก DB)" },
-  { value: "Target Total", label: "เป้าหมายรวมยอดขาย (จาก DB)" },
-];
-
-export type WonderDivisorBase = "unit" | "revenue";
-
-export type WonderBaseMode = "unit" | "revenue";
-
-export type WonderBaseDivisor = "iPhone" | "iPad" | "Mac" | "iPhone+iPad" | "All Units";
+export type WonderFilter = {
+  categories?: string[];
+  subCategories?: string[];
+  models?: string[];
+  brands?: string[];
+  customerCodes?: string[];
+  productNames?: string[];
+  docTypes?: string[];
+  includeNonInventory?: boolean;
+};
 
 export type WonderItemConfig = {
   id: string;
   name: string;
   targetPercent: number;
-  divisor?: WonderDivisor;
-  divisorBase?: WonderDivisorBase;
-  baseMode?: WonderBaseMode;
-  baseDivisors?: WonderBaseDivisor[];
-  matchKeywords?: string[];
-  baseCategories?: string[]; // list of "Category||Sub Category"
-  divisorCategories?: string[]; // list of "Category||Sub Category"
-  divisorColumn?: string; // column header name in sales file
-  divisorValue?: string; // matching value in that column
+  calcType: WonderCalcType;
+  labelA: string;
+  labelB: string;
+  filtersA: WonderFilter[];
+  filtersB: WonderFilter[];
+  color?: string;
 };
 
 export const DEFAULT_WONDER_CONFIGS: WonderItemConfig[] = [
   {
     id: "w1",
-    name: "Trade In",
-    targetPercent: 50,
-    divisor: "iPhone",
-    matchKeywords: ["trade", "เทรด"],
-    baseCategories: [],
-    divisorCategories: [],
+    name: "COVER+",
+    targetPercent: 60,
+    calcType: "attach",
+    labelA:
+      "Smile > Cover+ with Apple Care Services (1+1)/Cover+ with Apple Care Services (2Y)/Cover+ with Apple Care Services (3Y)/COVER PLUS > Product: COVER+ with AppleCare Services for Apple iPhone (1-Year)/COVER+ with AppleCare Services for Apple iPhone (2-Year)...",
+    labelB: "iPhone",
+    filtersA: [
+      {
+        categories: ["Smile"],
+        subCategories: [],
+        models: [
+          "Cover+ with Apple Care Services (1+1)",
+          "Cover+ with Apple Care Services (2Y)",
+          "Cover+ with Apple Care Services (3Y)",
+          "COVER PLUS",
+        ],
+        brands: [],
+        customerCodes: [],
+        productNames: [
+          "COVER+ with AppleCare Services for Apple iPhone (1-Year)",
+          "COVER+ with AppleCare Services for Apple iPhone (2-Year)",
+          "COVER+ with AppleCare Services for Apple iPhone 16e/17e (1-Year)",
+          "COVER+ with AppleCare Services for Apple iPhone 16e/17e (2-Year)",
+          "COVER+ with AppleCare Services for Apple iPhone Air (1-Year)",
+          "COVER+ with AppleCare Services for Apple iPhone Air (2-Year)",
+          "COVER+ with AppleCare Services for Apple iPhone Pro / Pro Max (1-Year)",
+          "COVER+ with AppleCare Services for Apple iPhone Pro / Pro Max (2-Year)",
+          "COVER+ with AppleCare Services for Apple iPhone Pro / Pro Max (3-Year)",
+          "COVER+ with AppleCare Services for Apple iPhone+ with AppleCare Services (1-Year)",
+        ],
+        docTypes: [],
+        includeNonInventory: false,
+      },
+    ],
+    filtersB: [
+      {
+        categories: ["iPhone"],
+        subCategories: [
+          "IPHONE 13",
+          "IPHONE 14",
+          "IPHONE 15",
+          "IPHONE 15 PLUS",
+          "IPHONE 16",
+          "IPHONE 16 PLUS",
+          "IPHONE 16E",
+          "IPHONE 17",
+          "IPHONE 17 PRO",
+          "IPHONE 17 PRO MAX",
+          "IPHONE 17E",
+          "IPHONE AIR",
+        ],
+        models: [],
+        brands: [],
+        customerCodes: [],
+        productNames: [],
+        docTypes: [],
+        includeNonInventory: false,
+      },
+    ],
+    color: "green",
   },
   {
     id: "w2",
-    name: "Cover Plus",
-    targetPercent: 25,
-    divisor: "iPhone",
-    matchKeywords: ["cover+"],
-    baseCategories: [],
-    divisorCategories: [],
+    name: "SIM",
+    targetPercent: 15,
+    calcType: "attach",
+    labelA: "Promo Operator",
+    labelB: "iPhone",
+    filtersA: [
+      {
+        categories: ["Promo Operator"],
+        subCategories: [],
+        models: [],
+        brands: [],
+        customerCodes: [],
+        productNames: [],
+        docTypes: [],
+        includeNonInventory: true,
+      },
+    ],
+    filtersB: [
+      {
+        categories: ["iPhone"],
+        subCategories: [
+          "IPHONE 13",
+          "IPHONE 14",
+          "IPHONE 15",
+          "IPHONE 15 PLUS",
+          "IPHONE 16",
+          "IPHONE 16 PLUS",
+          "IPHONE 16E",
+          "IPHONE 17",
+          "IPHONE 17 PRO",
+          "IPHONE 17 PRO MAX",
+          "IPHONE 17E",
+          "IPHONE AIR",
+        ],
+        models: [],
+        brands: [],
+        customerCodes: [],
+        productNames: [],
+        docTypes: [],
+        includeNonInventory: false,
+      },
+    ],
+    color: "green",
   },
   {
     id: "w3",
-    name: "UFUND Personal",
-    targetPercent: 6,
-    divisor: "iPhone",
-    matchKeywords: ["ufund", "personal"],
-    baseCategories: [],
-    divisorCategories: [],
+    name: "%ATT PENCIL",
+    targetPercent: 85,
+    calcType: "attach",
+    labelA:
+      "Apple Acc for iPad & iPhone > APPLE PENCIL AND IPAD MAGIC KEYBOARD > Pencil",
+    labelB:
+      "iPad > IPAD 11TH GEN (2025)/IPAD AIR 11 M3 5TH GEN (2025)/IPAD AIR 11 M4 6TH GEN (2026)/IPAD AIR 13 M3 2ND GEN (2025)/IPAD AIR 13 M4 3RD GEN (2026)/IPAD MINI 7 (2024)/IPAD PRO 11 M4 5TH GEN (2024)/IPAD PRO 11 M5 6TH GEN (2025)/IPAD PRO 13 M4 7TH GEN (2024)/IPAD PRO 13 M5 8TH GEN (2025)",
+    filtersA: [
+      {
+        categories: ["Apple Acc for iPad & iPhone"],
+        subCategories: ["APPLE PENCIL AND IPAD MAGIC KEYBOARD"],
+        models: ["Pencil"],
+        brands: [],
+        customerCodes: [],
+        productNames: [],
+        docTypes: [],
+        includeNonInventory: false,
+      },
+    ],
+    filtersB: [
+      {
+        categories: ["iPad"],
+        subCategories: [
+          "IPAD 11TH GEN (2025)",
+          "IPAD AIR 11 M3 5TH GEN (2025)",
+          "IPAD AIR 11 M4 6TH GEN (2026)",
+          "IPAD AIR 13 M3 2ND GEN (2025)",
+          "IPAD AIR 13 M4 3RD GEN (2026)",
+          "IPAD MINI 7 (2024)",
+          "IPAD PRO 11 M4 5TH GEN (2024)",
+          "IPAD PRO 11 M5 6TH GEN (2025)",
+          "IPAD PRO 13 M4 7TH GEN (2024)",
+          "IPAD PRO 13 M5 8TH GEN (2025)",
+        ],
+        models: [],
+        brands: [],
+        customerCodes: [],
+        productNames: [],
+        docTypes: [],
+        includeNonInventory: false,
+      },
+    ],
+    color: "green",
   },
   {
     id: "w4",
-    name: "SIM Attach",
-    targetPercent: 15,
-    divisor: "iPhone",
-    matchKeywords: ["sim"],
-    baseCategories: [],
-    divisorCategories: [],
+    name: "PVL",
+    targetPercent: 30,
+    calcType: "attach",
+    labelA:
+      "Adapter/Cases/Mobile Cable/Power Bank/Film for Mobile and Tablet/Film for Computer > ADAPTERS/CAR CHARGER/CASE ACCESSORIES/CASE AIRPODS/CASE APPLE WATCH/CASE IPAD/CASE IPHONE/CASE MACBOOK/... (PVL third-party accessories)",
+    labelB:
+      "iPhone/iPad > IPAD 11TH GEN (2025)/IPAD AIR 11 M3 5TH GEN (2025)/.../IPHONE AIR",
+    filtersA: [
+      {
+        categories: [],
+        subCategories: [],
+        models: [],
+        brands: [
+          "BLUE BOX",
+          "FOX",
+          "IKARAO",
+          "KING KONG",
+          "MCDODO",
+          "MUTURAL",
+          "QPLUS",
+          "TECHPRO",
+          "TITANV",
+          "BASEUS",
+          "JOYROOM",
+          "CASE CLUB",
+        ],
+        customerCodes: [],
+        productNames: [],
+        docTypes: [],
+      },
+    ],
+    filtersB: [
+      {
+        categories: ["iPhone", "iPad", "Mac", "Apple Watch"],
+        subCategories: [
+          "CTO",
+          "IMAC",
+          "IPAD 11TH GEN (2025)",
+          "IPAD AIR 11 M3 5TH GEN (2025)",
+          "IPAD AIR 11 M4 6TH GEN (2026)",
+          "IPAD AIR 13 M3 2ND GEN (2025)",
+          "IPAD AIR 13 M4 3RD GEN (2026)",
+          "IPAD MINI 7 (2024)",
+          "IPAD PRO 11 M4 5TH GEN (2024)",
+          "IPAD PRO 11 M5 6TH GEN (2025)",
+          "IPAD PRO 13 M4 7TH GEN (2024)",
+          "IPAD PRO 13 M5 8TH GEN (2025)",
+          "IPHONE 13",
+          "IPHONE 14",
+          "IPHONE 15",
+          "IPHONE 16",
+          "IPHONE 16 PLUS",
+          "IPHONE 16E",
+          "IPHONE 17",
+          "IPHONE 17 PRO",
+          "IPHONE 17 PRO MAX",
+          "IPHONE 17E",
+          "IPHONE AIR",
+          "MAC MINI",
+          "MACBOOK AIR",
+          "MACBOOK NEO",
+          "MACBOOK PRO RETINA",
+          "SE (2024) GPS - 2ND GEN",
+          "SE 3 (2025) CELLULAR - 3RD GEN",
+          "SE 3 (2025) GPS - 3RD GEN",
+          "SERIES 10 WATCH SPORT GPS",
+          "SERIES 11 WATCH SPORT GPS",
+          "WATCH ULTRA 3 (2025)",
+        ],
+        models: [],
+        brands: [],
+        customerCodes: [],
+        productNames: [],
+        docTypes: [],
+      },
+    ],
+    color: "purple",
   },
   {
     id: "w5",
-    name: "Pencil Attach",
-    targetPercent: 85,
-    divisor: "iPad",
-    matchKeywords: ["pencil"],
-    baseCategories: [],
-    divisorCategories: [],
+    name: "PVL Mix Btb 3rd 12%",
+    targetPercent: 12,
+    calcType: "bahtRate",
+    labelA:
+      "Brand: BASEUS/BLUE BOX/FOX/IKARAO/JOYROOM/KING KONG/MCDODO/MUTURAL/QPLUS/TECHPRO/TITANV/WIWU",
+    labelB:
+      "Adapter/Bag/Case Club/Cases/Console and Gaming Gadget/External Harddrive/Film for Computer/Film for Mobile and Tablet/Flash Drive and Memory Card/Gadget/...",
+    filtersA: [
+      {
+        categories: [],
+        subCategories: [],
+        models: [],
+        brands: [
+          "BASEUS",
+          "BLUE BOX",
+          "FOX",
+          "IKARAO",
+          "JOYROOM",
+          "KING KONG",
+          "MCDODO",
+          "MUTURAL",
+          "QPLUS",
+          "TECHPRO",
+          "TITANV",
+          "CASE CLUB",
+        ],
+        customerCodes: [],
+        productNames: [],
+        docTypes: [],
+      },
+    ],
+    filtersB: [
+      {
+        categories: [
+          "Adapter",
+          "Bag",
+          "Case Club",
+          "Cases",
+          "Console and Gaming Gadget",
+          "External Harddrive",
+          "Film for Computer",
+          "Film for Mobile and Tablet",
+          "Flash Drive and Memory Card",
+          "Gadget",
+          "Gaming Gear",
+          "Graphic Card",
+          "Headphone",
+          "Health & Sport",
+          "IT Accessories",
+          "Mainboard",
+          "Mobile Cable",
+          "Mobile and Tablet Accessory",
+          "Monitor",
+          "Mouse & Keyboards",
+          "Network",
+          "Outdoor Activities",
+          "Power Bank",
+          "Security",
+          "Smart Living",
+          "Smartphone Acc",
+          "Smartwatch",
+          "Software",
+          "Solid State Drive Internal (SSD)",
+          "Speaker",
+          "Streaming",
+          "Stylus",
+          "Techgift",
+          "Xiaomi Eco",
+          "Printer",
+        ],
+        subCategories: [],
+        models: [],
+        brands: [],
+        customerCodes: [],
+        productNames: [],
+        docTypes: [],
+      },
+    ],
+    color: "teal",
   },
   {
     id: "w6",
-    name: "Mac APP",
-    targetPercent: 15,
-    divisor: "Mac",
-    matchKeywords: ["applecare", "care"],
-    baseCategories: [],
-    divisorCategories: [],
+    name: "UFUND P",
+    targetPercent: 6,
+    calcType: "attach",
+    labelA: "ทุกสินค้า",
+    labelB: "iPhone",
+    filtersA: [
+      {
+        categories: ["iPhone", "iPad", "Mac"],
+        subCategories: [
+          "CTO",
+          "DISPLAY",
+          "IMAC",
+          "IPAD 10TH GEN (2022)",
+          "IPAD 11TH GEN (2025)",
+          "IPAD 9TH GEN (2021)",
+          "IPAD AIR 11 M2 4TH GEN (2024)",
+          "IPAD AIR 11 M3 5TH GEN (2025)",
+          "IPAD AIR 11 M4 6TH GEN (2026)",
+          "IPAD AIR 13 M2 1ST GEN (2024)",
+          "IPAD AIR 13 M3 2ND GEN (2025)",
+          "IPAD AIR 13 M4 3RD GEN (2026)",
+          "IPAD AIR 5TH GEN (2022)",
+          "IPAD MINI 6 (2021)",
+          "IPAD MINI 7 (2024)",
+          "IPAD PRO 11 M4 5TH GEN (2024)",
+          "IPAD PRO 11 M5 6TH GEN (2025)",
+          "IPAD PRO 12.9-INCH 6TH GEN (2022)",
+          "IPAD PRO 13 M4 7TH GEN (2024)",
+          "IPAD PRO 13 M5 8TH GEN (2025)",
+          "IPHONE 13",
+          "IPHONE 14",
+          "IPHONE 14 PLUS",
+          "IPHONE 15",
+          "IPHONE 15 PLUS",
+          "IPHONE 15 PRO",
+          "IPHONE 15 PRO MAX",
+          "IPHONE 16",
+          "IPHONE 16 PLUS",
+          "IPHONE 16 PRO",
+          "IPHONE 16 PRO MAX",
+          "IPHONE 16E",
+          "IPHONE 17",
+          "IPHONE 17 PRO",
+          "IPHONE 17 PRO MAX",
+          "IPHONE 17E",
+          "IPHONE AIR",
+          "IPHONE SE",
+          "MAC MINI",
+          "MAC STUDIO",
+          "MACBOOK AIR",
+          "MACBOOK NEO",
+          "MACBOOK PRO RETINA",
+        ],
+        models: [],
+        brands: [],
+        customerCodes: ["UFUND PERSONAL"],
+        productNames: [],
+        docTypes: [],
+      },
+    ],
+    filtersB: [
+      {
+        categories: ["iPhone"],
+        subCategories: [],
+        models: [],
+        brands: [],
+        customerCodes: [],
+        productNames: [],
+        docTypes: [],
+      },
+    ],
+    color: "green",
   },
   {
     id: "w7",
-    name: "Case iPhone+iPad",
+    name: "Film/iPhone",
     targetPercent: 50,
-    divisor: "iPhone+iPad",
-    matchKeywords: ["case"],
-    baseCategories: [],
-    divisorCategories: [],
+    calcType: "attach",
+    labelA: "Film for Mobile and Tablet > FILM IPHONE",
+    labelB:
+      "iPhone > IPHONE 13/IPHONE 14/IPHONE 15/IPHONE 15 PLUS/IPHONE 16/IPHONE 16 PLUS/IPHONE 16E/IPHONE 17/IPHONE 17 PRO/IPHONE 17 PRO MAX/IPHONE 17E/IPHONE AIR",
+    filtersA: [
+      {
+        categories: ["Film for Mobile and Tablet"],
+        subCategories: ["FILM IPHONE"],
+        models: [],
+        brands: [],
+        customerCodes: [],
+        productNames: [],
+        docTypes: [],
+        includeNonInventory: false,
+      },
+    ],
+    filtersB: [
+      {
+        categories: ["iPhone"],
+        subCategories: [
+          "IPHONE 13",
+          "IPHONE 14",
+          "IPHONE 15",
+          "IPHONE 15 PLUS",
+          "IPHONE 16",
+          "IPHONE 16 PLUS",
+          "IPHONE 16E",
+          "IPHONE 17",
+          "IPHONE 17 PRO",
+          "IPHONE 17 PRO MAX",
+          "IPHONE 17E",
+          "IPHONE AIR",
+        ],
+        models: [],
+        brands: [],
+        customerCodes: [],
+        productNames: [],
+        docTypes: [],
+        includeNonInventory: false,
+      },
+    ],
+    color: "amber",
+  },
+  {
+    id: "w8",
+    name: "Film/iPad",
+    targetPercent: 50,
+    calcType: "attach",
+    labelA: "Film for Mobile and Tablet > FILM IPAD",
+    labelB:
+      "iPad > IPAD 11TH GEN (2025)/IPAD AIR 11 M3 5TH GEN (2025)/IPAD AIR 11 M4 6TH GEN (2026)/IPAD AIR 13 M3 2ND GEN (2025)/IPAD AIR 13 M4 3RD GEN (2026)/IPAD MINI 7 (2024)/IPAD PRO 11 M4 5TH GEN (2024)/IPAD PRO 11 M5 6TH GEN (2025)/IPAD PRO 13 M4 7TH GEN (2024)/IPAD PRO 13 M5 8TH GEN (2025)",
+    filtersA: [
+      {
+        categories: ["Film for Mobile and Tablet"],
+        subCategories: ["FILM IPAD"],
+        models: [],
+        brands: [],
+        customerCodes: [],
+        productNames: [],
+        docTypes: [],
+        includeNonInventory: false,
+      },
+    ],
+    filtersB: [
+      {
+        categories: ["iPad"],
+        subCategories: [
+          "IPAD 11TH GEN (2025)",
+          "IPAD AIR 11 M3 5TH GEN (2025)",
+          "IPAD AIR 11 M4 6TH GEN (2026)",
+          "IPAD AIR 13 M3 2ND GEN (2025)",
+          "IPAD AIR 13 M4 3RD GEN (2026)",
+          "IPAD MINI 7 (2024)",
+          "IPAD PRO 11 M4 5TH GEN (2024)",
+          "IPAD PRO 11 M5 6TH GEN (2025)",
+          "IPAD PRO 13 M4 7TH GEN (2024)",
+          "IPAD PRO 13 M5 8TH GEN (2025)",
+        ],
+        models: [],
+        brands: [],
+        customerCodes: [],
+        productNames: [],
+        docTypes: [],
+        includeNonInventory: false,
+      },
+    ],
+    color: "green",
+  },
+  {
+    id: "w9",
+    name: "Case iPad",
+    targetPercent: 50,
+    calcType: "attach",
+    labelA: "Case Club/Cases > CASE IPAD",
+    labelB:
+      "iPad > IPAD 11TH GEN (2025)/IPAD AIR 11 M3 5TH GEN (2025)/IPAD AIR 11 M4 6TH GEN (2026)/IPAD AIR 13 M3 2ND GEN (2025)/IPAD AIR 13 M4 3RD GEN (2026)/IPAD MINI 7 (2024)/IPAD PRO 11 M5 6TH GEN (2025)/IPAD PRO 13 M5 8TH GEN (2025)",
+    filtersA: [
+      {
+        categories: ["Case Club", "Cases"],
+        subCategories: ["CASE IPAD"],
+        models: [],
+        brands: [],
+        customerCodes: [],
+        productNames: [],
+        docTypes: [],
+        includeNonInventory: false,
+      },
+    ],
+    filtersB: [
+      {
+        categories: ["iPad"],
+        subCategories: [
+          "IPAD 11TH GEN (2025)",
+          "IPAD AIR 11 M3 5TH GEN (2025)",
+          "IPAD AIR 11 M4 6TH GEN (2026)",
+          "IPAD AIR 13 M3 2ND GEN (2025)",
+          "IPAD AIR 13 M4 3RD GEN (2026)",
+          "IPAD MINI 7 (2024)",
+          "IPAD PRO 11 M5 6TH GEN (2025)",
+          "IPAD PRO 13 M5 8TH GEN (2025)",
+        ],
+        models: [],
+        brands: [],
+        customerCodes: [],
+        productNames: [],
+        docTypes: [],
+        includeNonInventory: false,
+      },
+    ],
+    color: "green",
+  },
+  {
+    id: "w10",
+    name: "Case iPhone",
+    targetPercent: 50,
+    calcType: "attach",
+    labelA: "Cases/Case Club > CASE IPHONE",
+    labelB:
+      "iPhone > IPHONE 13/IPHONE 14/IPHONE 15/IPHONE 16/IPHONE 16 PLUS/IPHONE 17/IPHONE 17 PRO/IPHONE 17 PRO MAX/IPHONE 17E/IPHONE AIR",
+    filtersA: [
+      {
+        categories: ["Cases", "Case Club"],
+        subCategories: ["CASE IPHONE"],
+        models: [],
+        brands: [],
+        customerCodes: [],
+        productNames: [],
+        docTypes: [],
+        includeNonInventory: false,
+      },
+    ],
+    filtersB: [
+      {
+        categories: ["iPhone"],
+        subCategories: [
+          "IPHONE 13",
+          "IPHONE 14",
+          "IPHONE 15",
+          "IPHONE 16",
+          "IPHONE 16 PLUS",
+          "IPHONE 17",
+          "IPHONE 17 PRO",
+          "IPHONE 17 PRO MAX",
+          "IPHONE 17E",
+          "IPHONE AIR",
+        ],
+        models: [],
+        brands: [],
+        customerCodes: [],
+        productNames: [],
+        docTypes: [],
+        includeNonInventory: false,
+      },
+    ],
+    color: "green",
   },
 ];
 
 const LOCAL_STORAGE_KEY = "dashboard_7wonder_configs";
 
+const normalize = (value: unknown): string =>
+  String(value ?? "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+
+const normalizeForCompare = (value: unknown): string =>
+  String(value ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9ก-๙]/gi, "")
+    .trim();
+
+const rowField = (row: Record<string, unknown>, ...keys: string[]): string => {
+  for (const key of keys) {
+    const val = row[key];
+    if (val !== undefined && val !== null && String(val).trim() !== "") {
+      return String(val);
+    }
+  }
+  return "";
+};
+
+const matchesAny = (rowValue: string, list: string[] | undefined): boolean => {
+  if (!list || list.length === 0) return true;
+  const norm = normalize(rowValue);
+  const compact = normalizeForCompare(rowValue);
+  if (!norm && !compact) return false;
+  return list.some((item) => {
+    const a = normalize(item);
+    const b = normalizeForCompare(item);
+    if (!a) return false;
+    return norm === a || (norm && a.includes(norm)) || (norm && norm.includes(a)) || (b && compact && compact.includes(b));
+  });
+};
+
+export function rowMatchesFilter(
+  row: Record<string, unknown>,
+  filter: WonderFilter | undefined,
+): boolean {
+  if (!filter) return true;
+
+  if (filter.includeNonInventory === false) {
+    const productType = String(
+      row["Product Type"] ?? row.product_type ?? "Inventory Item",
+    ).trim();
+    if (productType && productType !== "Inventory Item") return false;
+  }
+
+  const category = rowField(row, "Category (Name)", "category", "Category");
+  const subCategory = rowField(row, "Sub Category", "sub_category", "SubCategory", "subcategory");
+  const model = rowField(row, "Model", "model", "Models");
+  const brand = rowField(row, "Brand", "brand", "Brands");
+  const customerCode = rowField(
+    row,
+    "Customer Code",
+    "customerCodes",
+    "customer_code",
+    "CustomerCode",
+  );
+  const productName = rowField(row, "Product (Name)", "product_name", "Product");
+  const docType = rowField(row, "Doc Type", "doc_type", "DocType");
+
+  if (!matchesAny(category, filter.categories)) return false;
+  if (!matchesAny(subCategory, filter.subCategories)) return false;
+  if (!matchesAny(model, filter.models)) return false;
+  if (!matchesAny(brand, filter.brands)) return false;
+  if (!matchesAny(customerCode, filter.customerCodes)) return false;
+  if (!matchesAny(productName, filter.productNames)) return false;
+  if (!matchesAny(docType, filter.docTypes)) return false;
+
+  return true;
+}
+
+export function rowMatchesFilters(
+  row: Record<string, unknown>,
+  filters: WonderFilter[] | undefined,
+): boolean {
+  if (!filters || filters.length === 0) return true;
+  return filters.some((f) => rowMatchesFilter(row, f));
+}
+
+const toNumber = (value: unknown): number =>
+  Number(String(value ?? "").replace(/[^\d.-]/g, "")) || 0;
+
+const rowQuantity = (row: Record<string, unknown>): number => {
+  const v = toNumber(
+    row["Number"] ?? row.number ?? row.qty ?? row.quantity ?? 1,
+  );
+  return v > 0 ? v : 1;
+};
+
+const rowRevenue = (row: Record<string, unknown>): number =>
+  toNumber(
+    row["ราคาขายตามบิล"] ??
+      row.bill_amount ??
+      row["Total Price"] ??
+      row.totalPrice ??
+      0,
+  );
+
+export interface WonderCalcResult {
+  numerator: number;
+  denominator: number;
+  numeratorRows: number;
+  denominatorRows: number;
+}
+
+export function calcWonderForRows(
+  rows: Record<string, unknown>[],
+  wonder: Pick<WonderItemConfig, "filtersA" | "filtersB" | "calcType">,
+): WonderCalcResult {
+  let numerator = 0;
+  let denominator = 0;
+  let numeratorRows = 0;
+  let denominatorRows = 0;
+
+  rows.forEach((row) => {
+    const matchA = rowMatchesFilters(row, wonder.filtersA);
+    const matchB = rowMatchesFilters(row, wonder.filtersB);
+
+    if (wonder.calcType === "bahtRate") {
+      if (matchA) numerator += rowRevenue(row);
+      if (matchB) denominator += rowRevenue(row);
+    } else {
+      if (matchA) {
+        numerator += rowQuantity(row);
+        numeratorRows += 1;
+      }
+      if (matchB) {
+        denominator += rowQuantity(row);
+        denominatorRows += 1;
+      }
+    }
+  });
+
+  return { numerator, denominator, numeratorRows, denominatorRows };
+}
+
+export function calcWonderRate(result: WonderCalcResult): number {
+  if (!result.denominator) return 0;
+  return (result.numerator / result.denominator) * 100;
+}
+
+export function isLegacyWonderConfig(item: any): boolean {
+  if (!item || typeof item !== "object") return false;
+  if (Array.isArray(item.filtersA) && Array.isArray(item.filtersB)) return false;
+  if (Array.isArray(item.matchKeywords)) return true;
+  if (Array.isArray(item.baseCategories)) return true;
+  if (typeof item.divisor === "string") return true;
+  if (typeof item.divisorColumn === "string" && item.divisorColumn) return true;
+  return false;
+}
+
+const LEGACY_KEYWORD_TO_FILTER: Record<
+  string,
+  { name: string; filter: WonderFilter; divisorFilter: WonderFilter }
+> = {
+  trade: {
+    name: "Trade In",
+    filter: {
+      categories: [],
+      subCategories: [],
+      models: [],
+      brands: [],
+      customerCodes: [],
+      productNames: [],
+      docTypes: [],
+      includeNonInventory: false,
+    },
+    divisorFilter: {
+      categories: ["iPhone"],
+      subCategories: [],
+      models: [],
+      brands: [],
+      customerCodes: [],
+      productNames: [],
+      docTypes: [],
+      includeNonInventory: false,
+    },
+  },
+  coverplus: {
+    name: "Cover Plus",
+    filter: {
+      categories: ["Smile"],
+      subCategories: [],
+      models: [
+        "Cover+ with Apple Care Services (1+1)",
+        "Cover+ with Apple Care Services (2Y)",
+        "Cover+ with Apple Care Services (3Y)",
+        "COVER PLUS",
+      ],
+      brands: [],
+      customerCodes: [],
+      productNames: [],
+      docTypes: [],
+      includeNonInventory: false,
+    },
+    divisorFilter: {
+      categories: ["iPhone"],
+      subCategories: [],
+      models: [],
+      brands: [],
+      customerCodes: [],
+      productNames: [],
+      docTypes: [],
+      includeNonInventory: false,
+    },
+  },
+  ufund: {
+    name: "UFUND Personal",
+    filter: {
+      categories: ["iPhone", "iPad", "Mac"],
+      subCategories: [],
+      models: [],
+      brands: [],
+      customerCodes: ["UFUND PERSONAL"],
+      productNames: [],
+      docTypes: [],
+    },
+    divisorFilter: {
+      categories: ["iPhone"],
+      subCategories: [],
+      models: [],
+      brands: [],
+      customerCodes: [],
+      productNames: [],
+      docTypes: [],
+    },
+  },
+  sim: {
+    name: "SIM Attach",
+    filter: {
+      categories: ["Promo Operator"],
+      subCategories: [],
+      models: [],
+      brands: [],
+      customerCodes: [],
+      productNames: [],
+      docTypes: [],
+      includeNonInventory: true,
+    },
+    divisorFilter: {
+      categories: ["iPhone"],
+      subCategories: [],
+      models: [],
+      brands: [],
+      customerCodes: [],
+      productNames: [],
+      docTypes: [],
+      includeNonInventory: false,
+    },
+  },
+  pencil: {
+    name: "Pencil Attach",
+    filter: {
+      categories: ["Apple Acc for iPad & iPhone"],
+      subCategories: ["APPLE PENCIL AND IPAD MAGIC KEYBOARD"],
+      models: ["Pencil"],
+      brands: [],
+      customerCodes: [],
+      productNames: [],
+      docTypes: [],
+      includeNonInventory: false,
+    },
+    divisorFilter: {
+      categories: ["iPad"],
+      subCategories: [],
+      models: [],
+      brands: [],
+      customerCodes: [],
+      productNames: [],
+      docTypes: [],
+      includeNonInventory: false,
+    },
+  },
+  applecare: {
+    name: "Mac APP",
+    filter: {
+      categories: [],
+      subCategories: [],
+      models: [],
+      brands: [],
+      customerCodes: [],
+      productNames: [],
+      docTypes: [],
+      includeNonInventory: false,
+    },
+    divisorFilter: {
+      categories: ["Mac"],
+      subCategories: [],
+      models: [],
+      brands: [],
+      customerCodes: [],
+      productNames: [],
+      docTypes: [],
+      includeNonInventory: false,
+    },
+  },
+  case: {
+    name: "Case iPhone+iPad",
+    filter: {
+      categories: ["Cases", "Case Club"],
+      subCategories: ["CASE IPHONE", "CASE IPAD"],
+      models: [],
+      brands: [],
+      customerCodes: [],
+      productNames: [],
+      docTypes: [],
+      includeNonInventory: false,
+    },
+    divisorFilter: {
+      categories: ["iPhone", "iPad"],
+      subCategories: [],
+      models: [],
+      brands: [],
+      customerCodes: [],
+      productNames: [],
+      docTypes: [],
+      includeNonInventory: false,
+    },
+  },
+};
+
+function inferKeywordFromLegacy(item: any): string {
+  const keywords = Array.isArray(item?.matchKeywords) ? item.matchKeywords : [];
+  for (const kw of keywords) {
+    const norm = String(kw).toLowerCase();
+    if (norm.includes("trade")) return "trade";
+    if (norm.includes("cover")) return "coverplus";
+    if (norm.includes("ufund")) return "ufund";
+    if (norm.includes("sim")) return "sim";
+    if (norm.includes("pencil")) return "pencil";
+    if (norm.includes("applecare") || norm.includes("care")) return "applecare";
+    if (norm.includes("case")) return "case";
+  }
+  return "";
+}
+
+export function migrateLegacyWonderConfig(item: any): WonderItemConfig {
+  const kw = inferKeywordFromLegacy(item);
+  const preset = LEGACY_KEYWORD_TO_FILTER[kw];
+
+  const filterA: WonderFilter = preset
+    ? { ...preset.filter }
+    : {
+        categories: [],
+        subCategories: [],
+        models: [],
+        brands: [],
+        customerCodes: [],
+        productNames: [],
+        docTypes: [],
+        includeNonInventory: false,
+      };
+
+  const filterB: WonderFilter = preset
+    ? { ...preset.divisorFilter }
+    : {
+        categories: [],
+        subCategories: [],
+        models: [],
+        brands: [],
+        customerCodes: [],
+        productNames: [],
+        docTypes: [],
+        includeNonInventory: false,
+      };
+
+  const baseCats = Array.isArray(item?.baseCategories) ? item.baseCategories : [];
+  if (baseCats.length) {
+    const cats: string[] = [];
+    const subs: string[] = [];
+    baseCats.forEach((b: string) => {
+      const [c, s] = String(b).split("||");
+      if (c) cats.push(c);
+      if (s) subs.push(s);
+    });
+    if (cats.length) filterA.categories = Array.from(new Set([...(filterA.categories ?? []), ...cats]));
+    if (subs.length) filterA.subCategories = Array.from(new Set([...(filterA.subCategories ?? []), ...subs]));
+  }
+
+  const divCats = Array.isArray(item?.divisorCategories) ? item.divisorCategories : [];
+  if (divCats.length) {
+    const cats: string[] = [];
+    const subs: string[] = [];
+    divCats.forEach((b: string) => {
+      const [c, s] = String(b).split("||");
+      if (c) cats.push(c);
+      if (s) subs.push(s);
+    });
+    if (cats.length) filterB.categories = Array.from(new Set([...(filterB.categories ?? []), ...cats]));
+    if (subs.length) filterB.subCategories = Array.from(new Set([...(filterB.subCategories ?? []), ...subs]));
+  }
+
+  if (item?.divisorColumn && item?.divisorValue) {
+    filterB.productNames = filterB.productNames ?? [];
+    filterB.brands = [...(filterB.brands ?? []), String(item.divisorValue)];
+  }
+
+  return {
+    id: String(item?.id ?? `w_${Date.now()}`),
+    name: String(item?.name ?? preset?.name ?? "Wonder"),
+    targetPercent: Number(item?.targetPercent) || 0,
+    calcType: "attach",
+    labelA: preset?.name ?? item?.name ?? "ตัวเศษ",
+    labelB: kw === "ufund" ? "iPhone" : item?.divisor ?? "iPhone",
+    filtersA: [filterA],
+    filtersB: [filterB],
+    color: "green",
+  };
+}
+
+export function normalizeWonderConfig(item: any): WonderItemConfig | null {
+  if (!item || typeof item !== "object") return null;
+  if (isLegacyWonderConfig(item)) {
+    return migrateLegacyWonderConfig(item);
+  }
+  if (!item.id || !item.name) return null;
+  return {
+    id: String(item.id),
+    name: String(item.name),
+    targetPercent: Number(item.targetPercent) || 0,
+    calcType: item.calcType === "bahtRate" ? "bahtRate" : "attach",
+    labelA: String(item.labelA ?? ""),
+    labelB: String(item.labelB ?? ""),
+    filtersA: Array.isArray(item.filtersA) ? item.filtersA : [],
+    filtersB: Array.isArray(item.filtersB) ? item.filtersB : [],
+    color: typeof item.color === "string" ? item.color : "green",
+  };
+}
+
+export function normalizeWonderConfigs(items: unknown): WonderItemConfig[] {
+  if (!Array.isArray(items)) return DEFAULT_WONDER_CONFIGS;
+  const out: WonderItemConfig[] = [];
+  for (const raw of items) {
+    const norm = normalizeWonderConfig(raw);
+    if (norm) out.push(norm);
+  }
+  return out.length > 0 ? out : DEFAULT_WONDER_CONFIGS;
+}
+
 export function loadWonderConfigs(): WonderItemConfig[] {
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (!raw) return DEFAULT_WONDER_CONFIGS;
-    const parsed = JSON.parse(raw) as WonderItemConfig[];
-    // Basic validation
-    if (!Array.isArray(parsed) || parsed.length === 0) return DEFAULT_WONDER_CONFIGS;
-    if (!parsed[0].id || !parsed[0].name) return DEFAULT_WONDER_CONFIGS;
-    return parsed.map((item) => ({
-      ...item,
-      baseCategories: Array.isArray(item.baseCategories) ? item.baseCategories : [],
-      divisorCategories: Array.isArray(item.divisorCategories) ? item.divisorCategories : [],
-      divisorBase: item.divisorBase === "revenue" ? "revenue" : "unit",
-      baseMode: item.baseMode === "revenue" ? "revenue" : "unit",
-      divisorColumn: item.divisorColumn ?? "",
-      divisorValue: item.divisorValue ?? "",
-    }));
+    const parsed = JSON.parse(raw);
+    return normalizeWonderConfigs(parsed);
   } catch {
     return DEFAULT_WONDER_CONFIGS;
   }
@@ -165,27 +1083,22 @@ export async function fetchWonderConfigs(): Promise<WonderItemConfig[]> {
     if (!res.ok) throw new Error("HTTP error");
     const data = await res.json();
     if (data && Array.isArray(data.configs) && data.configs.length > 0) {
-      const mapped = data.configs.map((c: any) => ({
-        ...c,
-        baseCategories: Array.isArray(c.baseCategories) ? c.baseCategories : [],
-        divisorCategories: Array.isArray(c.divisorCategories) ? c.divisorCategories : [],
-        matchKeywords: Array.isArray(c.matchKeywords) ? c.matchKeywords : [],
-        divisor: c.divisor || "iPhone",
-        divisorColumn: c.divisorColumn ?? "",
-        divisorValue: c.divisorValue ?? "",
-      }));
-      // Cache to localStorage
+      const mapped = normalizeWonderConfigs(data.configs);
       saveWonderConfigs(mapped);
       return mapped;
     }
   } catch (err) {
-    console.warn("Failed to fetch wonder configs from Turso, falling back to localStorage:", err);
+    console.warn(
+      "Failed to fetch wonder configs from Turso, falling back to localStorage:",
+      err,
+    );
   }
   return loadWonderConfigs();
 }
 
-export async function updateWonderConfigs(configs: WonderItemConfig[]): Promise<boolean> {
-  // Always update local cache immediately
+export async function updateWonderConfigs(
+  configs: WonderItemConfig[],
+): Promise<boolean> {
   saveWonderConfigs(configs);
   try {
     const res = await fetch("/api/wonder-configs", {

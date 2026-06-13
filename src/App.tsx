@@ -86,9 +86,6 @@ import {
   type AttachMatrixDisplayRow,
   type AttachOfficerRow,
   type AttachTargetGroup,
-  getGroupCategory,
-  buildCategoryLookup,
-  matchesAttachMember,
 } from "./lib/attachRate";
 import {
   PolarAngleAxis,
@@ -111,7 +108,7 @@ import { HomeDashboardSection } from "./components/dashboard/HomeDashboardSectio
 
 import { StaffOverviewSection } from "./components/dashboard/StaffOverviewSection";
 import { StaffSection } from "./components/dashboard/StaffSection";
-import { loadWonderConfigs, saveWonderConfigs, type WonderItemConfig, fetchWonderConfigs, updateWonderConfigs } from "./lib/wonderConfig";
+import { loadWonderConfigs, saveWonderConfigs, type WonderItemConfig, fetchWonderConfigs, updateWonderConfigs, calcWonderForRows, calcWonderRate } from "./lib/wonderConfig";
 import { ReportsSection } from "./components/dashboard/ReportsSection";
 import { SettingsSection } from "./components/dashboard/SettingsSection";
 
@@ -2031,17 +2028,11 @@ export default function App() {
 
   const activeOfficer7WondersPerformance = useMemo<CategoryPerformanceRow[]>(() => {
     if (!activeOfficer) return [];
-    
+
     const officerName = activeOfficer?.name ?? currentStaff.name;
     const officerIndex = activeOfficerIndex;
     const hasData = displayUploads.current.length > 0;
-    
-    // Count base units by product category for fallback presets
-    let iphoneCount = 0;
-    let ipadCount = 0;
-    let macCount = 0;
-    let allUnitsCount = 0;
-    
+
     const officerRows = hasData
       ? displayUploads.current.filter((row) => {
           const officer = String(row["Officer (Name)"] ?? "").trim();
@@ -2049,183 +2040,34 @@ export default function App() {
         })
       : [];
 
-    if (hasData && officerRows.length > 0) {
-      officerRows.forEach((row) => {
-        const units = Math.max(toNumber(row.Number ?? row.number ?? row.qty), 0);
-        const rowCat = getCategory(row);
-        if (rowCat === "iPhone") iphoneCount += units;
-        if (rowCat === "Mac") macCount += units;
-        if (rowCat === "iPad") ipadCount += units;
-        allUnitsCount += units;
-      });
-    }
-
-    const categoryLookup = buildCategoryLookup(displayUploads.categoryMaster);
-    
-    const isAttachMemberMatched = (gc: string, subCategory: string, selectedList?: string[]): boolean => {
-      if (!selectedList || selectedList.length === 0) return false;
-      return selectedList.some((member) => matchesAttachMember(gc, subCategory, member));
-    };
-
-    // Helper to get divisor count
-    const getDivisorCount = (divisor?: string, divisorBase: "unit" | "revenue" = "unit"): number => {
-      const getTargetRevenue = () => {
-        if (!divisor) return 0;
-        const targetRow = displayUploads.target.find((row) => {
-          const name = `${row.NAME ?? ""} ${row.SURNAME ?? ""}`.trim();
-          return matchesOfficer(name, officerName);
-        });
-        if (!targetRow) return 0;
-        const targetCol = divisor.replace("Target ", "");
-        if (targetCol === "Total") return toNumber(targetRow.Total);
-        for (const [key, val] of Object.entries(targetRow)) {
-          if (key.toLowerCase() === targetCol.toLowerCase() || normalizeText(key) === normalizeText(targetCol)) {
-            return toNumber(val);
-          }
-        }
-        return 0;
-      };
-
-      const getBaseUnits = () => {
-        if (!divisor) return 0;
-        switch (divisor) {
-          case "iPhone": return iphoneCount;
-          case "iPad": return ipadCount;
-          case "Mac": return macCount;
-          case "iPhone+iPad": return iphoneCount + ipadCount;
-          case "All Units": return allUnitsCount;
-          default:
-            if (divisor.startsWith("Target ")) return getTargetRevenue();
-            return iphoneCount;
-        }
-      };
-
-      if (divisorBase === "revenue") {
-        if (!divisor) return 0;
-        if (divisor.startsWith("Target ")) return getTargetRevenue();
-        const divisorLower = divisor.toLowerCase();
-        return officerRows.reduce((sum, row) => {
-          const cat = String(row["Category (Name)"] ?? "Other").trim();
-          const sub = String(row["Sub Category"] ?? "").trim();
-          const prod = String(row["Product (Name)"] ?? "").trim();
-          const text = normalizeText(`${cat} ${sub} ${prod}`);
-          const match =
-            divisorLower === "iphone" ? text.includes("iphone") :
-            divisorLower === "ipad" ? text.includes("ipad") :
-            divisorLower === "mac" ? text.includes("mac") :
-            divisorLower === "iphone+ipad" ? (text.includes("iphone") || text.includes("ipad")) :
-            divisorLower === "all units" ? true :
-            false;
-          return match ? sum + getCategoryValue(row) : sum;
-        }, 0);
-      }
-
-      return getBaseUnits();
-    };
-    
     const rows: CategoryPerformanceRow[] = wonderConfigs.map((w, idx) => {
       let actualVal: number;
-      
-      if (hasData) {
-        const baseMode = w.baseMode ?? "unit";
-        const baseDivisors = Array.isArray(w.baseDivisors) && w.baseDivisors.length > 0 ? w.baseDivisors : ["iPhone"];
-        const matchesBaseDivisor = (row: any): boolean => {
-          const cat = String(row["Category (Name)"] ?? "Other").trim().toLowerCase();
-          const sub = String(row["Sub Category"] ?? "").trim().toLowerCase();
-          const prod = String(row["Product (Name)"] ?? "").trim().toLowerCase();
-          const text = `${cat} ${sub} ${prod}`;
-          return baseDivisors.some((div) => {
-            switch (div) {
-              case "iPhone": return text.includes("iphone");
-              case "iPad": return text.includes("ipad");
-              case "Mac": return text.includes("mac");
-              case "iPhone+iPad": return text.includes("iphone") || text.includes("ipad");
-              case "All Units": return true;
-              default: return false;
-            }
-          });
-        };
-        const matchesOfficerColumn = (row: any): boolean => {
-          const officer = String(row["Officer (Name)"] ?? row.officer_name ?? "").trim();
-          return matchesOfficer(officer, officerName);
-        };
-        const matchesColumnFilter = (row: any): boolean => {
-          if (!w.divisorColumn || !w.divisorValue) return false;
-          const val = String(row[w.divisorColumn] ?? "").trim();
-          const matchVal = String(w.divisorValue).trim();
-          return val.toLowerCase() === matchVal.toLowerCase() || normalizeText(val) === normalizeText(matchVal);
-        };
-        const shouldCountRow = (row: any): boolean => matchesOfficerColumn(row) && (w.divisorColumn && w.divisorValue ? matchesColumnFilter(row) : true);
-        // Calculate numerator
-        let numerator = 0;
-        officerRows.forEach((row) => {
-          const cat = String(row["Category (Name)"] ?? "Other").trim();
-          const sub = String(row["Sub Category"] ?? "").trim();
-          const prod = String(row["Product (Name)"] ?? "").trim();
-          const units = Math.max(toNumber(row.Number ?? row.number ?? row.qty), 0);
-          const value = baseMode === "revenue" ? getCategoryValue(row) : units;
-          const gc = getGroupCategory(cat, sub, categoryLookup, prod);
-          if (!shouldCountRow(row)) return;
 
-          if (w.divisorColumn && w.divisorValue) {
-            numerator += value;
-          } else if (w.baseCategories && w.baseCategories.length > 0) {
-            if (isAttachMemberMatched(gc, sub, w.baseCategories)) {
-              numerator += value;
-            }
-          } else if (Array.isArray(w.matchKeywords) && w.matchKeywords.length > 0) {
-            const text = normalizeText(`${cat} ${sub} ${prod}`);
-            const matched = w.matchKeywords.some((kw) => {
-              const kwLower = kw.toLowerCase();
-              return text.includes(kwLower) || prod.toUpperCase().includes(kw.toUpperCase());
-            });
-            if (matched) {
-              numerator += value;
-            }
-          }
-        });
-
-        // Calculate denominator
-        let denominator = 0;
-        if (w.divisorColumn && w.divisorValue) {
-          officerRows.forEach((row) => {
-            const val = String(row[w.divisorColumn!] ?? "").trim();
-            const matchVal = String(w.divisorValue!).trim();
-            const units = Math.max(toNumber(row.Number ?? row.number ?? row.qty), 0);
-            const amount = getCategoryValue(row);
-            const compareVal = (w.divisorBase ?? "unit") === "revenue" ? amount : units;
-            
-            if (val.toLowerCase() === matchVal.toLowerCase() || normalizeText(val) === normalizeText(matchVal)) {
-              denominator += compareVal;
-            }
-          });
-        } else if (w.divisorCategories && w.divisorCategories.length > 0) {
-          officerRows.forEach((row) => {
-            const cat = String(row["Category (Name)"] ?? "Other").trim();
-            const sub = String(row["Sub Category"] ?? "").trim();
-            const prod = String(row["Product (Name)"] ?? "").trim();
-            const units = Math.max(toNumber(row.Number ?? row.number ?? row.qty), 0);
-            const amount = getCategoryValue(row);
-            const gc = getGroupCategory(cat, sub, categoryLookup, prod);
-            if (isAttachMemberMatched(gc, sub, w.divisorCategories)) {
-              denominator += (w.divisorBase ?? "unit") === "revenue" ? amount : units;
-            }
-          });
-        } else {
-          denominator = getDivisorCount(w.divisor, w.divisorBase ?? "unit");
-        }
-
-        actualVal = denominator > 0 ? (numerator / denominator) * 100 : 0;
+      if (hasData && officerRows.length > 0) {
+        const result = calcWonderForRows(officerRows, w);
+        actualVal = calcWonderRate(result);
       } else {
-        // Fallback mock values for demo
-        const mockBase = [45, 22, 5.5, 13, 78, 12, 46];
-        const mockOffset = [(officerIndex % 3) * 3, (officerIndex % 5) * 1.5, (officerIndex % 4) * 0.3, (officerIndex % 3) * 1.5, (officerIndex % 3) * 4, (officerIndex % 3) * 2, (officerIndex % 5) * 2];
-        actualVal = (mockBase[idx % mockBase.length] ?? 30) + (mockOffset[idx % mockOffset.length] ?? 0);
+        const mockBase = [45, 22, 5.5, 13, 78, 12, 46, 35, 28, 42];
+        const mockOffset = [
+          (officerIndex % 3) * 3,
+          (officerIndex % 5) * 1.5,
+          (officerIndex % 4) * 0.3,
+          (officerIndex % 3) * 1.5,
+          (officerIndex % 3) * 4,
+          (officerIndex % 3) * 2,
+          (officerIndex % 5) * 2,
+          (officerIndex % 4) * 1.2,
+          (officerIndex % 3) * 2.5,
+          (officerIndex % 4) * 3,
+        ];
+        actualVal =
+          (mockBase[idx % mockBase.length] ?? 30) +
+          (mockOffset[idx % mockOffset.length] ?? 0);
       }
-      
+
       const target = w.targetPercent;
       const achPercent = target ? (actualVal / target) * 100 : 0;
-      
+
       return {
         category: `${idx + 1}. ${w.name}`,
         target,
@@ -2243,11 +2085,11 @@ export default function App() {
         achDayPercent: achPercent,
       };
     });
-    
+
     const totalTarget = rows.reduce((s, r) => s + r.target, 0) / (rows.length || 1);
     const totalActual = rows.reduce((s, r) => s + r.actual, 0) / (rows.length || 1);
     const totalAchPercent = rows.reduce((s, r) => s + r.achPercent, 0) / (rows.length || 1);
-    
+
     const totalRow: CategoryPerformanceRow = {
       category: "Average",
       target: totalTarget,
@@ -2264,7 +2106,7 @@ export default function App() {
       diffDay: totalActual - totalTarget,
       achDayPercent: totalAchPercent,
     };
-    
+
     return [...rows, totalRow];
   }, [activeOfficer, displayUploads, parsedReport, activeOfficerIndex, wonderConfigs]);
 
