@@ -36,6 +36,11 @@ const mapSalesRow = (row, period) => {
     ["Product (Name)"],
     ["Category (Name)", "category"],
     ["Sub Category", "subcategory"],
+    ["Brand", "brand", "Brands", "Brand Name"],
+    ["Customer Code", "customerCodes", "customer_code", "CustomerCode", "Cust Code", "Customer Code "],
+    ["Model", "model", "Models", "Model Name"],
+    ["Doc Type", "doc_type", "DocType"],
+    ["Product Type", "product_type", "ProductType"],
     ["Branch (Name)", "branch"],
     ["Officer (Name)", "Officer", "officer"],
     ["Doc No"],
@@ -52,14 +57,19 @@ const mapSalesRow = (row, period) => {
     product_name: pick(row, keysUsed[1]),
     category_name: pick(row, keysUsed[2]),
     sub_category: pick(row, keysUsed[3]),
-    branch_name: pick(row, keysUsed[4]),
-    officer_name: pick(row, keysUsed[5]),
-    doc_no: pick(row, keysUsed[6]),
-    doc_date: pick(row, keysUsed[7]),
-    total_price: pick(row, keysUsed[8]),
-    bill_amount: pick(row, keysUsed[9]),
-    quantity: pick(row, keysUsed[10]),
-    customer_name: pick(row, keysUsed[11]),
+    brand: pick(row, keysUsed[4]),
+    customer_code: pick(row, keysUsed[5]),
+    model: pick(row, keysUsed[6]),
+    doc_type: pick(row, keysUsed[7]),
+    product_type: pick(row, keysUsed[8]),
+    branch_name: pick(row, keysUsed[9]),
+    officer_name: pick(row, keysUsed[10]),
+    doc_no: pick(row, keysUsed[11]),
+    doc_date: pick(row, keysUsed[12]),
+    total_price: pick(row, keysUsed[13]),
+    bill_amount: pick(row, keysUsed[14]),
+    quantity: pick(row, keysUsed[15]),
+    customer_name: pick(row, keysUsed[16]),
     extra_json: usedKeys(row, keysUsed),
   };
 };
@@ -71,6 +81,11 @@ const toSalesRawRow = (cells) => {
     product_name,
     category_name,
     sub_category,
+    brand,
+    customer_code,
+    model,
+    doc_type,
+    product_type,
     branch_name,
     officer_name,
     doc_no,
@@ -88,6 +103,11 @@ const toSalesRawRow = (cells) => {
       "Product (Name)": product_name ?? "",
       "Category (Name)": category_name ?? "",
       "Sub Category": sub_category ?? "",
+      "Brand": brand ?? "",
+      "Customer Code": customer_code ?? "",
+      "Model": model ?? "",
+      "Doc Type": doc_type ?? "",
+      "Product Type": product_type ?? "Inventory Item",
       "Branch (Name)": branch_name ?? "",
       "Officer (Name)": officer_name ?? "",
       "Doc No": doc_no ?? "",
@@ -208,6 +228,11 @@ const RELATIONAL_DDL = [
     product_name TEXT,
     category_name TEXT,
     sub_category TEXT,
+    brand TEXT,
+    customer_code TEXT,
+    model TEXT,
+    doc_type TEXT,
+    product_type TEXT,
     branch_name TEXT,
     officer_name TEXT,
     doc_no TEXT,
@@ -219,6 +244,8 @@ const RELATIONAL_DDL = [
     extra_json TEXT
   )`,
   `CREATE INDEX IF NOT EXISTS idx_data_sales_period ON data_sales(period)`,
+  `CREATE INDEX IF NOT EXISTS idx_data_sales_customer_code ON data_sales(customer_code)`,
+  `CREATE INDEX IF NOT EXISTS idx_data_sales_brand ON data_sales(brand)`,
   `CREATE TABLE IF NOT EXISTS data_targets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     branch_name TEXT,
@@ -268,6 +295,11 @@ const SALES_COLUMNS = [
   "product_name",
   "category_name",
   "sub_category",
+  "brand",
+  "customer_code",
+  "model",
+  "doc_type",
+  "product_type",
   "branch_name",
   "officer_name",
   "doc_no",
@@ -311,6 +343,22 @@ const ensureRelationalSchema = async (tursoExecute) => {
     await tursoExecute("ALTER TABLE wonder_configs ADD COLUMN divisor_value TEXT");
   } catch (e) {
     // Ignore if column already exists
+  }
+  // Backfill brand / customer_code / model / doc_type / product_type columns
+  // for older data_sales tables that predate Wonder filter multi-field support.
+  const optionalAlter = [
+    "ALTER TABLE data_sales ADD COLUMN brand TEXT",
+    "ALTER TABLE data_sales ADD COLUMN customer_code TEXT",
+    "ALTER TABLE data_sales ADD COLUMN model TEXT",
+    "ALTER TABLE data_sales ADD COLUMN doc_type TEXT",
+    "ALTER TABLE data_sales ADD COLUMN product_type TEXT",
+  ];
+  for (const sql of optionalAlter) {
+    try {
+      await tursoExecute(sql);
+    } catch (e) {
+      // Ignore if column already exists
+    }
   }
 };
 

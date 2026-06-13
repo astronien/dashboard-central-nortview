@@ -330,4 +330,115 @@ describe("wonderConfig", () => {
     assert.equal(out?.calcType, "attach");
     assert.equal(out?.filtersA[0].categories?.[0], "Smile");
   });
+
+  it("rowMatchesFilter reads brand from multiple header aliases", () => {
+    const filter = {
+      categories: [],
+      subCategories: [],
+      models: [],
+      brands: ["TECHPRO"],
+      customerCodes: [],
+      productNames: [],
+      docTypes: [],
+    };
+    assert.equal(
+      rowMatchesFilter({ "Category (Name)": "Cases", Brand: "TECHPRO" }, filter),
+      true,
+    );
+    assert.equal(
+      rowMatchesFilter({ "Category (Name)": "Cases", brand: "techpro" }, filter),
+      true,
+      "lowercase brand header",
+    );
+    assert.equal(
+      rowMatchesFilter({ "Category (Name)": "Cases", "Brand Name": "TECHPRO" }, filter),
+      true,
+      "Brand Name header",
+    );
+  });
+
+  it("rowMatchesFilter reads customer code from multiple header aliases", () => {
+    const filter = {
+      categories: [],
+      subCategories: [],
+      models: [],
+      brands: [],
+      customerCodes: ["UFUND PERSONAL"],
+      productNames: [],
+      docTypes: [],
+    };
+    assert.equal(
+      rowMatchesFilter(
+        { "Category (Name)": "iPhone", "Customer Code": "UFUND PERSONAL" },
+        filter,
+      ),
+      true,
+    );
+    assert.equal(
+      rowMatchesFilter(
+        { "Category (Name)": "iPhone", customerCodes: "UFUND PERSONAL" },
+        filter,
+      ),
+      true,
+      "lowercase customerCodes header",
+    );
+    assert.equal(
+      rowMatchesFilter(
+        { "Category (Name)": "iPhone", customer_code: "UFUND PERSONAL" },
+        filter,
+      ),
+      true,
+      "snake_case customer_code header",
+    );
+    assert.equal(
+      rowMatchesFilter({ "Category (Name)": "iPhone", "Customer Code": "STU-PAYATSTORE" }, filter),
+      false,
+      "different customer code does not match",
+    );
+    assert.equal(
+      rowMatchesFilter({ "Category (Name)": "iPhone" }, filter),
+      false,
+      "missing customer code does not match",
+    );
+  });
+
+  it("Trade In filter (productNames-based) does NOT over-match all iPhone rows", () => {
+    const migrated = migrateLegacyWonderConfig({
+      id: "w1",
+      name: "Trade In",
+      targetPercent: 50,
+      divisor: "iPhone",
+      matchKeywords: ["trade", "เทรด"],
+      baseCategories: [],
+      divisorCategories: [],
+    });
+    const rows = [
+      iphone({ "Product (Name)": "Apple iPhone 16 Pro" }),
+      iphone({ "Product (Name)": "Trade In iPhone 14" }),
+      iphone({ "Product (Name)": "iPhone เทรด 15" }),
+    ];
+    const result = calcWonderForRows(rows, migrated);
+    assert.equal(result.numerator, 2, "only rows with 'trade' or 'เทรด' in product name");
+    assert.equal(result.denominator, 3);
+  });
+
+  it("Mac APP filter (productNames-based) does NOT over-match all Mac rows", () => {
+    const migrated = migrateLegacyWonderConfig({
+      id: "w6",
+      name: "Mac APP",
+      targetPercent: 15,
+      divisor: "Mac",
+      matchKeywords: ["applecare", "care"],
+      baseCategories: [],
+      divisorCategories: [],
+    });
+    const rows = [
+      iphone({ "Product (Name)": "MacBook Pro 14", "Category (Name)": "Mac" }),
+      iphone({ "Product (Name)": "AppleCare for MacBook", "Category (Name)": "Mac" }),
+      iphone({ "Product (Name)": "Magic Mouse", "Category (Name)": "Mac" }),
+    ];
+    const result = calcWonderForRows(rows, migrated);
+    assert.equal(result.numerator, 1, "only AppleCare rows counted");
+    assert.equal(result.denominator, 3);
+  });
 });

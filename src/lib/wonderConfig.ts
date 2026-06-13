@@ -665,18 +665,55 @@ export function rowMatchesFilter(
     if (productType && productType !== "Inventory Item") return false;
   }
 
-  const category = rowField(row, "Category (Name)", "category", "Category");
-  const subCategory = rowField(row, "Sub Category", "sub_category", "SubCategory", "subcategory");
-  const model = rowField(row, "Model", "model", "Models");
-  const brand = rowField(row, "Brand", "brand", "Brands");
+  const category = rowField(
+    row,
+    "Category (Name)",
+    "category",
+    "Category",
+    "category_name",
+    "Cat",
+  );
+  const subCategory = rowField(
+    row,
+    "Sub Category",
+    "sub_category",
+    "SubCategory",
+    "subcategory",
+    "Sub_Category",
+  );
+  const model = rowField(
+    row,
+    "Model",
+    "model",
+    "Models",
+    "Model Name",
+    "model_name",
+  );
+  const brand = rowField(
+    row,
+    "Brand",
+    "brand",
+    "Brands",
+    "Brand Name",
+    "brand_name",
+  );
   const customerCode = rowField(
     row,
     "Customer Code",
     "customerCodes",
     "customer_code",
     "CustomerCode",
+    "Cust Code",
+    "Customer code",
+    "Customer Code ",
   );
-  const productName = rowField(row, "Product (Name)", "product_name", "Product");
+  const productName = rowField(
+    row,
+    "Product (Name)",
+    "product_name",
+    "Product",
+    "Product Name",
+  );
   const docType = rowField(row, "Doc Type", "doc_type", "DocType");
 
   if (!matchesAny(category, filter.categories)) return false;
@@ -782,7 +819,7 @@ const LEGACY_KEYWORD_TO_FILTER: Record<
       models: [],
       brands: [],
       customerCodes: [],
-      productNames: [],
+      productNames: ["trade", "เทรด", "Trade In", "Trade-In", "TRADE IN"],
       docTypes: [],
       includeNonInventory: false,
     },
@@ -810,7 +847,10 @@ const LEGACY_KEYWORD_TO_FILTER: Record<
       ],
       brands: [],
       customerCodes: [],
-      productNames: [],
+      productNames: [
+        "COVER+ with AppleCare Services for Apple iPhone (1-Year)",
+        "COVER+ with AppleCare Services for Apple iPhone (2-Year)",
+      ],
       docTypes: [],
       includeNonInventory: false,
     },
@@ -877,7 +917,7 @@ const LEGACY_KEYWORD_TO_FILTER: Record<
       models: ["Pencil"],
       brands: [],
       customerCodes: [],
-      productNames: [],
+      productNames: ["Pencil", "Apple Pencil"],
       docTypes: [],
       includeNonInventory: false,
     },
@@ -900,7 +940,7 @@ const LEGACY_KEYWORD_TO_FILTER: Record<
       models: [],
       brands: [],
       customerCodes: [],
-      productNames: [],
+      productNames: ["AppleCare", "APPLECARE", "applecare", "Apple Care", "APPLE CARE"],
       docTypes: [],
       includeNonInventory: false,
     },
@@ -923,7 +963,7 @@ const LEGACY_KEYWORD_TO_FILTER: Record<
       models: [],
       brands: [],
       customerCodes: [],
-      productNames: [],
+      productNames: ["case", "Case", "CASE"],
       docTypes: [],
       includeNonInventory: false,
     },
