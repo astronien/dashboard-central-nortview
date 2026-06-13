@@ -334,6 +334,19 @@ const CATEGORY_COLUMNS = ["cat_sub_cat", "cat_daily", "extra_json"];
 // Cleared whenever ensureRelationalSchema runs an ALTER.
 const columnCache = new Map();
 
+// Local cell value extractor that handles the Turso HTTP row format
+// (each cell is either a raw value or { type, value }). Mirrors the helper
+// in turso.js but kept local so tables-sync.js stays self-contained.
+const cellValue = (cell) => {
+  if (cell == null) return null;
+  if (typeof cell === "object" && "value" in cell) return cell.value;
+  return cell;
+};
+const tableInfoRowValues = (row) => {
+  if (!Array.isArray(row)) return [];
+  return row.map(cellValue);
+};
+
 const ensureRelationalSchema = async (tursoExecute) => {
   for (const sql of RELATIONAL_DDL) {
     await tursoExecute(sql);
@@ -386,11 +399,16 @@ const intersectWithExistingColumns = async (
     const result = await tursoExecute(`PRAGMA table_info(${table})`);
     const present = new Set(
       (result.rows ?? [])
-        .map((row) => rowValues(row)[1])
-        .filter(Boolean)
+        .map((row) => tableInfoRowValues(row)[1])
+        .filter((v) => v !== null && v !== undefined && String(v).trim() !== "")
         .map((name) => String(name)),
     );
-    existing = new Set(desiredColumns.filter((c) => present.has(c)));
+    if (present.size > 0) {
+      existing = new Set(desiredColumns.filter((c) => present.has(c)));
+    }
+    // If present is empty (PRAGMA returned no rows or unrecognized format),
+    // we keep `existing = new Set(desiredColumns)` and the actual SQL will
+    // surface a clear "no such column" error.
   } catch (e) {
     // If PRAGMA fails (e.g. table missing), keep all desired columns and let
     // the calling query surface the underlying error.
