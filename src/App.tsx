@@ -1596,8 +1596,21 @@ export default function App() {
   const [staffBuilderOpen, setStaffBuilderOpen] = useState(false);
   const [staffPhotos, setStaffPhotos] = useState<StaffPhotosMap>({});
   const [staffPhotoError, setStaffPhotoError] = useState<string | null>(null);
-  const [wonderConfigs, setWonderConfigs] = useState<WonderItemConfig[]>(loadWonderConfigs);
+  const [wonderConfigs, setWonderConfigs] = useState<WonderItemConfig[] | null>(null);
   const [uploadingPhotoId, setUploadingPhotoId] = useState<string | null>(null);
+  // loadWonderConfigs is async (IDB); seed with DEFAULT_WONDER_CONFIGS and
+  // hydrate from IDB in a useEffect below.
+  useEffect(() => {
+    void (async () => {
+      try {
+        const loaded = await loadWonderConfigs();
+        setWonderConfigs(loaded);
+      } catch (e) {
+        console.warn("[App] loadWonderConfigs failed:", e);
+        setWonderConfigs(null);
+      }
+    })();
+  }, []);
 
   const uniqueCombos = useMemo(() => {
     const combos = new Map<string, { cat: string; sub: string; label: string }>();
@@ -2061,7 +2074,7 @@ export default function App() {
         })
       : [];
 
-    const rows: CategoryPerformanceRow[] = wonderConfigs.map((w, idx) => {
+    const rows: CategoryPerformanceRow[] = (wonderConfigs ?? []).map((w, idx) => {
       let actualVal: number;
 
       if (hasData && officerRows.length > 0) {
