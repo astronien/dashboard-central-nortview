@@ -92,7 +92,7 @@ type Props = {
   uploadedFiles: Record<UploadKind, RawRow[]>;
   uploadedFileNames: Record<UploadKind, string>;
   isUploadingFile: Record<UploadKind, boolean>;
-  isSavingTurso: boolean;
+  isSaving: boolean;
   uploadError: string | null;
   uploadStatus: UploadStatus | null;
   onExportCsv: () => void;
@@ -212,7 +212,7 @@ export function ReportsSection({
   uploadedFiles,
   uploadedFileNames,
   isUploadingFile,
-  isSavingTurso,
+  isSaving,
   uploadError,
   uploadStatus,
   onExportCsv,
@@ -362,9 +362,9 @@ export function ReportsSection({
             <FileSpreadsheet className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-xl font-bold tracking-tight">Backend Report Logic Preview</h2>
+            <h2 className="text-xl font-bold tracking-tight">สรุปผลรายงาน</h2>
             <p className="text-sm text-white/60 mt-1">
-              Summary of branch, category, and officer calculations from the backend logic doc.
+              Branch / Category / Officer summary คำนวณจากข้อมูลที่อัปโหลด
             </p>
           </div>
         </div>
@@ -379,7 +379,7 @@ export function ReportsSection({
             <button
               type="button"
               onClick={() => {
-                if (confirm("ลบข้อมูลทั้งหมดใน Browser? (Turso DB ไม่ถูกแตะ)")) {
+                if (confirm("ลบข้อมูลทั้งหมดใน Browser? (จะลบทั้ง Current / Last Month / Last Year / Target / Category Master)")) {
                   onClearAll();
                 }
               }}
@@ -390,7 +390,7 @@ export function ReportsSection({
             </button>
           </motion.div>
           <div className="text-xs text-white/50 text-right max-w-md">
-            {isSavingTurso
+            {isSaving
               ? "กำลังบันทึก..."
               : `Loaded ${parsedReport.branches.length} branches • ${parsedReport.categories.length} categories • ${parsedReport.officers.length} officers`}
           </div>
@@ -431,27 +431,38 @@ export function ReportsSection({
                 </tr>
               </thead>
               <tbody>
-                {parsedReport.branches.map((row) => {
-                  const achPercent = row.target ? (row.actual / row.target) * 100 : 0;
-                  const momPercent = row.lastMonth ? ((row.actual - row.lastMonth) / row.lastMonth) * 100 : 0;
-                  const yoyPercent = row.lastYear ? ((row.actual - row.lastYear) / row.lastYear) * 100 : 0;
-                  return (
-                    <tr key={row.label} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                      <td className="py-3 pr-4 font-medium text-white/90">{row.label}</td>
-                      <td className="py-3 px-3 text-white/80">฿{Math.round(row.target).toLocaleString()}</td>
-                      <td className="py-3 px-3 text-white/80">฿{Math.round(row.actual).toLocaleString()}</td>
-                      <td className={`py-3 px-3 font-semibold ${achPercent >= 100 ? "text-emerald-400" : "text-yellow-400"}`}>
-                        {Math.round(achPercent)}%
-                      </td>
-                      <td className={`py-3 px-3 font-semibold ${momPercent >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                        {Math.round(momPercent)}%
-                      </td>
-                      <td className={`py-3 px-3 font-semibold ${yoyPercent >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                        {Math.round(yoyPercent)}%
-                      </td>
-                    </tr>
-                  );
-                })}
+                {parsedReport.branches.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-12 text-center">
+                      <div className="flex flex-col items-center gap-2 text-white/40">
+                        <Upload className="w-8 h-8 opacity-50" />
+                        <p className="text-sm">ยังไม่มีข้อมูล — อัปโหลดไฟล์ด้านบน</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  parsedReport.branches.map((row) => {
+                    const achPercent = row.target ? (row.actual / row.target) * 100 : 0;
+                    const momPercent = row.lastMonth ? ((row.actual - row.lastMonth) / row.lastMonth) * 100 : 0;
+                    const yoyPercent = row.lastYear ? ((row.actual - row.lastYear) / row.lastYear) * 100 : 0;
+                    return (
+                      <tr key={row.label} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                        <td className="py-3 pr-4 font-medium text-white/90">{row.label}</td>
+                        <td className="py-3 px-3 text-white/80">฿{Math.round(row.target).toLocaleString()}</td>
+                        <td className="py-3 px-3 text-white/80">฿{Math.round(row.actual).toLocaleString()}</td>
+                        <td className={`py-3 px-3 font-semibold ${achPercent >= 100 ? "text-emerald-400" : "text-yellow-400"}`}>
+                          {Math.round(achPercent)}%
+                        </td>
+                        <td className={`py-3 px-3 font-semibold ${momPercent >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                          {Math.round(momPercent)}%
+                        </td>
+                        <td className={`py-3 px-3 font-semibold ${yoyPercent >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                          {Math.round(yoyPercent)}%
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
@@ -492,24 +503,31 @@ export function ReportsSection({
             <span className="text-xs text-white/50">Main category totals</span>
           </div>
           <div className="space-y-3">
-            {parsedReport.categories.map((item) => (
-              <div key={item.category} className="rounded-2xl bg-white/5 border border-white/5 p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="font-medium text-white/90">{item.category}</div>
-                  <div className="text-sm text-white/60">{item.share}% share</div>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-white/70">Actual ฿{Math.round(item.actual).toLocaleString()}</span>
-                  <span className="text-white/70">Target ฿{Math.round(item.target).toLocaleString()}</span>
-                </div>
-                <div className="mt-3 h-2 rounded-full bg-white/10 overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-emerald-400"
-                    style={{ width: `${Math.min((item.actual / item.target) * 100, 140)}%` }}
-                  />
-                </div>
+            {parsedReport.categories.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-12 text-white/40">
+                <Upload className="w-8 h-8 opacity-50" />
+                <p className="text-sm">ยังไม่มีข้อมูล</p>
               </div>
-            ))}
+            ) : (
+              parsedReport.categories.map((item) => (
+                <div key={item.category} className="rounded-2xl bg-white/5 border border-white/5 p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="font-medium text-white/90">{item.category}</div>
+                    <div className="text-sm text-white/60">{item.share}% share</div>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-white/70">Actual ฿{Math.round(item.actual).toLocaleString()}</span>
+                    <span className="text-white/70">Target ฿{Math.round(item.target).toLocaleString()}</span>
+                  </div>
+                  <div className="mt-3 h-2 rounded-full bg-white/10 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-emerald-400"
+                      style={{ width: `${Math.min((item.actual / item.target) * 100, 140)}%` }}
+                    />
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -530,15 +548,26 @@ export function ReportsSection({
                 </tr>
               </thead>
               <tbody>
-                {parsedReport.officers.map((item) => (
-                  <tr key={item.name} className="border-t border-white/5 hover:bg-white/5 transition-colors">
-                    <td className="py-3 px-4 text-white/90 font-medium">{item.name}</td>
-                    <td className="py-3 px-4 text-white/70">{item.branch}</td>
-                    <td className="py-3 px-4 text-white/70">฿{Math.round(item.actual).toLocaleString()}</td>
-                    <td className="py-3 px-4 text-white/70">฿{Math.round(item.target).toLocaleString()}</td>
-                    <td className="py-3 px-4 font-semibold text-emerald-400">{Math.round(item.rate)}%</td>
+                {parsedReport.officers.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-12 text-center">
+                      <div className="flex flex-col items-center gap-2 text-white/40">
+                        <Upload className="w-8 h-8 opacity-50" />
+                        <p className="text-sm">ยังไม่มีข้อมูล</p>
+                      </div>
+                    </td>
                   </tr>
-                ))}
+                ) : (
+                  parsedReport.officers.map((item) => (
+                    <tr key={item.name} className="border-t border-white/5 hover:bg-white/5 transition-colors">
+                      <td className="py-3 px-4 text-white/90 font-medium">{item.name}</td>
+                      <td className="py-3 px-4 text-white/70">{item.branch}</td>
+                      <td className="py-3 px-4 text-white/70">฿{Math.round(item.actual).toLocaleString()}</td>
+                      <td className="py-3 px-4 text-white/70">฿{Math.round(item.target).toLocaleString()}</td>
+                      <td className="py-3 px-4 font-semibold text-emerald-400">{Math.round(item.rate)}%</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

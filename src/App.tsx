@@ -1550,7 +1550,7 @@ export default function App() {
   const [selectedAttachOfficers, setSelectedAttachOfficers] = useState<string[]>([]);
   const [isAttachDropdownOpen, setIsAttachDropdownOpen] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [isSavingTurso, setIsSavingTurso] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isUploadingFile, setIsUploadingFile] = useState<Record<UploadKind, boolean>>({
     target: false,
@@ -2235,13 +2235,6 @@ export default function App() {
     [displayUploads.target, parsedReport.officers],
   );
 
-  const uploadStats = useMemo(() => {
-    const branches = parsedReport.branches.length;
-    const categories = parsedReport.categories.length;
-    const officers = parsedReport.officers.length;
-    return { branches, categories, officers };
-  }, [parsedReport]);
-
   const derivedHomeStats = useMemo<DerivedHomeStat[]>(() => {
     const totalSales = parsedReport.branches.reduce((sum, branch) => sum + branch.actual, 0);
     const totalTarget = parsedReport.branches.reduce((sum, branch) => sum + branch.target, 0);
@@ -2778,7 +2771,7 @@ export default function App() {
     nextUploads: UploadState,
     kinds?: UploadKind[],
   ) => {
-    setIsSavingTurso(true);
+    setIsSaving(true);
     try {
       await saveUploads(nextUploads, kinds);
       setUploadError(null);
@@ -2790,7 +2783,7 @@ export default function App() {
           : "บันทึกลง Browser ไม่สำเร็จ",
       );
     } finally {
-      setIsSavingTurso(false);
+      setIsSaving(false);
     }
   };
 
@@ -3063,6 +3056,14 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#1c2722] p-4 font-sans text-white md:p-8 flex flex-col items-center">
+      {isInitialLoading && (
+        <div className="fixed inset-0 z-[999] bg-[#1c2722] flex items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-12 h-12 border-4 border-white/20 border-t-emerald-400 rounded-full animate-spin" />
+            <p className="text-white/60 text-sm">กำลังโหลดข้อมูล...</p>
+          </div>
+        </div>
+      )}
       <div className="w-full max-w-[1440px] h-auto min-h-[90vh] bg-gradient-to-br from-[#1b5d44] to-[#123627] rounded-[2rem] border border-white/10 shadow-2xl flex flex-col relative overflow-hidden">
         {/* Logo (Absolute Left) */}
         <div className="absolute top-6 left-8 z-50 flex items-center gap-4 pointer-events-auto">
@@ -3289,7 +3290,7 @@ export default function App() {
                   uploadedFiles={uploadedFiles}
                   uploadedFileNames={uploadedFileNames}
                   isUploadingFile={isUploadingFile}
-                  isSavingTurso={isSavingTurso}
+                  isSaving={isSaving}
                   uploadError={uploadError}
                   uploadStatus={uploadStatus}
                   onExportCsv={exportCsv}
