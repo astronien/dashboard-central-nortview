@@ -1,3 +1,5 @@
+import { getItem, setItem } from "./storage";
+
 /**
  * Wonder / KPI Config — structured filter system.
  *
@@ -1220,20 +1222,19 @@ export function normalizeWonderConfigs(items: unknown): WonderItemConfig[] {
   return out.length > 0 ? out : DEFAULT_WONDER_CONFIGS;
 }
 
-export function loadWonderConfigs(): WonderItemConfig[] {
+export async function loadWonderConfigs(): Promise<WonderItemConfig[]> {
   try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (!raw) return DEFAULT_WONDER_CONFIGS;
-    const parsed = JSON.parse(raw);
-    return normalizeWonderConfigs(parsed);
+    const stored = await getItem<unknown>(LOCAL_STORAGE_KEY);
+    if (stored === null) return DEFAULT_WONDER_CONFIGS;
+    return normalizeWonderConfigs(stored);
   } catch {
     return DEFAULT_WONDER_CONFIGS;
   }
 }
 
-export function saveWonderConfigs(configs: WonderItemConfig[]): void {
+export async function saveWonderConfigs(configs: WonderItemConfig[]): Promise<void> {
   try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(configs));
+    await setItem(LOCAL_STORAGE_KEY, configs);
   } catch {
     // silently fail
   }
@@ -1246,12 +1247,12 @@ export async function fetchWonderConfigs(): Promise<WonderItemConfig[]> {
     const data = await res.json();
     if (data && Array.isArray(data.configs) && data.configs.length > 0) {
       const mapped = normalizeWonderConfigs(data.configs);
-      saveWonderConfigs(mapped);
+      void saveWonderConfigs(mapped);
       return mapped;
     }
   } catch (err) {
     console.warn(
-      "Failed to fetch wonder configs from Turso, falling back to localStorage:",
+      "Failed to fetch wonder configs from Turso, falling back to IDB:",
       err,
     );
   }
@@ -1261,7 +1262,7 @@ export async function fetchWonderConfigs(): Promise<WonderItemConfig[]> {
 export async function updateWonderConfigs(
   configs: WonderItemConfig[],
 ): Promise<boolean> {
-  saveWonderConfigs(configs);
+  void saveWonderConfigs(configs);
   try {
     const res = await fetch("/api/wonder-configs", {
       method: "POST",

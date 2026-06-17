@@ -1,4 +1,4 @@
-import { compressJson } from "./compress";
+import { getItem, setItem, removeItem } from "./storage";
 
 export type UploadKind =
   | "target"
@@ -11,7 +11,8 @@ export type UploadKind =
 export type RawRow = Record<string, string | number | undefined>;
 export type UploadState = Record<UploadKind, RawRow[]>;
 
-const UPLOADS_URL = "/api/uploads";
+const UPLOADS_PREFIX = "dashboard-uploads:";
+
 const UPLOAD_KINDS: UploadKind[] = [
   "target",
   "current",
@@ -21,30 +22,14 @@ const UPLOAD_KINDS: UploadKind[] = [
   "categoryMaster",
 ];
 
-const UPLOAD_ROW_LIMIT = 1200;
-
-const kindUrl = (kind: UploadKind) =>
-  `${UPLOADS_URL}?kind=${encodeURIComponent(kind)}`;
+const kindKey = (kind: UploadKind) => `${UPLOADS_PREFIX}${kind}`;
 
 export const hasUploadData = (state: UploadState) =>
   Object.values(state).some((rows) => rows.length > 0);
 
-const splitRows = (rows: RawRow[]) => {
-  const chunks: RawRow[][] = [];
-  for (let i = 0; i < rows.length; i += UPLOAD_ROW_LIMIT) {
-    chunks.push(rows.slice(i, i + UPLOAD_ROW_LIMIT));
-  }
-  return chunks;
-};
-
 const fetchUploadKind = async (kind: UploadKind): Promise<RawRow[]> => {
-  const response = await fetch(kindUrl(kind));
-  if (!response.ok) {
-    throw new Error(`โหลดข้อมูล ${kind} ล้มเหลว (${response.status})`);
-  }
-
-  const payload = (await response.json()) as { rows?: RawRow[] };
-  return Array.isArray(payload.rows) ? payload.rows : [];
+  const rows = await getItem<RawRow[]>(kindKey(kind));
+  return Array.isArray(rows) ? rows : [];
 };
 
 export const fetchUploads = async (): Promise<UploadState | null> => {
@@ -56,62 +41,17 @@ export const fetchUploads = async (): Promise<UploadState | null> => {
   return hasUploadData(state) ? state : null;
 };
 
-const logUploadError = async (kind: UploadKind, response: Response) => {
-  try {
-    const payload = (await response.json()) as { error?: string };
-    console.error(`[uploads/${kind}]`, response.status, payload.error ?? response.statusText);
-  } catch {
-    console.error(`[uploads/${kind}]`, response.status, response.statusText);
-  }
-};
-
 export const saveUploadKind = async (
   kind: UploadKind,
   rows: RawRow[],
 ): Promise<boolean> => {
-  const chunks = splitRows(rows);
-  const url = kindUrl(kind);
-
-  if (!chunks.length) {
-    const response = await fetch(url, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ format: "gzip-base64", data: await compressJson([]) }),
-    });
-    if (!response.ok) await logUploadError(kind, response);
-    return response.ok;
+  try {
+    await setItem(kindKey(kind), rows);
+    return true;
+  } catch (e) {
+    console.error(`[uploadsApi] saveUploadKind(${kind}) failed:`, e);
+    return false;
   }
-
-  if (chunks.length === 1) {
-    const data = await compressJson(chunks[0]);
-    const response = await fetch(url, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ format: "gzip-base64", data }),
-    });
-    if (!response.ok) await logUploadError(kind, response);
-    return response.ok;
-  }
-
-  for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex += 1) {
-    const data = await compressJson(chunks[chunkIndex]);
-    const response = await fetch(url, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        format: "gzip-base64",
-        data,
-        chunkIndex,
-        chunkCount: chunks.length,
-      }),
-    });
-    if (!response.ok) {
-      await logUploadError(kind, response);
-      return false;
-    }
-  }
-
-  return true;
 };
 
 export const saveUploads = async (
@@ -127,13 +67,22 @@ export const saveUploads = async (
 };
 
 export const deleteUploadKind = async (kind: UploadKind): Promise<boolean> => {
-  const response = await fetch(kindUrl(kind), { method: "DELETE" });
-  return response.ok;
+  try {
+    await removeItem(kindKey(kind));
+    return true;
+  } catch (e) {
+    console.error(`[uploadsApi] deleteUploadKind(${kind}) failed:`, e);
+    return false;
+  }
 };
 
 export const clearAllUploads = async (): Promise<boolean> => {
-  const response = await fetch(UPLOADS_URL, { method: "DELETE" });
-  return response.ok;
+  let ok = true;
+  for (const kind of UPLOAD_KINDS) {
+    const deleted = await deleteUploadKind(kind);
+    if (!deleted) ok = false;
+  }
+  return ok;
 };
 
 export type TursoHealthStats = Record<
@@ -141,21 +90,15 @@ export type TursoHealthStats = Record<
   { rowCount: number; storage?: string; updatedAt?: string }
 >;
 
+/**
+ * Returns empty stats now that we no longer keep an in-memory snapshot
+ * of Turso data. The component that displays these stats no longer
+ * references this shape, but the type stays exported for compatibility
+ * with the few places that still pass it down to ReportsSection.
+ */
 export const fetchTursoStats = async (): Promise<{
   database: string;
   stats: TursoHealthStats;
 } | null> => {
-  const response = await fetch("/api/health?stats=1");
-  if (!response.ok) return null;
-
-  const payload = (await response.json()) as {
-    database?: string;
-    stats?: TursoHealthStats;
-  };
-
-  if (!payload.stats) return null;
-  return {
-    database: payload.database ?? "turso",
-    stats: payload.stats,
-  };
+  return null;
 };

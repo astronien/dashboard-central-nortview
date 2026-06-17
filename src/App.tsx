@@ -37,15 +37,18 @@ import AttachTargetGroupEditor from "./components/AttachTargetGroupEditor";
 import { AnimatePresence, motion } from "motion/react";
 import React, { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { parseCategoryMasterFile } from "./lib/categoryMasterUpload";
+import { parseSalesExcelFile } from "./lib/salesUpload";
+import { parseTargetExcelFile } from "./lib/targetUpload";
 import {
   clearAllUploads,
-  fetchTursoStats,
+  deleteUploadKind,
   fetchUploads,
   hasUploadData,
   saveUploads,
-  type TursoHealthStats,
+  type UploadKind,
   type UploadState,
 } from "./lib/uploadsApi";
+import { getItem as idbGet, setItem as idbSet, migrateFromLocalStorage } from "./lib/storage";
 import { buildCategorySnapshots } from "./lib/categorySnapshotBuilder";
 import type { KpiCategoryKey } from "./lib/kpiCategoryAdapter";
 import {
@@ -460,7 +463,6 @@ type ParsedReport = {
   officers: Array<OfficerPerformance>;
   fileName: string;
 };
-type UploadKind = "target" | "current" | "today" | "lastMonth" | "lastYear" | "categoryMaster";
 
 const normalizeText = (value: unknown) => String(value ?? "").toLowerCase().replace(/\s+/g, " ").replace(/[^a-z0-9ก-๙ ]/gi, "").trim();
 const cleanBranchForMatching = (val: unknown): string => {
@@ -1280,21 +1282,14 @@ export default function App() {
   >("home");
   const [parsedReport, setParsedReport] = useState<ParsedReport>(fallbackReport);
   const [uploadedFiles, setUploadedFiles] = useState<Record<UploadKind, RawRow[]>>({ target: [], current: [], today: [], lastMonth: [], lastYear: [], categoryMaster: [] });
-  const [selectedBranch, setSelectedBranch] = useState<string>(() => {
-    try {
-      return window.localStorage.getItem("dashboard-selected-branch") || "Mega Bangna";
-    } catch {
-      return "Mega Bangna";
-    }
-  });
+  const [selectedBranch, setSelectedBranch] = useState<string>("Mega Bangna");
+  const [selectedBranchLoaded, setSelectedBranchLoaded] = useState(false);
 
   const handleBranchChange = (newBranch: string) => {
     setSelectedBranch(newBranch);
-    try {
-      window.localStorage.setItem("dashboard-selected-branch", newBranch);
-    } catch {
-      // ignore
-    }
+    void idbSet("dashboard-selected-branch", newBranch).catch((e) =>
+      console.warn("[App] persist selectedBranch failed:", e),
+    );
   };
 
   const displayUploads = useMemo<Record<UploadKind, RawRow[]>>(
@@ -1557,15 +1552,32 @@ export default function App() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isSavingTurso, setIsSavingTurso] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
-  const [isSyncingSheets, setIsSyncingSheets] = useState(false);
-  const [isUploadingCategoryMaster, setIsUploadingCategoryMaster] = useState(false);
-  const [syncResult, setSyncResult] = useState<any>(null);
+  const [isUploadingFile, setIsUploadingFile] = useState<Record<UploadKind, boolean>>({
+    target: false,
+    current: false,
+    today: false,
+    lastMonth: false,
+    lastYear: false,
+    categoryMaster: false,
+  });
+  const [uploadedFileNames, setUploadedFileNames] = useState<Record<UploadKind, string>>({
+    target: "",
+    current: "",
+    today: "",
+    lastMonth: "",
+    lastYear: "",
+    categoryMaster: "",
+  });
+  const [uploadStatus, setUploadStatus] = useState<{
+    ok: boolean;
+    message: string;
+    summary?: Record<string, number>;
+    errors?: Array<{ kind: string; error: string }>;
+  } | null>(null);
   const [sheetBranches, setSheetBranches] = useState<string[]>([]);
 
   const [homeTab, setHomeTab] = useState<"monthly" | "today">("monthly");
   const [staffViewTab, setStaffViewTab] = useState<"leaderboard" | "attach_builder" | "pc_zone">("leaderboard");
-  const [tursoDatabase, setTursoDatabase] = useState<string | null>(null);
-  const [tursoStats, setTursoStats] = useState<TursoHealthStats | null>(null);
   const [staffBaseCategories, setStaffBaseCategories] = useState<string[]>([
     ...DEFAULT_BASE_CATEGORIES,
   ]);
@@ -1658,7 +1670,16 @@ export default function App() {
     return Array.from(headers).sort();
   }, [displayUploads.current]);
 
-  const STORAGE_KEY = "dashboard-upload-state-v1";
+  const STORAGE_KEY = "dashboard-upload-state-v1"; // legacy localStorage key — only used for one-time migration
+
+  const KIND_LABELS: Record<UploadKind, string> = {
+    target: "Target",
+    current: "Current",
+    today: "Today",
+    lastMonth: "Last Month",
+    lastYear: "Last Year",
+    categoryMaster: "Category Master",
+  };
 
   const toggleAttachFilter = (id: string) => {
     setAttachFilters((prev) =>
@@ -2735,57 +2756,26 @@ export default function App() {
     };
   }, [displayUploads.current, activeOfficer?.name, currentStaff.name]);
 
-  const persistUploadsLocal = (nextUploads: UploadState) => {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextUploads));
-    } catch {
-      // ignore storage errors
-    }
-  };
-
-  const loadPersistedUploadsLocal = (): UploadState | null => {
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw) as Partial<UploadState>;
-      const merged: UploadState = {
-        target: parsed.target ?? [],
-        current: parsed.current ?? [],
-        today: parsed.today ?? [],
-        lastMonth: parsed.lastMonth ?? [],
-        lastYear: parsed.lastYear ?? [],
-        categoryMaster: parsed.categoryMaster ?? [],
-      };
-      return hasUploadData(merged) ? merged : null;
-    } catch {
-      return null;
-    }
-  };
-
-  const refreshTursoStats = async () => {
-    const health = await fetchTursoStats();
-    if (!health) return;
-    setTursoDatabase(health.database);
-    setTursoStats(health.stats);
-  };
-
+  /**
+   * Persist the upload state to IndexedDB (replaces the old
+   * localStorage-based persistUploadsLocal). Per-kind save so we
+   * don't rewrite the whole 50 MB state when only one file changes.
+   */
   const persistUploads = async (
     nextUploads: UploadState,
     kinds?: UploadKind[],
   ) => {
     setIsSavingTurso(true);
     try {
-      const saved = await saveUploads(nextUploads, kinds);
-      await refreshTursoStats();
-      if (!saved) {
-        persistUploadsLocal(nextUploads);
-        setUploadError(
-          "บันทึกลง Turso ไม่สำเร็จ — เก็บชั่วคราวในเบราว์เซอร์แล้ว เปิด Console (F12) ดู error",
-        );
-        return;
-      }
-      persistUploadsLocal(nextUploads);
+      await saveUploads(nextUploads, kinds);
       setUploadError(null);
+    } catch (e) {
+      console.error("[App] persistUploads failed:", e);
+      setUploadError(
+        e instanceof Error
+          ? `บันทึกลง Browser ไม่สำเร็จ: ${e.message}`
+          : "บันทึกลง Browser ไม่สำเร็จ",
+      );
     } finally {
       setIsSavingTurso(false);
     }
@@ -2794,14 +2784,11 @@ export default function App() {
   const loadPersistedUploads = async (): Promise<UploadState | null> => {
     try {
       const remote = await fetchUploads();
-      if (remote && hasUploadData(remote)) {
-        persistUploadsLocal(remote);
-        return remote;
-      }
-    } catch {
-      // fall back to local storage
+      if (remote && hasUploadData(remote)) return remote;
+    } catch (e) {
+      console.warn("[App] fetchUploads failed:", e);
     }
-    return loadPersistedUploadsLocal();
+    return null;
   };
 
   const rebuildReport = (
@@ -2851,12 +2838,6 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
-  const removeUploadedFile = (kind: UploadKind) => {
-    const nextUploads = { ...uploadedFiles, [kind]: [] };
-    setUploadedFiles(nextUploads);
-    rebuildReport(nextUploads, { changedKinds: [kind] });
-  };
-
   const emptyUploadState = (): UploadState => ({
     target: [],
     current: [],
@@ -2866,107 +2847,61 @@ export default function App() {
     categoryMaster: [],
   });
 
-  const handleCategoryMasterUpload = async (
-    event: ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
+  /**
+   * Generic file-upload handler for any kind.
+   * Routes to the right parser based on kind, persists to IndexedDB,
+   * rebuilds the report, and shows a status message.
+   */
+  const handleUploadFile = async (kind: UploadKind, file: File) => {
+    setIsUploadingFile((prev) => ({ ...prev, [kind]: true }));
     setUploadError(null);
-    setIsUploadingCategoryMaster(true);
+
     try {
-      const rows = await parseCategoryMasterFile(file);
-      const nextUploads: UploadState = {
-        ...uploadedFiles,
-        categoryMaster: rows,
-      };
+      let rows: RawRow[];
+      if (kind === "categoryMaster") {
+        rows = await parseCategoryMasterFile(file);
+      } else if (kind === "target") {
+        rows = await parseTargetExcelFile(file);
+      } else {
+        // current, today, lastMonth, lastYear — all sales data
+        rows = await parseSalesExcelFile(file);
+      }
+
+      const nextUploads: UploadState = { ...uploadedFiles, [kind]: rows };
       setUploadedFiles(nextUploads);
-      rebuildReport(nextUploads, { changedKinds: ["categoryMaster"] });
-      setSyncResult({
+      setUploadedFileNames((prev) => ({ ...prev, [kind]: file.name }));
+
+      rebuildReport(nextUploads, { changedKinds: [kind] });
+
+      setUploadStatus({
         ok: true,
-        message: `อัปโหลด Category Master สำเร็จ — ${rows.length.toLocaleString()} แถว`,
-        summary: { categoryMaster: rows.length },
+        message: `อัปโหลด ${KIND_LABELS[kind]} สำเร็จ — ${rows.length.toLocaleString()} แถว`,
+        summary: { [kind]: rows.length },
       });
-      await refreshTursoStats();
     } catch (error) {
-      setUploadError(
-        error instanceof Error
-          ? error.message
-          : "อัปโหลด Category Master ไม่สำเร็จ",
-      );
+      const message =
+        error instanceof Error ? error.message : `อัปโหลด ${KIND_LABELS[kind]} ไม่สำเร็จ`;
+      setUploadError(message);
+      setUploadStatus({
+        ok: false,
+        message: `อัปโหลด ${KIND_LABELS[kind]} ไม่สำเร็จ — ${message}`,
+      });
     } finally {
-      setIsUploadingCategoryMaster(false);
-      event.target.value = "";
+      setIsUploadingFile((prev) => ({ ...prev, [kind]: false }));
     }
   };
 
-  const handleSyncSheets = async (kind?: string) => {
-    setIsSyncingSheets(true);
-    setUploadError(null);
-    setSyncResult(null);
-    try {
-      const kindsToSync: UploadKind[] = kind 
-        ? [kind as UploadKind] 
-        : ["target", "categoryMaster", "current", "today", "lastMonth", "lastYear"];
-        
-      let combinedSummary: Record<string, any> = {};
-      let combinedErrors: any[] = [];
-      
-      for (const k of kindsToSync) {
-        const url = `/api/sync-sheets?kind=${encodeURIComponent(k)}`;
-        const res = await fetch(url, { method: "POST" });
-        const data = await res.json();
-        if (!res.ok) {
-          throw new Error(data.error || `ซิงก์ข้อมูล ${k} ไม่สำเร็จ`);
-        }
-        if (data.summary) {
-          combinedSummary = { ...combinedSummary, ...data.summary };
-        }
-        if (data.errors) {
-          combinedErrors = [...combinedErrors, ...data.errors];
-        }
-      }
-      
-      const categoryMasterSummary = combinedSummary.categoryMaster;
-      const categorySkipped =
-        categoryMasterSummary &&
-        typeof categoryMasterSummary === "object" &&
-        "skipped" in categoryMasterSummary;
-      const categoryPreserved =
-        categorySkipped &&
-        (categoryMasterSummary as { reason?: string }).reason ===
-          "preserved_existing";
-
-      setSyncResult({
-        ok: combinedErrors.length === 0,
-        message:
-          combinedErrors.length === 0
-            ? categoryPreserved
-              ? "ซิงก์สำเร็จ — เก็บ Category Master ที่อัปโหลดไว้แล้ว"
-              : "ซิงก์สำเร็จ — บันทึกทุกสาขาแล้ว"
-            : "ซิงก์บางส่วนสำเร็จ — ดูรายละเอียดด้านล่าง",
-        summary: combinedSummary,
-        errors: combinedErrors.length ? combinedErrors : undefined,
-      });
-      
-      const nextUploads = await fetchUploads();
-      if (nextUploads) {
-        setUploadedFiles(nextUploads);
-        persistUploadsLocal(nextUploads);
-        rebuildReport(nextUploads, { skipPersist: true });
-      }
-      
-      const stats = await fetchTursoStats();
-      setTursoStats(stats);
-    } catch (error) {
-      setUploadError(error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการซิงก์ข้อมูล");
-    } finally {
-      setIsSyncingSheets(false);
-    }
+  const removeUploadedFile = async (kind: UploadKind) => {
+    const nextUploads: UploadState = { ...uploadedFiles, [kind]: [] };
+    setUploadedFiles(nextUploads);
+    setUploadedFileNames((prev) => ({ ...prev, [kind]: "" }));
+    await deleteUploadKind(kind);
+    rebuildReport(nextUploads, { skipPersist: true, changedKinds: [kind] });
   };
 
   const clearAllUploadData = async () => {
-    const cleared = await clearAllUploads();
+    await clearAllUploads();
+    // Also clean up legacy localStorage entry if it still exists
     try {
       window.localStorage.removeItem(STORAGE_KEY);
     } catch {
@@ -2974,38 +2909,59 @@ export default function App() {
     }
     const empty = emptyUploadState();
     setUploadedFiles(empty);
+    setUploadedFileNames({
+      target: "",
+      current: "",
+      today: "",
+      lastMonth: "",
+      lastYear: "",
+      categoryMaster: "",
+    });
     setParsedReport(emptyReport);
-    setTursoStats(null);
-    await refreshTursoStats();
-    setUploadError(cleared ? null : "ลบบน Turso ไม่สำเร็จ — ลบในเบราว์เซอร์แล้ว ลองกดอีกครั้งหลัง deploy");
+    setUploadError(null);
+    setUploadStatus({
+      ok: true,
+      message: "ลบข้อมูลทั้งหมดเรียบร้อย",
+    });
   };
 
   useEffect(() => {
     void (async () => {
       setIsInitialLoading(true);
-      await refreshTursoStats();
-      const [persisted, photos, branchesRes] = await Promise.all([
+
+      // One-time migration: copy any legacy localStorage data into
+      // IndexedDB on first run, then drop the localStorage entry.
+      await migrateFromLocalStorage("dashboard-selected-branch");
+      await migrateFromLocalStorage("dashboard_7wonder_configs");
+      await migrateFromLocalStorage("dashboard-staff-photos-v1");
+      await migrateFromLocalStorage(STORAGE_KEY); // legacy upload state
+
+      const [persisted, photos, branchesRes, savedBranch] = await Promise.all([
         loadPersistedUploads(),
         fetchStaffPhotos(),
-        fetch("/api/branches").then(r => r.ok ? r.json() : null).catch(() => null)
+        fetch("/api/branches").then((r) => (r.ok ? r.json() : null)).catch(() => null),
+        idbGet<string>("dashboard-selected-branch"),
       ]);
+
+      if (savedBranch) {
+        setSelectedBranch(savedBranch);
+        setSelectedBranchLoaded(true);
+      }
+
       if (photos) setStaffPhotos(photos);
       if (branchesRes && branchesRes.ok && Array.isArray(branchesRes.branches)) {
         setSheetBranches(branchesRes.branches);
-        
-        // Auto-match current selectedBranch to the sheet branch format
-        const saved = window.localStorage.getItem("dashboard-selected-branch") || "Mega Bangna";
-        const savedNorm = cleanBranchForMatching(saved);
-        const matched = branchesRes.branches.find((b: string) => {
-          const bNorm = cleanBranchForMatching(b);
-          return bNorm && savedNorm && (bNorm.includes(savedNorm) || savedNorm.includes(bNorm));
-        });
-        if (matched) {
-          setSelectedBranch(matched);
-          try {
-            window.localStorage.setItem("dashboard-selected-branch", matched);
-          } catch {
-            // ignore
+
+        // Auto-match the saved selectedBranch to the canonical sheet branch format
+        if (savedBranch) {
+          const savedNorm = cleanBranchForMatching(savedBranch);
+          const matched = branchesRes.branches.find((b: string) => {
+            const bNorm = cleanBranchForMatching(b);
+            return bNorm && savedNorm && (bNorm.includes(savedNorm) || savedNorm.includes(bNorm));
+          });
+          if (matched && matched !== savedBranch) {
+            setSelectedBranch(matched);
+            void idbSet("dashboard-selected-branch", matched);
           }
         }
       }
@@ -3026,10 +2982,13 @@ export default function App() {
   }, [parsedStoreHeader.name]);
 
   useEffect(() => {
+    // Skip the very first render before initial load completes — the
+    // init useEffect already calls rebuildReport with the right branch.
+    if (!selectedBranchLoaded) return;
     if (uploadedFiles && hasUploadData(uploadedFiles)) {
       rebuildReport(uploadedFiles, { skipPersist: true });
     }
-  }, [selectedBranch]);
+  }, [selectedBranch, selectedBranchLoaded]);
 
 
   const handleStaffPhotoUpload = async (
@@ -3315,22 +3274,15 @@ export default function App() {
               >
                 <ReportsSection
                   uploadedFiles={uploadedFiles}
-                  onSyncSheets={() => void handleSyncSheets()}
-                  onSyncKind={(kind) => void handleSyncSheets(kind)}
-                  isSyncingSheets={isSyncingSheets}
+                  uploadedFileNames={uploadedFileNames}
+                  isUploadingFile={isUploadingFile}
                   isSavingTurso={isSavingTurso}
-                  uploadStats={uploadStats}
-                  tursoDatabase={tursoDatabase}
-                  tursoStats={tursoStats}
                   uploadError={uploadError}
-                  syncResult={syncResult}
+                  uploadStatus={uploadStatus}
                   onExportCsv={exportCsv}
                   onClearAll={() => void clearAllUploadData()}
                   onRemoveFile={removeUploadedFile}
-                  onUploadCategoryMaster={(event) => {
-                    void handleCategoryMasterUpload(event);
-                  }}
-                  isUploadingCategoryMaster={isUploadingCategoryMaster}
+                  onUploadFile={handleUploadFile}
                   parsedReport={parsedReport}
                 />
               </motion.div>

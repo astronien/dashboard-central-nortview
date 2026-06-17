@@ -1,18 +1,10 @@
-import type { ChangeEvent } from "react";
-import { Activity, PieChart, Rocket, Upload } from "lucide-react";
-import { motion } from "framer-motion";
+import type React from "react";
 import type { UploadKind } from "../../lib/dashboardHelpers";
 import type { RawRow } from "../../lib/dashboardUtils";
+import { Upload, FileSpreadsheet, Trash2, X, CheckCircle2, AlertCircle } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 export type ReportStats = { branches: number; categories: number; officers: number };
-export type TursoStats = {
-  target?: { rowCount: number; updatedAt?: string };
-  current?: { rowCount: number; updatedAt?: string };
-  today?: { rowCount: number; updatedAt?: string };
-  lastMonth?: { rowCount: number; updatedAt?: string };
-  lastYear?: { rowCount: number; updatedAt?: string };
-  categoryMaster?: { rowCount: number; updatedAt?: string };
-};
 
 export type ParsedReport = {
   branches: { label: string; target: number; actual: number; lastMonth: number; lastYear: number }[];
@@ -20,7 +12,7 @@ export type ParsedReport = {
   officers: { name: string; branch: string; actual: number; target: number; rate: number; achPercent?: number; forecast?: number }[];
 };
 
-export type SyncResult = {
+export type UploadStatus = {
   ok: boolean;
   message: string;
   summary?: Record<string, number>;
@@ -30,39 +22,22 @@ export type SyncResult = {
 const getRowDate = (row: RawRow): Date | null => {
   const raw = String(row["Doc Date"] ?? row["doc_date"] ?? row["doc date"] ?? "").trim();
   if (!raw) return null;
-
-  // Clean up day-of-week prefix if exists, e.g. "จ. 11/05/2569 10:07:14" -> "11/05/2569 10:07:14"
   const cleaned = raw.replace(/^\S+\.\s*/, "").trim();
-
-  // Parse DD/MM/YYYY (with optional trailing HH:mm:ss)
-  // Using match is safer because Date.parse expects MM/DD/YYYY and would swap day and month,
-  // e.g. parsing "11/05/2569" (May 11) as Nov 5.
   const dmyMatch = cleaned.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
   if (dmyMatch) {
     const day = parseInt(dmyMatch[1], 10);
-    const month = parseInt(dmyMatch[2], 10) - 1; // 0-indexed month
+    const month = parseInt(dmyMatch[2], 10) - 1;
     let year = parseInt(dmyMatch[3], 10);
-
-    // If the year in the sheet is already in Buddhist Era (> 2400),
-    // convert it to Gregorian (CE) so that toLocaleDateString("th-TH") doesn't double-add 543.
-    if (year > 2400) {
-      year -= 543;
-    }
-
+    if (year > 2400) year -= 543;
     return new Date(year, month, day);
   }
-
-  // Fallback to standard Date.parse for other formats
   const parsed = Date.parse(cleaned);
   if (Number.isFinite(parsed)) {
     const d = new Date(parsed);
     let year = d.getFullYear();
-    if (year > 2400) {
-      d.setFullYear(year - 543);
-    }
+    if (year > 2400) d.setFullYear(year - 543);
     return d;
   }
-
   return null;
 };
 
@@ -72,288 +47,371 @@ const getDateRangeString = (rows: RawRow[]): string | null => {
   let maxMs = -Infinity;
   let minDate: Date | null = null;
   let maxDate: Date | null = null;
-
   rows.forEach((row) => {
     const d = getRowDate(row);
     if (d) {
       const ms = d.getTime();
-      if (ms < minMs) {
-        minMs = ms;
-        minDate = d;
-      }
-      if (ms > maxMs) {
-        maxMs = ms;
-        maxDate = d;
-      }
+      if (ms < minMs) { minMs = ms; minDate = d; }
+      if (ms > maxMs) { maxMs = ms; maxDate = d; }
     }
   });
-
   if (!minDate || !maxDate) return null;
-
-  const formatDate = (d: Date) => {
-    return d.toLocaleDateString("th-TH", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  };
-
-  if (minDate.getTime() === maxDate.getTime()) {
-    return formatDate(minDate);
-  }
-
+  const formatDate = (d: Date) =>
+    d.toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" });
+  if (minDate.getTime() === maxDate.getTime()) return formatDate(minDate);
   return `${formatDate(minDate)} - ${formatDate(maxDate)}`;
+};
+
+const KIND_LABELS: Record<UploadKind, string> = {
+  target: "Target",
+  current: "Current",
+  today: "Today",
+  lastMonth: "Last Month",
+  lastYear: "Last Year",
+  categoryMaster: "Category Master",
+};
+
+const UPLOADABLE_KINDS: UploadKind[] = [
+  "current",
+  "lastMonth",
+  "lastYear",
+  "target",
+  "categoryMaster",
+];
+
+const KIND_DESCRIPTIONS: Record<UploadKind, string> = {
+  target: "BRANCH NAME / STAFF ID / NAME / SURNAME / DAY / POSISION / Total / Mac / iPad …",
+  current: "Product / Number / ราคาขายตามบิล / Category / Sub Category / Brand …",
+  today: "ยังไม่ได้อัปโหลด (ใช้ Current เป็น Today อัตโนมัติ)",
+  lastMonth: "Product / Number / ราคาขายตามบิล / Category / Sub Category / Brand …",
+  lastYear: "Product / Number / ราคาขายตามบิล / Category / Sub Category / Brand …",
+  categoryMaster: "Cat & Sub Cat / CAT Daily",
+};
+
+type Props = {
+  uploadedFiles: Record<UploadKind, RawRow[]>;
+  uploadedFileNames: Record<UploadKind, string>;
+  isUploadingFile: Record<UploadKind, boolean>;
+  isSavingTurso: boolean;
+  uploadError: string | null;
+  uploadStatus: UploadStatus | null;
+  onExportCsv: () => void;
+  onClearAll: () => void;
+  onRemoveFile: (kind: UploadKind) => void;
+  onUploadFile: (kind: UploadKind, file: File) => Promise<void>;
+  parsedReport: ParsedReport;
+};
+
+type FileUploadCardProps = {
+  kind: UploadKind;
+  fileName: string;
+  rowCount: number;
+  dateRange: string | null;
+  isLoading: boolean;
+  isAvailable: boolean;
+  onFileSelected: (file: File) => void;
+};
+
+const FileUploadCard: React.FC<FileUploadCardProps> = (props) => {
+  const {
+    kind,
+    fileName,
+    rowCount,
+    dateRange,
+    isLoading,
+    isAvailable,
+    onFileSelected,
+  } = props;
+  const isLoaded = rowCount > 0;
+  return (
+    <div
+      className={`rounded-2xl border p-4 flex flex-col gap-2 min-h-[150px] transition-all ${
+        isLoaded
+          ? "border-teal-500/30 bg-teal-500/[0.04] shadow-[inset_0_1px_0_rgba(45,212,191,0.1)]"
+          : "border-white/10 bg-white/5"
+      }`}
+    >
+      <div className="flex justify-between items-start">
+        <div className="flex items-center gap-2">
+          <FileSpreadsheet className="w-3.5 h-3.5 text-white/50" />
+          <span className="text-[10px] font-bold text-white/70 uppercase tracking-wider">
+            {KIND_LABELS[kind]}
+          </span>
+        </div>
+        {isLoaded ? (
+          <span className="text-[9px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/20 px-2 py-0.5 rounded">
+            ✓ {rowCount.toLocaleString()}
+          </span>
+        ) : (
+          <span className="text-[9px] text-white/30 bg-white/5 px-2 py-0.5 rounded">empty</span>
+        )}
+      </div>
+
+      <div className="text-[10px] text-white/40 leading-tight min-h-[2.4em]">
+        {KIND_DESCRIPTIONS[kind]}
+      </div>
+
+      {isLoaded && fileName && (
+        <div
+          className="text-[10px] text-teal-300/80 font-medium truncate"
+          title={fileName}
+        >
+          📎 {fileName}
+        </div>
+      )}
+
+      {isLoaded && dateRange && (
+        <div className="text-[9px] text-white/50 font-medium tracking-wide">
+          📅 {dateRange}
+        </div>
+      )}
+
+      {isAvailable ? (
+        <label
+          className={`mt-auto flex items-center justify-center gap-2 cursor-pointer text-[10px] rounded-lg px-3 py-2 border transition-colors ${
+            isLoading
+              ? "border-white/10 bg-white/5 text-white/40 cursor-not-allowed"
+              : isLoaded
+                ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/20"
+                : "border-teal-500/20 bg-teal-500/15 text-teal-100 hover:bg-teal-500/25"
+          }`}
+        >
+          {isLoading ? (
+            <>
+              <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+              กำลังประมวลผล...
+            </>
+          ) : (
+            <>
+              <Upload className="w-3 h-3" />
+              {isLoaded ? "อัปโหลดไฟล์ใหม่ทับ" : "เลือกไฟล์ Excel"}
+            </>
+          )}
+          <input
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            className="hidden"
+            disabled={isLoading}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) onFileSelected(f);
+              e.target.value = "";
+            }}
+          />
+        </label>
+      ) : (
+        <div className="mt-auto text-[10px] text-white/30 italic text-center px-3 py-2 bg-white/5 rounded-lg border border-white/5 border-dashed">
+          ไม่ต้องอัปโหลด (ใช้ Current แทน)
+        </div>
+      )}
+    </div>
+  );
 };
 
 export function ReportsSection({
   uploadedFiles,
-  onSyncSheets,
-  onSyncKind,
-  isSyncingSheets,
+  uploadedFileNames,
+  isUploadingFile,
   isSavingTurso,
-  uploadStats,
-  tursoDatabase,
-  tursoStats,
   uploadError,
-  syncResult,
+  uploadStatus,
   onExportCsv,
   onClearAll,
   onRemoveFile,
-  onUploadCategoryMaster,
-  isUploadingCategoryMaster,
+  onUploadFile,
   parsedReport,
-}: {
-  uploadedFiles: Record<UploadKind, RawRow[]>;
-  onSyncSheets: () => void;
-  onSyncKind: (kind: UploadKind) => void;
-  isSyncingSheets: boolean;
-  isSavingTurso: boolean;
-  uploadStats: ReportStats;
-  tursoDatabase: string | null;
-  tursoStats: TursoStats | null;
-  uploadError: string | null;
-  syncResult: SyncResult | null;
-  onExportCsv: () => void;
-  onClearAll: () => void;
-  onRemoveFile: (kind: UploadKind) => void;
-  onUploadCategoryMaster: (event: ChangeEvent<HTMLInputElement>) => void;
-  isUploadingCategoryMaster: boolean;
-  parsedReport: ParsedReport;
-}) {
-  const categoryMasterRows = uploadedFiles.categoryMaster.length;
-  const categoryMasterUpdatedAt = tursoStats?.categoryMaster?.updatedAt;
+}: Props) {
+  const stats = {
+    target: uploadedFiles.target.length,
+    current: uploadedFiles.current.length,
+    today: uploadedFiles.today?.length ?? 0,
+    lastMonth: uploadedFiles.lastMonth.length,
+    lastYear: uploadedFiles.lastYear.length,
+    categoryMaster: uploadedFiles.categoryMaster.length,
+  };
+  const hasAny = Object.values(stats).some((v) => v > 0);
+  const totalRows = Object.values(stats).reduce((s, v) => s + v, 0);
+
   return (
     <>
-      <div className="text-xs font-semibold tracking-wider text-teal-400/80 uppercase mb-1">Google Sheets Live Sync</div>
+      {/* Section: File upload */}
+      <div className="text-xs font-semibold tracking-wider text-teal-400/80 uppercase mb-1">
+        File Upload
+      </div>
       <div className="bg-white/10 backdrop-blur-md rounded-[2rem] p-6 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-5">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-teal-500/20 rounded-xl text-teal-400 shrink-0 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)]">
-              <Activity className={`w-6 h-6 ${isSyncingSheets ? "animate-pulse" : ""}`} />
+            <div className="p-3 bg-teal-500/20 rounded-xl text-teal-400 shrink-0">
+              <Upload className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="text-lg font-bold tracking-tight text-white">Live Data Synchronization</h3>
-              <p className="text-xs text-white/60 mt-0.5">ดึงข้อมูลทุกสาขาจาก Google Sheets บันทึกลง Turso — กรองสาขาใน Settings</p>
+              <h3 className="text-lg font-bold tracking-tight text-white">
+                อัปโหลดข้อมูลจากไฟล์ Excel
+              </h3>
+              <p className="text-xs text-white/60 mt-0.5">
+                อัปโหลด 4 ไฟล์ (Current / Last Month / Last Year / Target) + 1 ไฟล์ Category Master
+                — บันทึกลง Browser (IndexedDB)
+              </p>
             </div>
           </div>
-          <button
-            type="button"
-            disabled={isSyncingSheets}
-            onClick={onSyncSheets}
-            className={`rounded-xl px-5 py-3 font-semibold text-xs transition-all duration-300 shadow-lg flex items-center gap-2 shrink-0 ${
-              isSyncingSheets
-                ? "bg-teal-600/30 border border-teal-500/20 text-teal-300 cursor-not-allowed"
-                : "bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white shadow-teal-500/25 hover:shadow-teal-400/30 hover:scale-[1.02] active:scale-98 cursor-pointer"
-            }`}
-          >
-            {isSyncingSheets ? (
-              <><div className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div><span>กำลังดึงข้อมูล...</span></>
-            ) : (
-              <><Rocket className="w-3.5 h-3.5" /><span>ซิงก์ข้อมูลทั้งหมด (Live Sync)</span></>
-            )}
-          </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mt-5">
-          {(["target", "current", "today", "lastMonth", "lastYear", "categoryMaster"] as UploadKind[]).map((kind) => {
-            const label = kind.replace(/([A-Z])/g, " $1");
-            const rowCount = uploadedFiles[kind].length;
-            const isLoaded = rowCount > 0;
-            const dateRange = (kind === "current" || kind === "today" || kind === "lastMonth" || kind === "lastYear")
-              ? getDateRangeString(uploadedFiles[kind])
-              : null;
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+          {UPLOADABLE_KINDS.map((kind) => {
+            const rows = uploadedFiles[kind] ?? [];
+            const dateRange =
+              kind === "current" || kind === "lastMonth" || kind === "lastYear"
+                ? getDateRangeString(rows)
+                : null;
             return (
-              <div key={kind} className={`rounded-2xl border p-4 flex flex-col justify-between min-h-[110px] transition-all bg-white/5 ${isLoaded ? "border-teal-500/25 bg-teal-500/[0.02]" : "border-white/5"}`}>
-                <div className="flex flex-col gap-1">
-                  <div className="flex justify-between items-start">
-                    <span className="text-[10px] font-bold text-white/50 uppercase tracking-wider">{label}</span>
-                    <span className={`w-2 h-2 rounded-full shrink-0 ${isLoaded ? "bg-teal-400 animate-pulse shadow-[0_0_8px_#2dd4bf]" : "bg-white/10"}`}></span>
-                  </div>
-                  {isLoaded && dateRange && (
-                    <span className="text-[9px] text-teal-300/80 font-medium tracking-wide mt-1">
-                      {dateRange}
-                    </span>
-                  )}
-                </div>
-                <div className="mt-3 flex items-end justify-between">
-                  <div className="text-[11px] font-extrabold text-white">{isLoaded ? `${rowCount.toLocaleString()} rows` : "No data"}</div>
-                  <button onClick={() => onSyncKind(kind)} disabled={isSyncingSheets} className="text-[9px] bg-white/5 border border-white/10 hover:bg-white/10 hover:border-teal-400/30 active:bg-white/15 rounded px-2.5 py-1.5 text-white font-medium transition-all cursor-pointer">Sync</button>
-                </div>
-              </div>
+              <FileUploadCard
+                key={`upload-${kind}`}
+                kind={kind}
+                fileName={uploadedFileNames[kind]}
+                rowCount={rows.length}
+                dateRange={dateRange}
+                isLoading={isUploadingFile[kind] ?? false}
+                isAvailable={true}
+                onFileSelected={(file) => void onUploadFile(kind, file)}
+              />
             );
           })}
+          {/* "Today" placeholder card — explains it falls back to current */}
+          <FileUploadCard
+            key="upload-today"
+            fileName=""
+            rowCount={stats.today}
+            dateRange={null}
+            isLoading={false}
+            isAvailable={false}
+            onFileSelected={() => {}}
+          />
         </div>
       </div>
 
-      <div className="rounded-2xl border border-teal-500/20 bg-teal-500/[0.04] p-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="text-sm font-semibold text-white">อัปโหลด Category Master</div>
-            <p className="text-xs text-white/60 mt-1 max-w-xl">
-              ไฟล์ .xlsx / .csv ต้องมีคอลัมน์ <span className="font-mono text-teal-200/90">Cat &amp; Sub Cat</span> และ{" "}
-              <span className="font-mono text-teal-200/90">CAT Daily</span> — บันทึกลง Turso แทน Google Sheets (ซิงก์ sales ยังใช้ Live Sync ตามเดิม)
-            </p>
-            <div className="mt-2 text-[11px] text-white/50">
-              {categoryMasterRows > 0
-                ? `${categoryMasterRows.toLocaleString()} แถวในระบบ`
-                : "ยังไม่มี Category Master — อัปโหลดก่อนดูรายงาน category ให้ถูก"}
-              {categoryMasterUpdatedAt ? (
-                <span className="ml-2 text-white/40">
-                  • อัปเดตล่าสุด {new Date(categoryMasterUpdatedAt).toLocaleString("th-TH")}
-                </span>
-              ) : null}
-            </div>
-          </div>
-          <label
-            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold border transition-all shrink-0 ${
-              isUploadingCategoryMaster
-                ? "border-white/10 bg-white/5 text-white/40 cursor-not-allowed"
-                : "border-teal-400/30 bg-teal-500/15 text-teal-100 hover:bg-teal-500/25 cursor-pointer"
+      {/* Status banners */}
+      <AnimatePresence>
+        {uploadStatus && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className={`rounded-2xl border p-4 text-sm flex items-start gap-3 ${
+              uploadStatus.ok
+                ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-100"
+                : "border-amber-400/30 bg-amber-400/10 text-amber-100"
             }`}
           >
-            {isUploadingCategoryMaster ? (
-              <>
-                <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                กำลังอัปโหลด...
-              </>
+            {uploadStatus.ok ? (
+              <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
             ) : (
-              <>
-                <Upload className="w-3.5 h-3.5" />
-                เลือกไฟล์
-              </>
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
             )}
-            <input
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              className="hidden"
-              disabled={isUploadingCategoryMaster}
-              onChange={onUploadCategoryMaster}
-            />
-          </label>
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/70">
-        Target / Current / Last Month / Last Year โหลดผ่าน Google Sheets Live Sync — Category Master อัปโหลดเองด้านบน
-      </div>
-
-      {syncResult ? (
-        <div
-          className={`rounded-2xl border p-4 text-sm ${
-            syncResult.ok && !syncResult.errors?.length
-              ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-100"
-              : "border-amber-400/30 bg-amber-400/10 text-amber-100"
-          }`}
-        >
-          <div className="font-semibold text-white mb-1">{syncResult.message}</div>
-          {syncResult.summary ? (
-            <div className="text-xs font-mono text-white/70 mt-1 space-y-1">
-              {Object.entries(syncResult.summary).map(([kind, entry]) => {
-                const saved =
-                  typeof entry === "number"
-                    ? entry
-                    : typeof entry === "object" && entry && "saved" in entry
-                      ? Number((entry as { saved: number }).saved)
-                      : 0;
-                const dates =
-                  typeof entry === "object" && entry && "dates" in entry
-                    ? (entry as { dates?: { uniqueDays?: number; minDay?: string; maxDay?: string } }).dates
-                    : undefined;
-                const dayHint =
-                  dates && dates.uniqueDays === 1
-                    ? ` (วันเดียว ${dates.minDay})`
-                    : dates && dates.uniqueDays
-                      ? ` (${dates.uniqueDays} วัน: ${dates.minDay}–${dates.maxDay})`
-                      : "";
-                return (
-                  <div key={kind}>
-                    {kind}: {saved.toLocaleString()} rows{dayHint}
-                  </div>
-                );
-              })}
+            <div>
+              <div className="font-semibold text-white">{uploadStatus.message}</div>
+              {uploadStatus.summary && (
+                <div className="text-xs font-mono text-white/70 mt-1 space-y-0.5">
+                  {Object.entries(uploadStatus.summary).map(([kind, count]) => (
+                    <div key={kind}>
+                      {KIND_LABELS[kind as UploadKind] ?? kind}: {Number(count).toLocaleString()} rows
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          ) : null}
-          {syncResult.errors?.length ? (
-            <ul className="mt-2 text-xs space-y-1 list-disc list-inside text-amber-200/90">
-              {syncResult.errors.map((entry) => (
-                <li key={entry.kind}>
-                  {entry.kind}: {entry.error}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
-      ) : null}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
+      {uploadError && (
+        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+          {uploadError}
+        </div>
+      )}
+
+      {/* Status grid (mirror of card row counts) */}
       <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/70">
-        <div className="font-semibold text-white mb-2">Sync status</div>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-2 text-xs">
-          {(["target", "current", "today", "lastMonth", "lastYear", "categoryMaster"] as UploadKind[]).map((kind) => (
-            <div key={kind} className={`rounded-xl px-3 py-2 border ${uploadedFiles[kind].length ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200" : "border-white/10 bg-white/5 text-white/50"}`}>
-              {kind.replace(/([A-Z])/g, " $1")}: {uploadedFiles[kind].length ? `${uploadedFiles[kind].length} loaded` : "missing"}
+        <div className="font-semibold text-white mb-3 flex items-center justify-between">
+          <span>สถานะข้อมูล</span>
+          {hasAny && (
+            <span className="text-[10px] font-mono text-emerald-300">
+              รวม {totalRows.toLocaleString()} แถว
+            </span>
+          )}
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 text-xs">
+          {(Object.keys(stats) as UploadKind[]).map((kind) => (
+            <div
+              key={kind}
+              className={`rounded-xl px-3 py-2 border ${
+                stats[kind]
+                  ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
+                  : "border-white/10 bg-white/5 text-white/50"
+              }`}
+            >
+              {KIND_LABELS[kind]}: {stats[kind] ? `${stats[kind].toLocaleString()} แถว` : "ยังไม่ได้อัปโหลด"}
             </div>
           ))}
         </div>
       </div>
 
+      {/* Report preview header */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
         <div className="flex items-center gap-4">
-          <div className="p-3 bg-emerald-500/20 rounded-xl text-emerald-400"><PieChart className="w-6 h-6" /></div>
+          <div className="p-3 bg-emerald-500/20 rounded-xl text-emerald-400">
+            <FileSpreadsheet className="w-6 h-6" />
+          </div>
           <div>
             <h2 className="text-xl font-bold tracking-tight">Backend Report Logic Preview</h2>
-            <p className="text-sm text-white/60 mt-1">Summary of branch, category, and officer calculations from the backend logic doc.</p>
+            <p className="text-sm text-white/60 mt-1">
+              Summary of branch, category, and officer calculations from the backend logic doc.
+            </p>
           </div>
         </div>
         <div className="flex flex-col items-start lg:items-end gap-2">
           <motion.div className="flex flex-wrap items-center gap-2 justify-end">
-            <button onClick={onExportCsv} className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/80 hover:bg-white/10 transition-colors">Export CSV</button>
-            <button type="button" onClick={() => void onClearAll()} className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-100 hover:bg-red-500/20 transition-colors">ลบข้อมูลทั้งหมด</button>
+            <button
+              onClick={onExportCsv}
+              className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/80 hover:bg-white/10 transition-colors"
+            >
+              Export CSV
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (confirm("ลบข้อมูลทั้งหมดใน Browser? (Turso DB ไม่ถูกแตะ)")) {
+                  onClearAll();
+                }
+              }}
+              className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-100 hover:bg-red-500/20 transition-colors flex items-center gap-2"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              ลบข้อมูลทั้งหมด
+            </button>
           </motion.div>
           <div className="text-xs text-white/50 text-right max-w-md">
-            {isSavingTurso ? "กำลังบันทึกลง Turso..." : `Loaded ${uploadStats.branches} branches • ${uploadStats.categories} categories • ${uploadStats.officers} officers`}
-            <div className="mt-1 text-[11px] text-white/40">Sheets: Target {uploadedFiles.target.length} • Current {uploadedFiles.current.length} • Today {uploadedFiles.today.length} • Last Month {uploadedFiles.lastMonth.length} • Last Year {uploadedFiles.lastYear.length} • Category Master {uploadedFiles.categoryMaster.length}</div>
-            {tursoDatabase ? (
-              <motion.div className="mt-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-[11px] text-left text-emerald-100">
-                <div className="font-medium text-emerald-200">Turso DB: {tursoDatabase}</div>
-                <div className="text-white/70">ดูใน Turso Dashboard: <span className="font-mono">data_sales</span>, <span className="font-mono">data_targets</span>, <span className="font-mono">data_categories</span></div>
-                {tursoStats ? (
-                  <div className="font-mono text-[10px] text-white/60 mt-1">
-                    rows — target {tursoStats.target?.rowCount ?? 0} • current {tursoStats.current?.rowCount ?? 0} • today {tursoStats.today?.rowCount ?? 0} • lastMonth {tursoStats.lastMonth?.rowCount ?? 0} • lastYear {tursoStats.lastYear?.rowCount ?? 0} • category {tursoStats.categoryMaster?.rowCount ?? 0}
-                  </div>
-                ) : null}
-              </motion.div>
-            ) : null}
+            {isSavingTurso
+              ? "กำลังบันทึก..."
+              : `Loaded ${parsedReport.branches.length} branches • ${parsedReport.categories.length} categories • ${parsedReport.officers.length} officers`}
           </div>
           <div className="flex gap-2 flex-wrap justify-end">
-            {Object.entries(uploadedFiles).map(([kind, rows]) => (
-              <button key={kind} onClick={() => onRemoveFile(kind as UploadKind)} className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-white/70 hover:bg-white/10">Clear {kind} ({(rows as RawRow[]).length})</button>
-            ))}
+            {UPLOADABLE_KINDS.map((kind) =>
+              stats[kind] > 0 ? (
+                <button
+                  key={kind}
+                  onClick={() => onRemoveFile(kind)}
+                  className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-white/70 hover:bg-white/10 flex items-center gap-1"
+                >
+                  Clear {KIND_LABELS[kind]} ({stats[kind].toLocaleString()})
+                  <X className="w-2.5 h-2.5" />
+                </button>
+              ) : null,
+            )}
           </div>
         </div>
       </div>
 
-      {uploadError && <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">{uploadError}</div>}
-
+      {/* Branch summary table */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
           <div className="flex items-center justify-between mb-5">
@@ -382,9 +440,15 @@ export function ReportsSection({
                       <td className="py-3 pr-4 font-medium text-white/90">{row.label}</td>
                       <td className="py-3 px-3 text-white/80">฿{Math.round(row.target).toLocaleString()}</td>
                       <td className="py-3 px-3 text-white/80">฿{Math.round(row.actual).toLocaleString()}</td>
-                      <td className={`py-3 px-3 font-semibold ${achPercent >= 100 ? "text-emerald-400" : "text-yellow-400"}`}>{Math.round(achPercent)}%</td>
-                      <td className={`py-3 px-3 font-semibold ${momPercent >= 0 ? "text-emerald-400" : "text-red-400"}`}>{Math.round(momPercent)}%</td>
-                      <td className={`py-3 px-3 font-semibold ${yoyPercent >= 0 ? "text-emerald-400" : "text-red-400"}`}>{Math.round(yoyPercent)}%</td>
+                      <td className={`py-3 px-3 font-semibold ${achPercent >= 100 ? "text-emerald-400" : "text-yellow-400"}`}>
+                        {Math.round(achPercent)}%
+                      </td>
+                      <td className={`py-3 px-3 font-semibold ${momPercent >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                        {Math.round(momPercent)}%
+                      </td>
+                      <td className={`py-3 px-3 font-semibold ${yoyPercent >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                        {Math.round(yoyPercent)}%
+                      </td>
                     </tr>
                   );
                 })}
@@ -398,15 +462,24 @@ export function ReportsSection({
           <div className="space-y-4 text-sm text-white/80">
             <div className="rounded-2xl bg-white/5 border border-white/5 p-4">
               <div className="font-semibold text-white mb-1">Data flow</div>
-              <p>Google Sheets sync → map headers → compute target/current/last month/last year.</p>
+              <p>
+                อัปโหลด Excel → แมป header → คำนวณ target / current / last month / last year
+                (วันนี้ใช้ current เป็นตัวแทน)
+              </p>
             </div>
             <div className="rounded-2xl bg-white/5 border border-white/5 p-4">
               <div className="font-semibold text-white mb-1">Category rule</div>
-              <p>SIM uses Number; other categories use total price, with category master fallback mapping.</p>
+              <p>
+                SIM นับจาก Number; หมวดอื่นใช้ total price (ราคาขายตามบิล), ใช้ category
+                master เป็น fallback
+              </p>
             </div>
             <div className="rounded-2xl bg-white/5 border border-white/5 p-4">
               <div className="font-semibold text-white mb-1">Matching rule</div>
-              <p>Officer names are cleaned, normalized, alias-matched, and compared bidirectionally.</p>
+              <p>
+                ชื่อ officer ถูก clean, normalize, alias-match และเทียบแบบ bidirectional
+                (มี alias เช่น แพวนภา → แพรวนภา)
+              </p>
             </div>
           </div>
         </div>
@@ -430,7 +503,10 @@ export function ReportsSection({
                   <span className="text-white/70">Target ฿{Math.round(item.target).toLocaleString()}</span>
                 </div>
                 <div className="mt-3 h-2 rounded-full bg-white/10 overflow-hidden">
-                  <div className="h-full rounded-full bg-emerald-400" style={{ width: `${Math.min((item.actual / item.target) * 100, 140)}%` }} />
+                  <div
+                    className="h-full rounded-full bg-emerald-400"
+                    style={{ width: `${Math.min((item.actual / item.target) * 100, 140)}%` }}
+                  />
                 </div>
               </div>
             ))}
