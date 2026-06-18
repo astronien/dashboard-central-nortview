@@ -3043,7 +3043,7 @@ export default function App() {
           </div>
         </div>
       )}
-      <div className="w-full max-w-[1440px] h-auto min-h-[90vh] bg-gradient-to-br from-[#1b5d44] to-[#123627] rounded-[2rem] border border-white/10 shadow-2xl flex flex-col relative overflow-hidden">
+      <div className="w-full max-w-[1440px] h-auto min-h-[90vh] bg-gradient-to-br from-[#1b5d44] to-[#123627] rounded-[2rem] border border-white/10 shadow-2xl flex flex-col relative overflow-x-hidden">
         {/* Logo (Absolute Left) */}
         <div className="absolute top-6 left-8 z-50 flex items-center gap-4 pointer-events-auto">
           <img src="/site-logo.09b5daa.svg" alt="Logo" className="h-8" />
