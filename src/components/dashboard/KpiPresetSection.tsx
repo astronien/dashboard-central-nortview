@@ -1,13 +1,14 @@
 import { useMemo, useState } from "react";
 import { Sparkles, Sliders } from "lucide-react";
-import { parseBills } from "../../lib/presetBills";
+import { parseBills, type BillSummary } from "../../lib/presetBills";
 import { calcAllPresets } from "../../lib/presetEngine";
 import { buildCatDailyLookup, enrichSalesRowsWithCatDaily } from "../../lib/presetCatDaily";
 import type { Preset, PresetResult } from "../../lib/presetTypes";
 import type { RawRow } from "../../lib/salesAggregations";
 import KpiPresetManager from "./KpiPresetManager";
 import KpiPresetRow from "./KpiPresetRow";
-import KpiPresetTogglePills from "./KpiPresetTogglePills";
+import KpiDateFilterBar, { type KpiFilters, type KpiFilterMode } from "./KpiDateFilterBar";
+import KpiResultsTable, { type KpiResultsMode } from "./KpiResultsTable";
 
 interface KpiPresetSectionProps {
   salesRows: RawRow[];
@@ -17,6 +18,13 @@ interface KpiPresetSectionProps {
   onPresetsChange: (presets: Preset[]) => void;
 }
 
+const toYYYYMMDD = (d: Date): string => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
 export default function KpiPresetSection({
   salesRows,
   categoryMasterRows,
@@ -25,6 +33,17 @@ export default function KpiPresetSection({
   onPresetsChange,
 }: KpiPresetSectionProps) {
   const [activePresetIds, setActivePresetIds] = useState<string[]>([]);
+  const [resultsMode, setResultsMode] = useState<KpiResultsMode>("branch");
+  const [filters, setFilters] = useState<KpiFilters>(() => {
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    return {
+      startDate: toYYYYMMDD(firstDay),
+      endDate: toYYYYMMDD(now),
+      mode: "cumulative",
+      brand: "",
+    };
+  });
 
   const catDailyOptions = useMemo(() => {
     const set = new Set<string>();
@@ -41,7 +60,7 @@ export default function KpiPresetSection({
     return enrichSalesRowsWithCatDaily(salesRows, lookup);
   }, [salesRows, categoryMasterRows]);
 
-  const bills = useMemo(() => {
+  const allBills = useMemo(() => {
     if (enrichedRows.length === 0) return [];
     let rows = enrichedRows;
     if (selectedBranch && selectedBranch !== "All Branches") {
@@ -58,16 +77,64 @@ export default function KpiPresetSection({
     return parseBills(rows);
   }, [enrichedRows, selectedBranch]);
 
+  // Filter by date range + brand
+  const filteredBills = useMemo<BillSummary[]>(() => {
+    if (allBills.length === 0) return [];
+    const start = new Date(filters.startDate);
+    const end = new Date(filters.endDate);
+    end.setHours(23, 59, 59, 999);
+    const brand = filters.brand.trim();
+    return allBills.filter((bill) => {
+      if (bill.docDate < start || bill.docDate > end) return false;
+      if (brand) {
+        const hasBrand = bill.lineItems.some(
+          (li) => String((li as any).Brand ?? (li as any).brand ?? "") === brand,
+        );
+        if (!hasBrand) return false;
+      }
+      return true;
+    });
+  }, [allBills, filters.startDate, filters.endDate, filters.brand]);
+
+  // For daily mode, take only the most recent day's bills
+  const billsForCalc = useMemo<BillSummary[]>(() => {
+    if (filters.mode === "cumulative") return filteredBills;
+    if (filteredBills.length === 0) return [];
+    const maxDate = filteredBills.reduce(
+      (max, b) => (b.docDate > max ? b.docDate : max),
+      filteredBills[0].docDate,
+    );
+    const maxDateStr = toYYYYMMDD(maxDate);
+    return filteredBills.filter((b) => toYYYYMMDD(b.docDate) === maxDateStr);
+  }, [filteredBills, filters.mode]);
+
   const results: PresetResult[] = useMemo(() => {
-    if (activePresetIds.length === 0 || bills.length === 0) return [];
+    if (activePresetIds.length === 0 || billsForCalc.length === 0) return [];
     const active = presets.filter((p) => activePresetIds.includes(p.id));
-    return calcAllPresets(bills, active);
-  }, [bills, presets, activePresetIds]);
+    return calcAllPresets(billsForCalc, active);
+  }, [billsForCalc, presets, activePresetIds]);
+
+  const activePresets = useMemo(
+    () => presets.filter((p) => activePresetIds.includes(p.id)),
+    [presets, activePresetIds],
+  );
 
   const handleToggle = (id: string) => {
     setActivePresetIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
+  };
+
+  const handleSelectAll = () => {
+    setActivePresetIds(presets.map((p) => p.id));
+  };
+
+  const handleDeselectAll = () => {
+    setActivePresetIds([]);
+  };
+
+  const handleReorderPresets = (newOrder: Preset[]) => {
+    onPresetsChange(newOrder);
   };
 
   const salesEmpty = salesRows.length === 0;
@@ -102,23 +169,59 @@ export default function KpiPresetSection({
       />
 
       {!salesEmpty && (
+        <KpiDateFilterBar
+          filters={filters}
+          setFilters={setFilters}
+          allBills={allBills}
+          filteredCount={filteredBills.length}
+          presets={presets}
+          activePresetIds={activePresetIds}
+          onTogglePreset={handleToggle}
+          onSelectAllPresets={handleSelectAll}
+          onDeselectAllPresets={handleDeselectAll}
+          onReorderPresets={handleReorderPresets}
+        />
+      )}
+
+      {!salesEmpty && activePresets.length > 0 && results.length > 0 && (
+        <KpiPresetRow results={results} />
+      )}
+
+      {!salesEmpty && (
         <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 p-5 shadow-[0_8px_32px_rgba(0,0,0,0.12)] space-y-4">
-          <div className="flex items-center gap-2">
-            <Sliders className="w-4 h-4 text-emerald-400" />
-            <h3 className="text-base font-bold text-white">ผลลัพธ์ Preset ที่เลือก</h3>
-          </div>
-          <KpiPresetTogglePills
-            presets={presets}
-            activePresetIds={activePresetIds}
-            onToggle={handleToggle}
-          />
-          {results.length > 0 ? (
-            <KpiPresetRow results={results} />
-          ) : (
-            <div className="text-center text-white/50 text-sm py-6">
-              เลือก Preset ด้านบนเพื่อดูผลลัพธ์
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Sliders className="w-4 h-4 text-emerald-400" />
+              <h3 className="text-base font-bold text-white">ตารางผลลัพธ์</h3>
             </div>
-          )}
+            <div className="flex gap-1 bg-white/5 rounded-lg p-1 border border-white/10">
+              <button
+                onClick={() => setResultsMode("branch")}
+                className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                  resultsMode === "branch"
+                    ? "bg-white/15 text-white shadow"
+                    : "text-emerald-300/80 hover:text-white"
+                }`}
+              >
+                รายสาขา
+              </button>
+              <button
+                onClick={() => setResultsMode("officer")}
+                className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                  resultsMode === "officer"
+                    ? "bg-white/15 text-white shadow"
+                    : "text-emerald-300/80 hover:text-white"
+                }`}
+              >
+                รายพนักงาน
+              </button>
+            </div>
+          </div>
+          <KpiResultsTable
+            mode={resultsMode}
+            filteredBills={billsForCalc}
+            activePresets={activePresets}
+          />
         </div>
       )}
     </div>
