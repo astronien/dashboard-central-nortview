@@ -32,13 +32,14 @@ export type CategorySnapshotItem = {
 };
 
 const SNAPSHOT_CATEGORIES: Array<{ label: string; kpiKey?: KpiCategoryKey }> = [
-  { label: "Total Sales" },
   { label: "Mac", kpiKey: "Mac" },
   { label: "iPad", kpiKey: "iPad" },
   { label: "iPhone", kpiKey: "iPhone" },
   { label: "Apple Watch", kpiKey: "Apple Watch" },
   { label: "BTB(Apple)", kpiKey: "BTB(Apple)" },
   { label: "BTB", kpiKey: "BTB" },
+  { label: "COVER+", kpiKey: "COVER+" },
+  { label: "AC+", kpiKey: "AC+" },
   { label: "SIM", kpiKey: "SIM" },
 ];
 
@@ -205,13 +206,16 @@ export function buildCategorySnapshots(params: {
     const yoy =
       lastYearActual > 0 ? ((actual - lastYearActual) / lastYearActual) * 100 : "New";
 
+    const achieveRate = target === 0 && actual > 0 ? 100 : calcAchievementPct(actual, target);
+    const forecastRate = target === 0 ? 0 : calcAchievementPct(forecast, target);
+
     return {
       category: label,
       actual,
       target,
       forecast,
-      achieveRate: calcAchievementPct(actual, target),
-      forecastRate: calcAchievementPct(forecast, target),
+      achieveRate,
+      forecastRate,
       targetDay: targetToToday,
       today,
       todayAchieveRate: calcTodayAchievementPct(today, targetToToday),

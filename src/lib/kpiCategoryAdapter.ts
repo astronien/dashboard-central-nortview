@@ -18,7 +18,9 @@ export type KpiCategoryKey =
   | "SIM"
   | "BTB"
   | "BTB(Apple)"
-  | "Smile";
+  | "Smile"
+  | "COVER+"
+  | "AC+";
 
 export type KpiMeasureType = "revenue" | "quantity";
 
@@ -38,6 +40,8 @@ const KPI_CONFIG: Record<KpiCategoryKey, KpiCategoryConfig> = {
   Smile: { targetField: "simTarget", measureType: "quantity", matchNames: ["Smile", "SIM"] },
   BTB: { targetField: "btbTarget", measureType: "revenue", matchNames: ["BTB"] },
   "BTB(Apple)": { targetField: "btbAppleTarget", measureType: "revenue", matchNames: ["BTB(Apple)", "BTB Apple"] },
+  "COVER+": { targetField: "totalTarget", measureType: "quantity", matchNames: ["COVER+", "Cover+", "cover+"] },
+  "AC+": { targetField: "totalTarget", measureType: "quantity", matchNames: ["Apple Care", "AppleCare", "AC+"] },
 };
 
 export function getKpiCategoryConfig(category: string): KpiCategoryConfig | undefined {
@@ -88,6 +92,14 @@ export function rowMatchesKpiCategory(row: RawRow, category: string): boolean {
 
   if (catNorm === "btb(apple)" || catNorm === "btb apple") {
     return text.includes("btb apple") || text.includes("btb(apple)");
+  }
+
+  if (catNorm === "cover+" || catNorm === "cover plus") {
+    return text.includes("cover+") || text.includes("cover plus");
+  }
+
+  if (catNorm === "ac+" || catNorm === "apple care") {
+    return text.includes("apple care") || text.includes("applecare") || text.includes("ac+");
   }
 
   const cfg = getKpiCategoryConfig(category);
