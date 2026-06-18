@@ -81,7 +81,7 @@ const mapTargetCategoryKey = (category: string, subCategory = "", productName = 
 const getRowKey = (row: RawRow) => [
   String(row["Doc No"] ?? "").trim(),
   String(row["Product (Name)"] ?? "").replace(/\s+/g, " ").trim(),
-  String(row["ราคาจำหน่าย"] || row["ราคาขายตามบิล"] || row["Total Price"] || row.totalPrice || "").trim(),
+  String(row["ราคาจำหน่าย"] ?? row["ราคาขายตามบิล"] ?? row["Total Price"] ?? row.totalPrice ?? "").trim(),
   String(row["Serial"] ?? "").trim(),
   String(row["Doc Date"] ?? "").trim(),
 ].join("||");
@@ -175,7 +175,7 @@ export function buildReport(targetRows: RawRow[], currentRows: RawRow[], lastMon
       if (period === "current") {
         // Include quantity in the key to avoid dropping rows that are legitimately different
         const qty = String(row.Number ?? row.number ?? row.qty ?? "1").trim();
-        const dupKey = `${row["Doc No"]}_${row["Product (Code)"] ?? row.product_code ?? ""}_${row["ราคาจำหน่าย"] || row["ราคาขายตามบิล"] || row["Total Price"] || row.totalPrice}_${qty}`;
+        const dupKey = `${row["Doc No"]}_${row["Product (Code)"] ?? row.product_code ?? ""}_${row["ราคาจำหน่าย"] ?? row["ราคาขายตามบิล"] ?? row["Total Price"] ?? row.totalPrice}_${qty}`;
         const count = seen.get(dupKey) ?? 0;
         if (count > 0 && !CHOSEN_DUPLICATE_KEYS.has(getRowKey(row))) return;
         seen.set(dupKey, count + 1);

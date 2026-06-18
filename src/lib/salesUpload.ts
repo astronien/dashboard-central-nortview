@@ -58,6 +58,11 @@ const pickField = (row: Record<string, unknown>, keys: readonly string[]): strin
   return "";
 };
 
+const pickFieldOrUndefined = (row: Record<string, unknown>, keys: readonly string[]): string | undefined => {
+  const v = pickField(row, keys);
+  return v !== "" ? v : undefined;
+};
+
 const workbookToRows = (workbook: XLSX.WorkBook): RawRow[] => {
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   if (!sheet) return [];
@@ -79,9 +84,9 @@ const workbookToRows = (workbook: XLSX.WorkBook): RawRow[] => {
       "Product (Code)": pickField(norm, ALIASES.productCode),
       "Product (Name)": pickField(norm, ALIASES.productName),
       "Number": pickField(norm, ALIASES.number),
-      "Total Price": pickField(norm, ALIASES.totalPrice),
-      "ราคาจำหน่าย": pickField(norm, ALIASES.sellingPrice),
-      "ราคาขายตามบิล": pickField(norm, ALIASES.billAmount),
+      "Total Price": pickFieldOrUndefined(norm, ALIASES.totalPrice),
+      "ราคาจำหน่าย": pickFieldOrUndefined(norm, ALIASES.sellingPrice),
+      "ราคาขายตามบิล": pickFieldOrUndefined(norm, ALIASES.billAmount),
       "Category (Name)": pickField(norm, ALIASES.category),
       "Sub Category": pickField(norm, ALIASES.subCategory),
       "Brand": pickField(norm, ALIASES.brand),

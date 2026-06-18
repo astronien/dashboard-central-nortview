@@ -519,7 +519,7 @@ const matchesOfficer = (a: string, b: string) => {
 };
 const getCategoryValue = (row: RawRow) => {
   const category = normalizeText(row["Category (Name)"] ?? row.category ?? row.cat ?? row["Cat & Sub Cat"]);
-  return category.includes("sim") ? toNumber(row.Number || row.number || row.qty) : toNumber(row["ราคาจำหน่าย"] || row["ราคาขายตามบิล"] || row["Total Price"] || row.totalPrice);
+  return category.includes("sim") ? toNumber(row.Number ?? row.number ?? row.qty) : toNumber(row["ราคาจำหน่าย"] ?? row["ราคาขายตามบิล"] ?? row["Total Price"] ?? row.totalPrice);
 };
 const mapAttachmentMetrics = (category: string, actual: number) => {
   const normalized = normalizeText(category);
@@ -600,7 +600,7 @@ const sumSales = (
     const prod = String(row["Product (Name)"] ?? row.product ?? "").toLowerCase();
     const sub = String(row["Sub Category"] ?? "").toLowerCase();
     if (filterFn(cat, prod, sub)) {
-      sum += toNumber(row["ราคาจำหน่าย"] || row["ราคาขายตามบิล"] || row["Total Price"] || row.totalPrice);
+      sum += toNumber(row["ราคาจำหน่าย"] ?? row["ราคาขายตามบิล"] ?? row["Total Price"] ?? row.totalPrice);
     }
   });
   return sum;
@@ -635,7 +635,7 @@ const getRowKey = (row: RawRow) => {
   return [
     String(row["Doc No"] ?? "").trim(),
     String(row["Product (Name)"] ?? "").replace(/\s+/g, " ").trim(),
-    String(row["ราคาจำหน่าย"] || row["ราคาขายตามบิล"] || row["Total Price"] || row.totalPrice || "").trim(),
+    String(row["ราคาจำหน่าย"] ?? row["ราคาขายตามบิล"] ?? row["Total Price"] ?? row.totalPrice ?? "").trim(),
     String(row["Serial"] ?? "").trim(),
     String(row["Doc Date"] ?? "").trim()
   ].join("||");
@@ -1761,7 +1761,7 @@ export default function App() {
       const officerName = String(row["Officer (Name)"] ?? row.Officer ?? "");
       if (attachMatchesOfficer(officerName, activeOfficer.name)) {
         const cat = String(row["Category (Name)"] ?? row.category ?? "Other").trim();
-        const amount = toNumber(row["ราคาจำหน่าย"] || row["ราคาขายตามบิล"] || row["Total Price"] || row.totalPrice);
+        const amount = toNumber(row["ราคาจำหน่าย"] ?? row["ราคาขายตามบิล"] ?? row["Total Price"] ?? row.totalPrice);
         if (cat) {
           catSales.set(cat, (catSales.get(cat) ?? 0) + amount);
         }
@@ -2675,7 +2675,7 @@ export default function App() {
 
     const formatValue = (row: RawRow) => {
       const amount = toNumber(
-        row["ราคาจำหน่าย"] || row["ราคาขายตามบิล"] || row["Total Price"] || row.totalPrice,
+        row["ราคาจำหน่าย"] ?? row["ราคาขายตามบิล"] ?? row["Total Price"] ?? row.totalPrice,
       );
       return amount ? amount.toLocaleString() : "-";
     };

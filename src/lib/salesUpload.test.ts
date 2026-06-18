@@ -79,7 +79,7 @@ describe("parseSalesExcelFile (via _internalNormalize)", () => {
     assert.equal(row["Brand"], "");
     assert.equal(row["Customer Code"], "");
     assert.equal(row["Number"], "");
-    assert.equal(row["ราคาขายตามบิล"], "");
+    assert.equal(row["ราคาขายตามบิล"], undefined);
     // Product Type defaults to "Inventory Item" when missing
     assert.equal(row["Product Type"], "Inventory Item");
   });
