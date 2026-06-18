@@ -114,6 +114,12 @@ import { StaffSection } from "./components/dashboard/StaffSection";
 import { loadWonderConfigs, saveWonderConfigs, type WonderItemConfig, fetchWonderConfigs, updateWonderConfigs, calcWonderForRows, calcWonderRate } from "./lib/wonderConfig";
 import { ReportsSection } from "./components/dashboard/ReportsSection";
 import { SettingsSection } from "./components/dashboard/SettingsSection";
+import KpiPresetSection from "./components/dashboard/KpiPresetSection";
+import {
+  getPresets as getKpiPresets,
+  migrateFromLegacyLocalStorage as migrateKpiPresetsFromLS,
+} from "./lib/presetStorage";
+import type { Preset as KpiPreset } from "./lib/presetTypes";
 
 
 type Staff = {
@@ -1236,12 +1242,13 @@ const emptyReport: ParsedReport = {
 
 export default function App() {
   const [currentView, setCurrentView] = useState<
-    "home" | "staff" | "staff_overview" | "settings" | "reports"
+    "home" | "staff" | "staff_overview" | "settings" | "reports" | "kpi_preset"
   >("home");
   const [parsedReport, setParsedReport] = useState<ParsedReport>(fallbackReport);
   const [uploadedFiles, setUploadedFiles] = useState<Record<UploadKind, RawRow[]>>({ target: [], current: [], today: [], lastMonth: [], lastYear: [], categoryMaster: [] });
   const [selectedBranch, setSelectedBranch] = useState<string>("Mega Bangna");
   const [selectedBranchLoaded, setSelectedBranchLoaded] = useState(false);
+  const [kpiPresets, setKpiPresets] = useState<KpiPreset[]>([]);
 
   const handleBranchChange = (newBranch: string) => {
     setSelectedBranch(newBranch);
@@ -1566,6 +1573,19 @@ export default function App() {
       } catch (e) {
         console.warn("[App] loadWonderConfigs failed:", e);
         setWonderConfigs(null);
+      }
+    })();
+  }, []);
+
+  // Load KPI presets from IDB (one-time legacy LS migration included).
+  useEffect(() => {
+    void (async () => {
+      try {
+        await migrateKpiPresetsFromLS();
+        const presets = await getKpiPresets();
+        setKpiPresets(presets);
+      } catch (e) {
+        console.warn("[App] load KPI presets failed:", e);
       }
     })();
   }, []);
@@ -3068,6 +3088,13 @@ export default function App() {
                 <PieChart className="w-5 h-5" />
               </button>
               <button
+                onClick={() => setCurrentView("kpi_preset")}
+                className={`p-2 rounded-full transition-colors ${currentView === "kpi_preset" ? "bg-[#0f4430] shadow-inner text-white" : "text-white/60 hover:text-white"}`}
+                title="KPI Preset"
+              >
+                <SlidersHorizontal className="w-5 h-5" />
+              </button>
+              <button
                 onClick={() => setCurrentView("reports")}
                 className="p-2 rounded-full transition-colors text-white/60 hover:text-white"
                 title="Go to Reports"
@@ -3257,6 +3284,24 @@ export default function App() {
                   onRemoveFile={removeUploadedFile}
                   onUploadFile={handleUploadFile}
                   parsedReport={parsedReport}
+                />
+              </motion.div>
+            )}
+            {currentView === "kpi_preset" && (
+              <motion.div
+                key="kpi_preset"
+                initial={{ opacity: 0, scale: 0.96, filter: "blur(8px)" }}
+                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+                exit={{ opacity: 0, scale: 1.04, filter: "blur(8px)" }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+                className="flex flex-col gap-6 w-full h-full relative z-20"
+              >
+                <KpiPresetSection
+                  salesRows={displayUploads.current}
+                  categoryMasterRows={displayUploads.categoryMaster}
+                  selectedBranch={selectedBranch}
+                  presets={kpiPresets}
+                  onPresetsChange={setKpiPresets}
                 />
               </motion.div>
             )}
