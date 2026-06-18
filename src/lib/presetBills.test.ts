@@ -46,6 +46,13 @@ describe("ROW_READERS", () => {
     assert.equal(ROW_READERS.isInventoryItem(baseRow({ "Product Type": "Service" })), false);
   });
 
+  it("isInventoryItem is strict — returns false for empty Product Type", () => {
+    // After fix to match source repo: only exact "Inventory Item" is true
+    assert.equal(ROW_READERS.isInventoryItem(baseRow({ "Product Type": "" })), false);
+    assert.equal(ROW_READERS.isInventoryItem(baseRow({ "Product Type": "inventory item" })), false);
+    assert.equal(ROW_READERS.isInventoryItem(baseRow({ "Product Type": "Non Inventory Item" })), false);
+  });
+
   it("readStr falls back to alternate keys", () => {
     const row: RawRow = { category_name: "iPhone" };
     assert.equal(ROW_READERS.getCategoryName(row), "iPhone");
@@ -115,5 +122,17 @@ describe("parseBills", () => {
 
   it("returns empty array for empty input", () => {
     assert.deepEqual(parseBills([]), []);
+  });
+
+  it("falls back to 'GNR' / 'ลูกค้าทั่วไป' for missing customerCode/customerName", () => {
+    const rows = [
+      baseRow({
+        "Customer (Code)": "",
+        "Customer (Name)": "",
+      }),
+    ];
+    const bills = parseBills(rows);
+    assert.equal(bills[0].customerCode, "GNR");
+    assert.equal(bills[0].customerName, "ลูกค้าทั่วไป");
   });
 });

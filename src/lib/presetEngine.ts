@@ -124,10 +124,9 @@ export function countItemQuantityAnyFilter(bill: BillSummary, filters: ItemFilte
       const name = ROW_READERS.getProductName(li as any);
       const itemKey = `${code}-${serial || "no-serial"}-${name}`;
       if (!matchedItems.has(itemKey)) {
-        // SIM rows use quantity, others use 1
-        const cat = ROW_READERS.getCategoryName(li as any).toLowerCase();
-        const qty = cat.includes("sim") ? ROW_READERS.getQuantity(li) : 1;
-        matchedItems.set(itemKey, qty);
+        // Match source repo: use li.quantity for ALL items, not just SIM
+        // (handles line items with Number > 1, e.g. iPhone 2 units in 1 row)
+        matchedItems.set(itemKey, ROW_READERS.getQuantity(li));
       }
     });
   });

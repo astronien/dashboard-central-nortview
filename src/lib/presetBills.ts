@@ -76,8 +76,9 @@ function readNum(row: RawRow, ...keys: string[]): number {
 }
 
 function isInventoryItem(row: RawRow): boolean {
+  // Match source repo: strict "Inventory Item" check only
   const t = readStr(row, "Product Type", "product_type", "ProductType");
-  return t === "Inventory Item" || t === "" || t === "inventory item";
+  return t === "Inventory Item";
 }
 
 function getProductType(row: RawRow): string {
@@ -206,8 +207,8 @@ export function parseBills(lineItems: RawRow[]): BillSummary[] {
       officerId: getOfficerId(items[0]),
       branchId: getBranchId(items[0]),
       branchName: getBranchName(items[0]),
-      customerCode: getCustomerCode(items[0]),
-      customerName: getCustomerName(items[0]),
+      customerCode: getCustomerCode(items[0]) || "GNR",
+      customerName: getCustomerName(items[0]) || "ลูกค้าทั่วไป",
       totalRevenue,
       itemCount,
       categories,
