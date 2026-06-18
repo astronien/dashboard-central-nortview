@@ -33,26 +33,38 @@ const formatNumber = (n: number, isCurrency: boolean): string => {
 const isCurrencyCalc = (calcType: string | undefined) =>
   calcType === "baht" || calcType === "bahtRate" || calcType === "catBaht";
 
-const valueForResult = (r: PresetResult): { text: string; raw: number; suffix: string } => {
+const valueForResult = (
+  r: PresetResult,
+): { text: string; raw: number; suffix: string } => {
   const ct = r.calcType;
   if (ct === "baht" || ct === "catBaht") {
     return { text: `฿${formatNumber(r.totalBaht, true)}`, raw: r.totalBaht, suffix: "" };
   }
   if (ct === "unit" || ct === "catQty") {
-    return { text: r.billsWithAandB.toLocaleString(), raw: r.billsWithAandB, suffix: " ชิ้น" };
-  }
-  if (ct === "bahtRate") {
     return {
-      text: r.totalBahtB === 0 ? "-" : `${r.bahtRate.toFixed(1)}%`,
-      raw: r.bahtRate,
+      text: `${r.billsWithAandB.toLocaleString()} ชิ้น`,
+      raw: r.billsWithAandB,
       suffix: "",
     };
   }
+  if (ct === "bahtRate") {
+    if (r.totalBahtB === 0) {
+      return { text: "-", raw: 0, suffix: "" };
+    }
+    return {
+      text: `${r.bahtRate.toFixed(1)}%`,
+      raw: r.bahtRate,
+      suffix: `฿${formatNumber(r.totalBaht, true)} / ฿${formatNumber(r.totalBahtB, true)}`,
+    };
+  }
   // attach / catAttach
+  if (r.billsWithB === 0) {
+    return { text: "-", raw: 0, suffix: "" };
+  }
   return {
-    text: r.billsWithB === 0 ? "-" : `${r.attachRate.toFixed(1)}%`,
+    text: `${r.attachRate.toFixed(1)}%`,
     raw: r.attachRate,
-    suffix: r.billsWithB > 0 ? ` (${r.billsWithAandB}/${r.billsWithB})` : "",
+    suffix: `${r.billsWithAandB}/${r.billsWithB} ชิ้น`,
   };
 };
 
