@@ -518,8 +518,7 @@ const matchesOfficer = (a: string, b: string) => {
   return false;
 };
 const getCategoryValue = (row: RawRow) => {
-  const category = normalizeText(row["Category (Name)"] ?? row.category ?? row.cat ?? row["Cat & Sub Cat"]);
-  return category.includes("sim") ? toNumber(row.Number ?? row.number ?? row.qty) : toNumber(row["ราคาจำหน่าย"] ?? row["ราคาขายตามบิล"] ?? row["Total Price"] ?? row.totalPrice);
+  return toNumber(row["ราคาจำหน่าย"] ?? row["ราคาขายตามบิล"] ?? row["Total Price"] ?? row.totalPrice);
 };
 const mapAttachmentMetrics = (category: string, actual: number) => {
   const normalized = normalizeText(category);
