@@ -788,7 +788,8 @@ const rowDefaultUnits = (row: Record<string, unknown>): number => {
 
 const rowRevenue = (row: Record<string, unknown>): number =>
   toNumber(
-    row["ราคาขายตามบิล"] ??
+    row["ราคาจำหน่าย"] ??
+      row["ราคาขายตามบิล"] ??
       row.bill_amount ??
       row["Total Price"] ??
       row.totalPrice ??

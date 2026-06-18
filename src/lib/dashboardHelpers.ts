@@ -66,7 +66,7 @@ export { calculateMetrics } from "./targetAggregations";
 export const getRowKey = (row: RawRow) => [
   String(row["Doc No"] ?? "").trim(),
   String(row["Product (Name)"] ?? "").replace(/\s+/g, " ").trim(),
-  String(row["ราคาขายตามบิล"] ?? row["Total Price"] ?? row.totalPrice ?? "").trim(),
+  String(row["ราคาจำหน่าย"] ?? row["ราคาขายตามบิล"] ?? row["Total Price"] ?? row.totalPrice ?? "").trim(),
   String(row["Serial"] ?? "").trim(),
   String(row["Doc Date"] ?? "").trim(),
 ].join("||");

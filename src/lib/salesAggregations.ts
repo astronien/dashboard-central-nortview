@@ -167,5 +167,5 @@ export function getCategoryValue(row: RawRow) {
   const category = normalizeText(row["Category (Name)"] ?? row.category ?? row.cat ?? row["Cat & Sub Cat"]);
   return category.includes("sim")
     ? toNumber(row.Number ?? row.number ?? row.qty)
-    : toNumber(row["ราคาขายตามบิล"] ?? row["Total Price"] ?? row.totalPrice);
+    : toNumber(row["ราคาจำหน่าย"] ?? row["ราคาขายตามบิล"] ?? row["Total Price"] ?? row.totalPrice);
 }

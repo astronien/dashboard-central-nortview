@@ -99,7 +99,7 @@ function sumTodayActual(rows: RawRow[], category?: string): number {
     return todayRows.reduce(
       (sum, row) =>
         sum +
-        (Number(String(row["ราคาขายตามบิล"] ?? row["Total Price"] ?? "0").replace(/[^\d.-]/g, "")) ||
+        (Number(String(row["ราคาจำหน่าย"] ?? row["ราคาขายตามบิล"] ?? row["Total Price"] ?? "0").replace(/[^\d.-]/g, "")) ||
           0),
       0,
     );
@@ -117,7 +117,7 @@ function periodActual(
     return rows.reduce(
       (sum, row) =>
         sum +
-        (Number(String(row["ราคาขายตามบิล"] ?? row["Total Price"] ?? "0").replace(/[^\d.-]/g, "")) ||
+        (Number(String(row["ราคาจำหน่าย"] ?? row["ราคาขายตามบิล"] ?? row["Total Price"] ?? "0").replace(/[^\d.-]/g, "")) ||
           0),
       0,
     );

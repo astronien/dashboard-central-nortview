@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS data_sales (
   doc_no TEXT,
   doc_date TEXT,
   total_price TEXT,
+  selling_price TEXT,
   bill_amount TEXT,
   quantity TEXT,
   customer_name TEXT,
