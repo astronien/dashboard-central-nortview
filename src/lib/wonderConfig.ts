@@ -1241,6 +1241,32 @@ export async function saveWonderConfigs(configs: WonderItemConfig[]): Promise<vo
   }
 }
 
+/**
+ * One-time cleanup: remove any wonder config whose name looks like test data
+ * (e.g. "testxx", "test", "ทดสอบ", or names that contain "test"). Returns the
+ * list of removed names so the caller can log/show a notice.
+ */
+export async function cleanupTestWonderConfigs(): Promise<string[]> {
+  const TEST_PATTERNS = [/^testxx$/i, /^test\d*$/i, /^ทดสอบ/i, /\btest\b/i];
+  try {
+    const configs = await loadWonderConfigs();
+    const removed: string[] = [];
+    const kept = configs.filter((c) => {
+      const isTest = TEST_PATTERNS.some((p) => p.test(String(c.name ?? "")));
+      if (isTest) removed.push(String(c.name));
+      return !isTest;
+    });
+    if (removed.length > 0) {
+      await saveWonderConfigs(kept);
+      console.info(`[wonderConfig] Cleaned up test configs: ${removed.join(", ")}`);
+    }
+    return removed;
+  } catch (e) {
+    console.warn("[wonderConfig] cleanupTestWonderConfigs failed:", e);
+    return [];
+  }
+}
+
 export async function fetchWonderConfigs(): Promise<WonderItemConfig[]> {
   try {
     const res = await fetch("/api/wonder-configs");

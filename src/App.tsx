@@ -111,13 +111,14 @@ import { HomeDashboardSection } from "./components/dashboard/HomeDashboardSectio
 
 import { StaffOverviewSection } from "./components/dashboard/StaffOverviewSection";
 import { StaffSection } from "./components/dashboard/StaffSection";
-import { loadWonderConfigs, saveWonderConfigs, type WonderItemConfig, fetchWonderConfigs, updateWonderConfigs, calcWonderForRows, calcWonderRate } from "./lib/wonderConfig";
+import { loadWonderConfigs, saveWonderConfigs, type WonderItemConfig, fetchWonderConfigs, updateWonderConfigs, calcWonderForRows, calcWonderRate, cleanupTestWonderConfigs } from "./lib/wonderConfig";
 import { ReportsSection } from "./components/dashboard/ReportsSection";
 import { SettingsSection } from "./components/dashboard/SettingsSection";
 import KpiPresetSection from "./components/dashboard/KpiPresetSection";
 import {
   getPresets as getKpiPresets,
   migrateFromLegacyLocalStorage as migrateKpiPresetsFromLS,
+  cleanupTestPresets as cleanupKpiPresets,
 } from "./lib/presetStorage";
 import type { Preset as KpiPreset } from "./lib/presetTypes";
 
@@ -1568,6 +1569,11 @@ export default function App() {
   useEffect(() => {
     void (async () => {
       try {
+        // One-time cleanup: remove any "testxx" / "test" presets from previous sessions
+        const removed = await cleanupTestWonderConfigs();
+        if (removed.length > 0) {
+          console.info(`[App] removed test wonder configs: ${removed.join(", ")}`);
+        }
         const loaded = await loadWonderConfigs();
         setWonderConfigs(loaded);
       } catch (e) {
@@ -1582,6 +1588,10 @@ export default function App() {
     void (async () => {
       try {
         await migrateKpiPresetsFromLS();
+        const removedKpi = await cleanupKpiPresets();
+        if (removedKpi.length > 0) {
+          console.info(`[App] removed test KPI presets: ${removedKpi.join(", ")}`);
+        }
         const presets = await getKpiPresets();
         setKpiPresets(presets);
       } catch (e) {

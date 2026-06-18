@@ -115,6 +115,31 @@ export function getDefaultPresets(): Omit<Preset, "id">[] {
 }
 
 /**
+ * One-time cleanup: remove any KPI preset whose name looks like test data
+ * (e.g. "testxx", "test", "ทดสอบ"). Returns the list of removed names.
+ */
+export async function cleanupTestPresets(): Promise<string[]> {
+  const TEST_PATTERNS = [/^testxx$/i, /^test\d*$/i, /^ทดสอบ/i, /\btest\b/i];
+  try {
+    const presets = await getPresets();
+    const removed: string[] = [];
+    const kept = presets.filter((p) => {
+      const isTest = TEST_PATTERNS.some((pat) => pat.test(String(p.name ?? "")));
+      if (isTest) removed.push(String(p.name));
+      return !isTest;
+    });
+    if (removed.length > 0) {
+      await savePresets(kept);
+      console.info(`[presetStorage] Cleaned up test presets: ${removed.join(", ")}`);
+    }
+    return removed;
+  } catch (e) {
+    console.warn("[presetStorage] cleanupTestPresets failed:", e);
+    return [];
+  }
+}
+
+/**
  * One-time migration from old localStorage key (s7_presets) to IDB.
  * Returns true if migration was performed.
  */
