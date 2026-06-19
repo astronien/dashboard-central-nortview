@@ -37,13 +37,21 @@ function toDate(value: unknown): Date | null {
   }
   const str = String(value).trim();
   if (!str) return null;
-  // Try native Date parse first (handles ISO format "2026-05-14")
-  const d = new Date(str);
-  if (!Number.isNaN(d.getTime())) return d;
-  // Handle Thai day prefix format: "พฤ. 14/05/2026 18:33:00" or "อา. 01/06/2026"
-  // Strip the Thai day abbreviation prefix (e.g. "พฤ. ", "อา. ", "จ. ")
+
+  // Strip Thai day abbreviation prefix (e.g. "พฤ. ", "อา. ", "จ. ") BEFORE
+  // any Date parsing, because V8 may misinterpret "01/06/2026" as mm/dd/yyyy
+  // (Jan 6) instead of dd/mm/yyyy (Jun 1).
   const stripped = str.replace(/^[^\d]+/, "").trim();
-  // Try dd/mm/yyyy format (with optional time)
+
+  // Try ISO format "2026-06-17" or "2026-06-17T10:00:00" via native Date
+  if (/^\d{4}-\d{2}-\d{2}/.test(stripped)) {
+    const d = new Date(stripped);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+
+  // Try dd/mm/yyyy format (Thai/European format — NOT mm/dd/yyyy)
+  // This must come BEFORE any native Date() call on slash-separated strings,
+  // because V8 treats "01/06/2026" as mm/dd/yyyy (Jan 6) not dd/mm/yyyy (Jun 1).
   const m = stripped.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
   if (m) {
     const day = Number(m[1]);
@@ -52,12 +60,18 @@ function toDate(value: unknown): Date | null {
     const d2 = new Date(year, month, day);
     if (!Number.isNaN(d2.getTime())) return d2;
   }
+
   // Try dd-mm-yyyy format
   const m2 = stripped.match(/(\d{1,2})-(\d{1,2})-(\d{4})/);
   if (m2) {
     const d3 = new Date(Number(m2[3]), Number(m2[2]) - 1, Number(m2[1]));
     if (!Number.isNaN(d3.getTime())) return d3;
   }
+
+  // Fallback: native Date parse
+  const d4 = new Date(stripped);
+  if (!Number.isNaN(d4.getTime())) return d4;
+
   return null;
 }
 
