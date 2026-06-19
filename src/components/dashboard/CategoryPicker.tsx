@@ -305,6 +305,12 @@ export default function CategoryPicker({
         <label className="text-sm font-medium text-white/80 block">{label}</label>
       )}
 
+      {allLines.length === 0 ? (
+        <div className="text-center py-8 text-white/40 text-sm border border-white/10 rounded-lg bg-white/5">
+          ยังไม่มีข้อมูล — กรุณาอัปโหลดไฟล์ Current Sales ก่อน
+        </div>
+      ) : (
+        <>
       <label className="inline-flex items-center gap-2 cursor-pointer select-none">
         <input
           type="checkbox"
@@ -549,6 +555,8 @@ export default function CategoryPicker({
           </p>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }
