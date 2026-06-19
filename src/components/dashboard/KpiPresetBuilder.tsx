@@ -145,7 +145,7 @@ export default function KpiPresetBuilder({
   return (
     <form
       onSubmit={handleSubmit}
-      className="bg-white/5 rounded-2xl p-4 space-y-4 border border-white/10 max-h-[70vh] overflow-y-auto"
+      className="bg-white/5 rounded-2xl p-4 space-y-4 border border-white/10"
     >
       <div>
         <label className="text-sm font-medium text-white/80 block mb-1">ชื่อ Preset</label>

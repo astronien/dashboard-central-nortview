@@ -326,7 +326,9 @@ export default function CategoryPicker({
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {/* Categories */}
         <div>
-          <label className="text-xs text-emerald-400 font-bold block mb-1">Category</label>
+          <label className="text-xs text-emerald-400 font-bold block mb-1">
+            Category <span className="text-white/30">({allCategories.length})</span>
+          </label>
           <div className="border border-white/10 rounded-lg p-2 max-h-40 overflow-y-auto bg-white/5">
             <label className="flex items-center gap-2 p-1 hover:bg-white/5 rounded cursor-pointer">
               <input
@@ -359,7 +361,9 @@ export default function CategoryPicker({
 
         {/* Sub Categories */}
         <div>
-          <label className="text-xs text-emerald-400 font-bold block mb-1">Sub Category</label>
+          <label className="text-xs text-emerald-400 font-bold block mb-1">
+            Sub Category <span className="text-white/30">({allSubCategories.length})</span>
+          </label>
           <div className="border border-white/10 rounded-lg p-2 max-h-40 overflow-y-auto bg-white/5">
             <label className="flex items-center gap-2 p-1 hover:bg-white/5 rounded cursor-pointer">
               <input
@@ -392,7 +396,9 @@ export default function CategoryPicker({
 
         {/* Models */}
         <div>
-          <label className="text-xs text-emerald-400 font-bold block mb-1">Model</label>
+          <label className="text-xs text-emerald-400 font-bold block mb-1">
+            Model <span className="text-white/30">({allModels.length})</span>
+          </label>
           <div className="border border-white/10 rounded-lg p-2 max-h-40 overflow-y-auto bg-white/5">
             <label className="flex items-center gap-2 p-1 hover:bg-white/5 rounded cursor-pointer">
               <input
@@ -425,7 +431,9 @@ export default function CategoryPicker({
 
         {/* Brands */}
         <div>
-          <label className="text-xs text-emerald-400 font-bold block mb-1">Brand</label>
+          <label className="text-xs text-emerald-400 font-bold block mb-1">
+            Brand <span className="text-white/30">({allBrands.length})</span>
+          </label>
           <div className="border border-white/10 rounded-lg p-2 max-h-40 overflow-y-auto bg-white/5">
             <label className="flex items-center gap-2 p-1 hover:bg-white/5 rounded cursor-pointer">
               <input
@@ -458,7 +466,9 @@ export default function CategoryPicker({
 
         {/* Customer Codes */}
         <div>
-          <label className="text-xs text-emerald-400 font-bold block mb-1">Customer Code</label>
+          <label className="text-xs text-emerald-400 font-bold block mb-1">
+            Customer Code <span className="text-white/30">({allCustomerCodes.length})</span>
+          </label>
           <div className="border border-white/10 rounded-lg p-2 max-h-40 overflow-y-auto bg-white/5">
             <label className="flex items-center gap-2 p-1 hover:bg-white/5 rounded cursor-pointer">
               <input
@@ -491,7 +501,9 @@ export default function CategoryPicker({
 
         {/* Product Names */}
         <div>
-          <label className="text-xs text-emerald-400 font-bold block mb-1">Product Name</label>
+          <label className="text-xs text-emerald-400 font-bold block mb-1">
+            Product Name <span className="text-white/30">({allProductNames.length})</span>
+          </label>
           <div className="border border-white/10 rounded-lg p-2 max-h-40 overflow-y-auto bg-white/5">
             <label className="flex items-center gap-2 p-1 hover:bg-white/5 rounded cursor-pointer">
               <input
@@ -524,7 +536,9 @@ export default function CategoryPicker({
 
         {/* Document Types */}
         <div>
-          <label className="text-xs text-emerald-400 font-bold block mb-1">Doc Type (หัวบิล)</label>
+          <label className="text-xs text-emerald-400 font-bold block mb-1">
+            Doc Type (หัวบิล) <span className="text-white/30">({allDocTypes.length})</span>
+          </label>
           <div className="border border-white/10 rounded-lg p-2 max-h-40 overflow-y-auto bg-white/5">
             <label className="flex items-center gap-2 p-1 hover:bg-white/5 rounded cursor-pointer">
               <input
