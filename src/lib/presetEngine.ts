@@ -10,19 +10,36 @@ import { ROW_READERS } from "./presetBills";
 import type { ItemFilter, Preset, PresetResult } from "./presetTypes";
 
 /**
- * Smart string match: try exact (case-sensitive) first, then case-insensitive
- * exact, then case-insensitive substring. Cross-field: checks all given values.
- *
- * This makes presets user-friendly — e.g. `categories: ["COVER+"]` matches
- * a row with `Product (Name) = "7CARE+ Free for COVER+ with AppleCare..."`.
+ * Exact match (case-sensitive, then case-insensitive). No substring.
+ * Used for categories, models, brands, docTypes — fields where exact
+ * values are well-defined (e.g. "iPhone", "Apple", "ใบกำกับภาษี").
  */
-function matchField(filters: string[], ...values: string[]): boolean {
+function matchExact(filters: string[], ...values: string[]): boolean {
   if (filters.length === 0) return true;
-  // 1. Exact match (case-sensitive — preserves precise presets)
   for (const v of values) {
     if (v && filters.includes(v)) return true;
   }
-  // 2. Case-insensitive exact match
+  const lowerFilters = filters.map((f) => f.toLowerCase());
+  for (const v of values) {
+    if (v && lowerFilters.includes(v.toLowerCase())) return true;
+  }
+  return false;
+}
+
+/**
+ * Smart match: exact (case-insensitive) first, then substring.
+ * Used for subCategories and productNames — fields where users may
+ * paste a product name that contains the filter value as a substring.
+ *
+ * e.g. subCategories: ["COVER+"] matches Product (Name) = "7CARE+ Free for COVER+..."
+ */
+function matchSmart(filters: string[], ...values: string[]): boolean {
+  if (filters.length === 0) return true;
+  // 1. Exact (case-sensitive)
+  for (const v of values) {
+    if (v && filters.includes(v)) return true;
+  }
+  // 2. Case-insensitive exact
   const lowerFilters = filters.map((f) => f.toLowerCase());
   for (const v of values) {
     if (v && lowerFilters.includes(v.toLowerCase())) return true;
@@ -58,11 +75,14 @@ export function matchesAnyFilter(
     const prod = ROW_READERS.getProductName(row as any);
     const catDaily = ROW_READERS.getCatDaily(row as any);
 
-    const categoryMatch = matchField(cats, cat, catDaily, sub, prod);
-    const subCategoryMatch = matchField(subs, sub, prod, cat);
-    const modelMatch = matchField(mods, mod, prod, sub);
-    const brandMatch = matchField(brnds, brand, prod);
-    const productMatch = matchField(prodNames, prod, sub, cat);
+    // categories: exact match on Category (Name) + catDaily only
+    const categoryMatch = matchExact(cats, cat, catDaily);
+    // subCategories: exact on Sub Category, smart cross-field on Product (Name)
+    const subCategoryMatch = matchExact(subs, sub) || matchSmart(subs, prod);
+    const modelMatch = matchExact(mods, mod);
+    const brandMatch = matchExact(brnds, brand);
+    // productNames: exact on Product (Name), smart cross-field on Sub Category
+    const productMatch = matchExact(prodNames, prod) || matchSmart(prodNames, sub);
 
     return categoryMatch && subCategoryMatch && modelMatch && brandMatch && productMatch;
   });
@@ -89,12 +109,15 @@ function rowMatchesFilter(
   const docType = ROW_READERS.getDocType(row as any);
   const catDaily = ROW_READERS.getCatDaily(row as any);
 
-  const categoryMatch = matchField(cats, cat, catDaily, sub, prod);
-  const subCategoryMatch = matchField(subs, sub, prod, cat);
-  const modelMatch = matchField(mods, mod, prod, sub);
-  const brandMatch = matchField(brnds, brand, prod);
+  // categories: exact match on Category (Name) + catDaily only (no cross-field substring)
+  const categoryMatch = matchExact(cats, cat, catDaily);
+  // subCategories: exact on Sub Category, smart cross-field on Product (Name)
+  const subCategoryMatch = matchExact(subs, sub) || matchSmart(subs, prod);
+  const modelMatch = matchExact(mods, mod);
+  const brandMatch = matchExact(brnds, brand);
   const customerMatch = custCodes.length === 0 || custCodes.includes(customerCode);
-  const productMatch = matchField(prodNames, prod, sub, cat);
+  // productNames: exact on Product (Name), smart cross-field on Sub Category
+  const productMatch = matchExact(prodNames, prod) || matchSmart(prodNames, sub);
   const docTypeMatch = docTypes.length === 0 || docTypes.includes(docType);
 
   return (

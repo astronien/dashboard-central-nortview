@@ -245,10 +245,10 @@ describe("Cross-field matching (user-friendly preset filter)", () => {
     assert.equal(result.billsWithAandB, 0);
   });
 
-  it("substring match: categories=['COVER+'] matches product name containing 'COVER+'", () => {
-    // Real-world bug: user sets categories: ["COVER+"] but there is no Category="COVER+"
-    // The actual product name is "7CARE+ Free for COVER+ with AppleCare Services..."
-    // Substring match should find "COVER+" inside the product name
+  it("substring match: subCategories=['COVER+'] matches product name containing 'COVER+'", () => {
+    // Real-world bug: user puts "COVER+" in subCategories field
+    // Actual data: subCategory="INSURANCE", productName contains "COVER+"
+    // Smart cross-field match should find "COVER+" inside the product name
     const items = [
       makeItem({
         "Category (Name)": "Smile",
@@ -274,8 +274,8 @@ describe("Cross-field matching (user-friendly preset filter)", () => {
       color: "green",
       filtersA: [
         {
-          categories: ["COVER+"],
-          subCategories: [],
+          categories: ["Smile"],
+          subCategories: ["COVER+"],
           models: [],
           brands: [],
           customerCodes: [],
@@ -299,11 +299,91 @@ describe("Cross-field matching (user-friendly preset filter)", () => {
     };
 
     const result = calcPreset([bill], preset);
-    // Both COVER+ items should match via substring on product name
+    // Both COVER+ items should match via substring on product name (through subCategories)
     assert.equal(result.billsWithAandB, 2);
   });
 
-  it("substring match is case-insensitive: 'cover+' matches 'COVER+'", () => {
+  it("categories=['COVER+'] does NOT substring match (exact only) — prevents iPhone over-counting", () => {
+    // This is the bug fix: categories must NOT do substring matching.
+    // Otherwise categories: ["iPhone"] would match Sub Category "IPHONE 15"
+    // and count non-iPhone items as iPhones.
+    const items = [
+      makeItem({
+        "Category (Name)": "Smile",
+        "Sub Category": "INSURANCE",
+        "Product (Name)": "7CARE+ Free for COVER+ with AppleCare Services (1-Year)",
+        "Product (Code)": "7C1",
+      }),
+    ];
+    const bill = makeBill(items);
+
+    const preset: Preset = {
+      id: "coverExactOnly",
+      name: "COVER+",
+      calcType: "unit",
+      labelA: "COVER+",
+      labelB: "",
+      color: "green",
+      filtersA: [
+        {
+          categories: ["COVER+"],
+          subCategories: [],
+          models: [],
+          brands: [],
+          customerCodes: [],
+          productNames: [],
+          docTypes: [],
+          includeNonInventory: false,
+        },
+      ],
+      filtersB: [],
+    };
+
+    const result = calcPreset([bill], preset);
+    // categories: ["COVER+"] should NOT match — Category (Name) is "Smile", not "COVER+"
+    assert.equal(result.billsWithAandB, 0);
+  });
+
+  it("categories=['iPhone'] does NOT match Sub Category 'IPHONE 15' (exact only)", () => {
+    // This is the critical bug fix: categories must be exact match only
+    const items = [
+      makeItem({
+        "Category (Name)": "Apple Acc for iPad & iPhone",
+        "Sub Category": "IPHONE 15",
+        "Product (Name)": "iPhone 15 Case",
+        "Product (Code)": "CASE1",
+      }),
+    ];
+    const bill = makeBill(items);
+
+    const preset: Preset = {
+      id: "iphoneExact",
+      name: "iPhone count",
+      calcType: "unit",
+      labelA: "iPhone",
+      labelB: "",
+      color: "blue",
+      filtersA: [
+        {
+          categories: ["iPhone"],
+          subCategories: [],
+          models: [],
+          brands: [],
+          customerCodes: [],
+          productNames: [],
+          docTypes: [],
+          includeNonInventory: false,
+        },
+      ],
+      filtersB: [],
+    };
+
+    const result = calcPreset([bill], preset);
+    // Category is "Apple Acc for iPad & iPhone", NOT "iPhone" — should NOT match
+    assert.equal(result.billsWithAandB, 0);
+  });
+
+  it("substring match is case-insensitive: subCategories 'cover+' matches 'COVER+'", () => {
     const items = [
       makeItem({
         "Category (Name)": "Smile",
@@ -323,8 +403,8 @@ describe("Cross-field matching (user-friendly preset filter)", () => {
       color: "green",
       filtersA: [
         {
-          categories: ["cover+"],
-          subCategories: [],
+          categories: ["Smile"],
+          subCategories: ["cover+"],
           models: [],
           brands: [],
           customerCodes: [],
