@@ -64,12 +64,26 @@ function rowMatchesFilter(
   const catDaily = ROW_READERS.getCatDaily(row as any);
 
   const categoryMatch =
-    cats.length === 0 || cats.includes(cat) || (catDaily && cats.includes(catDaily));
-  const subCategoryMatch = subs.length === 0 || subs.includes(sub);
-  const modelMatch = mods.length === 0 || mods.includes(mod);
-  const brandMatch = brnds.length === 0 || brnds.includes(brand);
+    cats.length === 0 ||
+    cats.includes(cat) ||
+    (catDaily && cats.includes(catDaily)) ||
+    // Cross-field: category also matches product name or sub category
+    cats.includes(sub) ||
+    cats.includes(prod);
+  // Cross-field matching: subCategories also match Product (Name) and Sub Category
+  // (so users can paste a product name into subCategories field and it still matches)
+  const subCategoryMatch =
+    subs.length === 0 || subs.includes(sub) || subs.includes(prod) || subs.includes(cat);
+  const modelMatch =
+    mods.length === 0 || mods.includes(mod) || mods.includes(prod) || mods.includes(sub);
+  const brandMatch =
+    brnds.length === 0 || brnds.includes(brand) || brnds.includes(prod);
   const customerMatch = custCodes.length === 0 || custCodes.includes(customerCode);
-  const productMatch = prodNames.length === 0 || prodNames.includes(prod);
+  const productMatch =
+    prodNames.length === 0 ||
+    prodNames.includes(prod) ||
+    prodNames.includes(sub) ||
+    prodNames.includes(cat);
   const docTypeMatch = docTypes.length === 0 || docTypes.includes(docType);
 
   return (
