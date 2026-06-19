@@ -115,7 +115,7 @@ function rowMatchesFilter(
   const subCategoryMatch = matchExact(subs, sub) || matchSmart(subs, prod);
   const modelMatch = matchExact(mods, mod);
   const brandMatch = matchExact(brnds, brand);
-  const customerMatch = custCodes.length === 0 || custCodes.includes(customerCode);
+  const customerMatch = matchExact(custCodes, customerCode);
   // productNames: exact on Product (Name), smart cross-field on Sub Category
   const productMatch = matchExact(prodNames, prod) || matchSmart(prodNames, sub);
   const docTypeMatch = docTypes.length === 0 || docTypes.includes(docType);
