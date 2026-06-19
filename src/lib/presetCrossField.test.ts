@@ -244,4 +244,138 @@ describe("Cross-field matching (user-friendly preset filter)", () => {
     const result = calcPreset([bill], preset);
     assert.equal(result.billsWithAandB, 0);
   });
+
+  it("substring match: categories=['COVER+'] matches product name containing 'COVER+'", () => {
+    // Real-world bug: user sets categories: ["COVER+"] but there is no Category="COVER+"
+    // The actual product name is "7CARE+ Free for COVER+ with AppleCare Services..."
+    // Substring match should find "COVER+" inside the product name
+    const items = [
+      makeItem({
+        "Category (Name)": "Smile",
+        "Sub Category": "INSURANCE",
+        "Product (Name)": "7CARE+ Free for COVER+ with AppleCare Services (1-Year)",
+        "Product (Code)": "7C1",
+      }),
+      makeItem({
+        "Category (Name)": "Smile",
+        "Sub Category": "INSURANCE",
+        "Product (Name)": "COVER+ with AppleCare Services for Apple iPhone (1-Year)",
+        "Product (Code)": "CV1",
+      }),
+    ];
+    const bill = makeBill(items);
+
+    const preset: Preset = {
+      id: "coverSubstr",
+      name: "COVER+",
+      calcType: "attach",
+      labelA: "COVER+",
+      labelB: "iPhone",
+      color: "green",
+      filtersA: [
+        {
+          categories: ["COVER+"],
+          subCategories: [],
+          models: [],
+          brands: [],
+          customerCodes: [],
+          productNames: [],
+          docTypes: [],
+          includeNonInventory: false,
+        },
+      ],
+      filtersB: [
+        {
+          categories: ["iPhone"],
+          subCategories: [],
+          models: [],
+          brands: [],
+          customerCodes: [],
+          productNames: [],
+          docTypes: [],
+          includeNonInventory: false,
+        },
+      ],
+    };
+
+    const result = calcPreset([bill], preset);
+    // Both COVER+ items should match via substring on product name
+    assert.equal(result.billsWithAandB, 2);
+  });
+
+  it("substring match is case-insensitive: 'cover+' matches 'COVER+'", () => {
+    const items = [
+      makeItem({
+        "Category (Name)": "Smile",
+        "Sub Category": "INSURANCE",
+        "Product (Name)": "COVER+ with AppleCare Services",
+        "Product (Code)": "CV1",
+      }),
+    ];
+    const bill = makeBill(items);
+
+    const preset: Preset = {
+      id: "caseInsensitive",
+      name: "cover+",
+      calcType: "unit",
+      labelA: "cover+",
+      labelB: "",
+      color: "green",
+      filtersA: [
+        {
+          categories: ["cover+"],
+          subCategories: [],
+          models: [],
+          brands: [],
+          customerCodes: [],
+          productNames: [],
+          docTypes: [],
+          includeNonInventory: false,
+        },
+      ],
+      filtersB: [],
+    };
+
+    const result = calcPreset([bill], preset);
+    assert.equal(result.billsWithAandB, 1);
+  });
+
+  it("exact match still takes priority over substring", () => {
+    // If categories: ["iPhone"] and Category (Name) = "iPhone", exact match wins
+    // This should NOT accidentally match "iPhone Acc for iPad" as a substring
+    // because "iPhone" is an exact match for Category="iPhone"
+    const items = [
+      makeItem({
+        "Category (Name)": "iPhone",
+        "Sub Category": "iPhone 15",
+        "Product (Name)": "iPhone 15 Pro",
+      }),
+    ];
+    const bill = makeBill(items);
+
+    const preset: Preset = {
+      id: "exactPriority",
+      name: "iPhone",
+      calcType: "unit",
+      labelA: "iPhone",
+      labelB: "",
+      color: "blue",
+      filtersA: [
+        {
+          categories: ["iPhone"],
+          subCategories: [],
+          models: [],
+          brands: [],
+          customerCodes: [],
+          productNames: [],
+          docTypes: [],
+          includeNonInventory: false,
+        },
+      ],
+      filtersB: [],
+    };
+
+    const result = calcPreset([bill], preset);
+    assert.equal(result.billsWithAandB, 1);
+  });
 });

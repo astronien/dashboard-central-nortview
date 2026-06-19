@@ -10,6 +10,33 @@ import { ROW_READERS } from "./presetBills";
 import type { ItemFilter, Preset, PresetResult } from "./presetTypes";
 
 /**
+ * Smart string match: try exact (case-sensitive) first, then case-insensitive
+ * exact, then case-insensitive substring. Cross-field: checks all given values.
+ *
+ * This makes presets user-friendly — e.g. `categories: ["COVER+"]` matches
+ * a row with `Product (Name) = "7CARE+ Free for COVER+ with AppleCare..."`.
+ */
+function matchField(filters: string[], ...values: string[]): boolean {
+  if (filters.length === 0) return true;
+  // 1. Exact match (case-sensitive — preserves precise presets)
+  for (const v of values) {
+    if (v && filters.includes(v)) return true;
+  }
+  // 2. Case-insensitive exact match
+  const lowerFilters = filters.map((f) => f.toLowerCase());
+  for (const v of values) {
+    if (v && lowerFilters.includes(v.toLowerCase())) return true;
+  }
+  // 3. Case-insensitive substring (filter is substring of value)
+  for (const v of values) {
+    if (!v) continue;
+    const lv = v.toLowerCase();
+    if (lowerFilters.some((f) => lv.includes(f))) return true;
+  }
+  return false;
+}
+
+/**
  * Check if a single line item matches any of the given filters (OR logic).
  */
 export function matchesAnyFilter(
@@ -31,12 +58,11 @@ export function matchesAnyFilter(
     const prod = ROW_READERS.getProductName(row as any);
     const catDaily = ROW_READERS.getCatDaily(row as any);
 
-    const categoryMatch =
-      cats.length === 0 || cats.includes(cat) || (catDaily && cats.includes(catDaily));
-    const subCategoryMatch = subs.length === 0 || subs.includes(sub);
-    const modelMatch = mods.length === 0 || mods.includes(mod);
-    const brandMatch = brnds.length === 0 || brnds.includes(brand);
-    const productMatch = prodNames.length === 0 || prodNames.includes(prod);
+    const categoryMatch = matchField(cats, cat, catDaily, sub, prod);
+    const subCategoryMatch = matchField(subs, sub, prod, cat);
+    const modelMatch = matchField(mods, mod, prod, sub);
+    const brandMatch = matchField(brnds, brand, prod);
+    const productMatch = matchField(prodNames, prod, sub, cat);
 
     return categoryMatch && subCategoryMatch && modelMatch && brandMatch && productMatch;
   });
@@ -63,27 +89,12 @@ function rowMatchesFilter(
   const docType = ROW_READERS.getDocType(row as any);
   const catDaily = ROW_READERS.getCatDaily(row as any);
 
-  const categoryMatch =
-    cats.length === 0 ||
-    cats.includes(cat) ||
-    (catDaily && cats.includes(catDaily)) ||
-    // Cross-field: category also matches product name or sub category
-    cats.includes(sub) ||
-    cats.includes(prod);
-  // Cross-field matching: subCategories also match Product (Name) and Sub Category
-  // (so users can paste a product name into subCategories field and it still matches)
-  const subCategoryMatch =
-    subs.length === 0 || subs.includes(sub) || subs.includes(prod) || subs.includes(cat);
-  const modelMatch =
-    mods.length === 0 || mods.includes(mod) || mods.includes(prod) || mods.includes(sub);
-  const brandMatch =
-    brnds.length === 0 || brnds.includes(brand) || brnds.includes(prod);
+  const categoryMatch = matchField(cats, cat, catDaily, sub, prod);
+  const subCategoryMatch = matchField(subs, sub, prod, cat);
+  const modelMatch = matchField(mods, mod, prod, sub);
+  const brandMatch = matchField(brnds, brand, prod);
   const customerMatch = custCodes.length === 0 || custCodes.includes(customerCode);
-  const productMatch =
-    prodNames.length === 0 ||
-    prodNames.includes(prod) ||
-    prodNames.includes(sub) ||
-    prodNames.includes(cat);
+  const productMatch = matchField(prodNames, prod, sub, cat);
   const docTypeMatch = docTypes.length === 0 || docTypes.includes(docType);
 
   return (
