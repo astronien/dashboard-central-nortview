@@ -80,12 +80,14 @@ export default function KpiPresetSection({
   // Filter by date range + brand
   const filteredBills = useMemo<BillSummary[]>(() => {
     if (allBills.length === 0) return [];
-    const start = new Date(filters.startDate);
-    const end = new Date(filters.endDate);
-    end.setHours(23, 59, 59, 999);
+    // Use string comparison (YYYY-MM-DD) to avoid timezone issues
+    const startStr = filters.startDate; // already "YYYY-MM-DD"
+    const endStr = filters.endDate;     // already "YYYY-MM-DD"
     const brand = filters.brand.trim();
     return allBills.filter((bill) => {
-      if (bill.docDate < start || bill.docDate > end) return false;
+      const bd = bill.docDate;
+      const billStr = `${bd.getFullYear()}-${String(bd.getMonth() + 1).padStart(2, "0")}-${String(bd.getDate()).padStart(2, "0")}`;
+      if (billStr < startStr || billStr > endStr) return false;
       if (brand) {
         const hasBrand = bill.lineItems.some(
           (li) => String((li as any).Brand ?? (li as any).brand ?? "") === brand,
@@ -100,12 +102,19 @@ export default function KpiPresetSection({
   const billsForCalc = useMemo<BillSummary[]>(() => {
     if (filters.mode === "cumulative") return filteredBills;
     if (filteredBills.length === 0) return [];
-    const maxDate = filteredBills.reduce(
-      (max, b) => (b.docDate > max ? b.docDate : max),
-      filteredBills[0].docDate,
-    );
-    const maxDateStr = toYYYYMMDD(maxDate);
-    return filteredBills.filter((b) => toYYYYMMDD(b.docDate) === maxDateStr);
+    // Use string comparison to find max date
+    let maxDateStr = "";
+    filteredBills.forEach((b) => {
+      const bd = b.docDate;
+      const s = `${bd.getFullYear()}-${String(bd.getMonth() + 1).padStart(2, "0")}-${String(bd.getDate()).padStart(2, "0")}`;
+      if (s > maxDateStr) maxDateStr = s;
+    });
+    const maxStr = maxDateStr;
+    return filteredBills.filter((b) => {
+      const bd = b.docDate;
+      const s = `${bd.getFullYear()}-${String(bd.getMonth() + 1).padStart(2, "0")}-${String(bd.getDate()).padStart(2, "0")}`;
+      return s === maxStr;
+    });
   }, [filteredBills, filters.mode]);
 
   const results: PresetResult[] = useMemo(() => {

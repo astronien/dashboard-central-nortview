@@ -31,18 +31,32 @@ function toDate(value: unknown): Date | null {
   if (!value) return null;
   if (value instanceof Date) return value;
   if (typeof value === "number") {
+    // Excel serial date number
     const ms = value > 25569 ? (value - 25569) * 86400 * 1000 : 0;
     return new Date(ms);
   }
   const str = String(value).trim();
   if (!str) return null;
+  // Try native Date parse first (handles ISO format "2026-05-14")
   const d = new Date(str);
   if (!Number.isNaN(d.getTime())) return d;
-  const parts = str.split(/[\/\-.]/);
-  if (parts.length === 3) {
-    const [a, b, c] = parts;
-    const d2 = new Date(Number(c), Number(b) - 1, Number(a));
+  // Handle Thai day prefix format: "พฤ. 14/05/2026 18:33:00" or "อา. 01/06/2026"
+  // Strip the Thai day abbreviation prefix (e.g. "พฤ. ", "อา. ", "จ. ")
+  const stripped = str.replace(/^[^\d]+/, "").trim();
+  // Try dd/mm/yyyy format (with optional time)
+  const m = stripped.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) {
+    const day = Number(m[1]);
+    const month = Number(m[2]) - 1;
+    const year = Number(m[3]);
+    const d2 = new Date(year, month, day);
     if (!Number.isNaN(d2.getTime())) return d2;
+  }
+  // Try dd-mm-yyyy format
+  const m2 = stripped.match(/(\d{1,2})-(\d{1,2})-(\d{4})/);
+  if (m2) {
+    const d3 = new Date(Number(m2[3]), Number(m2[2]) - 1, Number(m2[1]));
+    if (!Number.isNaN(d3.getTime())) return d3;
   }
   return null;
 }
