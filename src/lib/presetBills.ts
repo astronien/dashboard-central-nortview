@@ -114,7 +114,7 @@ function getProductType(row: RawRow): string {
 }
 
 function getCustomerCode(row: RawRow): string {
-  return readStr(row, "Customer (Code)", "customer_code", "CustomerCode", "customerCode");
+  return readStr(row, "Customer Code", "Customer (Code)", "customer_code", "CustomerCode", "customerCode");
 }
 
 function getCategoryName(row: RawRow): string {

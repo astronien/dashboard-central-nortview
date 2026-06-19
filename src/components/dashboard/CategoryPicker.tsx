@@ -87,7 +87,7 @@ export default function CategoryPicker({
   const allCustomerCodes = useMemo(() => {
     const codes = new Set<string>();
     allLines.forEach((li) => {
-      const code = readStr(li, "Customer (Code)", "customer_code", "CustomerCode");
+      const code = readStr(li, "Customer Code", "Customer (Code)", "customer_code", "CustomerCode");
       if (code) codes.add(code);
     });
     return Array.from(codes).sort();
@@ -113,7 +113,7 @@ export default function CategoryPicker({
     }
     if (value?.customerCodes && value.customerCodes.length > 0) {
       filtered = filtered.filter((li) =>
-        value.customerCodes.includes(readStr(li, "Customer (Code)", "customer_code")),
+        value.customerCodes.includes(readStr(li, "Customer Code", "Customer (Code)", "customer_code")),
       );
     }
     return Array.from(new Set(filtered.map((li) => readStr(li, "Product (Name)", "product_name"))))
