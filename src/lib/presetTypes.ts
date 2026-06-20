@@ -52,6 +52,7 @@ export interface Preset {
   id: string;
   name: string;
   calcType?: PresetCalcType;
+  targetPercent?: number;
   labelA: string;
   labelB: string;
   filtersA: ItemFilter[];

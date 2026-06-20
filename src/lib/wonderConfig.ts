@@ -1,5 +1,6 @@
 import { getItem, setItem } from "./storage";
 import { matchExact, matchSmart } from "./presetEngine";
+import type { Preset, ItemFilter, PresetCalcType } from "./presetTypes";
 
 /**
  * Wonder / KPI Config — structured filter system.
@@ -18,7 +19,7 @@ import { matchExact, matchSmart } from "./presetEngine";
  * are auto-converted to the new schema via `migrateLegacyWonderConfig()`.
  */
 
-export type WonderCalcType = "attach" | "bahtRate";
+export type WonderCalcType = PresetCalcType;
 
 export type WonderFilter = {
   categories?: string[];
@@ -1280,4 +1281,28 @@ export async function updateWonderConfigs(
     console.error("Failed to save wonder configs to Turso:", err);
     return false;
   }
+}
+
+export function wonderToPreset(wonder: WonderItemConfig): Preset {
+  const toItemFilter = (f: WonderFilter): ItemFilter => ({
+    categories: f.categories ?? [],
+    subCategories: f.subCategories ?? [],
+    models: f.models ?? [],
+    brands: f.brands ?? [],
+    customerCodes: f.customerCodes ?? [],
+    productNames: f.productNames ?? [],
+    docTypes: f.docTypes ?? [],
+    includeNonInventory: f.includeNonInventory,
+  });
+  return {
+    id: wonder.id,
+    name: wonder.name,
+    calcType: wonder.calcType,
+    targetPercent: wonder.targetPercent,
+    labelA: wonder.labelA,
+    labelB: wonder.labelB,
+    filtersA: wonder.filtersA.map(toItemFilter),
+    filtersB: wonder.filtersB.map(toItemFilter),
+    color: "green",
+  };
 }

@@ -111,10 +111,12 @@ import { HomeDashboardSection } from "./components/dashboard/HomeDashboardSectio
 
 import { StaffOverviewSection } from "./components/dashboard/StaffOverviewSection";
 import { StaffSection } from "./components/dashboard/StaffSection";
-import { loadWonderConfigs, saveWonderConfigs, type WonderItemConfig, fetchWonderConfigs, updateWonderConfigs, calcWonderForRows, calcWonderRate, cleanupTestWonderConfigs } from "./lib/wonderConfig";
+import { loadWonderConfigs, saveWonderConfigs, type WonderItemConfig, fetchWonderConfigs, updateWonderConfigs, wonderToPreset, cleanupTestWonderConfigs } from "./lib/wonderConfig";
 import { ReportsSection } from "./components/dashboard/ReportsSection";
 import { SettingsSection } from "./components/dashboard/SettingsSection";
 import KpiPresetSection from "./components/dashboard/KpiPresetSection";
+import { parseBills } from "./lib/presetBills";
+import { calcPreset, presetDisplayValue } from "./lib/presetEngine";
 import {
   getPresets as getKpiPresets,
   migrateFromLegacyLocalStorage as migrateKpiPresetsFromLS,
@@ -2067,8 +2069,10 @@ export default function App() {
       let actualVal: number;
 
       if (hasData && officerRows.length > 0) {
-        const result = calcWonderForRows(officerRows, w);
-        actualVal = calcWonderRate(result);
+        const bills = parseBills(officerRows);
+        const preset = wonderToPreset(w);
+        const result = calcPreset(bills, preset);
+        actualVal = presetDisplayValue(result);
       } else {
         const mockBase = [45, 22, 5.5, 13, 78, 12, 46, 35, 28, 42];
         const mockOffset = [
