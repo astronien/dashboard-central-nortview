@@ -114,15 +114,13 @@ import { StaffSection } from "./components/dashboard/StaffSection";
 import { loadWonderConfigs, saveWonderConfigs, type WonderItemConfig, fetchWonderConfigs, updateWonderConfigs, wonderToPreset, cleanupTestWonderConfigs } from "./lib/wonderConfig";
 import { ReportsSection } from "./components/dashboard/ReportsSection";
 import { SettingsSection } from "./components/dashboard/SettingsSection";
-import KpiPresetSection from "./components/dashboard/KpiPresetSection";
+import WonderPresetSection from "./components/dashboard/WonderPresetSection";
 import { parseBills } from "./lib/presetBills";
 import { calcPreset, presetDisplayValue } from "./lib/presetEngine";
 import {
-  getPresets as getKpiPresets,
   migrateFromLegacyLocalStorage as migrateKpiPresetsFromLS,
   cleanupTestPresets as cleanupKpiPresets,
 } from "./lib/presetStorage";
-import type { Preset as KpiPreset } from "./lib/presetTypes";
 
 
 type Staff = {
@@ -1251,8 +1249,6 @@ export default function App() {
   const [uploadedFiles, setUploadedFiles] = useState<Record<UploadKind, RawRow[]>>({ target: [], current: [], today: [], lastMonth: [], lastYear: [], categoryMaster: [] });
   const [selectedBranch, setSelectedBranch] = useState<string>("Mega Bangna");
   const [selectedBranchLoaded, setSelectedBranchLoaded] = useState(false);
-  const [kpiPresets, setKpiPresets] = useState<KpiPreset[]>([]);
-
   const handleBranchChange = (newBranch: string) => {
     setSelectedBranch(newBranch);
     void idbSet("dashboard-selected-branch", newBranch).catch((e) =>
@@ -1585,7 +1581,7 @@ export default function App() {
     })();
   }, []);
 
-  // Load KPI presets from IDB (one-time legacy LS migration included).
+  // Migrate KPI presets from legacy localStorage (one-time migration).
   useEffect(() => {
     void (async () => {
       try {
@@ -1594,10 +1590,8 @@ export default function App() {
         if (removedKpi.length > 0) {
           console.info(`[App] removed test KPI presets: ${removedKpi.join(", ")}`);
         }
-        const presets = await getKpiPresets();
-        setKpiPresets(presets);
       } catch (e) {
-        console.warn("[App] load KPI presets failed:", e);
+        console.warn("[App] KPI preset migration failed:", e);
       }
     })();
   }, []);
@@ -3310,12 +3304,15 @@ export default function App() {
                 transition={{ duration: 0.4, ease: "easeOut" }}
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
-                <KpiPresetSection
+                <WonderPresetSection
                   salesRows={displayUploads.current}
                   categoryMasterRows={displayUploads.categoryMaster}
                   selectedBranch={selectedBranch}
-                  presets={kpiPresets}
-                  onPresetsChange={setKpiPresets}
+                  wonderConfigs={wonderConfigs ?? []}
+                  onWonderConfigsChange={setWonderConfigs}
+                  uniqueCombos={uniqueCombos}
+                  staffCategoryTree={staffCategoryTree}
+                  salesHeaders={salesHeaders}
                 />
               </motion.div>
             )}
