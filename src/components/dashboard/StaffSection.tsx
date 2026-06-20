@@ -7,11 +7,9 @@ import {
   Radar,
   ResponsiveContainer,
 } from "recharts";
-import { ShoppingBag, Award, Star, TrendingUp, Apple, SlidersHorizontal } from "lucide-react";
+import { ShoppingBag, Award, Star, TrendingUp, Apple } from "lucide-react";
 import React from "react";
 import { calcTargetToDate, calcTodayAchievementPct } from "../../lib/targetAggregations";
-import type { Preset as KpiPreset, PresetResult as KpiPresetResult } from "../../lib/presetTypes";
-import { formatPresetValue as formatKpiPresetValue } from "../../lib/presetEngine";
 
 export type StaffLeaderboardItem = {
   id: string;
@@ -76,7 +74,6 @@ export function StaffSection({
   dynamicLanguages,
   activeOfficer7WondersPerformance,
   activeOfficerCategoryPerformance,
-  activeOfficerKpiPresetResults,
   todaySalesTotal,
   todayDateLabel,
   categoryPerformanceHint,
@@ -108,7 +105,6 @@ export function StaffSection({
   dynamicLanguages: string;
   activeOfficer7WondersPerformance: PerformanceRow[];
   activeOfficerCategoryPerformance: PerformanceRow[];
-  activeOfficerKpiPresetResults?: { preset: KpiPreset; result: KpiPresetResult }[];
   todaySalesTotal: number;
   todayDateLabel?: string;
   categoryPerformanceHint?: string | null;
@@ -140,66 +136,12 @@ export function StaffSection({
   const fmtSalesPct = (n: number) =>
     `${n >= 100 ? Math.round(n) : n.toFixed(1)}%`;
   const isTodayView = activeStat === "target";
-  const isKpiView = activeStat === "kpi";
 
-  // Build PerformanceRow[] from KPI preset results for the "kpi" tab
-  const kpiPresetRows: PerformanceRow[] = React.useMemo(() => {
-    if (!isKpiView || !activeOfficerKpiPresetResults) return [];
-    const rows = activeOfficerKpiPresetResults.map(({ preset, result }) => {
-      const ct = preset.calcType ?? "attach";
-      const isRate = ct === "attach" || ct === "bahtRate" || ct === "catAttach";
-      const isUnits = ct === "unit" || ct === "catQty";
-      const isBaht = ct === "baht" || ct === "catBaht";
-
-      const actualVal = isBaht ? result.totalBaht : isUnits ? result.billsWithAandB : result.attachRate;
-      const targetVal = 0; // KPI presets don't have a fixed targetPercent like wonder configs
-      const achPercent = 0;
-
-      return {
-        category: preset.name,
-        target: targetVal,
-        actual: actualVal,
-        achPercent,
-        forecast: actualVal,
-        forecastPercent: achPercent,
-        lastMonth: 0,
-        momPercent: "New" as const,
-        lastYear: 0,
-        yoyPercent: "New" as const,
-        targetDay: targetVal,
-        actualDay: actualVal,
-        diffDay: actualVal - targetVal,
-        achDayPercent: achPercent,
-      };
-    });
-    if (rows.length === 0) return [];
-    const avgAch = rows.reduce((s, r) => s + r.achPercent, 0) / rows.length;
-    const avgActual = rows.reduce((s, r) => s + r.actual, 0) / rows.length;
-    return [...rows, {
-      category: "Average",
-      target: rows.reduce((s, r) => s + r.target, 0) / rows.length,
-      actual: avgActual,
-      achPercent: avgAch,
-      forecast: avgActual,
-      forecastPercent: avgAch,
-      lastMonth: 0,
-      momPercent: "New" as const,
-      lastYear: 0,
-      yoyPercent: "New" as const,
-      targetDay: 0,
-      actualDay: avgActual,
-      diffDay: 0,
-      achDayPercent: avgAch,
-    }];
-  }, [isKpiView, activeOfficerKpiPresetResults]);
-
-  const tableRows = isKpiView
-    ? kpiPresetRows
-    : isTodayView
-      ? activeOfficerCategoryPerformance
-      : activeStat === "csat"
-        ? activeOfficer7WondersPerformance
-        : activeOfficerCategoryPerformance;
+  const tableRows = isTodayView
+    ? activeOfficerCategoryPerformance
+    : activeStat === "csat"
+      ? activeOfficer7WondersPerformance
+      : activeOfficerCategoryPerformance;
 
   const topAttachSummary = React.useMemo(() => {
     const matched = staffLeaderboard.find((item) =>
@@ -490,41 +432,6 @@ export function StaffSection({
                           </motion.div>
                         </AnimatePresence>
                       </motion.button>
-                      <motion.button
-                        onClick={() => onSetActiveStat("kpi")}
-                        initial={{ opacity: 0, y: 15 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ type: "spring", stiffness: 120, damping: 14, delay: 0.25 }}
-                        whileHover={{ scale: 1.05, y: -4, boxShadow: "0px 10px 25px rgba(16, 185, 129, 0.2)" }}
-                        whileTap={{ scale: 0.95 }}
-                        className={`backdrop-blur-xl rounded-2xl px-2 py-4 w-28 sm:w-32 text-center border shadow-xl relative overflow-hidden transition-all duration-200 ${activeStat === "kpi" ? "bg-white/20 border-white/40 ring-1 ring-emerald-500/50" : "bg-white/5 border-white/10 hover:bg-white/10"}`}
-                      >
-                        {activeStat === "kpi" && (
-                          <div className="absolute inset-0 bg-emerald-400/20 mix-blend-overlay"></div>
-                        )}
-                        <SlidersHorizontal
-                          className={`w-5 h-5 mx-auto mb-2 relative z-10 ${activeStat === "kpi" ? "text-emerald-200" : "text-white/60"}`}
-                        />
-                        <div className="text-[10px] relative z-10 text-emerald-100 mb-0.5 font-medium">
-                          KPI Preset
-                        </div>
-                        <div className="text-[8px] relative z-10 text-white/45 mb-1 leading-tight">
-                          {activeOfficerKpiPresetResults?.length ?? 0} presets
-                        </div>
-                        <AnimatePresence mode="wait">
-                          <motion.div
-                            key={activeOfficerKpiPresetResults?.length ?? 0}
-                            initial={{ opacity: 0, y: 5 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -5 }}
-                            className="text-sm relative z-10 text-white font-bold"
-                          >
-                            {activeOfficerKpiPresetResults && activeOfficerKpiPresetResults.length > 0
-                              ? `${activeOfficerKpiPresetResults.filter(r => r.result.billsWithB > 0).length}/${activeOfficerKpiPresetResults.length}`
-                              : "-"}
-                          </motion.div>
-                        </AnimatePresence>
-                      </motion.button>
                     </div>
 
                     {/* Bottom 2x2 Stats */}
@@ -620,35 +527,29 @@ export function StaffSection({
                       <div className="p-2 bg-emerald-500/20 rounded-xl border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
                         {activeStat === "csat" ? (
                           <Award className="w-4 h-4 text-emerald-400" />
-                        ) : isKpiView ? (
-                          <SlidersHorizontal className="w-4 h-4 text-emerald-400" />
                         ) : (
                           <TrendingUp className="w-4 h-4 text-emerald-400" />
                         )}
                       </div>
                       <div>
                         <h2 className="text-base font-bold tracking-tight text-white">
-                          {isKpiView
-                            ? "KPI Preset Results"
-                            : activeStat === "csat"
-                              ? "7 Wonders Attach Rates"
-                              : isTodayView
-                                ? "ยอดขายวันนี้ตามหมวด"
-                                : "Category Performance vs. Target"}
+                          {activeStat === "csat"
+                            ? "7 Wonders Attach Rates"
+                            : isTodayView
+                              ? "ยอดขายวันนี้ตามหมวด"
+                              : "Category Performance vs. Target"}
                         </h2>
                         <p className="text-[10px] text-white/50">
-                          {isKpiView
-                            ? `KPI Preset breakdown for ${activeOfficer?.name ?? currentStaff.name}`
-                            : activeStat === "csat"
-                              ? `Attach rate breakdown for ${activeOfficer?.name ?? currentStaff.name} against KPI targets`
-                              : isTodayView
-                                ? `ยอดขายของวันปัจจุบัน — ${activeOfficer?.name ?? currentStaff.name}${todayDateLabel ? ` • ${todayDateLabel}` : ""}`
-                                : `Performance breakdown for ${activeOfficer?.name ?? currentStaff.name} by product category`}
+                          {activeStat === "csat"
+                            ? `Attach rate breakdown for ${activeOfficer?.name ?? currentStaff.name} against KPI targets`
+                            : isTodayView
+                              ? `ยอดขายของวันปัจจุบัน — ${activeOfficer?.name ?? currentStaff.name}${todayDateLabel ? ` • ${todayDateLabel}` : ""}`
+                              : `Performance breakdown for ${activeOfficer?.name ?? currentStaff.name} by product category`}
                         </p>
                       </div>
                     </div>
 
-                    {categoryPerformanceHint && activeStat !== "csat" && !isKpiView ? (
+                    {categoryPerformanceHint && activeStat !== "csat" ? (
                       <p
                         className={`mb-3 rounded-lg border px-3 py-2 text-[11px] ${
                           isTodayView
@@ -665,16 +566,9 @@ export function StaffSection({
                         <thead>
                           <tr className="bg-[#0c3123] border-b border-emerald-500/20 text-white/90">
                             <th className="py-2.5 px-3 font-bold uppercase tracking-wider">
-                              {isKpiView ? "Preset" : activeStat === "csat" ? "Attach Category" : "Group Category"}
+                              {activeStat === "csat" ? "Attach Category" : "Group Category"}
                             </th>
-                            {isKpiView ? (
-                              <>
-                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Value</th>
-                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Target</th>
-                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-center">Ach. %</th>
-                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-center">A / B</th>
-                              </>
-                            ) : isTodayView ? (
+                            {isTodayView ? (
                               <>
                                 <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">
                                   เป้าวัน
@@ -739,41 +633,6 @@ export function StaffSection({
                                 if (isCsat) return `${diff > 0 ? "+" : ""}${diff.toFixed(2)}%`;
                                 return diff > 0 ? `+${diff.toLocaleString()}` : diff.toLocaleString();
                               };
-
-                              if (isKpiView) {
-                                const presetResult = activeOfficerKpiPresetResults?.[idx];
-                                const ct = presetResult?.preset.calcType ?? "attach";
-                                const isRate = ct === "attach" || ct === "bahtRate" || ct === "catAttach";
-                                const isBaht = ct === "baht" || ct === "catBaht";
-                                const isUnits = ct === "unit" || ct === "catQty";
-                                const result = presetResult?.result;
-                                const valStr = result ? formatKpiPresetValue(result) : "-";
-                                const abStr = result
-                                  ? isUnits || isBaht
-                                    ? `${result.billsWithAandB}`
-                                    : `${result.billsWithAandB}/${result.billsWithB}`
-                                  : "";
-                                return (
-                                  <tr
-                                    key={idx}
-                                    className={`hover:bg-white/5 transition-colors duration-150 text-white/90 ${isTotal ? "bg-[#0c3123]/90 font-bold border-t border-emerald-500/30" : ""}`}
-                                  >
-                                    <td className="py-2.5 px-3 font-bold">{row.category}</td>
-                                    <td className="py-2.5 px-3 text-right font-bold">{valStr}</td>
-                                    <td className={`py-2.5 px-3 text-right ${isTotal ? "text-white" : "text-white/60"}`}>
-                                      {isRate ? `${row.target.toFixed(1)}%` : isBaht ? `฿${Math.round(row.target).toLocaleString()}` : row.target.toLocaleString()}
-                                    </td>
-                                    <td className="py-2.5 px-3 text-center">
-                                      {isRate && row.target > 0 ? (
-                                        <span className={getBadgeClass(row.achPercent)}>{fmtPct(row.achPercent)}</span>
-                                      ) : (
-                                        <span className="text-white/40">—</span>
-                                      )}
-                                    </td>
-                                    <td className="py-2.5 px-3 text-center text-white/50 text-[10px]">{abStr}</td>
-                                  </tr>
-                                );
-                              }
 
                               if (isTodayView) {
                                 return (

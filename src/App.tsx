@@ -120,10 +120,7 @@ import {
   migrateFromLegacyLocalStorage as migrateKpiPresetsFromLS,
   cleanupTestPresets as cleanupKpiPresets,
 } from "./lib/presetStorage";
-import type { Preset as KpiPreset, PresetResult as KpiPresetResult } from "./lib/presetTypes";
-import { parseBills as parsePresetBills, type BillSummary as PresetBillSummary } from "./lib/presetBills";
-import { calcAllPresets as calcAllKpiPresets, formatPresetValue as formatKpiPresetValue } from "./lib/presetEngine";
-import { buildCatDailyLookup, enrichSalesRowsWithCatDaily } from "./lib/presetCatDaily";
+import type { Preset as KpiPreset } from "./lib/presetTypes";
 
 
 type Staff = {
@@ -1505,7 +1502,7 @@ export default function App() {
   }, [displayUploads.current, getCategoryValue]);
 
   const [activeTab, setActiveTab] = useState("Store");
-  const [activeStat, setActiveStat] = useState<"sales" | "csat" | "target" | "kpi">(
+  const [activeStat, setActiveStat] = useState<"sales" | "csat" | "target">(
     "sales",
   );
   const [activeStaffId, setActiveStaffId] = useState("1");
@@ -2135,33 +2132,6 @@ export default function App() {
 
     return [...rows, totalRow];
   }, [activeOfficer, displayUploads, parsedReport, activeOfficerIndex, wonderConfigs]);
-
-  // KPI Preset results for the active officer (used in Staff Profile "KPI Preset" tab)
-  const activeOfficerKpiPresetResults = useMemo<{ preset: KpiPreset; result: KpiPresetResult }[]>(() => {
-    if (!activeOfficer || kpiPresets.length === 0) return [];
-    const officerName = activeOfficer.name ?? currentStaff.name;
-    const hasData = displayUploads.current.length > 0;
-    if (!hasData) return [];
-
-    // Enrich rows with catDaily
-    const lookup = buildCatDailyLookup(displayUploads.categoryMaster);
-    const enrichedRows = enrichSalesRowsWithCatDaily(displayUploads.current, lookup);
-
-    // Filter to this officer's rows
-    const officerRows = enrichedRows.filter((row) => {
-      const officer = String(row["Officer (Name)"] ?? row["Officer (Name) ".trim()] ?? "").trim();
-      return matchesOfficer(officer, officerName);
-    });
-    if (officerRows.length === 0) return [];
-
-    // Parse into bills
-    const bills = parsePresetBills(officerRows);
-    if (bills.length === 0) return [];
-
-    // Calculate all presets
-    const results = calcAllKpiPresets(bills, kpiPresets);
-    return kpiPresets.map((preset, i) => ({ preset, result: results[i] }));
-  }, [activeOfficer, displayUploads, kpiPresets, currentStaff.name]);
 
   const sevenWondersScore = useMemo(() => {
     if (!displayUploads.current.length && Number(activeStaffId) <= 3) {
@@ -3291,7 +3261,6 @@ export default function App() {
                 dynamicLanguages={dynamicLanguages}
                 activeOfficer7WondersPerformance={activeOfficer7WondersPerformance}
                 activeOfficerCategoryPerformance={activeOfficerCategoryPerformance}
-                activeOfficerKpiPresetResults={activeOfficerKpiPresetResults}
                 todaySalesTotal={activeOfficerTodaySales}
                 todayDateLabel={todayStats.dateStr}
                 categoryPerformanceHint={categoryPerformanceHint}

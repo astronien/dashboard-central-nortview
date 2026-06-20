@@ -14,7 +14,7 @@ import type { ItemFilter, Preset, PresetResult } from "./presetTypes";
  * Used for categories, models, brands, docTypes — fields where exact
  * values are well-defined (e.g. "iPhone", "Apple", "ใบกำกับภาษี").
  */
-function matchExact(filters: string[], ...values: string[]): boolean {
+export function matchExact(filters: string[], ...values: string[]): boolean {
   if (filters.length === 0) return true;
   for (const v of values) {
     if (v && filters.includes(v)) return true;
@@ -33,7 +33,7 @@ function matchExact(filters: string[], ...values: string[]): boolean {
  *
  * e.g. subCategories: ["COVER+"] matches Product (Name) = "7CARE+ Free for COVER+..."
  */
-function matchSmart(filters: string[], ...values: string[]): boolean {
+export function matchSmart(filters: string[], ...values: string[]): boolean {
   if (filters.length === 0) return true;
   // 1. Exact (case-sensitive)
   for (const v of values) {
