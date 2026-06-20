@@ -234,35 +234,33 @@ export default function WonderConfigEditor({
                     className="w-full text-xs bg-white/5 border border-white/10 text-white rounded-xl px-3 py-2 outline-none focus:border-emerald-500"
                   />
                 </div>
-                  <div>
-                    <label className="text-[10px] text-white/50 block mb-1">Calc Type</label>
-                    <div className="flex gap-2 flex-wrap">
-                      <button type="button" onClick={() => setNewCalcType("attach")}
-                        className={`text-[10px] px-2.5 py-1.5 rounded-xl border transition-colors cursor-pointer ${
-                          newCalcType === "attach"
-                            ? "bg-emerald-500/20 border-emerald-400/30 text-emerald-200"
-                            : "bg-white/5 border-white/10 text-white/50 hover:text-white"
-                        }`}>Attach</button>
-                      <button type="button" onClick={() => setNewCalcType("unit")}
-                        className={`text-[10px] px-2.5 py-1.5 rounded-xl border transition-colors cursor-pointer ${
-                          newCalcType === "unit"
-                            ? "bg-sky-500/20 border-sky-400/30 text-sky-200"
-                            : "bg-white/5 border-white/10 text-white/50 hover:text-white"
-                        }`}>Unit</button>
-                      <button type="button" onClick={() => setNewCalcType("baht")}
-                        className={`text-[10px] px-2.5 py-1.5 rounded-xl border transition-colors cursor-pointer ${
-                          newCalcType === "baht"
-                            ? "bg-amber-500/20 border-amber-400/30 text-amber-200"
-                            : "bg-white/5 border-white/10 text-white/50 hover:text-white"
-                        }`}>Baht</button>
-                      <button type="button" onClick={() => setNewCalcType("bahtRate")}
-                        className={`text-[10px] px-2.5 py-1.5 rounded-xl border transition-colors cursor-pointer ${
-                          newCalcType === "bahtRate"
-                            ? "bg-violet-500/20 border-violet-400/30 text-violet-200"
-                            : "bg-white/5 border-white/10 text-white/50 hover:text-white"
-                        }`}>BahtRate</button>
-                    </div>
+                <div>
+                  <label className="text-[10px] text-white/50 block mb-1">Calc Type</label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setNewCalcType("attach")}
+                      className={`flex-1 text-xs px-3 py-2 rounded-xl border transition-colors cursor-pointer ${
+                        newCalcType === "attach"
+                          ? "bg-emerald-500/20 border-emerald-400/30 text-emerald-200"
+                          : "bg-white/5 border-white/10 text-white/50 hover:text-white"
+                      }`}
+                    >
+                      Attach (Unit)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewCalcType("bahtRate")}
+                      className={`flex-1 text-xs px-3 py-2 rounded-xl border transition-colors cursor-pointer ${
+                        newCalcType === "bahtRate"
+                          ? "bg-emerald-500/20 border-emerald-400/30 text-emerald-200"
+                          : "bg-white/5 border-white/10 text-white/50 hover:text-white"
+                      }`}
+                    >
+                      BahtRate (Revenue)
+                    </button>
                   </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -347,10 +345,12 @@ export default function WonderConfigEditor({
                         onChange={(e) => setEditCalcType(e.target.value as WonderCalcType)}
                         className="text-[10px] bg-white/5 border border-white/10 text-white rounded-lg px-2 py-1 outline-none"
                       >
-                        <option value="attach" className="text-gray-900">Attach</option>
-                        <option value="unit" className="text-gray-900">Unit</option>
-                        <option value="baht" className="text-gray-900">Baht</option>
-                        <option value="bahtRate" className="text-gray-900">BahtRate</option>
+                        <option value="attach" className="text-gray-900">
+                          Attach
+                        </option>
+                        <option value="bahtRate" className="text-gray-900">
+                          BahtRate
+                        </option>
                       </select>
                     ) : (
                       <span className="text-[10px] font-bold text-white/85 bg-white/5 border border-white/10 px-2 py-0.5 rounded-md">

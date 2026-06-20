@@ -136,7 +136,6 @@ export function StaffSection({
   const fmtSalesPct = (n: number) =>
     `${n >= 100 ? Math.round(n) : n.toFixed(1)}%`;
   const isTodayView = activeStat === "target";
-
   const tableRows = isTodayView
     ? activeOfficerCategoryPerformance
     : activeStat === "csat"

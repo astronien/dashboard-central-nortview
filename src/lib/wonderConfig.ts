@@ -1,6 +1,4 @@
 import { getItem, setItem } from "./storage";
-import { matchExact, matchSmart } from "./presetEngine";
-import type { Preset, ItemFilter, PresetCalcType } from "./presetTypes";
 
 /**
  * Wonder / KPI Config — structured filter system.
@@ -19,7 +17,7 @@ import type { Preset, ItemFilter, PresetCalcType } from "./presetTypes";
  * are auto-converted to the new schema via `migrateLegacyWonderConfig()`.
  */
 
-export type WonderCalcType = PresetCalcType;
+export type WonderCalcType = "attach" | "bahtRate";
 
 export type WonderFilter = {
   categories?: string[];
@@ -640,18 +638,40 @@ export const DEFAULT_WONDER_CONFIGS: WonderItemConfig[] = [
 
 const LOCAL_STORAGE_KEY = "dashboard_7wonder_configs";
 
+const normalize = (value: unknown): string =>
+  String(value ?? "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+
+const normalizeForCompare = (value: unknown): string =>
+  String(value ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9ก-๙]/gi, "")
+    .trim();
 
 const rowField = (row: Record<string, unknown>, ...keys: string[]): string => {
   for (const key of keys) {
     const val = row[key];
     if (val !== undefined && val !== null && String(val).trim() !== "") {
-      return String(val).trim();
+      return String(val);
     }
   }
   return "";
 };
 
-
+const matchesAny = (rowValue: string, list: string[] | undefined): boolean => {
+  if (!list || list.length === 0) return true;
+  const norm = normalize(rowValue);
+  const compact = normalizeForCompare(rowValue);
+  if (!norm && !compact) return false;
+  return list.some((item) => {
+    const a = normalize(item);
+    const b = normalizeForCompare(item);
+    if (!a) return false;
+    return norm === a || (norm && a.includes(norm)) || (norm && norm.includes(a)) || (b && compact && compact.includes(b));
+  });
+};
 
 export function rowMatchesFilter(
   row: Record<string, unknown>,
@@ -718,13 +738,13 @@ export function rowMatchesFilter(
   );
   const docType = rowField(row, "Doc Type", "doc_type", "DocType");
 
-  if (!matchExact(filter.categories ?? [], category)) return false;
-  if (!matchExact(filter.subCategories ?? [], subCategory) && !matchSmart(filter.subCategories ?? [], productName)) return false;
-  if (!matchExact(filter.models ?? [], model)) return false;
-  if (!matchExact(filter.brands ?? [], brand)) return false;
-  if (!matchExact(filter.customerCodes ?? [], customerCode)) return false;
-  if (!matchSmart(filter.productNames ?? [], productName)) return false;
-  if (!matchExact(filter.docTypes ?? [], docType)) return false;
+  if (!matchesAny(category, filter.categories)) return false;
+  if (!matchesAny(subCategory, filter.subCategories)) return false;
+  if (!matchesAny(model, filter.models)) return false;
+  if (!matchesAny(brand, filter.brands)) return false;
+  if (!matchesAny(customerCode, filter.customerCodes)) return false;
+  if (!matchesAny(productName, filter.productNames)) return false;
+  if (!matchesAny(docType, filter.docTypes)) return false;
 
   return true;
 }
@@ -1281,28 +1301,4 @@ export async function updateWonderConfigs(
     console.error("Failed to save wonder configs to Turso:", err);
     return false;
   }
-}
-
-export function wonderToPreset(wonder: WonderItemConfig): Preset {
-  const toItemFilter = (f: WonderFilter): ItemFilter => ({
-    categories: f.categories ?? [],
-    subCategories: f.subCategories ?? [],
-    models: f.models ?? [],
-    brands: f.brands ?? [],
-    customerCodes: f.customerCodes ?? [],
-    productNames: f.productNames ?? [],
-    docTypes: f.docTypes ?? [],
-    includeNonInventory: f.includeNonInventory,
-  });
-  return {
-    id: wonder.id,
-    name: wonder.name,
-    calcType: wonder.calcType,
-    targetPercent: wonder.targetPercent,
-    labelA: wonder.labelA,
-    labelB: wonder.labelB,
-    filtersA: wonder.filtersA.map(toItemFilter),
-    filtersB: wonder.filtersB.map(toItemFilter),
-    color: "green",
-  };
 }
