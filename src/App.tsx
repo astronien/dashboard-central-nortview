@@ -33,7 +33,7 @@ import {
   CreditCard,
 } from "lucide-react";
 import CategoryTreePicker from "./components/CategoryTreePicker";
-import AttachTargetGroupEditor from "./components/AttachTargetGroupEditor";
+
 import { AnimatePresence, motion } from "motion/react";
 import React, { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { parseCategoryMasterFile } from "./lib/categoryMasterUpload";
@@ -76,19 +76,12 @@ import {
   saveStaffPhoto,
 } from "./lib/staffPhotosApi";
 import {
-  ATTACH_CHART_COLORS,
-  buildAttachMatrixDisplay,
-  buildCategoryTree,
-  categoryToChartKey,
   computeAttachRateRows,
   DEFAULT_ATTACH_CATEGORIES,
   DEFAULT_BASE_CATEGORIES,
-  formatOfficerShortName,
   matchesOfficer as attachMatchesOfficer,
   overallAttachRate,
-  type AttachMatrixDisplayRow,
   type AttachOfficerRow,
-  type AttachTargetGroup,
 } from "./lib/attachRate";
 import {
   PolarAngleAxis,
@@ -109,7 +102,6 @@ import {
 } from "recharts";
 import { HomeDashboardSection } from "./components/dashboard/HomeDashboardSection";
 
-import { StaffOverviewSection } from "./components/dashboard/StaffOverviewSection";
 import { StaffSection } from "./components/dashboard/StaffSection";
 import { loadWonderConfigs, saveWonderConfigs, type WonderItemConfig, fetchWonderConfigs, updateWonderConfigs, calcWonderForRows, calcWonderRate, cleanupTestWonderConfigs } from "./lib/wonderConfig";
 import { ReportsSection } from "./components/dashboard/ReportsSection";
@@ -1243,7 +1235,7 @@ const emptyReport: ParsedReport = {
 
 export default function App() {
   const [currentView, setCurrentView] = useState<
-    "home" | "staff" | "staff_overview" | "settings" | "reports" | "kpi_preset"
+    "home" | "staff" | "settings" | "reports" | "kpi_preset"
   >("home");
   const [parsedReport, setParsedReport] = useState<ParsedReport>(fallbackReport);
   const [uploadedFiles, setUploadedFiles] = useState<Record<UploadKind, RawRow[]>>({ target: [], current: [], today: [], lastMonth: [], lastYear: [], categoryMaster: [] });
@@ -1425,96 +1417,13 @@ export default function App() {
     };
   }, [todayRows, parsedReport, getCategory, getCategoryValue]);
 
-  const staffAttachMatrix = useMemo(() => {
-    if (!displayUploads.current.length || !displayUploads.target.length) return [];
-    const groups: AttachTargetGroup[] = [
-      { id: "Cover+", label: "Cover+", members: ["Cover+"] },
-      { id: "AppleCare+", label: "AC+", members: ["Apple Care", "AppleCare+"] },
-      { id: "Pencil", label: "Pencil", members: ["Pencil", "Apple Pencil"] },
-      { id: "Case", label: "Case", members: ["Case", "Casing"] },
-      { id: "SIM", label: "SIM", members: ["SIM"] },
-      { id: "AirPods", label: "AirPods", members: ["AirPods", "AirPod"] },
-      { id: "UFD", label: "UFD", members: ["UFD", "UFUND"] }
-    ];
-    return computeAttachRateRows({
-      currentRows: displayUploads.current,
-      targetRows: displayUploads.target,
-      categoryMaster: displayUploads.categoryMaster,
-      baseCategories: ["iPhone", "iPad", "Mac", "Apple Watch"],
-      attachCategories: groups.map(g => g.label),
-      attachGroups: groups,
-      kpiTargetsByCategory: {
-        "Cover+": 25,
-        "AC+": 20,
-        "Pencil": 85,
-        "Case": 60,
-        "SIM": 15,
-        "AirPods": 25,
-        "UFD": 5
-      }
-    });
-  }, [displayUploads.current, displayUploads.target, displayUploads.categoryMaster]);
-
-  const pcZoneStats = useMemo(() => {
-    if (!displayUploads.current.length) return [];
-    
-    const distributors = [
-      { name: "SUPER SALES", brands: ["BLUE BOX", "TECHPRO", "QPLUS", "TITANV", "MCDODO"] },
-      { name: "RTB", brands: ["UNIQ", "ENERGEA", "B&O", "VONMAEHLEN", "JISULIFE"] },
-      { name: "MTJ", brands: ["MTJ", "MOFT", "SKINARMA"] }
-    ];
-    
-    return distributors.map(dist => {
-      let distRevenue = 0;
-      let distUnits = 0;
-      const brandMap = new Map<string, { revenue: number, units: number }>();
-      
-      displayUploads.current.forEach(row => {
-        const brand = String(row["Brand"] ?? row.brand ?? "").toUpperCase().trim();
-        const cat = String(row["Category (Name)"] ?? "").toLowerCase();
-        const matchesBrand = dist.brands.some(b => brand.includes(b));
-        
-        if (matchesBrand) {
-          const val = getCategoryValue(row);
-          const qty = cat.includes("sim") ? toNumber(row.Number ?? row.number ?? row.qty ?? 1) : 1;
-          distRevenue += val;
-          distUnits += qty;
-          
-          const existing = brandMap.get(brand) ?? { revenue: 0, units: 0 };
-          existing.revenue += val;
-          existing.units += qty;
-          brandMap.set(brand, existing);
-        }
-      });
-      
-      const topBrands = Array.from(brandMap.entries())
-        .map(([brand, data]) => ({ name: brand, ...data }))
-        .sort((a, b) => b.revenue - a.revenue)
-        .slice(0, 5);
-        
-      return {
-        name: dist.name,
-        revenue: distRevenue,
-        units: distUnits,
-        topBrands
-      };
-    });
-  }, [displayUploads.current, getCategoryValue]);
-
   const [activeTab, setActiveTab] = useState("Store");
   const [activeStat, setActiveStat] = useState<"sales" | "csat" | "target">(
     "sales",
   );
   const [activeStaffId, setActiveStaffId] = useState("1");
   const [showDropdown, setShowDropdown] = useState(false);
-  const [attachFilters, setAttachFilters] = useState<string[]>([
-    "appleCare",
-    "accessories",
-  ]);
   const [selectedDevice, setSelectedDevice] = useState("iPhone");
-  const [selectedAttachCategories, setSelectedAttachCategories] = useState<string[]>([]);
-  const [selectedAttachOfficers, setSelectedAttachOfficers] = useState<string[]>([]);
-  const [isAttachDropdownOpen, setIsAttachDropdownOpen] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -1543,27 +1452,10 @@ export default function App() {
   const [sheetBranches, setSheetBranches] = useState<string[]>([]);
 
   const [homeTab, setHomeTab] = useState<"monthly" | "today">("monthly");
-  const [staffViewTab, setStaffViewTab] = useState<"leaderboard" | "attach_builder" | "pc_zone">("leaderboard");
-  const [staffBaseCategories, setStaffBaseCategories] = useState<string[]>([
-    ...DEFAULT_BASE_CATEGORIES,
-  ]);
-  const [staffAttachGroups, setStaffAttachGroups] = useState<AttachTargetGroup[]>(() =>
-    DEFAULT_ATTACH_CATEGORIES.map((cat) => ({
-      id: `grp-${cat}`,
-      label: cat,
-      members: [cat],
-    })),
-  );
-  const [staffKpiTargets, setStaffKpiTargets] = useState<Record<string, number>>(() =>
-    Object.fromEntries(DEFAULT_ATTACH_CATEGORIES.map((cat) => [cat, 20])),
-  );
-  const [staffFilterBranch, setStaffFilterBranch] = useState("All Branches");
-  const [officerFilter, setOfficerFilter] = useState("All Staff");
-  const [staffBuilderOpen, setStaffBuilderOpen] = useState(false);
-  const [staffPhotos, setStaffPhotos] = useState<StaffPhotosMap>({});
-  const [staffPhotoError, setStaffPhotoError] = useState<string | null>(null);
   const [wonderConfigs, setWonderConfigs] = useState<WonderItemConfig[] | null>(null);
   const [uploadingPhotoId, setUploadingPhotoId] = useState<string | null>(null);
+  const [staffPhotos, setStaffPhotos] = useState<StaffPhotosMap>({});
+  const [staffPhotoError, setStaffPhotoError] = useState<string | null>(null);
   // loadWonderConfigs is async (IDB); seed with DEFAULT_WONDER_CONFIGS and
   // hydrate from IDB in a useEffect below.
   useEffect(() => {
@@ -1683,40 +1575,11 @@ export default function App() {
     categoryMaster: "Category Master",
   };
 
-  const toggleAttachFilter = (id: string) => {
-    setAttachFilters((prev) =>
-      prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id],
-    );
-  };
-
   const currentStaff =
     staffData.find((s) => s.id === activeStaffId) || staffData[0];
   const currentOfficer = parsedReport.officers[Number(activeStaffId) - 1] ?? parsedReport.officers[0];
   const activeOfficerIndex = Math.max(Number(activeStaffId) - 1, 0);
   const activeOfficer = parsedReport.officers[activeOfficerIndex] ?? parsedReport.officers[0];
-
-  const attachBaseCategories = useMemo(() => {
-    if (currentView === "staff_overview") return staffBaseCategories;
-    return DEFAULT_BASE_CATEGORIES;
-  }, [currentView, staffBaseCategories]);
-
-  const attachTargetCategories = useMemo(() => {
-    if (currentView === "staff_overview") {
-      return staffAttachGroups.map((g) => g.label);
-    }
-    return DEFAULT_ATTACH_CATEGORIES;
-  }, [currentView, staffAttachGroups]);
-
-  const attachFilterBranch =
-    currentView === "staff_overview" ? staffFilterBranch : "All Branches";
-
-  const attachKpiTargetsByCategory = useMemo(() => {
-    const map: Record<string, number> = {};
-    staffAttachGroups.forEach((g) => {
-      map[g.label] = staffKpiTargets[g.label] ?? 20;
-    });
-    return map;
-  }, [staffAttachGroups, staffKpiTargets]);
 
   const attachOfficerRows = useMemo<AttachOfficerRow[]>(() => {
     if (!displayUploads.current.length) return [];
@@ -1724,25 +1587,15 @@ export default function App() {
       currentRows: displayUploads.current,
       targetRows: displayUploads.target,
       categoryMaster: displayUploads.categoryMaster,
-      baseCategories: attachBaseCategories,
-      attachCategories: attachTargetCategories,
-      attachGroups:
-        currentView === "staff_overview" ? staffAttachGroups : undefined,
-      kpiTargetsByCategory:
-        currentView === "staff_overview" ? attachKpiTargetsByCategory : undefined,
+      baseCategories: DEFAULT_BASE_CATEGORIES,
+      attachCategories: DEFAULT_ATTACH_CATEGORIES,
       kpiTarget: 20,
-      filterBranch: attachFilterBranch,
+      filterBranch: "All Branches",
     });
   }, [
     displayUploads.current,
     displayUploads.target,
     displayUploads.categoryMaster,
-    attachBaseCategories,
-    attachTargetCategories,
-    staffAttachGroups,
-    attachKpiTargetsByCategory,
-    attachFilterBranch,
-    currentView,
   ]);
 
 
@@ -2484,67 +2337,6 @@ export default function App() {
 
   const attachCategoryOptions = useMemo(() => getAttachCategoryOptions(displayUploads.categoryMaster), [displayUploads.categoryMaster]);
 
-  const toggleAttachCategory = (value: string) => {
-    setSelectedAttachCategories((prev) =>
-      prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value],
-    );
-  };
-
-  const toggleAttachOfficer = (value: string) => {
-    setSelectedAttachOfficers((prev) =>
-      prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value],
-    );
-  };
-
-  const staffBranchesList = useMemo(() => {
-    if (!displayUploads.target.length) {
-      const fromReport = [
-        ...new Set(parsedReport.officers.map((o) => o.branch).filter(Boolean)),
-      ].sort();
-      return ["All Branches", ...fromReport];
-    }
-    const branches = new Set(
-      displayUploads.target
-        .map((t) => String(t["BRANCH NAME"] ?? "").trim())
-        .filter(Boolean),
-    );
-    return ["All Branches", ...Array.from(branches).sort()];
-  }, [displayUploads.target, parsedReport.officers]);
-
-  const staffCategoryTree = useMemo(
-    () =>
-      buildCategoryTree(
-        displayUploads.current,
-        displayUploads.categoryMaster,
-      ),
-    [displayUploads.current, displayUploads.categoryMaster],
-  );
-
-  const setStaffKpiForCategory = (cat: string, value: number) => {
-    setStaffKpiTargets((prev) => ({ ...prev, [cat]: value }));
-  };
-
-  const toggleStaffCategory = (cat: string, isBase: boolean) => {
-    setStaffBaseCategories((prev) =>
-      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat],
-    );
-  };
-
-  const syncKpiForGroups = (groups: AttachTargetGroup[]) => {
-    setStaffKpiTargets((prev) => {
-      const next = { ...prev };
-      groups.forEach((g) => {
-        if (next[g.label] == null) next[g.label] = 20;
-      });
-      return next;
-    });
-  };
-
-  const handleAttachGroupsChange = (groups: AttachTargetGroup[]) => {
-    setStaffAttachGroups(groups);
-    syncKpiForGroups(groups);
-  };
-
   const displayStaffAvatar = useMemo(() => {
     if (!activeOfficer) return currentStaff.image;
     const attachRow = attachOfficerRows.find((row) =>
@@ -2589,83 +2381,6 @@ export default function App() {
       id: "10452",
     };
   }, [parsedReport.branches, selectedBranch]);
-
-  const attachOverviewRows = useMemo<AttachMatrixDisplayRow[]>(() => {
-    const selectedOfficerSet = selectedAttachOfficers.length
-      ? new Set(selectedAttachOfficers.map(cleanOfficerName))
-      : null;
-    const categories =
-      attachTargetCategories.length > 0
-        ? attachTargetCategories
-        : DEFAULT_ATTACH_CATEGORIES;
-
-    const filtered = attachOfficerRows
-      .filter((row) => !selectedOfficerSet || selectedOfficerSet.has(row.id))
-      .filter((row) => row.baseUnits > 0 || row.totalAttachUnitsForSorting > 0);
-
-    if (filtered.length) {
-      return buildAttachMatrixDisplay(filtered, categories).map((row, index) => ({
-        ...row,
-        avatar: getStaffAvatar(staffPhotos, {
-          staffId: filtered[index]?.staffId,
-          officerKey: row.id,
-          fallbackIndex: index,
-        }),
-      }));
-    }
-
-    if (!parsedReport.officers.length) return [];
-
-    return parsedReport.officers
-      .filter(
-        (officer) =>
-          !selectedOfficerSet || selectedOfficerSet.has(cleanOfficerName(officer.name)),
-      )
-      .map((officer, index) => ({
-        id: cleanOfficerName(officer.name),
-        name: officer.name,
-        shortName: formatOfficerShortName(officer.name),
-        branch: officer.branch,
-        baseUnits: officer.actual,
-        avatar: getStaffAvatar(staffPhotos, {
-          officerKey: cleanOfficerName(officer.name),
-          fallbackIndex: index,
-        }),
-        rates: Object.fromEntries(
-          categories.map((cat) => [cat, Math.min(officer.rate, 160)]),
-        ),
-        units: Object.fromEntries(categories.map((cat) => [cat, 0])),
-        isHit: Object.fromEntries(
-          categories.map((cat) => [
-            cat,
-            officer.rate >= (staffKpiTargets[cat] ?? 20),
-          ]),
-        ),
-      }));
-  }, [
-    attachOfficerRows,
-    attachTargetCategories,
-    selectedAttachOfficers,
-    parsedReport.officers,
-    staffKpiTargets,
-    staffPhotos,
-  ]);
-
-  const attachOverviewChartData = useMemo(() => {
-    const categories =
-      attachTargetCategories.length > 0
-        ? attachTargetCategories
-        : DEFAULT_ATTACH_CATEGORIES;
-    return attachOverviewRows.map((row) => ({
-      ...row,
-      ...Object.fromEntries(
-        categories.map((cat) => [
-          categoryToChartKey(cat),
-          Math.round(row.rates[cat] ?? 0),
-        ]),
-      ),
-    }));
-  }, [attachOverviewRows, attachTargetCategories]);
 
   const staffLeaderboard = useMemo(() => {
     const ranked = attachOfficerRows.filter(
@@ -3080,12 +2795,6 @@ export default function App() {
                 <Home className="w-5 h-5" />
               </button>
               <button
-                onClick={() => setCurrentView("staff_overview")}
-                className={`p-2 rounded-full transition-colors ${currentView === "staff_overview" ? "bg-[#0f4430] shadow-inner text-white" : "text-white/60 hover:text-white"}`}
-              >
-                <Users className="w-5 h-5" />
-              </button>
-              <button
                 onClick={() => setCurrentView("staff")}
                 className={`p-2 rounded-full transition-colors ${currentView === "staff" ? "bg-[#0f4430] shadow-inner text-white" : "text-white/60 hover:text-white"}`}
               >
@@ -3198,51 +2907,6 @@ export default function App() {
                   categorySnapshots={categorySnapshotData}
                 />
               </motion.div>
-            )}
-            {currentView === "staff_overview" && (
-              <StaffOverviewSection
-                staffCategoryTree={staffCategoryTree}
-                staffBaseCategories={staffBaseCategories}
-                staffAttachGroups={staffAttachGroups}
-                staffFilterBranch={staffFilterBranch}
-                staffBranchesList={staffBranchesList}
-                staffKpiTargets={staffKpiTargets}
-                selectedAttachOfficers={selectedAttachOfficers}
-                attachOverviewChartData={attachOverviewChartData}
-                attachTargetCategories={attachTargetCategories}
-                attachOverviewRows={attachOverviewRows}
-                pcZoneStats={pcZoneStats}
-                staffAttachMatrix={attachOfficerRows}
-                parsedOfficers={parsedReport.officers}
-                onToggleStaffCategory={toggleStaffCategory}
-                onAttachGroupsChange={handleAttachGroupsChange}
-                onBranchChange={setStaffFilterBranch}
-                onSetKpi={setStaffKpiForCategory}
-                onToggleOfficer={toggleAttachOfficer}
-                onOpenStaffProfile={(name) => {
-                  const officerIndex = parsedReport.officers.findIndex((officer) =>
-                    attachMatchesOfficer(officer.name, name),
-                  );
-                  if (officerIndex < 0) return;
-                  setActiveStaffId(String(officerIndex + 1));
-                  setCurrentView("staff");
-                }}
-                formatOfficerShortName={formatOfficerShortName}
-                matchesOfficer={attachMatchesOfficer}
-                wonderConfigs={wonderConfigs}
-                onWonderConfigsChange={handleWonderConfigsChange}
-                uniqueCombos={uniqueCombos}
-                salesHeaders={salesHeaders}
-                onOpenStaffProfileWithWonders={(name) => {
-                  const officerIndex = parsedReport.officers.findIndex((officer) =>
-                    attachMatchesOfficer(officer.name, name),
-                  );
-                  if (officerIndex < 0) return;
-                  setActiveStaffId(String(officerIndex + 1));
-                  setActiveStat("csat");
-                  setCurrentView("staff");
-                }}
-              />
             )}
             {currentView === "staff" && (
               <StaffSection
