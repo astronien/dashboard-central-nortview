@@ -1,8 +1,10 @@
-import { Activity, DollarSign, Laptop, PenTool, Rocket, ShieldCheck, Smartphone, Star, Tablet, TrendingUp, TrendingDown, Building, Building2 } from "lucide-react";
+import { Activity, DollarSign, Laptop, PenTool, Rocket, ShieldCheck, Smartphone, Star, Tablet, TrendingUp, TrendingDown, Building, Building2, User } from "lucide-react";
 import type { CategorySnapshotItem } from "../../lib/categorySnapshotBuilder";
 import type { DerivedHomeStat } from "./dashboardTypes";
 import { CategorySnapshotSection } from "./CategorySnapshotSection";
 import { KpiCard } from "./KpiCard";
+import type { Preset } from "../../lib/presetTypes";
+import type { PresetCalcType } from "../../lib/presetTypes";
 
 export type MonthlyPerformance = {
   overallScore: { score: number; grade: string };
@@ -21,14 +23,26 @@ export type MonthlyPerformance = {
   lowForecast: number;
 };
 
+export type BranchOverviewKpiRow = {
+  officer: { name: string; branch: string };
+  results: Record<string, number>;
+};
+
+export type BranchOverviewKpiData = {
+  presets: Preset[];
+  rows: BranchOverviewKpiRow[];
+};
+
 export function HomeDashboardSection({
   derivedHomeStats,
   monthlyPerformance,
   categorySnapshots,
+  branchOverviewKpiData,
 }: {
   derivedHomeStats: DerivedHomeStat[];
   monthlyPerformance: MonthlyPerformance;
   categorySnapshots?: CategorySnapshotItem[];
+  branchOverviewKpiData?: BranchOverviewKpiData;
 }) {
   const gradeColor =
     monthlyPerformance.overallScore.grade === "A"
@@ -253,6 +267,143 @@ export function HomeDashboardSection({
           rightSub="YoY"
         />
       </div>
+
+      {branchOverviewKpiData && branchOverviewKpiData.presets.length > 0 ? (
+        <BranchOverviewKpiTable data={branchOverviewKpiData} />
+      ) : null}
     </>
+  );
+}
+
+const colorDotClass = (color: string) => {
+  const map: Record<string, string> = {
+    green: "bg-emerald-500",
+    amber: "bg-amber-500",
+    blue: "bg-blue-500",
+    teal: "bg-teal-500",
+    purple: "bg-purple-500",
+    coral: "bg-orange-500",
+  };
+  return map[color] || "bg-white/40";
+};
+
+const formatKpiCell = (val: number, calcType: PresetCalcType | undefined): string => {
+  if (!isFinite(val) || isNaN(val)) return "—";
+  switch (calcType) {
+    case "attach":
+    case "bahtRate":
+    case "catAttach":
+      return `${val.toFixed(1)}%`;
+    case "baht":
+    case "catBaht":
+      return `฿${Math.round(val).toLocaleString()}`;
+    case "unit":
+    case "catQty":
+      return Math.round(val).toLocaleString();
+    default:
+      return val.toFixed(1);
+  }
+};
+
+const calcTypeLabel = (calcType: PresetCalcType | undefined): string => {
+  switch (calcType) {
+    case "attach":
+      return "Attach %";
+    case "bahtRate":
+      return "฿ Attach %";
+    case "unit":
+      return "Unit";
+    case "baht":
+      return "Baht";
+    case "catBaht":
+      return "฿ CatMaster";
+    case "catQty":
+      return "Qty CatMaster";
+    case "catAttach":
+      return "ATT % CatMaster";
+    default:
+      return "—";
+  }
+};
+
+function BranchOverviewKpiTable({ data }: { data: BranchOverviewKpiData }) {
+  const { presets, rows } = data;
+
+  return (
+    <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)] overflow-hidden">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="p-2 bg-amber-500/20 rounded-xl border border-amber-500/20">
+          <User className="w-5 h-5 text-amber-400" />
+        </div>
+        <div>
+          <h2 className="text-lg font-bold tracking-tight text-white">
+            ตาราง KPI เจ้าหน้าที่ตามที่เลือก
+          </h2>
+          <p className="text-[11px] text-white/50">
+            แสดงค่า KPI ของ Preset ที่เลือก "หน้ารวมสาขา" แยกตามรายชื่อเจ้าหน้าที่
+          </p>
+        </div>
+      </div>
+
+      {rows.length === 0 ? (
+        <p className="text-sm text-white/50 text-center py-8">
+          ยังไม่มีข้อมูลเจ้าหน้าที่ — กรุณาอัปโหลดไฟล์ Current
+        </p>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-white/10">
+          <table className="w-full text-left border-collapse text-[11px]">
+            <thead>
+              <tr className="bg-[#0c3123] border-b border-emerald-500/20 text-white/90">
+                <th className="py-3 px-3 font-bold uppercase tracking-wider sticky left-0 bg-[#0c3123] z-10 min-w-[160px]">
+                  เจ้าหน้าที่
+                </th>
+                <th className="py-3 px-3 font-bold uppercase tracking-wider min-w-[120px]">
+                  สาขา
+                </th>
+                {presets.map((p) => (
+                  <th
+                    key={p.id}
+                    className="py-3 px-3 font-bold uppercase tracking-wider text-right min-w-[120px]"
+                    title={p.labelA + " → " + (p.labelB || "(ไม่มี)")}
+                  >
+                    <div className="flex items-center justify-end gap-1.5">
+                      <span className={`w-2 h-2 rounded-full ${colorDotClass(p.color)}`} />
+                      <span>{p.name}</span>
+                    </div>
+                    <div className="text-[9px] text-white/40 font-normal normal-case mt-0.5">
+                      {calcTypeLabel(p.calcType)}
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, idx) => (
+                <tr
+                  key={`${row.officer.name}-${idx}`}
+                  className="border-b border-white/5 hover:bg-white/5 transition-colors"
+                >
+                  <td className="py-2.5 px-3 font-medium text-white sticky left-0 bg-[#0a1f17] z-10">
+                    {row.officer.name}
+                  </td>
+                  <td className="py-2.5 px-3 text-white/70">{row.officer.branch || "-"}</td>
+                  {presets.map((p) => {
+                    const val = row.results[p.id] ?? 0;
+                    return (
+                      <td
+                        key={p.id}
+                        className="py-2.5 px-3 text-right font-mono font-semibold text-white"
+                      >
+                        {formatKpiCell(val, p.calcType)}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }

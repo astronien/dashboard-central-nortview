@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Download, Upload, RotateCcw, ChevronDown, ChevronUp, Plus } from "lucide-react";
+import { Download, Upload, RotateCcw, ChevronDown, ChevronUp, Plus, User, Home as HomeIcon } from "lucide-react";
 import {
   addPreset,
   deletePreset,
@@ -137,6 +137,15 @@ export default function KpiPresetManager({
     }
   };
 
+  const handleToggleFlag = async (
+    preset: Preset,
+    flag: "showInStaffProfile" | "showInBranchOverview",
+  ) => {
+    await updatePreset(preset.id, { ...preset, [flag]: !preset[flag] });
+    const { getPresets } = await import("../../lib/presetStorage");
+    onPresetsChange(await getPresets());
+  };
+
   return (
     <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
       <div
@@ -219,6 +228,30 @@ export default function KpiPresetManager({
                   </div>
                 </div>
                 <div className="flex gap-2 shrink-0">
+                  <button
+                    type="button"
+                    title={preset.showInStaffProfile ? "ซ่อนจาก Staff Profile" : "แสดงใน Staff Profile (7 Wonders)"}
+                    onClick={() => handleToggleFlag(preset, "showInStaffProfile")}
+                    className={`p-1.5 rounded-lg border transition-colors ${
+                      preset.showInStaffProfile
+                        ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300"
+                        : "bg-white/5 border-white/10 text-white/40 hover:text-white/70 hover:bg-white/10"
+                    }`}
+                  >
+                    <User className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    title={preset.showInBranchOverview ? "ซ่อนจากหน้ารวมสาขา" : "แสดงในหน้ารวมสาขา"}
+                    onClick={() => handleToggleFlag(preset, "showInBranchOverview")}
+                    className={`p-1.5 rounded-lg border transition-colors ${
+                      preset.showInBranchOverview
+                        ? "bg-amber-500/20 border-amber-500/40 text-amber-300"
+                        : "bg-white/5 border-white/10 text-white/40 hover:text-white/70 hover:bg-white/10"
+                    }`}
+                  >
+                    <HomeIcon className="w-4 h-4" />
+                  </button>
                   <button
                     onClick={() => handleEdit(preset)}
                     className="px-3 py-1 text-sm bg-white/10 text-white/80 border border-white/10 rounded hover:bg-white/20 transition"

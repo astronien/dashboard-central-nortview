@@ -35,7 +35,7 @@ import {
 import CategoryTreePicker from "./components/CategoryTreePicker";
 
 import { AnimatePresence, motion } from "motion/react";
-import React, { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { parseCategoryMasterFile } from "./lib/categoryMasterUpload";
 import { parseSalesExcelFile } from "./lib/salesUpload";
 import { parseTargetExcelFile } from "./lib/targetUpload";
@@ -103,7 +103,6 @@ import {
 import { HomeDashboardSection } from "./components/dashboard/HomeDashboardSection";
 
 import { StaffSection } from "./components/dashboard/StaffSection";
-import { loadWonderConfigs, saveWonderConfigs, type WonderItemConfig, fetchWonderConfigs, updateWonderConfigs, calcWonderForRows, calcWonderRate, cleanupTestWonderConfigs } from "./lib/wonderConfig";
 import { ReportsSection } from "./components/dashboard/ReportsSection";
 import { SettingsSection } from "./components/dashboard/SettingsSection";
 import KpiPresetSection from "./components/dashboard/KpiPresetSection";
@@ -112,7 +111,10 @@ import {
   migrateFromLegacyLocalStorage as migrateKpiPresetsFromLS,
   cleanupTestPresets as cleanupKpiPresets,
 } from "./lib/presetStorage";
-import type { Preset as KpiPreset } from "./lib/presetTypes";
+import type { Preset as KpiPreset, PresetResult } from "./lib/presetTypes";
+import { calcPreset, presetDisplayValue } from "./lib/presetEngine";
+import { parseBills, type BillSummary } from "./lib/presetBills";
+import { enrichSalesRowsWithCatDaily, buildCatDailyLookup } from "./lib/presetCatDaily";
 
 
 type Staff = {
@@ -1452,28 +1454,9 @@ export default function App() {
   const [sheetBranches, setSheetBranches] = useState<string[]>([]);
 
   const [homeTab, setHomeTab] = useState<"monthly" | "today">("monthly");
-  const [wonderConfigs, setWonderConfigs] = useState<WonderItemConfig[] | null>(null);
   const [uploadingPhotoId, setUploadingPhotoId] = useState<string | null>(null);
   const [staffPhotos, setStaffPhotos] = useState<StaffPhotosMap>({});
   const [staffPhotoError, setStaffPhotoError] = useState<string | null>(null);
-  // loadWonderConfigs is async (IDB); seed with DEFAULT_WONDER_CONFIGS and
-  // hydrate from IDB in a useEffect below.
-  useEffect(() => {
-    void (async () => {
-      try {
-        // One-time cleanup: remove any "testxx" / "test" presets from previous sessions
-        const removed = await cleanupTestWonderConfigs();
-        if (removed.length > 0) {
-          console.info(`[App] removed test wonder configs: ${removed.join(", ")}`);
-        }
-        const loaded = await loadWonderConfigs();
-        setWonderConfigs(loaded);
-      } catch (e) {
-        console.warn("[App] loadWonderConfigs failed:", e);
-        setWonderConfigs(null);
-      }
-    })();
-  }, []);
 
   // Load KPI presets from IDB (one-time legacy LS migration included).
   useEffect(() => {
@@ -1897,94 +1880,121 @@ export default function App() {
     todayStats.dateStr,
   ]);
 
-  const handleWonderConfigsChange = React.useCallback((newConfigs: WonderItemConfig[]) => {
-    setWonderConfigs(newConfigs);
-    updateWonderConfigs(newConfigs);
-  }, []);
+  // Parse officer's bills for preset-based 7 Wonders calculation
+  const activeOfficerBills = useMemo<BillSummary[]>(() => {
+    if (!activeOfficer) return [];
+    const officerName = activeOfficer.name;
+    const officerRows = displayUploads.current.filter((row) => {
+      const officer = String(row["Officer (Name)"] ?? "").trim();
+      return matchesOfficer(officer, officerName);
+    });
+    if (officerRows.length === 0) return [];
+    const lookup = buildCatDailyLookup(displayUploads.categoryMaster);
+    const enriched = enrichSalesRowsWithCatDaily(officerRows, lookup);
+    return parseBills(enriched);
+  }, [activeOfficer, displayUploads.current, displayUploads.categoryMaster]);
+
+  // Compute KPI results for presets marked showInStaffProfile
+  const activeOfficerPresetResults = useMemo<PresetResult[]>(() => {
+    if (activeOfficerBills.length === 0) return [];
+    const staffPresets = kpiPresets.filter((p) => p.showInStaffProfile);
+    if (staffPresets.length === 0) return [];
+    return staffPresets.map((p) => calcPreset(activeOfficerBills, p));
+  }, [activeOfficerBills, kpiPresets]);
 
   const activeOfficer7WondersPerformance = useMemo<CategoryPerformanceRow[]>(() => {
     if (!activeOfficer) return [];
-
     const officerName = activeOfficer?.name ?? currentStaff.name;
     const officerIndex = activeOfficerIndex;
     const hasData = displayUploads.current.length > 0;
+    const hasPresetResults = activeOfficerPresetResults.length > 0;
 
-    const officerRows = hasData
-      ? displayUploads.current.filter((row) => {
-          const officer = String(row["Officer (Name)"] ?? "").trim();
-          return matchesOfficer(officer, officerName);
-        })
-      : [];
+    if (hasPresetResults) {
+      const rows: CategoryPerformanceRow[] = activeOfficerPresetResults.map((r, idx) => {
+        const actualVal = presetDisplayValue(r);
+        const target = kpiPresets.find((p) => p.id === r.presetId)?.targetPercent ?? 0;
+        const achPercent = target > 0 ? (actualVal / target) * 100 : 0;
+        return {
+          category: `${idx + 1}. ${r.presetName}`,
+          target,
+          actual: actualVal,
+          achPercent,
+          forecast: actualVal,
+          forecastPercent: achPercent,
+          lastMonth: 0,
+          momPercent: "New",
+          lastYear: 0,
+          yoyPercent: "New",
+          targetDay: target,
+          actualDay: actualVal,
+          diffDay: actualVal - target,
+          achDayPercent: achPercent,
+        };
+      });
 
-    const rows: CategoryPerformanceRow[] = (wonderConfigs ?? []).map((w, idx) => {
-      let actualVal: number;
+      const totalTarget = rows.reduce((s, r) => s + r.target, 0) / (rows.length || 1);
+      const totalActual = rows.reduce((s, r) => s + r.actual, 0) / (rows.length || 1);
+      const totalAchPercent = rows.reduce((s, r) => s + r.achPercent, 0) / (rows.length || 1);
 
-      if (hasData && officerRows.length > 0) {
-        const result = calcWonderForRows(officerRows, w);
-        actualVal = calcWonderRate(result);
-      } else {
-        const mockBase = [45, 22, 5.5, 13, 78, 12, 46, 35, 28, 42];
-        const mockOffset = [
-          (officerIndex % 3) * 3,
-          (officerIndex % 5) * 1.5,
-          (officerIndex % 4) * 0.3,
-          (officerIndex % 3) * 1.5,
-          (officerIndex % 3) * 4,
-          (officerIndex % 3) * 2,
-          (officerIndex % 5) * 2,
-          (officerIndex % 4) * 1.2,
-          (officerIndex % 3) * 2.5,
-          (officerIndex % 4) * 3,
-        ];
-        actualVal =
-          (mockBase[idx % mockBase.length] ?? 30) +
-          (mockOffset[idx % mockOffset.length] ?? 0);
-      }
-
-      const target = w.targetPercent;
-      const achPercent = target ? (actualVal / target) * 100 : 0;
-
-      return {
-        category: `${idx + 1}. ${w.name}`,
-        target,
-        actual: actualVal,
-        achPercent,
-        forecast: actualVal,
-        forecastPercent: achPercent,
+      const totalRow: CategoryPerformanceRow = {
+        category: "Average",
+        target: totalTarget,
+        actual: totalActual,
+        achPercent: totalAchPercent,
+        forecast: totalActual,
+        forecastPercent: totalAchPercent,
         lastMonth: 0,
         momPercent: "New",
         lastYear: 0,
         yoyPercent: "New",
-        targetDay: target,
-        actualDay: actualVal,
-        diffDay: actualVal - target,
-        achDayPercent: achPercent,
+        targetDay: totalTarget,
+        actualDay: totalActual,
+        diffDay: totalActual - totalTarget,
+        achDayPercent: totalAchPercent,
       };
-    });
 
-    const totalTarget = rows.reduce((s, r) => s + r.target, 0) / (rows.length || 1);
-    const totalActual = rows.reduce((s, r) => s + r.actual, 0) / (rows.length || 1);
-    const totalAchPercent = rows.reduce((s, r) => s + r.achPercent, 0) / (rows.length || 1);
+      return [...rows, totalRow];
+    }
 
-    const totalRow: CategoryPerformanceRow = {
-      category: "Average",
-      target: totalTarget,
-      actual: totalActual,
-      achPercent: totalAchPercent,
-      forecast: totalActual,
-      forecastPercent: totalAchPercent,
-      lastMonth: 0,
-      momPercent: "New",
-      lastYear: 0,
-      yoyPercent: "New",
-      targetDay: totalTarget,
-      actualDay: totalActual,
-      diffDay: totalActual - totalTarget,
-      achDayPercent: totalAchPercent,
-    };
+    // Fallback: no preset marked — show mock data for first 3 staff
+    if (!hasData) {
+      const mockBase = [45, 22, 5.5, 13, 78, 12, 46, 35, 28, 42];
+      const mockOffset = [
+        (officerIndex % 3) * 3,
+        (officerIndex % 5) * 1.5,
+        (officerIndex % 4) * 0.3,
+        (officerIndex % 3) * 1.5,
+        (officerIndex % 3) * 4,
+        (officerIndex % 3) * 2,
+        (officerIndex % 5) * 2,
+        (officerIndex % 4) * 1.2,
+        (officerIndex % 3) * 2.5,
+        (officerIndex % 4) * 3,
+      ];
+      const rows: CategoryPerformanceRow[] = mockBase.map((base, idx) => {
+        const actualVal = base + (mockOffset[idx] ?? 0);
+        return {
+          category: `${idx + 1}. Wonder ${idx + 1}`,
+          target: 0,
+          actual: actualVal,
+          achPercent: 0,
+          forecast: actualVal,
+          forecastPercent: 0,
+          lastMonth: 0,
+          momPercent: "New",
+          lastYear: 0,
+          yoyPercent: "New",
+          targetDay: 0,
+          actualDay: actualVal,
+          diffDay: actualVal,
+          achDayPercent: 0,
+        };
+      });
+      return rows;
+    }
 
-    return [...rows, totalRow];
-  }, [activeOfficer, displayUploads, parsedReport, activeOfficerIndex, wonderConfigs]);
+    return [];
+  }, [activeOfficer, displayUploads.current, activeOfficerIndex, currentStaff.name, activeOfficerPresetResults, kpiPresets]);
 
   const sevenWondersScore = useMemo(() => {
     if (!displayUploads.current.length && Number(activeStaffId) <= 3) {
@@ -1992,15 +2002,62 @@ export default function App() {
     }
     const wondersRows = activeOfficer7WondersPerformance.filter(r => r.category !== "Average" && r.category !== "Total");
     if (wondersRows.length === 0) return 0;
-    
+
     const scale = (val: number, target: number) => {
       const pct = target > 0 ? (val / target) * 100 : 0;
       return Math.min(Math.max(Math.round(pct), 0), 100);
     };
-    
+
     const sum = wondersRows.reduce((acc, row) => acc + scale(row.actual, row.target), 0);
     return Math.round(sum / wondersRows.length);
   }, [activeOfficer7WondersPerformance, displayUploads.current, activeStaffId, currentStaff]);
+
+  // Branch Overview: per-officer KPI results for presets marked showInBranchOverview
+  const branchOverviewKpiData = useMemo<{
+    presets: KpiPreset[];
+    rows: { officer: { name: string; branch: string }; results: Record<string, number> }[];
+  }>(() => {
+    const branchPresets = kpiPresets.filter((p) => p.showInBranchOverview);
+    if (branchPresets.length === 0) return { presets: [], rows: [] };
+    if (displayUploads.current.length === 0) return { presets: branchPresets, rows: [] };
+
+    const lookup = buildCatDailyLookup(displayUploads.categoryMaster);
+    const enriched = enrichSalesRowsWithCatDaily(displayUploads.current, lookup);
+    const allBills = parseBills(enriched);
+
+    const officerList = parsedReport.officers.length > 0
+      ? parsedReport.officers
+      : Array.from(
+          new Map(
+            allBills
+              .filter((b) => b.officerName)
+              .map((b) => [b.officerName, { name: b.officerName, branch: b.branchName }]),
+          ).values(),
+        );
+
+    const rows: { officer: { name: string; branch: string }; results: Record<string, number> }[] =
+      officerList
+        .map((officer) => {
+          const officerBills = allBills.filter((b) =>
+            matchesOfficer(b.officerName, officer.name),
+          );
+          if (officerBills.length === 0) return null;
+          const results: Record<string, number> = {};
+          branchPresets.forEach((p) => {
+            const r = calcPreset(officerBills, p);
+            results[p.id] = presetDisplayValue(r);
+          });
+          return { officer, results };
+        })
+        .filter((r): r is { officer: { name: string; branch: string }; results: Record<string, number> } => r !== null)
+        .sort((a, b) => {
+          const aTotal = Object.values<number>(a.results).reduce((s, v) => s + v, 0);
+          const bTotal = Object.values<number>(b.results).reduce((s, v) => s + v, 0);
+          return bTotal - aTotal;
+        });
+
+    return { presets: branchPresets, rows };
+  }, [kpiPresets, displayUploads.current, displayUploads.categoryMaster, parsedReport.officers]);
 
   const dynamicRadarData = useMemo(() => {
     if (!displayUploads.current.length && Number(activeStaffId) <= 3 && activeStat === "csat") {
@@ -2905,6 +2962,7 @@ export default function App() {
                   derivedHomeStats={derivedHomeStats}
                   monthlyPerformance={monthlyPerformance}
                   categorySnapshots={categorySnapshotData}
+                  branchOverviewKpiData={branchOverviewKpiData}
                 />
               </motion.div>
             )}

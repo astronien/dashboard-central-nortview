@@ -1,4 +1,5 @@
 import { useState, useMemo, type FormEvent } from "react";
+import { User, Home as HomeIcon } from "lucide-react";
 import {
   emptyItemFilter,
   PRESET_COLORS,
@@ -92,6 +93,9 @@ export default function KpiPresetBuilder({
     initialPreset?.filtersB || (initialPreset?.filterB ? [initialPreset.filterB] : [emptyItemFilter()]),
   );
   const [color, setColor] = useState<PresetColor>(initialPreset?.color || "green");
+  const [targetPercent, setTargetPercent] = useState<number>(initialPreset?.targetPercent ?? 0);
+  const [showInStaffProfile, setShowInStaffProfile] = useState<boolean>(initialPreset?.showInStaffProfile ?? false);
+  const [showInBranchOverview, setShowInBranchOverview] = useState<boolean>(initialPreset?.showInBranchOverview ?? false);
 
   const addFilterA = () => setFiltersA([...filtersA, emptyItemFilter()]);
   const removeFilterA = (idx: number) => setFiltersA(filtersA.filter((_, i) => i !== idx));
@@ -130,6 +134,9 @@ export default function KpiPresetBuilder({
       filtersA: isCatMode ? [] : filtersA,
       filtersB: isCatMode ? [] : filtersB,
       color,
+      targetPercent: targetPercent > 0 ? targetPercent : undefined,
+      showInStaffProfile,
+      showInBranchOverview,
       ...(isCatMode
         ? { catDailyFilter, ...(calcType === "catAttach" ? { catDailyFilterB } : {}) }
         : {}),
@@ -353,6 +360,75 @@ export default function KpiPresetBuilder({
             />
           ))}
         </div>
+      </div>
+
+      <div className="border border-white/10 rounded-lg p-3 bg-white/5 space-y-3">
+        <p className="text-xs font-semibold text-white/80">การแสดงผล</p>
+
+        <div>
+          <label className="text-xs text-white/60 block mb-1">เป้าหมาย (%) — ใช้คำนวณ Ach% ใน Staff Profile</label>
+          <input
+            type="number"
+            min={0}
+            step={1}
+            value={targetPercent || ""}
+            onChange={(e) => setTargetPercent(e.target.value === "" ? 0 : Number(e.target.value))}
+            placeholder="เช่น 60"
+            className={inputClass}
+          />
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setShowInStaffProfile(!showInStaffProfile)}
+          className={`w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg border transition-colors ${
+            showInStaffProfile
+              ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-100"
+              : "bg-white/5 border-white/10 text-white/70 hover:bg-white/10"
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <User className="w-4 h-4" />
+            <span className="text-sm">แสดงใน Staff Profile (7 Wonders)</span>
+          </div>
+          <div
+            className={`w-9 h-5 rounded-full relative transition-colors ${
+              showInStaffProfile ? "bg-emerald-500" : "bg-white/20"
+            }`}
+          >
+            <div
+              className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+                showInStaffProfile ? "translate-x-4" : "translate-x-0.5"
+              }`}
+            />
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setShowInBranchOverview(!showInBranchOverview)}
+          className={`w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg border transition-colors ${
+            showInBranchOverview
+              ? "bg-amber-500/20 border-amber-500/40 text-amber-100"
+              : "bg-white/5 border-white/10 text-white/70 hover:bg-white/10"
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <HomeIcon className="w-4 h-4" />
+            <span className="text-sm">แสดงในหน้ารวมสาขา (Branch Overview)</span>
+          </div>
+          <div
+            className={`w-9 h-5 rounded-full relative transition-colors ${
+              showInBranchOverview ? "bg-amber-500" : "bg-white/20"
+            }`}
+          >
+            <div
+              className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+                showInBranchOverview ? "translate-x-4" : "translate-x-0.5"
+              }`}
+            />
+          </div>
+        </button>
       </div>
 
       <div className="bg-white/5 rounded-lg p-3 border border-white/10">

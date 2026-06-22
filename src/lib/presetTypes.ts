@@ -63,6 +63,9 @@ export interface Preset {
   color: PresetColor;
   catDailyFilter?: string;
   catDailyFilterB?: string;
+  targetPercent?: number;
+  showInStaffProfile?: boolean;
+  showInBranchOverview?: boolean;
 }
 
 export interface PresetResult {
