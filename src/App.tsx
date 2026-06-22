@@ -2010,13 +2010,9 @@ export default function App() {
     const wondersRows = activeOfficer7WondersPerformance.filter(r => r.category !== "Average" && r.category !== "Total");
     if (wondersRows.length === 0) return 0;
 
-    const scale = (val: number, target: number) => {
-      const pct = target > 0 ? (val / target) * 100 : 0;
-      return Math.min(Math.max(Math.round(pct), 0), 100);
-    };
-
-    const sum = wondersRows.reduce((acc, row) => acc + scale(row.actual, row.target), 0);
-    return Math.round(sum / wondersRows.length);
+    const sum = wondersRows.reduce((acc, row) => acc + (row.achPercent || 0), 0);
+    const avg = sum / wondersRows.length;
+    return Math.min(100, Math.max(0, Math.round(avg)));
   }, [activeOfficer7WondersPerformance, displayUploads.current, activeStaffId, currentStaff]);
 
   // Branch Overview: per-officer KPI results for presets marked showInBranchOverview
@@ -2073,21 +2069,14 @@ export default function App() {
     
     if (activeStat === "csat") {
       const wondersRows = activeOfficer7WondersPerformance.filter(r => r.category !== "Average" && r.category !== "Total");
-      
-      const scale = (val: number, target: number) => {
-        const pct = target > 0 ? (val / target) * 100 : 0;
-        return Math.min(Math.max(Math.round(pct), 0), 100);
-      };
-      
+
       return wondersRows.map((row) => {
-        const rawActual = row.actual;
-        const rawTarget = row.target;
-        const scaledVal = scale(rawActual, rawTarget);
+        const achPct = row.achPercent || 0;
         const label = row.category.replace(/^\d+\.\s*/, "").trim();
 
         return {
-          subject: `${label}|${Math.round(rawActual)}%`,
-          value: scaledVal,
+          subject: `${label}|${achPct.toFixed(1)}%`,
+          value: Math.min(100, Math.max(0, Math.round(achPct))),
           fullMark: 100
         };
       });
