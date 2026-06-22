@@ -10,6 +10,7 @@ import {
 import { ShoppingBag, Award, Star, TrendingUp, Apple } from "lucide-react";
 import React from "react";
 import { calcTargetToDate, calcTodayAchievementPct } from "../../lib/targetAggregations";
+import type { PresetCalcType } from "../../lib/presetTypes";
 
 export type StaffLeaderboardItem = {
   id: string;
@@ -33,6 +34,9 @@ export type PerformanceRow = {
   actualDay: number;
   diffDay: number;
   achDayPercent: number;
+  actualA?: number;
+  actualB?: number;
+  calcType?: PresetCalcType;
 };
 
 export type OfficerData = {
@@ -56,6 +60,10 @@ export type CurrentStaff = {
 export type RadarDatum = {
   subject: string;
   value: number;
+};
+
+const isCurrencyCalcType = (calcType: PresetCalcType | undefined): boolean => {
+  return calcType === "baht" || calcType === "bahtRate" || calcType === "catBaht";
 };
 
 export function StaffSection({
@@ -135,7 +143,24 @@ export function StaffSection({
   const fmtSalesNum = (n: number) => n.toLocaleString();
   const fmtSalesPct = (n: number) =>
     `${n >= 100 ? Math.round(n) : n.toFixed(1)}%`;
+  const fmtActualAB = (
+    a: number | undefined,
+    b: number | undefined,
+    calcType: PresetCalcType | undefined,
+  ): string => {
+    if (a === undefined) return "—";
+    const isCurrency = isCurrencyCalcType(calcType);
+    const aStr = isCurrency
+      ? `฿${Math.round(a).toLocaleString()}`
+      : Math.round(a).toLocaleString();
+    if (b === undefined) return aStr;
+    const bStr = isCurrency
+      ? `฿${Math.round(b).toLocaleString()}`
+      : Math.round(b).toLocaleString();
+    return `${aStr}/${bStr}`;
+  };
   const isTodayView = activeStat === "target";
+  const isCsatView = activeStat === "csat";
   const tableRows = isTodayView
     ? activeOfficerCategoryPerformance
     : activeStat === "csat"
@@ -567,7 +592,13 @@ export function StaffSection({
                             <th className="py-2.5 px-3 font-bold uppercase tracking-wider">
                               {activeStat === "csat" ? "Attach Category" : "Group Category"}
                             </th>
-                            {isTodayView ? (
+                            {isCsatView ? (
+                              <>
+                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Target</th>
+                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Actual</th>
+                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-center">Ach. %</th>
+                              </>
+                            ) : isTodayView ? (
                               <>
                                 <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">
                                   เป้าวัน
@@ -615,7 +646,7 @@ export function StaffSection({
                               const isTotal = row.category === "Total" || row.category === "Average";
                               const fmtNum = (val: number) => isCsat ? `${val.toFixed(2)}%` : val.toLocaleString();
                               const fmtPct = (val: number) => `${val.toFixed(2)}%`;
-                              
+
                               const getBadgeClass = (rate: number) => {
                                 if (rate >= 100) return "bg-green-500/20 text-green-400 font-extrabold px-1.5 py-0.5 rounded border border-green-500/20";
                                 if (rate >= 80) return "bg-amber-500/20 text-amber-400 font-extrabold px-1.5 py-0.5 rounded border border-amber-500/20";
@@ -632,6 +663,28 @@ export function StaffSection({
                                 if (isCsat) return `${diff > 0 ? "+" : ""}${diff.toFixed(2)}%`;
                                 return diff > 0 ? `+${diff.toLocaleString()}` : diff.toLocaleString();
                               };
+
+                              if (isCsatView) {
+                                return (
+                                  <tr
+                                    key={idx}
+                                    className={`hover:bg-white/5 transition-colors duration-150 text-white/90 ${isTotal ? "bg-[#0c3123]/90 font-bold border-t border-emerald-500/30" : ""}`}
+                                  >
+                                    <td className="py-2.5 px-3 font-bold">{row.category}</td>
+                                    <td className={`py-2.5 px-3 text-right ${isTotal ? "text-white" : "text-white/60"}`}>
+                                      {row.target > 0 ? `${row.target}%` : "—"}
+                                    </td>
+                                    <td className="py-2.5 px-3 text-right font-bold">
+                                      {fmtActualAB(row.actualA, row.actualB, row.calcType)}
+                                    </td>
+                                    <td className="py-2.5 px-3 text-center">
+                                      <span className={getBadgeClass(row.achPercent)}>
+                                        {fmtPct(row.achPercent)}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                );
+                              }
 
                               if (isTodayView) {
                                 return (

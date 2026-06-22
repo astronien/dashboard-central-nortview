@@ -111,7 +111,7 @@ import {
   migrateFromLegacyLocalStorage as migrateKpiPresetsFromLS,
   cleanupTestPresets as cleanupKpiPresets,
 } from "./lib/presetStorage";
-import type { Preset as KpiPreset, PresetResult } from "./lib/presetTypes";
+import type { Preset as KpiPreset, PresetResult, PresetCalcType } from "./lib/presetTypes";
 import { calcPreset, presetDisplayValue } from "./lib/presetEngine";
 import { parseBills, type BillSummary } from "./lib/presetBills";
 import { enrichSalesRowsWithCatDaily, buildCatDailyLookup } from "./lib/presetCatDaily";
@@ -1203,6 +1203,9 @@ type CategoryPerformanceRow = {
   actualDay: number;
   diffDay: number;
   achDayPercent: number;
+  actualA?: number;
+  actualB?: number;
+  calcType?: PresetCalcType;
 };
 
 const getCategoryForSalesRow = (row: RawRow): string => {
@@ -1912,7 +1915,8 @@ export default function App() {
     if (hasPresetResults) {
       const rows: CategoryPerformanceRow[] = activeOfficerPresetResults.map((r, idx) => {
         const actualVal = presetDisplayValue(r);
-        const target = kpiPresets.find((p) => p.id === r.presetId)?.targetPercent ?? 0;
+        const preset = kpiPresets.find((p) => p.id === r.presetId);
+        const target = preset?.targetPercent ?? 0;
         const achPercent = target > 0 ? (actualVal / target) * 100 : 0;
         return {
           category: `${idx + 1}. ${r.presetName}`,
@@ -1929,6 +1933,9 @@ export default function App() {
           actualDay: actualVal,
           diffDay: actualVal - target,
           achDayPercent: achPercent,
+          actualA: r.billsWithAandB,
+          actualB: r.billsWithB,
+          calcType: preset?.calcType,
         };
       });
 
