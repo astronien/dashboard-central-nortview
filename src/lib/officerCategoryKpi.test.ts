@@ -50,6 +50,25 @@ describe("officerCategoryKpi", () => {
     assert.equal(getCategoryTargetFromUploadRow(targetRow, "Mac"), 550000);
   });
 
+  it("getCategoryTargetFromUploadRow reads BTB(Apple) target", () => {
+    assert.equal(getCategoryTargetFromUploadRow(targetRow, "BTB(Apple)"), 350000);
+  });
+
+  it("getCategoryTargetFromUploadRow handles BTB(Apple) alias variants", () => {
+    assert.equal(
+      getCategoryTargetFromUploadRow({ "BTB (Apple)": "100000" }, "BTB(Apple)"),
+      100000,
+    );
+    assert.equal(
+      getCategoryTargetFromUploadRow({ "BTB Apple": "200000" }, "BTB(Apple)"),
+      200000,
+    );
+    assert.equal(
+      getCategoryTargetFromUploadRow({ BTB_Apple: "300000" }, "BTB(Apple)"),
+      300000,
+    );
+  });
+
   it("sumOfficerCategoryActual aggregates by officer name and mapped category", () => {
     const getCategory = () => "iPhone";
     const total = sumOfficerCategoryActual(

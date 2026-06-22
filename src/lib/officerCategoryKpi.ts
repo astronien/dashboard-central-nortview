@@ -71,7 +71,11 @@ export function getCategoryTargetFromUploadRow(
         row["BTB(Apple)"] ??
           row["BTB (Apple)"] ??
           row["BTB Apple"] ??
+          row["btb(apple)"] ??
+          row["btb (apple)"] ??
+          row["btb apple"] ??
           row.BTB_Apple ??
+          row.btb_apple ??
           row.btbAppleTarget,
       );
     default:

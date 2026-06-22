@@ -104,4 +104,23 @@ describe("targetAggregations", () => {
     assert.equal(records[0].simTarget, 5);
     assert.equal(records[0].btbAppleTarget, 25);
   });
+
+  it("rawTargetRowsToRecords keeps row with only BTB(Apple) target", () => {
+    const records = rawTargetRowsToRecords([
+      {
+        month: "202605",
+        emp_shop_code: "B9",
+        emp_id: "123",
+        NAME: "Test",
+        SURNAME: "User",
+        Total: "0",
+        iPhone: "0",
+        Mac: "0",
+        iPad: "0",
+        "BTB(Apple)": "350000",
+      },
+    ]);
+    assert.equal(records.length, 1);
+    assert.equal(records[0].btbAppleTarget, 350000);
+  });
 });

@@ -105,4 +105,31 @@ describe("parseTargetExcelFile (via _internalNormalize)", () => {
     assert.equal(result.length, 1);
     assert.equal(result[0]["BRANCH NAME"], "Sheet1Branch");
   });
+
+  it("reads BTB(Apple) target column", () => {
+    const wb = buildWorkbook([
+      {
+        "BRANCH NAME": "iStudio Central",
+        "STAFF ID": "12345",
+        NAME: "สมชาย",
+        SURNAME: "ใจดี",
+        Total: "500000",
+        "BTB(Apple)": "350000",
+      },
+    ]);
+    const [row] = normalizeTarget(wb);
+    assert.equal(row["BTB(Apple)"], "350000");
+  });
+
+  it("reads BTB(Apple) alias variants", () => {
+    const wb1 = buildWorkbook([
+      { "BTB (Apple)": "100", Total: "200" },
+    ]);
+    assert.equal(normalizeTarget(wb1)[0]["BTB(Apple)"], "100");
+
+    const wb2 = buildWorkbook([
+      { "BTB Apple": "200", Total: "200" },
+    ]);
+    assert.equal(normalizeTarget(wb2)[0]["BTB(Apple)"], "200");
+  });
 });

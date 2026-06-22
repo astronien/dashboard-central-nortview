@@ -89,8 +89,31 @@ export function rawTargetRowsToRecords(rows: RawRow[]): TargetRecord[] {
       const iPhoneTarget = parseTargetNumber(row.iPhone ?? row.iPhoneTarget);
       const iPadTarget = parseTargetNumber(row.iPad ?? row.iPadTarget);
       const macTarget = parseTargetNumber(row.Mac ?? row.macTarget);
+      const watchTarget = parseTargetNumber(row["Apple Watch"] ?? row.Apple_Watch ?? row.watchTarget);
+      const simTarget = parseTargetNumber(row.SIM ?? row.simTarget);
+      const btbTarget = parseTargetNumber(row.BTB ?? row.btbTarget);
+      const btbAppleTarget = parseTargetNumber(
+        row["BTB(Apple)"] ??
+          row["BTB (Apple)"] ??
+          row["BTB Apple"] ??
+          row["btb(apple)"] ??
+          row["btb (apple)"] ??
+          row["btb apple"] ??
+          row.BTB_Apple ??
+          row.btb_apple ??
+          row.btbAppleTarget,
+      );
 
-      if (totalTarget === 0 && iPhoneTarget === 0 && iPadTarget === 0 && macTarget === 0) {
+      if (
+        totalTarget === 0 &&
+        iPhoneTarget === 0 &&
+        iPadTarget === 0 &&
+        macTarget === 0 &&
+        watchTarget === 0 &&
+        simTarget === 0 &&
+        btbTarget === 0 &&
+        btbAppleTarget === 0
+      ) {
         return null;
       }
 
@@ -105,16 +128,10 @@ export function rawTargetRowsToRecords(rows: RawRow[]): TargetRecord[] {
         iPhoneTarget,
         iPadTarget,
         macTarget,
-        watchTarget: parseTargetNumber(row["Apple Watch"] ?? row.Apple_Watch ?? row.watchTarget),
-        simTarget: parseTargetNumber(row.SIM ?? row.simTarget),
-        btbTarget: parseTargetNumber(row.BTB ?? row.btbTarget),
-        btbAppleTarget: parseTargetNumber(
-          row["BTB(Apple)"] ??
-            row["BTB (Apple)"] ??
-            row["BTB Apple"] ??
-            row.BTB_Apple ??
-            row.btbAppleTarget,
-        ),
+        watchTarget,
+        simTarget,
+        btbTarget,
+        btbAppleTarget,
       } satisfies TargetRecord;
     })
     .filter((r): r is TargetRecord => r !== null);

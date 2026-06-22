@@ -28,6 +28,17 @@ const ALIASES = {
   appleWatch: ["Apple Watch", "apple_watch", "APPLE WATCH", "Apple Watch "],
   sim: ["SIM", "sim", "Sim "],
   btb: ["BTB", "btb"],
+  btbApple: [
+    "BTB(Apple)",
+    "BTB (Apple)",
+    "BTB Apple",
+    "btb(apple)",
+    "btb (apple)",
+    "btb apple",
+    "BTB_Apple",
+    "btb_apple",
+    "BTBAPPLE",
+  ],
   smartphone: ["Smartphone", "smartphone", "SMARTPHONE", "Smartphone "],
 } as const;
 
@@ -72,6 +83,7 @@ const workbookToRows = (workbook: XLSX.WorkBook): RawRow[] => {
       "Apple Watch": pickField(norm, ALIASES.appleWatch),
       "SIM": pickField(norm, ALIASES.sim),
       "BTB": pickField(norm, ALIASES.btb),
+      "BTB(Apple)": pickField(norm, ALIASES.btbApple),
       "Smartphone": pickField(norm, ALIASES.smartphone),
     };
   });
