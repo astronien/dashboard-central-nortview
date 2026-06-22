@@ -286,14 +286,14 @@ export function StaffSection({
                       </ResponsiveContainer>
                       {/* Center Value */}
                       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <div className="w-16 h-16 rounded-full border border-emerald-500/30 flex items-center justify-center bg-emerald-500/10 backdrop-blur-sm">
+                        <div className="w-11 h-11 rounded-full border border-emerald-500/20 flex items-center justify-center bg-emerald-500/5 backdrop-blur-sm">
                           <AnimatePresence mode="wait">
                             <motion.span
                               key={dynamicScore}
                               initial={{ opacity: 0, scale: 0.5 }}
                               animate={{ opacity: 1, scale: 1 }}
                               exit={{ opacity: 0, scale: 0.5 }}
-                              className="text-white/60 text-3xl font-bold tracking-tighter"
+                              className="text-white/55 text-base font-semibold tracking-tighter"
                             >
                               {dynamicScore}
                             </motion.span>
