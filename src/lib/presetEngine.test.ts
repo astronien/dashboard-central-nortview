@@ -3,11 +3,12 @@ import { describe, it } from "node:test";
 import {
   calcPreset,
   calcAllPresets,
+  computePresetAchPercent,
   formatPresetValue,
   presetDisplayValue,
 } from "./presetEngine";
 import type { BillSummary } from "./presetBills";
-import type { Preset } from "./presetTypes";
+import type { Preset, PresetResult } from "./presetTypes";
 
 const baseItem = (overrides: Record<string, unknown> = {}) => ({
   "Category (Name)": "iPhone",
@@ -348,5 +349,69 @@ describe("presetEngine", () => {
     assert.equal(presetDisplayValue({ ...r, calcType: "bahtRate" }), 50);
     assert.equal(presetDisplayValue({ ...r, calcType: "catAttach" }), 50);
     assert.equal(presetDisplayValue({ ...r, calcType: "attach" }), 50);
+  });
+});
+
+describe("computePresetAchPercent", () => {
+  const base = {
+    presetId: "p",
+    presetName: "p",
+    color: "green",
+    billsWithB: 30,
+    billsWithAandB: 4,
+    attachRate: 13.333,
+    totalBaht: 360000,
+    totalBahtB: 1200000,
+    bahtRate: 30,
+  };
+
+  it("attach: Ach% = attachRate (not rate/target)", () => {
+    const r: PresetResult = { ...base, calcType: "attach" };
+    // COVER+ example: Actual 4/30 = 13.33%, target 15% — should give 13.33, not 88.89
+    assert.equal(computePresetAchPercent(r, 15), 13.333);
+  });
+
+  it("bahtRate: Ach% = bahtRate", () => {
+    const r: PresetResult = { ...base, calcType: "bahtRate" };
+    assert.equal(computePresetAchPercent(r, 50), 30);
+  });
+
+  it("catAttach: Ach% = attachRate", () => {
+    const r: PresetResult = { ...base, calcType: "catAttach" };
+    assert.equal(computePresetAchPercent(r, 60), 13.333);
+  });
+
+  it("unit: Ach% = (billsWithAandB / target) * 100", () => {
+    const r: PresetResult = { ...base, calcType: "unit" };
+    // 4 units against target 5 = 80%
+    assert.equal(computePresetAchPercent(r, 5), 80);
+  });
+
+  it("baht: Ach% = (totalBaht / target) * 100", () => {
+    const r: PresetResult = { ...base, calcType: "baht" };
+    // 360,000 / 400,000 * 100 = 90%
+    assert.equal(computePresetAchPercent(r, 400000), 90);
+  });
+
+  it("catBaht: Ach% = (totalBaht / target) * 100", () => {
+    const r: PresetResult = { ...base, calcType: "catBaht" };
+    assert.equal(computePresetAchPercent(r, 500000), 72);
+  });
+
+  it("catQty: Ach% = (billsWithAandB / target) * 100", () => {
+    const r: PresetResult = { ...base, calcType: "catQty" };
+    // 4 / 10 * 100 = 40%
+    assert.equal(computePresetAchPercent(r, 10), 40);
+  });
+
+  it("returns 0 when target is 0 for non-percentage calcTypes", () => {
+    const r: PresetResult = { ...base, calcType: "unit" };
+    assert.equal(computePresetAchPercent(r, 0), 0);
+  });
+
+  it("attach: ignores target (always uses attachRate)", () => {
+    const r: PresetResult = { ...base, calcType: "attach" };
+    assert.equal(computePresetAchPercent(r, 0), 13.333);
+    assert.equal(computePresetAchPercent(r, 100), 13.333);
   });
 });

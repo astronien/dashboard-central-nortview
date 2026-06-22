@@ -112,7 +112,7 @@ import {
   cleanupTestPresets as cleanupKpiPresets,
 } from "./lib/presetStorage";
 import type { Preset as KpiPreset, PresetResult, PresetCalcType } from "./lib/presetTypes";
-import { calcPreset, presetDisplayValue } from "./lib/presetEngine";
+import { calcPreset, presetDisplayValue, computePresetAchPercent } from "./lib/presetEngine";
 import { parseBills, type BillSummary } from "./lib/presetBills";
 import { enrichSalesRowsWithCatDaily, buildCatDailyLookup } from "./lib/presetCatDaily";
 
@@ -1917,7 +1917,7 @@ export default function App() {
         const actualVal = presetDisplayValue(r);
         const preset = kpiPresets.find((p) => p.id === r.presetId);
         const target = preset?.targetPercent ?? 0;
-        const achPercent = target > 0 ? (actualVal / target) * 100 : 0;
+        const achPercent = computePresetAchPercent(r, target);
         return {
           category: `${idx + 1}. ${r.presetName}`,
           target,

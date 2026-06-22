@@ -309,6 +309,29 @@ export function presetDisplayValue(result: PresetResult): number {
   }
 }
 
+/**
+ * Compute Ach% for a preset result against its target.
+ *
+ * For percentage-based calcTypes, the actual value IS a rate, so Ach% = the
+ * rate itself — not rate/target.  For unit/baht calcTypes, compare the
+ * absolute actual value against the target percentage.
+ */
+export function computePresetAchPercent(result: PresetResult, target: number): number {
+  const calcType = result.calcType;
+  if (calcType === "bahtRate") {
+    return result.bahtRate;
+  }
+  if (calcType === "attach" || calcType === "catAttach") {
+    return result.attachRate;
+  }
+  if (target <= 0) return 0;
+  const actual =
+    calcType === "baht" || calcType === "catBaht"
+      ? result.totalBaht
+      : result.billsWithAandB;
+  return (actual / target) * 100;
+}
+
 export function formatPresetValue(result: PresetResult): string {
   switch (result.calcType) {
     case "bahtRate":
