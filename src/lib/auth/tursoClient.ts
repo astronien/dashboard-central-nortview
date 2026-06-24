@@ -25,30 +25,54 @@ CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE INDEX IF NOT EXISTS idx_users_officer_id ON users(officer_id);
 `;
 
-function readEnvVar(key: string): string | undefined {
-  // 1) Vite browser/runtime — only defined when bundled by Vite
+/**
+ * Read a config value, with priority:
+ *   1. `import.meta.env.VITE_*`  (Vite browser, statically replaced at build)
+ *   2. `process.env.*`           (Node script / tsx)
+ *
+ * IMPORTANT: Vite can only inline env vars at build time if they appear
+ * as a literal `import.meta.env.VITE_*` access. We pass the key name
+ * through `import.meta.env[key]` indirectly so this helper still works
+ * in plain Node, but the actual values used in the browser are read
+ * via the literal accessors below.
+ */
+function getTursoUrl(): string | undefined {
+  let fromVite: string | undefined;
   try {
-    const meta = (import.meta as ImportMeta & { env?: Record<string, string> });
-    if (meta.env && typeof meta.env[key] === "string") {
-      return meta.env[key];
-    }
+    // Vite: statically replaced at build time
+    fromVite = import.meta.env.VITE_TURSO_DATABASE_URL as string | undefined;
   } catch {
-    // import.meta.env not available (e.g. plain Node)
+    fromVite = undefined;
   }
-  // 2) Plain Node — read from process.env (loaded by dotenv in scripts)
-  if (typeof process !== "undefined" && process.env && process.env[key]) {
-    return process.env[key];
+  if (fromVite && !fromVite.includes("your-database")) return fromVite;
+  // Node: read from process.env (loaded via dotenv)
+  if (typeof process !== "undefined" && process.env?.VITE_TURSO_DATABASE_URL) {
+    return process.env.VITE_TURSO_DATABASE_URL;
   }
-  return undefined;
+  return fromVite; // may be undefined or placeholder
+}
+
+function getTursoToken(): string | undefined {
+  let fromVite: string | undefined;
+  try {
+    fromVite = import.meta.env.VITE_TURSO_AUTH_TOKEN as string | undefined;
+  } catch {
+    fromVite = undefined;
+  }
+  if (fromVite && fromVite !== "your-turso-auth-token") return fromVite;
+  if (typeof process !== "undefined" && process.env?.VITE_TURSO_AUTH_TOKEN) {
+    return process.env.VITE_TURSO_AUTH_TOKEN;
+  }
+  return fromVite;
 }
 
 let _client: Client | null = null;
 
 export function getTursoClient(): Client {
   if (_client) return _client;
-  const url = readEnvVar("VITE_TURSO_DATABASE_URL");
-  const authToken = readEnvVar("VITE_TURSO_AUTH_TOKEN");
-  if (!url || !authToken || url.includes("your-database")) {
+  const url = getTursoUrl();
+  const authToken = getTursoToken();
+  if (!url || !authToken || url.includes("your-database") || authToken === "your-turso-auth-token") {
     throw new Error(
       "Turso is not configured. Set VITE_TURSO_DATABASE_URL and VITE_TURSO_AUTH_TOKEN in .env",
     );
@@ -58,9 +82,14 @@ export function getTursoClient(): Client {
 }
 
 export function isTursoConfigured(): boolean {
-  const url = readEnvVar("VITE_TURSO_DATABASE_URL");
-  const authToken = readEnvVar("VITE_TURSO_AUTH_TOKEN");
-  return Boolean(url && authToken && !url.includes("your-database"));
+  const url = getTursoUrl();
+  const authToken = getTursoToken();
+  return Boolean(
+    url &&
+      authToken &&
+      !url.includes("your-database") &&
+      authToken !== "your-turso-auth-token",
+  );
 }
 
 export async function initSchema(): Promise<void> {
