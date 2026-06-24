@@ -92,7 +92,17 @@ export async function migrateFromLocalStorage(
   try {
     const raw = window.localStorage.getItem(storageKey);
     if (raw === null) return false;
-    const parsed = JSON.parse(raw);
+    // Only attempt JSON.parse if the value looks like JSON. Plain strings
+    // (e.g. "ID645 : Studio 7") would otherwise throw and pollute the console.
+    const trimmed = raw.trim();
+    const looksLikeJson =
+      (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+      (trimmed.startsWith("[") && trimmed.endsWith("]")) ||
+      trimmed === "null" ||
+      trimmed === "true" ||
+      trimmed === "false" ||
+      /^-?\d+(\.\d+)?([eE][+-]?\d+)?$/.test(trimmed);
+    const parsed = looksLikeJson ? JSON.parse(raw) : raw;
     await setItem(newKey, parsed);
     window.localStorage.removeItem(storageKey);
     console.info(`[storage] Migrated localStorage[${storageKey}] → IDB[${newKey}]`);

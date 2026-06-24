@@ -74,4 +74,27 @@ describe("session token", () => {
     clearSession();
     assert.equal(readSession(), null);
   });
+
+  it("round-trips Thai / non-Latin1 names without throwing", () => {
+    // Regression: plain btoa() throws on non-ASCII — make sure UTF-8
+    // encoding handles Thai names, emoji, etc.
+    const cases = [
+      { name: "ฟารีดา มะโนรัตน์", username: "25293" },
+      { name: "Branch Sales Manager", username: "admin" },
+      { name: "สวัสดี 🚀", username: "tester" },
+      { name: "テスト", username: "jp" },
+    ];
+    for (const c of cases) {
+      const token = createSessionToken({
+        userId: 1,
+        username: c.username,
+        role: "pia",
+        name: c.name,
+      });
+      const payload = decodeSessionToken(token);
+      assert.ok(payload, `decode failed for name: ${c.name}`);
+      assert.equal(payload.name, c.name);
+      assert.equal(payload.username, c.username);
+    }
+  });
 });
