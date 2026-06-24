@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Download, Upload, RotateCcw, ChevronDown, ChevronUp, Plus, User, Home as HomeIcon } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Download, Upload, RotateCcw, ChevronDown, ChevronUp, Plus, User, Home as HomeIcon, Trash2, CheckSquare, Square } from "lucide-react";
 import {
   addPreset,
   deletePreset,
@@ -38,6 +38,34 @@ export default function KpiPresetManager({
   const [isOpen, setIsOpen] = useState(false);
   const [showBuilder, setShowBuilder] = useState(false);
   const [editingPreset, setEditingPreset] = useState<Preset | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const allSelected = useMemo(
+    () => presets.length > 0 && selectedIds.size === presets.length,
+    [presets.length, selectedIds],
+  );
+
+  const toggleOne = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    setSelectedIds((prev) => {
+      if (presets.length === 0) return prev;
+      const next = new Set(prev);
+      if (allSelected) {
+        next.clear();
+      } else {
+        presets.forEach((p) => next.add(p.id));
+      }
+      return next;
+    });
+  };
 
   const handleSave = async (presetData: Omit<Preset, "id">) => {
     if (editingPreset) {
@@ -56,7 +84,29 @@ export default function KpiPresetManager({
       await deletePreset(id);
       const { getPresets } = await import("../../lib/presetStorage");
       onPresetsChange(await getPresets());
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
     }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.size === 0) return;
+    if (
+      !confirm(
+        `ยืนยันลบ ${selectedIds.size} Preset ที่เลือก? (การกระทำนี้ไม่สามารถยกเลิกได้)`,
+      )
+    ) {
+      return;
+    }
+    const { getPresets } = await import("../../lib/presetStorage");
+    for (const id of selectedIds) {
+      await deletePreset(id);
+    }
+    onPresetsChange(await getPresets());
+    setSelectedIds(new Set());
   };
 
   const handleEdit = (preset: Preset) => {
@@ -133,6 +183,7 @@ export default function KpiPresetManager({
         next.push(await addPreset(d));
       }
       onPresetsChange(await getPresets());
+      setSelectedIds(new Set());
       alert(`คืนค่าเดิมสำเร็จ (${next.length} presets)`);
     }
   };
@@ -212,61 +263,111 @@ export default function KpiPresetManager({
             />
           )}
 
-          <div className="space-y-2">
-            {presets.map((preset) => (
-              <div
-                key={preset.id}
-                className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition"
+          {/* Multi-select toolbar */}
+          {presets.length > 0 && (
+            <div className="flex items-center justify-between gap-2 px-1">
+              <button
+                type="button"
+                onClick={toggleAll}
+                className="flex items-center gap-2 text-xs text-white/70 hover:text-white transition-colors px-2 py-1 rounded hover:bg-white/5"
               >
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className={`w-3 h-3 rounded-full shrink-0 ${colorDotClass(preset.color)}`} />
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-white truncate">{preset.name}</p>
-                    <p className="text-xs text-emerald-400 font-bold truncate">
-                      {preset.labelA} → {preset.labelB || "(ไม่มี)"}
-                    </p>
+                {allSelected ? (
+                  <CheckSquare className="w-4 h-4 text-emerald-400" />
+                ) : (
+                  <Square className="w-4 h-4 text-white/40" />
+                )}
+                <span>
+                  {allSelected ? "ยกเลิกเลือกทั้งหมด" : "เลือกทั้งหมด"} ({presets.length})
+                </span>
+              </button>
+
+              {selectedIds.size > 0 && (
+                <button
+                  type="button"
+                  onClick={handleDeleteSelected}
+                  className="flex items-center gap-1.5 text-xs bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/30 px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  ลบที่เลือก ({selectedIds.size})
+                </button>
+              )}
+            </div>
+          )}
+
+          <div className="space-y-2">
+            {presets.map((preset) => {
+              const isSelected = selectedIds.has(preset.id);
+              return (
+                <div
+                  key={preset.id}
+                  className={`flex items-center justify-between p-3 rounded-lg border transition ${
+                    isSelected
+                      ? "bg-emerald-500/10 border-emerald-500/40"
+                      : "bg-white/5 border-white/10 hover:bg-white/10"
+                  }`}
+                >
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <button
+                      type="button"
+                      onClick={() => toggleOne(preset.id)}
+                      title={isSelected ? "ยกเลิกเลือก" : "เลือก"}
+                      className="shrink-0"
+                    >
+                      {isSelected ? (
+                        <CheckSquare className="w-4 h-4 text-emerald-400" />
+                      ) : (
+                        <Square className="w-4 h-4 text-white/40 hover:text-white/80" />
+                      )}
+                    </button>
+                    <div className={`w-3 h-3 rounded-full shrink-0 ${colorDotClass(preset.color)}`} />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-white truncate">{preset.name}</p>
+                      <p className="text-xs text-emerald-400 font-bold truncate">
+                        {preset.labelA} → {preset.labelB || "(ไม่มี)"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      type="button"
+                      title={preset.showInStaffProfile ? "ซ่อนจาก Staff Profile" : "แสดงใน Staff Profile (7 Wonders)"}
+                      onClick={() => handleToggleFlag(preset, "showInStaffProfile")}
+                      className={`p-1.5 rounded-lg border transition-colors ${
+                        preset.showInStaffProfile
+                          ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300"
+                          : "bg-white/5 border-white/10 text-white/40 hover:text-white/70 hover:bg-white/10"
+                      }`}
+                    >
+                      <User className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      title={preset.showInBranchOverview ? "ซ่อนจากหน้ารวมสาขา" : "แสดงในหน้ารวมสาขา"}
+                      onClick={() => handleToggleFlag(preset, "showInBranchOverview")}
+                      className={`p-1.5 rounded-lg border transition-colors ${
+                        preset.showInBranchOverview
+                          ? "bg-amber-500/20 border-amber-500/40 text-amber-300"
+                          : "bg-white/5 border-white/10 text-white/40 hover:text-white/70 hover:bg-white/10"
+                      }`}
+                    >
+                      <HomeIcon className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleEdit(preset)}
+                      className="px-3 py-1 text-sm bg-white/10 text-white/80 border border-white/10 rounded hover:bg-white/20 transition"
+                    >
+                      แก้ไข
+                    </button>
+                    <button
+                      onClick={() => handleDelete(preset.id)}
+                      className="px-3 py-1 text-sm bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded hover:bg-rose-500/30 transition"
+                    >
+                      ลบ
+                    </button>
                   </div>
                 </div>
-                <div className="flex gap-2 shrink-0">
-                  <button
-                    type="button"
-                    title={preset.showInStaffProfile ? "ซ่อนจาก Staff Profile" : "แสดงใน Staff Profile (7 Wonders)"}
-                    onClick={() => handleToggleFlag(preset, "showInStaffProfile")}
-                    className={`p-1.5 rounded-lg border transition-colors ${
-                      preset.showInStaffProfile
-                        ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300"
-                        : "bg-white/5 border-white/10 text-white/40 hover:text-white/70 hover:bg-white/10"
-                    }`}
-                  >
-                    <User className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    title={preset.showInBranchOverview ? "ซ่อนจากหน้ารวมสาขา" : "แสดงในหน้ารวมสาขา"}
-                    onClick={() => handleToggleFlag(preset, "showInBranchOverview")}
-                    className={`p-1.5 rounded-lg border transition-colors ${
-                      preset.showInBranchOverview
-                        ? "bg-amber-500/20 border-amber-500/40 text-amber-300"
-                        : "bg-white/5 border-white/10 text-white/40 hover:text-white/70 hover:bg-white/10"
-                    }`}
-                  >
-                    <HomeIcon className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleEdit(preset)}
-                    className="px-3 py-1 text-sm bg-white/10 text-white/80 border border-white/10 rounded hover:bg-white/20 transition"
-                  >
-                    แก้ไข
-                  </button>
-                  <button
-                    onClick={() => handleDelete(preset.id)}
-                    className="px-3 py-1 text-sm bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded hover:bg-rose-500/30 transition"
-                  >
-                    ลบ
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
             {presets.length === 0 && (
               <div className="text-center text-white/50 text-sm py-8">
                 ยังไม่มี Preset — กด "เพิ่ม Preset" หรือ "คืนค่าเดิม"
