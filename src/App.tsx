@@ -1476,19 +1476,22 @@ function AppInternal({
 
   // PIA: auto-select their own officer + force "staff" view + restrict navigation
   useEffect(() => {
-    if (role !== "pia" || !userOfficerId) return;
+    if (role !== "pia") return;
     const officers = parsedReport.officers;
-    const ownIndex = officers.findIndex(
-      (o) => String(o.empId ?? "").trim() === String(userOfficerId).trim(),
-    );
-    if (ownIndex >= 0) {
-      const newId = String(ownIndex + 1);
-      if (activeStaffId !== newId) setActiveStaffId(newId);
-    }
+    if (officers.length === 0) return;
+    // Match by name — `userOfficerId` is the emp_id but OfficerPerformance
+    // does not carry an emp_id field, only `name` and `branch`. The PIA's
+    // `user.name` was set from the same officer record so it matches.
+    const piaName = (user?.name ?? "").trim();
+    const ownIndex = piaName
+      ? officers.findIndex((o) => matchesOfficer(o.name ?? "", piaName))
+      : -1;
+    const newId = ownIndex >= 0 ? String(ownIndex + 1) : "1";
+    if (activeStaffId !== newId) setActiveStaffId(newId);
     if (currentView !== "staff" && currentView !== "home") {
       setCurrentView("staff");
     }
-  }, [role, userOfficerId, parsedReport.officers, activeStaffId, currentView]);
+  }, [role, userOfficerId, user, parsedReport.officers, activeStaffId, currentView]);
 
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState("iPhone");
