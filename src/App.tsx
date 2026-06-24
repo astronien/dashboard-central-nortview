@@ -115,6 +115,7 @@ import {
 import type { Preset as KpiPreset, PresetResult, PresetCalcType } from "./lib/presetTypes";
 import { AuthProvider, useAuth } from "./lib/auth/authContext";
 import LoginPage from "./components/LoginPage";
+import ChangePasswordGate from "./components/ChangePasswordGate";
 import { syncPiaFromOfficers } from "./lib/auth/piSync";
 import { calcPreset, presetDisplayValue, computePresetAchPercent } from "./lib/presetEngine";
 import { parseBills, type BillSummary } from "./lib/presetBills";
@@ -1266,6 +1267,11 @@ function AppGate() {
 
   if (!user) {
     return <LoginPage />;
+  }
+
+  // Force password change on first login (admin seed + PIA sync set this flag)
+  if (user.mustChangePassword) {
+    return <ChangePasswordGate />;
   }
 
   return <AppInternal role={user.role} userOfficerId={user.officerId} />;
