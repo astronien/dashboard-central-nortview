@@ -2073,7 +2073,20 @@ function AppInternal({
     const wondersRows = activeOfficer7WondersPerformance.filter(r => r.category !== "Average" && r.category !== "Total");
     if (wondersRows.length === 0) return 0;
 
-    const sum = wondersRows.reduce((acc, row) => acc + (row.achPercent || 0), 0);
+    // Average the same scaled value used by the radar chart (see
+    // dynamicRadarData below) so the centre number and the polygon
+    // are always consistent. For percent-based preset types the radar
+    // value is (actual/target)*100; for absolute types it is achPercent.
+    const sum = wondersRows.reduce((acc, row) => {
+      const isPercentPreset =
+        row.calcType === "attach" ||
+        row.calcType === "bahtRate" ||
+        row.calcType === "catAttach";
+      const v = isPercentPreset && row.target > 0
+        ? (row.actual / row.target) * 100
+        : row.achPercent;
+      return acc + (v || 0);
+    }, 0);
     const avg = sum / wondersRows.length;
     return Math.min(100, Math.max(0, Math.round(avg)));
   }, [activeOfficer7WondersPerformance, displayUploads.current, activeStaffId, currentStaff]);
@@ -2134,12 +2147,26 @@ function AppInternal({
       const wondersRows = activeOfficer7WondersPerformance.filter(r => r.category !== "Average" && r.category !== "Total");
 
       return wondersRows.map((row) => {
-        const achPct = row.achPercent || 0;
         const label = row.category.replace(/^\d+\.\s*/, "").trim();
+        // For percent-based preset types (attach / bahtRate / catAttach)
+        // the raw `actual` is itself a percentage (e.g. COVER+ 29.4% of
+        // base). To make the radar chart show progress against the
+        // configured target, scale by (actual / target) * 100 so a
+        // hit-at-target reads as 100. For absolute preset types (unit /
+        // baht / catBaht / catQty) `achPercent` is already the
+        // (actual/target)*100 ratio, so use it directly.
+        const isPercentPreset =
+          row.calcType === "attach" ||
+          row.calcType === "bahtRate" ||
+          row.calcType === "catAttach";
+        const scaled = isPercentPreset && row.target > 0
+          ? (row.actual / row.target) * 100
+          : row.achPercent;
+        const displayPct = isPercentPreset ? row.actual : row.achPercent;
 
         return {
-          subject: `${label}|${achPct.toFixed(1)}%`,
-          value: Math.min(100, Math.max(0, Math.round(achPct))),
+          subject: `${label}|${displayPct.toFixed(1)}%`,
+          value: Math.min(100, Math.max(0, Math.round(scaled))),
           fullMark: 100
         };
       });
