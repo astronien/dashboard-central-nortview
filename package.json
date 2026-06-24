@@ -10,13 +10,14 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test": "tsx --test src/lib/targetAggregations.test.ts src/lib/kpiCategoryAdapter.test.ts src/lib/categoryMasterUpload.test.ts src/lib/officerCategoryKpi.test.ts src/lib/tablesSyncCompat.test.ts src/lib/salesUpload.test.ts src/lib/targetUpload.test.ts src/lib/presetTypes.test.ts src/lib/presetStorage.test.ts src/lib/presetEngine.test.ts src/lib/presetBills.test.ts src/lib/presetCatDaily.test.ts src/lib/presetStorageCleanup.test.ts src/lib/presetCoverPlus.test.ts src/lib/presetCrossField.test.ts",
+    "test": "tsx --test src/lib/targetAggregations.test.ts src/lib/kpiCategoryAdapter.test.ts src/lib/categoryMasterUpload.test.ts src/lib/officerCategoryKpi.test.ts src/lib/tablesSyncCompat.test.ts src/lib/salesUpload.test.ts src/lib/targetUpload.test.ts src/lib/auth.test.ts src/lib/presetTypes.test.ts src/lib/presetStorage.test.ts src/lib/presetEngine.test.ts src/lib/presetBills.test.ts src/lib/presetCatDaily.test.ts src/lib/presetStorageCleanup.test.ts src/lib/presetCoverPlus.test.ts src/lib/presetCrossField.test.ts",
     "search-db": "node scratch/search_db_for_target.cjs",
     "solve-knapsack": "node scratch/solve_knapsack.cjs",
     "analyze-dup-groups": "node scratch/analyze_dup_groups.cjs"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
+    "@supabase/supabase-js": "^2.108.2",
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",
     "dotenv": "^17.2.3",

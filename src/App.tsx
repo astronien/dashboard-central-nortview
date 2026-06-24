@@ -35,7 +35,7 @@ import {
 import CategoryTreePicker from "./components/CategoryTreePicker";
 
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import React, { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { parseCategoryMasterFile } from "./lib/categoryMasterUpload";
 import { parseSalesExcelFile } from "./lib/salesUpload";
 import { parseTargetExcelFile } from "./lib/targetUpload";
@@ -103,6 +103,10 @@ import {
 import { HomeDashboardSection } from "./components/dashboard/HomeDashboardSection";
 
 import { StaffSection } from "./components/dashboard/StaffSection";
+import LoginPage from "./components/auth/LoginPage";
+import LogoutButton from "./components/auth/LogoutButton";
+import { useAuth } from "./components/auth/AuthContext";
+import { isAdminRole, isPiaRole } from "./lib/authTypes";
 import { ReportsSection } from "./components/dashboard/ReportsSection";
 import { SettingsSection } from "./components/dashboard/SettingsSection";
 import KpiPresetSection from "./components/dashboard/KpiPresetSection";
@@ -1239,6 +1243,7 @@ const emptyReport: ParsedReport = {
 
 
 export default function App() {
+  const { user, loading: authLoading } = useAuth();
   const [currentView, setCurrentView] = useState<
     "home" | "staff" | "settings" | "reports" | "kpi_preset"
   >("home");
@@ -1247,6 +1252,12 @@ export default function App() {
   const [selectedBranch, setSelectedBranch] = useState<string>("Mega Bangna");
   const [selectedBranchLoaded, setSelectedBranchLoaded] = useState(false);
   const [kpiPresets, setKpiPresets] = useState<KpiPreset[]>([]);
+
+  // For PIA users, force the view to "staff" and lock officer selection
+  // to themselves (handled via the staffId prop on StaffSection).
+  const isPia = isPiaRole(user?.role);
+  const isAdmin = isAdminRole(user?.role);
+  const piaStaffId = isPia ? user?.staffId ?? null : null;
 
   const handleBranchChange = (newBranch: string) => {
     setSelectedBranch(newBranch);
@@ -1266,6 +1277,48 @@ export default function App() {
     }),
     [uploadedFiles, selectedBranch],
   );
+
+  // Effective officer index for PIA: resolve by matching staff_id in
+  // current sales rows that have a matching STAFF ID, then look up the
+  // officer name in parsedReport.officers.  BSM/ABSM keep full control.
+  const piaOfficerIndex = useMemo<number | null>(() => {
+    if (!isPia || !piaStaffId) return null;
+    if (displayUploads.current.length === 0) return 0;
+    const matchRow = displayUploads.current.find(
+      (r) => String(r["STAFF ID"] ?? r.emp_id ?? "").trim() === piaStaffId,
+    );
+    if (!matchRow) return 0;
+    const officerName = String(matchRow["Officer (Name)"] ?? "").trim();
+    if (!officerName) return 0;
+    const idx = parsedReport.officers.findIndex((o) =>
+      attachMatchesOfficer(o.name, officerName),
+    );
+    return idx >= 0 ? idx : 0;
+  }, [isPia, piaStaffId, displayUploads.current, parsedReport.officers]);
+
+  // For PIA: force activeStaffId to the resolved officer index,
+  // and force currentView to "staff" so they only see their profile.
+  useEffect(() => {
+    if (isPia && piaOfficerIndex !== null) {
+      setActiveStaffId(String(piaOfficerIndex + 1));
+    }
+    if (isPia && currentView !== "staff") {
+      setCurrentView("staff");
+    }
+  }, [isPia, piaOfficerIndex, currentView]);
+
+  // Auth gate: must be after all hooks so other state can be referenced.
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#061a13] via-[#0c291d] to-[#051710] text-white">
+        <div className="text-white/60 text-sm">Loading…</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginPage />;
+  }
 
   const categoryMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -2839,49 +2892,65 @@ export default function App() {
 
         {/* Top Navigation (Floating Right) */}
         <header className="absolute top-6 right-8 w-1/2 flex justify-end items-center z-50 pointer-events-none">
-          <div className="flex items-center gap-6 pointer-events-auto">
+          <div className="flex items-center gap-3 lg:gap-6 pointer-events-auto">
             <nav className="flex items-center space-x-2 lg:space-x-4 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/5 shadow-xl hidden md:flex">
-              <button
-                onClick={() => setCurrentView("home")}
-                className={`p-2 rounded-full transition-colors ${currentView === "home" ? "bg-[#0f4430] shadow-inner text-white" : "text-white/60 hover:text-white"}`}
-              >
-                <Home className="w-5 h-5" />
-              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => setCurrentView("home")}
+                  className={`p-2 rounded-full transition-colors ${currentView === "home" ? "bg-[#0f4430] shadow-inner text-white" : "text-white/60 hover:text-white"}`}
+                  title="Home"
+                >
+                  <Home className="w-5 h-5" />
+                </button>
+              )}
               <button
                 onClick={() => setCurrentView("staff")}
                 className={`p-2 rounded-full transition-colors ${currentView === "staff" ? "bg-[#0f4430] shadow-inner text-white" : "text-white/60 hover:text-white"}`}
+                title="Staff Profile"
               >
                 <User className="w-5 h-5" />
               </button>
-              <button
-                onClick={() => setCurrentView("reports")}
-                className={`p-2 rounded-full transition-colors ${currentView === "reports" ? "bg-[#0f4430] shadow-inner text-white" : "text-white/60 hover:text-white"}`}
-              >
-                <PieChart className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => setCurrentView("kpi_preset")}
-                className={`p-2 rounded-full transition-colors ${currentView === "kpi_preset" ? "bg-[#0f4430] shadow-inner text-white" : "text-white/60 hover:text-white"}`}
-                title="KPI Preset"
-              >
-                <SlidersHorizontal className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => setCurrentView("reports")}
-                className="p-2 rounded-full transition-colors text-white/60 hover:text-white"
-                title="Go to Reports"
-              >
-                <Search className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => setCurrentView("settings")}
-                className={`p-2 rounded-full transition-colors ${currentView === "settings" ? "bg-[#0f4430] shadow-inner text-white" : "text-white/60 hover:text-white"}`}
-              >
-                <Settings className="w-5 h-5" />
-              </button>
+              {isAdmin && (
+                <>
+                  <button
+                    onClick={() => setCurrentView("reports")}
+                    className={`p-2 rounded-full transition-colors ${currentView === "reports" ? "bg-[#0f4430] shadow-inner text-white" : "text-white/60 hover:text-white"}`}
+                    title="Reports"
+                  >
+                    <PieChart className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => setCurrentView("kpi_preset")}
+                    className={`p-2 rounded-full transition-colors ${currentView === "kpi_preset" ? "bg-[#0f4430] shadow-inner text-white" : "text-white/60 hover:text-white"}`}
+                    title="KPI Preset"
+                  >
+                    <SlidersHorizontal className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => setCurrentView("settings")}
+                    className={`p-2 rounded-full transition-colors ${currentView === "settings" ? "bg-[#0f4430] shadow-inner text-white" : "text-white/60 hover:text-white"}`}
+                    title="Settings"
+                  >
+                    <Settings className="w-5 h-5" />
+                  </button>
+                </>
+              )}
             </nav>
 
-            {currentView === "staff" && (
+            {/* User info badge + logout */}
+            <div className="hidden md:flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-2 rounded-full border border-white/5 shadow-xl">
+              <div className="flex flex-col items-end leading-tight">
+                <span className="text-[10px] text-white/50 uppercase tracking-wider font-semibold">
+                  {user.role}
+                </span>
+                <span className="text-xs text-white/90 max-w-[140px] truncate">
+                  {user.email}
+                </span>
+              </div>
+              <LogoutButton />
+            </div>
+
+            {currentView === "staff" && !isPia && (
               <div className="flex items-center gap-4">
                 <div className="relative">
                   <div
@@ -2988,7 +3057,7 @@ export default function App() {
                 parsedOfficers={parsedReport.officers}
                 attachMatchesOfficer={attachMatchesOfficer}
                 overallAttachRate={overallAttachRate}
-                onSetActiveStaffId={setActiveStaffId}
+                onSetActiveStaffId={isPia ? () => {} : setActiveStaffId}
               />
             )}
             {currentView === "reports" && (
