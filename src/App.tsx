@@ -109,7 +109,6 @@ import { SettingsSection } from "./components/dashboard/SettingsSection";
 import KpiPresetSection from "./components/dashboard/KpiPresetSection";
 import {
   getPresets as getKpiPresets,
-  migrateFromLegacyLocalStorage as migrateKpiPresetsFromLS,
   cleanupTestPresets as cleanupKpiPresets,
 } from "./lib/presetStorage";
 import type { Preset as KpiPreset, PresetResult, PresetCalcType } from "./lib/presetTypes";
@@ -1526,11 +1525,10 @@ function AppInternal({
   const [staffPhotos, setStaffPhotos] = useState<StaffPhotosMap>({});
   const [staffPhotoError, setStaffPhotoError] = useState<string | null>(null);
 
-  // Load KPI presets from IDB (one-time legacy LS migration included).
+  // Load KPI presets from Turso (cloud-backed).
   useEffect(() => {
     void (async () => {
       try {
-        await migrateKpiPresetsFromLS();
         const removedKpi = await cleanupKpiPresets();
         if (removedKpi.length > 0) {
           console.info(`[App] removed test KPI presets: ${removedKpi.join(", ")}`);

@@ -1,52 +1,42 @@
-import { getItem, setItem, removeItem } from "./storage";
+/**
+ * Uploaded file API — Turso-backed persistence.
+ *
+ * Replaces the previous IDB-based storage so files are shared across
+ * devices and survive browser data clears.
+ *
+ * Each upload kind (target, current, today, lastMonth, lastYear,
+ * categoryMaster) is chunked into Turso and re-assembled on read.
+ * Re-uploading a file replaces the existing chunks for that kind.
+ */
 
-export type UploadKind =
-  | "target"
-  | "current"
-  | "today"
-  | "lastMonth"
-  | "lastYear"
-  | "categoryMaster";
+import {
+  cloudClearAllUploads,
+  cloudDeleteUpload,
+  cloudFetchUploadMeta,
+  cloudFetchUploads,
+  cloudSetUpload,
+  hasUploadData as cloudHasUploadData,
+  type RawRow,
+  type UploadKind,
+  type UploadState,
+  type UploadMeta,
+} from "./cloudStorage";
 
-export type RawRow = Record<string, string | number | undefined>;
-export type UploadState = Record<UploadKind, RawRow[]>;
+export type { RawRow, UploadKind, UploadState, UploadMeta };
 
-const UPLOADS_PREFIX = "dashboard-uploads:";
-
-const UPLOAD_KINDS: UploadKind[] = [
-  "target",
-  "current",
-  "today",
-  "lastMonth",
-  "lastYear",
-  "categoryMaster",
-];
-
-const kindKey = (kind: UploadKind) => `${UPLOADS_PREFIX}${kind}`;
-
-export const hasUploadData = (state: UploadState) =>
-  Object.values(state).some((rows) => rows.length > 0);
-
-const fetchUploadKind = async (kind: UploadKind): Promise<RawRow[]> => {
-  const rows = await getItem<RawRow[]>(kindKey(kind));
-  return Array.isArray(rows) ? rows : [];
-};
+export const hasUploadData = (state: UploadState) => cloudHasUploadData(state);
 
 export const fetchUploads = async (): Promise<UploadState | null> => {
-  const entries = await Promise.all(
-    UPLOAD_KINDS.map(async (kind) => [kind, await fetchUploadKind(kind)] as const),
-  );
-
-  const state = Object.fromEntries(entries) as UploadState;
-  return hasUploadData(state) ? state : null;
+  return cloudFetchUploads();
 };
 
 export const saveUploadKind = async (
   kind: UploadKind,
   rows: RawRow[],
+  fileName?: string,
 ): Promise<boolean> => {
   try {
-    await setItem(kindKey(kind), rows);
+    await cloudSetUpload(kind, rows, fileName);
     return true;
   } catch (e) {
     console.error(`[uploadsApi] saveUploadKind(${kind}) failed:`, e);
@@ -56,7 +46,14 @@ export const saveUploadKind = async (
 
 export const saveUploads = async (
   state: UploadState,
-  kinds: UploadKind[] = UPLOAD_KINDS,
+  kinds: UploadKind[] = [
+    "target",
+    "current",
+    "today",
+    "lastMonth",
+    "lastYear",
+    "categoryMaster",
+  ],
 ): Promise<boolean> => {
   let ok = true;
   for (const kind of kinds) {
@@ -68,7 +65,7 @@ export const saveUploads = async (
 
 export const deleteUploadKind = async (kind: UploadKind): Promise<boolean> => {
   try {
-    await removeItem(kindKey(kind));
+    await cloudDeleteUpload(kind);
     return true;
   } catch (e) {
     console.error(`[uploadsApi] deleteUploadKind(${kind}) failed:`, e);
@@ -77,12 +74,13 @@ export const deleteUploadKind = async (kind: UploadKind): Promise<boolean> => {
 };
 
 export const clearAllUploads = async (): Promise<boolean> => {
-  let ok = true;
-  for (const kind of UPLOAD_KINDS) {
-    const deleted = await deleteUploadKind(kind);
-    if (!deleted) ok = false;
+  try {
+    await cloudClearAllUploads();
+    return true;
+  } catch (e) {
+    console.error(`[uploadsApi] clearAllUploads failed:`, e);
+    return false;
   }
-  return ok;
 };
 
 export type TursoHealthStats = Record<
@@ -91,14 +89,26 @@ export type TursoHealthStats = Record<
 >;
 
 /**
- * Returns empty stats now that we no longer keep an in-memory snapshot
- * of Turso data. The component that displays these stats no longer
- * references this shape, but the type stays exported for compatibility
- * with the few places that still pass it down to ReportsSection.
+ * Returns lightweight metadata for the Reports page UI.
+ * Backed by `upload_chunks` table in Turso.
  */
 export const fetchTursoStats = async (): Promise<{
   database: string;
   stats: TursoHealthStats;
 } | null> => {
-  return null;
+  try {
+    const meta = await cloudFetchUploadMeta();
+    const stats: TursoHealthStats = {
+      target: { rowCount: meta.target.rowCount, updatedAt: meta.target.updatedAt },
+      current: { rowCount: meta.current.rowCount, updatedAt: meta.current.updatedAt },
+      today: { rowCount: meta.today.rowCount, updatedAt: meta.today.updatedAt },
+      lastMonth: { rowCount: meta.lastMonth.rowCount, updatedAt: meta.lastMonth.updatedAt },
+      lastYear: { rowCount: meta.lastYear.rowCount, updatedAt: meta.lastYear.updatedAt },
+      categoryMaster: { rowCount: meta.categoryMaster.rowCount, updatedAt: meta.categoryMaster.updatedAt },
+    };
+    return { database: "turso", stats };
+  } catch (e) {
+    console.warn("[uploadsApi] fetchTursoStats failed:", e);
+    return null;
+  }
 };

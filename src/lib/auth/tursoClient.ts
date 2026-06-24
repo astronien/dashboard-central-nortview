@@ -23,6 +23,29 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE INDEX IF NOT EXISTS idx_users_officer_id ON users(officer_id);
+
+-- KPI Presets — single row per preset, identified by ID
+CREATE TABLE IF NOT EXISTS presets (
+  id TEXT PRIMARY KEY,
+  data TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Uploaded files (4 sales + 1 cat master) — chunked to handle large
+-- spreadsheets. One (kind, chunk_index) row per data chunk; the rows
+-- are concatenated in chunk_index order to reconstruct the file.
+-- Replacing an upload = DELETE all rows for that kind, then INSERT new.
+CREATE TABLE IF NOT EXISTS upload_chunks (
+  kind TEXT NOT NULL,
+  chunk_index INTEGER NOT NULL,
+  row_count INTEGER NOT NULL,
+  data TEXT NOT NULL,
+  file_name TEXT,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (kind, chunk_index)
+);
+
+CREATE INDEX IF NOT EXISTS idx_upload_chunks_kind ON upload_chunks(kind);
 `;
 
 /**
@@ -94,8 +117,11 @@ export function isTursoConfigured(): boolean {
 
 export async function initSchema(): Promise<void> {
   const client = getTursoClient();
-  // libSQL doesn't run multiple statements in one execute by default
-  for (const stmt of SCHEMA_SQL.split(";").map((s) => s.trim()).filter(Boolean)) {
+  // libSQL doesn't run multiple statements in one execute by default.
+  // Strip line comments first so a chunk that's only a comment doesn't
+  // get sent to the server as an empty statement.
+  const cleaned = SCHEMA_SQL.replace(/^\s*--.*$/gm, "");
+  for (const stmt of cleaned.split(";").map((s) => s.trim()).filter(Boolean)) {
     await client.execute(stmt);
   }
 }

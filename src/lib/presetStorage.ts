@@ -1,12 +1,17 @@
 /**
- * KPI Preset storage (IDB-backed)
+ * KPI Preset storage (Turso-backed)
  *
- * Ported from /Users/astronien/Downloads/studio7-sales-dashboard-main/utils/presetStorage.ts
- * Uses IndexedDB (via storage.ts) instead of localStorage to stay consistent
- * with the rest of the dashboard.
+ * Replaces the previous IDB-based implementation so presets are shared
+ * across devices and survive browser data clears.
  */
 
-import { getItem, setItem } from "./storage";
+import {
+  cloudDeleteAllPresets,
+  cloudDeletePreset,
+  cloudListPresets,
+  cloudUpsertAllPresets,
+  cloudUpsertPreset,
+} from "./cloudStorage";
 import {
   emptyItemFilter,
   DEFAULT_PRESETS,
@@ -14,13 +19,9 @@ import {
   type Preset,
 } from "./presetTypes";
 
-const KEY = "presets";
-/** Legacy localStorage key from source repo — for one-time migration */
-const LEGACY_LS_KEY = "s7_presets";
-
 function migrateFilter(f: any): ItemFilter {
   if (!f) {
-    return emptyFilter();
+    return emptyItemFilter();
   }
   if (Array.isArray(f.docTypes)) return f as ItemFilter;
   return {
@@ -37,10 +38,6 @@ function migrateFilter(f: any): ItemFilter {
     docTypes: Array.isArray(f.docTypes) ? f.docTypes : [],
     includeNonInventory: typeof f.includeNonInventory === "boolean" ? f.includeNonInventory : false,
   };
-}
-
-function emptyFilter(): ItemFilter {
-  return emptyItemFilter();
 }
 
 export function migratePreset(p: any): Preset {
@@ -64,19 +61,18 @@ export function migratePreset(p: any): Preset {
 }
 
 export async function getPresets(): Promise<Preset[]> {
-  if (typeof window === "undefined") return [];
-  const stored = await getItem<Preset[]>(KEY);
-  if (!stored) return [];
   try {
-    return stored.map(migratePreset);
-  } catch {
+    const raw = await cloudListPresets<Preset>();
+    if (raw.length === 0) return [];
+    return raw.map(migratePreset);
+  } catch (e) {
+    console.warn("[presetStorage] getPresets failed:", e);
     return [];
   }
 }
 
 export async function savePresets(presets: Preset[]): Promise<void> {
-  if (typeof window === "undefined") return;
-  await setItem(KEY, presets);
+  await cloudUpsertAllPresets(presets);
 }
 
 export async function addPreset(preset: Omit<Preset, "id">): Promise<Preset> {
@@ -84,29 +80,25 @@ export async function addPreset(preset: Omit<Preset, "id">): Promise<Preset> {
     ...preset,
     id: Date.now().toString() + Math.random().toString(36).slice(2, 7),
   };
-  const presets = await getPresets();
-  presets.push(newPreset);
-  await savePresets(presets);
+  await cloudUpsertPreset(newPreset);
   return newPreset;
 }
 
 export async function updatePreset(id: string, changes: Partial<Preset>): Promise<void> {
+  // Read existing, merge, write back
   const presets = await getPresets();
-  const index = presets.findIndex((p) => p.id === id);
-  if (index !== -1) {
-    presets[index] = { ...presets[index], ...changes };
-    await savePresets(presets);
-  }
+  const idx = presets.findIndex((p) => p.id === id);
+  if (idx === -1) return;
+  presets[idx] = { ...presets[idx], ...changes };
+  await cloudUpsertPreset(presets[idx]);
 }
 
 export async function deletePreset(id: string): Promise<void> {
-  const presets = await getPresets();
-  const filtered = presets.filter((p) => p.id !== id);
-  await savePresets(filtered);
+  await cloudDeletePreset(id);
 }
 
 export async function resetToDefaults(): Promise<Preset[]> {
-  await savePresets([]);
+  await cloudDeleteAllPresets();
   return [];
 }
 
@@ -136,33 +128,5 @@ export async function cleanupTestPresets(): Promise<string[]> {
   } catch (e) {
     console.warn("[presetStorage] cleanupTestPresets failed:", e);
     return [];
-  }
-}
-
-/**
- * One-time migration from old localStorage key (s7_presets) to IDB.
- * Returns true if migration was performed.
- */
-export async function migrateFromLegacyLocalStorage(): Promise<boolean> {
-  if (typeof window === "undefined") return false;
-  try {
-    const raw = window.localStorage.getItem(LEGACY_LS_KEY);
-    if (raw === null) return false;
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      window.localStorage.removeItem(LEGACY_LS_KEY);
-      return false;
-    }
-    const existing = await getPresets();
-    if (existing.length === 0) {
-      const migrated = parsed.map(migratePreset);
-      await savePresets(migrated);
-    }
-    window.localStorage.removeItem(LEGACY_LS_KEY);
-    console.info(`[presetStorage] Migrated localStorage[${LEGACY_LS_KEY}] → IDB[${KEY}]`);
-    return true;
-  } catch (e) {
-    console.warn(`[presetStorage] migration failed:`, e);
-    return false;
   }
 }
