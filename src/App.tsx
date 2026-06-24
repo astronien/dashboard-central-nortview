@@ -31,11 +31,12 @@ import {
   Activity,
   Watch,
   CreditCard,
+  LogOut,
 } from "lucide-react";
 import CategoryTreePicker from "./components/CategoryTreePicker";
 
 import { AnimatePresence, motion } from "motion/react";
-import React, { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { parseCategoryMasterFile } from "./lib/categoryMasterUpload";
 import { parseSalesExcelFile } from "./lib/salesUpload";
 import { parseTargetExcelFile } from "./lib/targetUpload";
@@ -103,10 +104,6 @@ import {
 import { HomeDashboardSection } from "./components/dashboard/HomeDashboardSection";
 
 import { StaffSection } from "./components/dashboard/StaffSection";
-import LoginPage from "./components/auth/LoginPage";
-import LogoutButton from "./components/auth/LogoutButton";
-import { useAuth } from "./components/auth/AuthContext";
-import { isAdminRole, isPiaRole } from "./lib/authTypes";
 import { ReportsSection } from "./components/dashboard/ReportsSection";
 import { SettingsSection } from "./components/dashboard/SettingsSection";
 import KpiPresetSection from "./components/dashboard/KpiPresetSection";
@@ -116,6 +113,9 @@ import {
   cleanupTestPresets as cleanupKpiPresets,
 } from "./lib/presetStorage";
 import type { Preset as KpiPreset, PresetResult, PresetCalcType } from "./lib/presetTypes";
+import { AuthProvider, useAuth } from "./lib/auth/authContext";
+import LoginPage from "./components/LoginPage";
+import { syncPiaFromOfficers } from "./lib/auth/piSync";
 import { calcPreset, presetDisplayValue, computePresetAchPercent } from "./lib/presetEngine";
 import { parseBills, type BillSummary } from "./lib/presetBills";
 import { enrichSalesRowsWithCatDaily, buildCatDailyLookup } from "./lib/presetCatDaily";
@@ -1243,7 +1243,42 @@ const emptyReport: ParsedReport = {
 
 
 export default function App() {
-  const { user, loading: authLoading } = useAuth();
+  return (
+    <AuthProvider>
+      <AppGate />
+    </AuthProvider>
+  );
+}
+
+function AppGate() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#1c2722] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-2 border-white/20 border-t-emerald-400 rounded-full animate-spin" />
+          <p className="text-white/60 text-sm">Loading session...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginPage />;
+  }
+
+  return <AppInternal role={user.role} userOfficerId={user.officerId} />;
+}
+
+function AppInternal({
+  role,
+  userOfficerId,
+}: {
+  role: "admin" | "pia";
+  userOfficerId: string | null;
+}) {
+  const { user, logout, isPia } = useAuth();
   const [currentView, setCurrentView] = useState<
     "home" | "staff" | "settings" | "reports" | "kpi_preset"
   >("home");
@@ -1252,12 +1287,6 @@ export default function App() {
   const [selectedBranch, setSelectedBranch] = useState<string>("Mega Bangna");
   const [selectedBranchLoaded, setSelectedBranchLoaded] = useState(false);
   const [kpiPresets, setKpiPresets] = useState<KpiPreset[]>([]);
-
-  // For PIA users, force the view to "staff" and lock officer selection
-  // to themselves (handled via the staffId prop on StaffSection).
-  const isPia = isPiaRole(user?.role);
-  const isAdmin = isAdminRole(user?.role);
-  const piaStaffId = isPia ? user?.staffId ?? null : null;
 
   const handleBranchChange = (newBranch: string) => {
     setSelectedBranch(newBranch);
@@ -1277,48 +1306,6 @@ export default function App() {
     }),
     [uploadedFiles, selectedBranch],
   );
-
-  // Effective officer index for PIA: resolve by matching staff_id in
-  // current sales rows that have a matching STAFF ID, then look up the
-  // officer name in parsedReport.officers.  BSM/ABSM keep full control.
-  const piaOfficerIndex = useMemo<number | null>(() => {
-    if (!isPia || !piaStaffId) return null;
-    if (displayUploads.current.length === 0) return 0;
-    const matchRow = displayUploads.current.find(
-      (r) => String(r["STAFF ID"] ?? r.emp_id ?? "").trim() === piaStaffId,
-    );
-    if (!matchRow) return 0;
-    const officerName = String(matchRow["Officer (Name)"] ?? "").trim();
-    if (!officerName) return 0;
-    const idx = parsedReport.officers.findIndex((o) =>
-      attachMatchesOfficer(o.name, officerName),
-    );
-    return idx >= 0 ? idx : 0;
-  }, [isPia, piaStaffId, displayUploads.current, parsedReport.officers]);
-
-  // For PIA: force activeStaffId to the resolved officer index,
-  // and force currentView to "staff" so they only see their profile.
-  useEffect(() => {
-    if (isPia && piaOfficerIndex !== null) {
-      setActiveStaffId(String(piaOfficerIndex + 1));
-    }
-    if (isPia && currentView !== "staff") {
-      setCurrentView("staff");
-    }
-  }, [isPia, piaOfficerIndex, currentView]);
-
-  // Auth gate: must be after all hooks so other state can be referenced.
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#061a13] via-[#0c291d] to-[#051710] text-white">
-        <div className="text-white/60 text-sm">Loading…</div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <LoginPage />;
-  }
 
   const categoryMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -1480,6 +1467,23 @@ export default function App() {
     "sales",
   );
   const [activeStaffId, setActiveStaffId] = useState("1");
+
+  // PIA: auto-select their own officer + force "staff" view + restrict navigation
+  useEffect(() => {
+    if (role !== "pia" || !userOfficerId) return;
+    const officers = parsedReport.officers;
+    const ownIndex = officers.findIndex(
+      (o) => String(o.empId ?? "").trim() === String(userOfficerId).trim(),
+    );
+    if (ownIndex >= 0) {
+      const newId = String(ownIndex + 1);
+      if (activeStaffId !== newId) setActiveStaffId(newId);
+    }
+    if (currentView !== "staff" && currentView !== "home") {
+      setCurrentView("staff");
+    }
+  }, [role, userOfficerId, parsedReport.officers, activeStaffId, currentView]);
+
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState("iPhone");
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -2689,6 +2693,17 @@ export default function App() {
 
       rebuildReport(nextUploads, { changedKinds: [kind] });
 
+      // After target upload, sync PIA users from the staff list
+      if (kind === "target" && rows.length > 0) {
+        void syncPiaFromOfficers(
+          rows.map((r) => ({
+            name: `${r.NAME ?? ""} ${r.SURNAME ?? ""}`.trim() || String(r["STAFF ID"] ?? ""),
+            empId: String(r["STAFF ID"] ?? r.emp_id ?? "").trim(),
+            branch: String(r["BRANCH NAME"] ?? r["emp_shop_code"] ?? "").trim(),
+          })),
+        ).catch((e) => console.warn("[App] PIA sync failed:", e));
+      }
+
       setUploadStatus({
         ok: true,
         message: `อัปโหลด ${KIND_LABELS[kind]} สำเร็จ — ${rows.length.toLocaleString()} แถว`,
@@ -2892,17 +2907,15 @@ export default function App() {
 
         {/* Top Navigation (Floating Right) */}
         <header className="absolute top-6 right-8 w-1/2 flex justify-end items-center z-50 pointer-events-none">
-          <div className="flex items-center gap-3 lg:gap-6 pointer-events-auto">
+          <div className="flex items-center gap-6 pointer-events-auto">
             <nav className="flex items-center space-x-2 lg:space-x-4 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/5 shadow-xl hidden md:flex">
-              {isAdmin && (
-                <button
-                  onClick={() => setCurrentView("home")}
-                  className={`p-2 rounded-full transition-colors ${currentView === "home" ? "bg-[#0f4430] shadow-inner text-white" : "text-white/60 hover:text-white"}`}
-                  title="Home"
-                >
-                  <Home className="w-5 h-5" />
-                </button>
-              )}
+              <button
+                onClick={() => setCurrentView("home")}
+                className={`p-2 rounded-full transition-colors ${currentView === "home" ? "bg-[#0f4430] shadow-inner text-white" : "text-white/60 hover:text-white"}`}
+                title="Home"
+              >
+                <Home className="w-5 h-5" />
+              </button>
               <button
                 onClick={() => setCurrentView("staff")}
                 className={`p-2 rounded-full transition-colors ${currentView === "staff" ? "bg-[#0f4430] shadow-inner text-white" : "text-white/60 hover:text-white"}`}
@@ -2910,7 +2923,7 @@ export default function App() {
               >
                 <User className="w-5 h-5" />
               </button>
-              {isAdmin && (
+              {!isPia && (
                 <>
                   <button
                     onClick={() => setCurrentView("reports")}
@@ -2937,25 +2950,31 @@ export default function App() {
               )}
             </nav>
 
-            {/* User info badge + logout */}
-            <div className="hidden md:flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-2 rounded-full border border-white/5 shadow-xl">
-              <div className="flex flex-col items-end leading-tight">
-                <span className="text-[10px] text-white/50 uppercase tracking-wider font-semibold">
-                  {user.role}
+            {/* User info + logout */}
+            <div className="pointer-events-auto flex items-center gap-3 pl-2 ml-2 border-l border-white/10">
+              <div className="hidden md:flex flex-col items-end">
+                <span className="text-xs text-white/90 font-medium leading-tight">
+                  {user?.name ?? "Guest"}
                 </span>
-                <span className="text-xs text-white/90 max-w-[140px] truncate">
-                  {user.email}
+                <span className="text-[10px] text-emerald-300 leading-tight">
+                  {user?.role === "admin" ? "Branch Sales Manager" : "PIA"}
                 </span>
               </div>
-              <LogoutButton />
+              <button
+                onClick={logout}
+                title="Logout"
+                className="p-2 rounded-full transition-colors text-white/60 hover:text-white hover:bg-white/10"
+              >
+                <LogOut className="w-5 h-5" />
+              </button>
             </div>
 
-            {currentView === "staff" && !isPia && (
+            {currentView === "staff" && (
               <div className="flex items-center gap-4">
                 <div className="relative">
                   <div
-                    className="w-10 h-10 border-2 border-white/20 rounded-full overflow-hidden shrink-0 cursor-pointer hover:border-white/40 transition-colors bg-emerald-500/20"
-                    onClick={() => setShowDropdown(!showDropdown)}
+                    className={`w-10 h-10 border-2 border-white/20 rounded-full overflow-hidden shrink-0 ${isPia ? "cursor-default" : "cursor-pointer hover:border-white/40"} transition-colors bg-emerald-500/20`}
+                    onClick={() => { if (!isPia) setShowDropdown(!showDropdown); }}
                   >
                     <img
                       src={displayStaffAvatar}
@@ -2964,7 +2983,7 @@ export default function App() {
                     />
                   </div>
                   <AnimatePresence>
-                    {showDropdown && (
+                    {showDropdown && !isPia && (
                       <motion.div
                         initial={{ opacity: 0, y: 10, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -3057,10 +3076,10 @@ export default function App() {
                 parsedOfficers={parsedReport.officers}
                 attachMatchesOfficer={attachMatchesOfficer}
                 overallAttachRate={overallAttachRate}
-                onSetActiveStaffId={isPia ? () => {} : setActiveStaffId}
+                onSetActiveStaffId={setActiveStaffId}
               />
             )}
-            {currentView === "reports" && (
+            {!isPia && currentView === "reports" && (
               <motion.div
                 key="reports"
                 initial={{ opacity: 0, scale: 0.96, filter: "blur(8px)" }}
@@ -3084,7 +3103,7 @@ export default function App() {
                 />
               </motion.div>
             )}
-            {currentView === "kpi_preset" && (
+            {!isPia && currentView === "kpi_preset" && (
               <motion.div
                 key="kpi_preset"
                 initial={{ opacity: 0, scale: 0.96, filter: "blur(8px)" }}
@@ -3102,7 +3121,7 @@ export default function App() {
                 />
               </motion.div>
             )}
-            {currentView === "settings" && (
+            {!isPia && currentView === "settings" && (
               <motion.div
                 key="settings"
                 initial={{ opacity: 0, scale: 0.96, filter: "blur(8px)" }}
