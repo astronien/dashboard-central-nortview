@@ -40,10 +40,22 @@ export function enrichSalesRowsWithCatDaily(
   return salesRows.map((row) => {
     const catSub = String(row["Cat & Sub Cat"] ?? "").trim();
     const category = String(row["Category (Name)"] ?? row.category ?? "").trim();
+    const subCategory = String(row["Sub Category"] ?? row.sub_category ?? "").trim();
     let catDaily = "";
+    // 1. Prefer explicit combined "Cat & Sub Cat" column if present
     if (catSub) {
       catDaily = lookup.get(normKey(catSub)) ?? "";
     }
+    // 2. Try the master-style concatenation `${category}${sub}` (no
+    //    space) — this matches how the Category Master spreadsheet
+    //    stores its keys, e.g. "Apple Case & ProtectionCASING ..."
+    if (!catDaily && category && subCategory) {
+      catDaily =
+        lookup.get(normKey(`${category}${subCategory}`)) ??
+        lookup.get(normKey(`${category} ${subCategory}`)) ??
+        "";
+    }
+    // 3. Fall back to category name only
     if (!catDaily && category) {
       catDaily = lookup.get(normKey(category)) ?? "";
     }
