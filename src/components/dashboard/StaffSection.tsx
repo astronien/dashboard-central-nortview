@@ -85,12 +85,6 @@ export function StaffSection({
   todaySalesTotal,
   todayDateLabel,
   categoryPerformanceHint,
-  activeTab,
-  onSetActiveTab,
-  staffLeaderboard,
-  parsedOfficers,
-  attachMatchesOfficer,
-  overallAttachRate,
   onSetActiveStaffId,
 }: {
   displayStaffAvatar: string;
@@ -116,12 +110,6 @@ export function StaffSection({
   todaySalesTotal: number;
   todayDateLabel?: string;
   categoryPerformanceHint?: string | null;
-  activeTab: string;
-  onSetActiveTab: (tab: string) => void;
-  staffLeaderboard: StaffLeaderboardItem[];
-  parsedOfficers: OfficerData[];
-  attachMatchesOfficer: (a: string, b: string) => boolean;
-  overallAttachRate: (item: StaffLeaderboardItem) => number;
   onSetActiveStaffId: (id: string) => void;
 }) {
   const monthlySalesActual = activeOfficer
@@ -166,19 +154,6 @@ export function StaffSection({
     : activeStat === "csat"
       ? activeOfficer7WondersPerformance
       : activeOfficerCategoryPerformance;
-
-  const topAttachSummary = React.useMemo(() => {
-    const matched = staffLeaderboard.find((item) =>
-      activeOfficer ? attachMatchesOfficer(item.name, activeOfficer.name) : false,
-    );
-    if (!matched) return null;
-
-    const best = Object.entries(matched.attachMap)
-      .map(([key, value]) => ({ key, rate: value?.rate ?? 0, units: value?.units ?? 0 }))
-      .sort((a, b) => b.rate - a.rate)[0];
-
-    return best ?? null;
-  }, [staffLeaderboard, activeOfficer, attachMatchesOfficer]);
 
   const focusKpiSummary = React.useMemo(() => {
     const rows = activeOfficerCategoryPerformance.filter((row) => row.category !== "Total" && row.category !== "Average");
@@ -496,10 +471,10 @@ export function StaffSection({
                         className="bg-white/10 backdrop-blur-md border border-white/10 rounded-full px-2 lg:px-4 py-2.5 text-center overflow-hidden min-w-0 flex flex-col items-center justify-center transition-colors duration-200"
                       >
                         <div className="text-[9px] uppercase tracking-wider text-white/60 mb-0.5 w-full truncate">
-                          Top Attach / Focus KPI
+                          Top Attach
                         </div>
                         <div className="text-[10px] lg:text-xs font-semibold w-full truncate">
-                          {topAttachSummary ? `${topAttachSummary.key} ${Math.round(topAttachSummary.rate)}%` : "—"}
+                          —
                         </div>
                       </motion.div>
                       <motion.div
@@ -545,7 +520,7 @@ export function StaffSection({
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.6, delay: 0.25, type: "spring", bounce: 0.15 }}
-                    className="lg:w-2/3 bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-6 flex flex-col shadow-[0_8px_32px_rgba(0,0,0,0.12)] overflow-hidden hover:border-white/20 transition-all duration-300"
+                    className="lg:w-full bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-6 flex flex-col shadow-[0_8px_32px_rgba(0,0,0,0.12)] overflow-hidden hover:border-white/20 transition-all duration-300"
                   >
                     <div className="flex items-center gap-3 mb-6">
                       <div className="p-2 bg-emerald-500/20 rounded-xl border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
@@ -761,121 +736,6 @@ export function StaffSection({
                         </AnimatePresence>
                       </table>
                     </div>
-                  </motion.div>
-
-                  {/* Top Performers */}
-                  <motion.div
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, delay: 0.35, type: "spring", bounce: 0.15 }}
-                    className="lg:w-1/3 flex flex-col gap-4"
-                  >
-                    {/* Header Tabs */}
-                    <div className="flex items-center gap-6 text-sm font-medium px-2">
-                      <button
-                        onClick={() => onSetActiveTab("Store")}
-                        className={`flex items-center gap-2 transition-colors ${activeTab === "Store" ? "text-emerald-400" : "text-white/50 hover:text-white/80"}`}
-                      >
-                        {activeTab === "Store" && (
-                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-400"></div>
-                        )}
-                        Top Performers
-                      </button>
-                      <button
-                        onClick={() => onSetActiveTab("Region")}
-                        className={`transition-colors ${activeTab === "Region" ? "text-emerald-400" : "text-white/50 hover:text-white/80"}`}
-                      >
-                        Store
-                      </button>
-                      <button
-                        onClick={() => onSetActiveTab("Area")}
-                        className={`transition-colors ${activeTab === "Area" ? "text-emerald-400" : "text-white/50 hover:text-white/80"}`}
-                      >
-                        Region
-                      </button>
-                    </div>
-
-                    {/* Performers List */}
-                    <AnimatePresence mode="wait">
-                      <motion.div
-                        key={activeTab}
-                        initial={{ opacity: 0, y: 15, filter: "blur(4px)" }}
-                        animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                        exit={{ opacity: 0, y: -15, filter: "blur(4px)" }}
-                        transition={{ duration: 0.25 }}
-                        className="flex-1 flex flex-col gap-2.5 relative"
-                      >
-                        {staffLeaderboard.map((performer, rank) => {
-                          const officerIndex = parsedOfficers.findIndex((o) =>
-                            attachMatchesOfficer(o.name, performer.name),
-                          );
-                          const attachRate = overallAttachRate(performer);
-                          const displayUnits = performer.baseUnits || 0;
-                          const isFirst = rank === 0;
-                          const isLast =
-                            rank === staffLeaderboard.length - 1 &&
-                            staffLeaderboard.length === 3;
-                          const shortName = performer.name.split(" ");
-                          const label =
-                            shortName.length > 1
-                              ? `${shortName[0]} ${shortName[1].charAt(0)}.`
-                              : performer.name;
-
-                          return (
-                            <motion.div
-                              key={performer.id}
-                              initial={{ opacity: 0, x: 20 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: rank * 0.08, type: "spring", stiffness: 100 }}
-                              whileHover={{ scale: 1.03, x: 4, transition: { duration: 0.15 } }}
-                              whileTap={{ scale: 0.98 }}
-                              className={`${isFirst ? "bg-white/10 backdrop-blur-md border-white/10 shadow-[0_4px_24px_rgba(0,0,0,0.1)]" : "bg-white/5 backdrop-blur-sm border-white/5"} rounded-2xl p-3.5 flex items-center border cursor-pointer hover:bg-white/[0.15] hover:border-emerald-500/30 transition-colors duration-200 ${isLast ? "h-[72px] overflow-hidden relative" : ""}`}
-                              onClick={() => {
-                                if (officerIndex >= 0)
-                                  onSetActiveStaffId(String(officerIndex + 1));
-                              }}
-                            >
-                              <div
-                                className={`${isFirst ? "bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]" : "bg-white/10 border border-white/5 text-white/80"} rounded-full w-9 h-9 flex items-center justify-center font-bold text-base mr-3`}
-                              >
-                                {rank + 1}
-                              </div>
-                              <div>
-                                <div
-                                  className={`text-[9px] uppercase tracking-wider mb-0.5 ${isFirst ? "text-white/60" : isLast ? "text-white/40" : "text-white/50"}`}
-                                >
-                                  This Month
-                                </div>
-                                <div
-                                  className={`font-semibold text-[13px] ${isFirst ? "text-white" : isLast ? "text-white/70 font-medium" : "text-white/90 font-medium"}`}
-                                >
-                                  {isFirst ? performer.name : label}
-                                </div>
-                              </div>
-                              <div
-                                className={`ml-auto text-right flex flex-col items-end ${isLast ? "mr-2" : ""}`}
-                              >
-                                <div
-                                  className={`font-bold text-lg leading-tight ${isFirst ? "" : isLast ? "text-white/70" : "text-white/90"}`}
-                                >
-                                  {displayUnits.toLocaleString()}
-                                </div>
-                                {!isLast && (
-                                  <div
-                                    className={`${attachRate >= 20 ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/20" : "bg-white/5 text-white/60 border-white/10"} text-[9px] font-bold px-1.5 py-0.5 rounded border mt-1 leading-none`}
-                                  >
-                                    {attachRate}%
-                                  </div>
-                                )}
-                              </div>
-                              {isLast && (
-                                <div className="absolute inset-x-0 bottom-0 top-1/2 bg-gradient-to-t from-[rgba(18,54,39,1)] to-transparent pointer-events-none rounded-b-2xl" />
-                              )}
-                            </motion.div>
-                          );
-                        })}
-                      </motion.div>
-                    </AnimatePresence>
                   </motion.div>
                 </div>
               </motion.div>

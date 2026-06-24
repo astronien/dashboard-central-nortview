@@ -1468,7 +1468,6 @@ function AppInternal({
     };
   }, [todayRows, parsedReport, getCategory, getCategoryValue]);
 
-  const [activeTab, setActiveTab] = useState("Store");
   const [activeStat, setActiveStat] = useState<"sales" | "csat" | "target">(
     "sales",
   );
@@ -3078,14 +3077,8 @@ function AppInternal({
                 activeOfficerCategoryPerformance={activeOfficerCategoryPerformance}
                 todaySalesTotal={activeOfficerTodaySales}
                 todayDateLabel={todayStats.dateStr}
-                categoryPerformanceHint={categoryPerformanceHint}
-                activeTab={activeTab}
-                onSetActiveTab={setActiveTab}
-                staffLeaderboard={staffLeaderboard}
-                parsedOfficers={parsedReport.officers}
-                attachMatchesOfficer={attachMatchesOfficer}
-                overallAttachRate={overallAttachRate}
-                onSetActiveStaffId={setActiveStaffId}
+                 categoryPerformanceHint={categoryPerformanceHint}
+                 onSetActiveStaffId={setActiveStaffId}
               />
             )}
             {!isPia && currentView === "reports" && (
