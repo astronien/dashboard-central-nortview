@@ -622,6 +622,22 @@ export function StaffSection({
                               const fmtNum = (val: number) => isCsat ? `${val.toFixed(2)}%` : val.toLocaleString();
                               const fmtPct = (val: number) => `${val.toFixed(2)}%`;
 
+                              // Scale a row's value to be relative to its target
+                              // (0 = zero progress, 100 = hit target). Used for the
+                              // colour band on the Ach.% badge so the colour
+                              // reflects how close the officer is to the target,
+                              // not the raw actual percentage.
+                              const scaledForTarget = (r: typeof row) => {
+                                const isPercentPreset =
+                                  r.calcType === "attach" ||
+                                  r.calcType === "bahtRate" ||
+                                  r.calcType === "catAttach";
+                                if (isPercentPreset && r.target > 0) {
+                                  return (r.actual / r.target) * 100;
+                                }
+                                return r.achPercent;
+                              };
+
                               const getBadgeClass = (rate: number) => {
                                 if (rate >= 100) return "bg-green-500/20 text-green-400 font-extrabold px-1.5 py-0.5 rounded border border-green-500/20";
                                 if (rate >= 80) return "bg-amber-500/20 text-amber-400 font-extrabold px-1.5 py-0.5 rounded border border-amber-500/20";
@@ -653,7 +669,7 @@ export function StaffSection({
                                       {fmtActualAB(row.actualA, row.actualB, row.calcType)}
                                     </td>
                                     <td className="py-2.5 px-3 text-center">
-                                      <span className={getBadgeClass(row.achPercent)}>
+                                      <span className={getBadgeClass(scaledForTarget(row))}>
                                         {fmtPct(row.achPercent)}
                                       </span>
                                     </td>
