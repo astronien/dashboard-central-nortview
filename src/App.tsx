@@ -1748,201 +1748,182 @@ function AppInternal({
     return `${maxCat} Specialist`;
   }, [displayUploads.current, activeOfficer, activeStaffId, currentStaff]);
 
+  // Compute per-category breakdown (TARGET / TODAY / ACTUAL / ACH% / FORECAST)
+  // for a single officer by name. Shared by activeOfficerCategoryPerformance
+  // and the per-officer BranchOverviewKpiTable breakdown.
+  const computeCategoryBreakdown = useCallback(
+    (officerName: string): CategoryPerformanceRow[] => {
+      const categoriesList: KpiCategoryKey[] = [
+        "Mac", "iPad", "iPhone", "Apple Watch", "BTB", "BTB(Apple)",
+      ];
+      const hasData = displayUploads.current.length > 0;
+      const targetRecords = rawTargetRowsToRecords(displayUploads.target);
+      const now = new Date();
+      const periodYear = now.getFullYear();
+      const periodMonth = now.getMonth();
+      const periodTotalDays = new Date(periodYear, periodMonth + 1, 0).getDate();
+      const periodMonthStr = String(periodMonth + 1).padStart(2, "0");
+      const periodStart = `${periodYear}-${periodMonthStr}-01`;
+      const periodEnd = `${periodYear}-${periodMonthStr}-${String(periodTotalDays).padStart(2, "0")}`;
+      const officerTargetRow = displayUploads.target.find((row) => {
+        const name = `${row.NAME ?? ""} ${row.SURNAME ?? ""}`.trim();
+        return matchesOfficer(name, officerName);
+      });
+      const officerId = resolveOfficerId(
+        officerName,
+        displayUploads.target,
+        targetRecords,
+        displayUploads.current,
+        matchesOfficer,
+      );
+      const currentMonthTotalDays = new Date(periodYear, periodMonth + 1, 0).getDate();
+      const currentDay = Math.min(new Date().getDate(), currentMonthTotalDays);
+      const totalDays = currentMonthTotalDays;
+
+      const todaySourceRows = todayRows.length ? todayRows : [];
+      let maxDateStr = "";
+      let maxDateTime = 0;
+      if (!todaySourceRows.length && hasData) {
+        displayUploads.current.forEach((row) => {
+          const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
+          if (!rawDate) return;
+          const parsed = Date.parse(rawDate.replace(/^\S+\.\s*/, ""));
+          if (parsed && parsed > maxDateTime) {
+            maxDateTime = parsed;
+            maxDateStr = rawDate;
+          }
+        });
+      }
+
+      const rows: CategoryPerformanceRow[] = categoriesList.map((catName) => {
+        let target = 0;
+        let actual = 0;
+        let lastMonth = 0;
+        let lastYear = 0;
+        let actualDay = 0;
+
+        if (hasData) {
+          const kpi = getOfficerCategoryKpi({
+            category: catName,
+            officerName,
+            officerId,
+            officerTargetRow,
+            targetRecords,
+            currentRows: displayUploads.current,
+            lastMonthRows: displayUploads.lastMonth,
+            lastYearRows: displayUploads.lastYear,
+            periodStart,
+            periodEnd,
+            getCategory,
+            matchesOfficer,
+          });
+          target = kpi.target;
+          actual = kpi.actual;
+          lastMonth = kpi.lastMonth;
+          lastYear = kpi.lastYear;
+
+          const dailyRows = todaySourceRows.length ? todaySourceRows : displayUploads.current;
+          dailyRows.forEach((row) => {
+            const rowOfficerId = String(row["STAFF ID"] ?? row.emp_id ?? "").trim();
+            const officer = String(row["Officer (Name)"] ?? "").trim();
+            const officerMatch =
+              (officerId && rowOfficerId && normalizeId(rowOfficerId) === normalizeId(officerId)) ||
+              matchesOfficer(officer, officerName);
+            if (!officerMatch) return;
+            const rowCat = getCategory(row);
+            if (rowCat !== catName) return;
+            if (!todaySourceRows.length) {
+              const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
+              const parsed = Date.parse(rawDate.replace(/^\S+\.\s*/, ""));
+              if (!((maxDateStr && rawDate === maxDateStr) || (parsed && parsed === maxDateTime))) return;
+            }
+            actualDay +=
+              kpi.measureType === "quantity"
+                ? toNumber(row.Number ?? row.number ?? row.qty ?? 0)
+                : getCategoryValue(row);
+          });
+        } else if (!hasData) {
+          const targetRates: Record<string, number> = {
+            "iPhone": 0.54, "Mac": 0.11, "iPad": 0.18,
+            "Apple Watch": 0.05, "BTB(Apple)": 0.07, "BTB": 0.05,
+          };
+          const actualRates: Record<string, number> = {
+            "iPhone": 0.53, "Mac": 0.10, "iPad": 0.20,
+            "Apple Watch": 0.05, "BTB(Apple)": 0.07, "BTB": 0.05,
+          };
+          // Without sales data, fall back to a mock distribution scaled
+          // by the officer's known totals. Use the activeOfficer for
+          // these mocks; otherwise zero.
+          const fallbackOfficer = parsedReport.officers.find(
+            (o) => matchesOfficer(o.name ?? "", officerName),
+          );
+          if (fallbackOfficer) {
+            target = Math.round(fallbackOfficer.target * (targetRates[catName] ?? 0.1));
+            actual = Math.round(fallbackOfficer.actual * (actualRates[catName] ?? 0.1));
+            actualDay = Math.round(fallbackOfficer.actualDay * (actualRates[catName] ?? 0.1));
+          }
+        }
+
+        const achPercent = calcAchievementPct(actual, target);
+        const forecast = calcForecastByDays(actual, currentDay, totalDays);
+        const forecastPercent = calcAchievementPct(forecast, target);
+        const targetDay = calcTargetToDate(target, currentDay, totalDays);
+        const diffDay = actualDay - targetDay;
+        const achDayPercent = calcTodayAchievementPct(actualDay, targetDay);
+
+        return {
+          category: catName,
+          target,
+          actual,
+          achPercent,
+          forecast,
+          forecastPercent,
+          lastMonth,
+          momPercent:
+            lastMonth > 0 ? ((actual - lastMonth) / lastMonth) * 100 : "New",
+          lastYear,
+          yoyPercent:
+            lastYear > 0 ? ((actual - lastYear) / lastYear) * 100 : "New",
+          targetDay,
+          actualDay,
+          diffDay,
+          achDayPercent,
+        };
+      });
+
+      const totalTarget = rows.reduce((s, r) => s + r.target, 0);
+      const totalActual = rows.reduce((s, r) => s + r.actual, 0);
+      const totalForecast = rows.reduce((s, r) => s + r.forecast, 0);
+      const totalTargetDay = rows.reduce((s, r) => s + r.targetDay, 0);
+      const totalActualDay = rows.reduce((s, r) => s + r.actualDay, 0);
+
+      return [
+        ...rows,
+        {
+          category: "Total",
+          target: totalTarget,
+          actual: totalActual,
+          achPercent: totalTarget ? (totalActual / totalTarget) * 100 : 0,
+          forecast: totalForecast,
+          forecastPercent: totalTarget ? (totalForecast / totalTarget) * 100 : 0,
+          lastMonth: 0,
+          momPercent: "New",
+          lastYear: 0,
+          yoyPercent: "New",
+          targetDay: totalTargetDay,
+          actualDay: totalActualDay,
+          diffDay: totalActualDay - totalTargetDay,
+          achDayPercent: calcTodayAchievementPct(totalActualDay, totalTargetDay),
+        } as CategoryPerformanceRow,
+      ];
+    },
+    [displayUploads, parsedReport, getCategory, todayRows],
+  );
+
   const activeOfficerCategoryPerformance = useMemo<CategoryPerformanceRow[]>(() => {
     if (!activeOfficer) return [];
-    
-    const categoriesList: KpiCategoryKey[] = ["Mac", "iPad", "iPhone", "Apple Watch", "BTB", "BTB(Apple)"];
-    const hasData = displayUploads.current.length > 0;
-    const targetRecords = rawTargetRowsToRecords(displayUploads.target);
-    const now = new Date();
-    const periodYear = now.getFullYear();
-    const periodMonth = now.getMonth();
-    const periodTotalDays = new Date(periodYear, periodMonth + 1, 0).getDate();
-    const periodMonthStr = String(periodMonth + 1).padStart(2, "0");
-    const periodStart = `${periodYear}-${periodMonthStr}-01`;
-    const periodEnd = `${periodYear}-${periodMonthStr}-${String(periodTotalDays).padStart(2, "0")}`;
-    const officerTargetRow = displayUploads.target.find((row) => {
-      const name = `${row.NAME ?? ""} ${row.SURNAME ?? ""}`.trim();
-      return matchesOfficer(name, activeOfficer.name);
-    });
-    const officerId = resolveOfficerId(
-      activeOfficer.name,
-      displayUploads.target,
-      targetRecords,
-      displayUploads.current,
-      matchesOfficer,
-    );
-    
-    // Use the actual current day/month length for daily target comparisons
-    const currentMonthTotalDays = new Date(periodYear, periodMonth + 1, 0).getDate();
-    const currentDay = Math.min(new Date().getDate(), currentMonthTotalDays);
-    const totalDays = currentMonthTotalDays;
-    
-    const todaySourceRows = todayRows.length ? todayRows : [];
-    let maxDateStr = "";
-    let maxDateTime = 0;
-    if (!todaySourceRows.length && hasData) {
-      displayUploads.current.forEach((row) => {
-        const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
-        if (!rawDate) return;
-        const parsed = Date.parse(rawDate.replace(/^\S+\.\s*/, ""));
-        if (parsed && parsed > maxDateTime) {
-          maxDateTime = parsed;
-          maxDateStr = rawDate;
-        }
-      });
-    }
-
-    // 3. For each category, compute target, actual, forecast, lastMonth, lastYear, actualDay
-    const rows: CategoryPerformanceRow[] = categoriesList.map((catName) => {
-      let target = 0;
-      let actual = 0;
-      let lastMonth = 0;
-      let lastYear = 0;
-      let actualDay = 0;
-      
-      if (hasData) {
-        const kpi = getOfficerCategoryKpi({
-          category: catName,
-          officerName: activeOfficer.name,
-          officerId,
-          officerTargetRow,
-          targetRecords,
-          currentRows: displayUploads.current,
-          lastMonthRows: displayUploads.lastMonth,
-          lastYearRows: displayUploads.lastYear,
-          periodStart,
-          periodEnd,
-          getCategory,
-          matchesOfficer,
-        });
-        target = kpi.target;
-        actual = kpi.actual;
-        lastMonth = kpi.lastMonth;
-        lastYear = kpi.lastYear;
-
-        const dailyRows = todaySourceRows.length ? todaySourceRows : displayUploads.current;
-        dailyRows.forEach((row) => {
-          const rowOfficerId = String(row["STAFF ID"] ?? row.emp_id ?? "").trim();
-          const officer = String(row["Officer (Name)"] ?? "").trim();
-          const officerMatch =
-            (officerId && rowOfficerId && normalizeId(rowOfficerId) === normalizeId(officerId)) ||
-            matchesOfficer(officer, activeOfficer.name);
-          if (!officerMatch) return;
-          const rowCat = getCategory(row);
-          if (rowCat !== catName) return;
-          if (!todaySourceRows.length) {
-            const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
-            const parsed = Date.parse(rawDate.replace(/^\S+\.\s*/, ""));
-            if (!((maxDateStr && rawDate === maxDateStr) || (parsed && parsed === maxDateTime))) return;
-          }
-          actualDay +=
-            kpi.measureType === "quantity"
-              ? toNumber(row.Number ?? row.number ?? row.qty ?? 0)
-              : getCategoryValue(row);
-        });
-      } else if (!hasData) {
-        // Fallback/Mock distribution matching activeOfficer total values!
-        const targetRates: Record<string, number> = {
-          "iPhone": 0.54,
-          "Mac": 0.11,
-          "iPad": 0.18,
-          "Apple Watch": 0.05,
-          "BTB(Apple)": 0.07,
-          "BTB": 0.05,
-        };
-        const actualRates: Record<string, number> = {
-          "iPhone": 0.53,
-          "Mac": 0.10,
-          "iPad": 0.20,
-          "Apple Watch": 0.05,
-          "BTB(Apple)": 0.07,
-          "BTB": 0.05,
-        };
-        
-        target = Math.round(activeOfficer.target * (targetRates[catName] ?? 0.1));
-        actual = Math.round(activeOfficer.actual * (actualRates[catName] ?? 0.1));
-        lastMonth = 0;
-        lastYear = 0;
-        actualDay = Math.round(activeOfficer.actualDay * (actualRates[catName] ?? 0.1));
-      }
-      
-      const achPercent = calcAchievementPct(actual, target);
-      const forecast = calcForecastByDays(actual, currentDay, totalDays);
-      const forecastPercent = calcAchievementPct(forecast, target);
-      
-      let momPercent: number | string = "New";
-      if (lastMonth > 0) {
-        momPercent = ((actual - lastMonth) / lastMonth) * 100;
-      }
-      
-      let yoyPercent: number | string = "New";
-      if (lastYear > 0) {
-        yoyPercent = ((actual - lastYear) / lastYear) * 100;
-      }
-      
-      const targetDay = calcTargetToDate(target, currentDay, totalDays);
-      const diffDay = actualDay - targetDay;
-      const achDayPercent = calcTodayAchievementPct(actualDay, targetDay);
-      
-      return {
-        category: catName,
-        target,
-        actual,
-        achPercent,
-        forecast,
-        forecastPercent,
-        lastMonth,
-        momPercent,
-        lastYear,
-        yoyPercent,
-        targetDay,
-        actualDay,
-        diffDay,
-        achDayPercent,
-      };
-    });
-    
-    // 4. Calculate Total row
-    const totalTarget = rows.reduce((s, r) => s + r.target, 0);
-    const totalActual = rows.reduce((s, r) => s + r.actual, 0);
-    const totalAchPercent = totalTarget ? (totalActual / totalTarget) * 100 : 0;
-    const totalForecast = rows.reduce((s, r) => s + r.forecast, 0);
-    const totalForecastPercent = totalTarget ? (totalForecast / totalTarget) * 100 : 0;
-    const totalLastMonth = rows.reduce((s, r) => s + r.lastMonth, 0);
-    let totalMomPercent: number | string = "New";
-    if (totalLastMonth > 0) {
-      totalMomPercent = ((totalActual - totalLastMonth) / totalLastMonth) * 100;
-    }
-    const totalLastYear = rows.reduce((s, r) => s + r.lastYear, 0);
-    let totalYoyPercent: number | string = "New";
-    if (totalLastYear > 0) {
-      totalYoyPercent = ((totalActual - totalLastYear) / totalLastYear) * 100;
-    }
-    const totalTargetDay = rows.reduce((s, r) => s + r.targetDay, 0);
-    const totalActualDay = rows.reduce((s, r) => s + r.actualDay, 0);
-    const totalDiffDay = totalActualDay - totalTargetDay;
-    const totalAchDayPercent = calcTodayAchievementPct(totalActualDay, totalTargetDay);
-    
-    const totalRow: CategoryPerformanceRow = {
-      category: "Total",
-      target: totalTarget,
-      actual: totalActual,
-      achPercent: totalAchPercent,
-      forecast: totalForecast,
-      forecastPercent: totalForecastPercent,
-      lastMonth: totalLastMonth,
-      momPercent: totalMomPercent,
-      lastYear: totalLastYear,
-      yoyPercent: totalYoyPercent,
-      targetDay: totalTargetDay,
-      actualDay: totalActualDay,
-      diffDay: totalDiffDay,
-      achDayPercent: totalAchDayPercent,
-    };
-    
-    return [...rows, totalRow];
-  }, [activeOfficer, displayUploads, parsedReport, getCategory, todayRows]);
+    return computeCategoryBreakdown(activeOfficer.name);
+  }, [activeOfficer, computeCategoryBreakdown]);
 
   const activeOfficerTodaySales = useMemo(() => {
     if (!activeOfficer) return 0;
@@ -2123,10 +2104,18 @@ function AppInternal({
   const branchOverviewKpiData = useMemo<{
     presets: KpiPreset[];
     rows: { officer: { name: string; branch: string }; results: Record<string, number> }[];
+    breakdownByOfficer: Record<
+      string,
+      { officer: { name: string; branch: string }; rows: CategoryPerformanceRow[] }
+    >;
   }>(() => {
     const branchPresets = kpiPresets.filter((p) => p.showInBranchOverview);
-    if (branchPresets.length === 0) return { presets: [], rows: [] };
-    if (displayUploads.current.length === 0) return { presets: branchPresets, rows: [] };
+    if (branchPresets.length === 0) {
+      return { presets: [], rows: [], breakdownByOfficer: {} };
+    }
+    if (displayUploads.current.length === 0) {
+      return { presets: branchPresets, rows: [], breakdownByOfficer: {} };
+    }
 
     const lookup = buildCatDailyLookup(displayUploads.categoryMaster);
     const enriched = enrichSalesRowsWithCatDaily(displayUploads.current, lookup);
@@ -2173,8 +2162,25 @@ function AppInternal({
         )
       : rows;
 
-    return { presets: branchPresets, rows: filteredRows };
-  }, [kpiPresets, displayUploads.current, displayUploads.categoryMaster, parsedReport.officers, role]);
+    // Per-officer category breakdown (TARGET / TODAY / ACTUAL / ACH% / FORECAST)
+    // — mirrors the structure in the user's reference screenshot.
+    const breakdownByOfficer: Record<
+      string,
+      { officer: { name: string; branch: string }; rows: CategoryPerformanceRow[] }
+    > = {};
+    for (const row of filteredRows) {
+      breakdownByOfficer[row.officer.name] = {
+        officer: row.officer,
+        rows: computeCategoryBreakdown(row.officer.name),
+      };
+    }
+
+    return {
+      presets: branchPresets,
+      rows: filteredRows,
+      breakdownByOfficer,
+    };
+  }, [kpiPresets, displayUploads.current, displayUploads.categoryMaster, parsedReport.officers, role, computeCategoryBreakdown]);
 
   const dynamicRadarData = useMemo(() => {
     if (!displayUploads.current.length && Number(activeStaffId) <= 3 && activeStat === "csat") {
