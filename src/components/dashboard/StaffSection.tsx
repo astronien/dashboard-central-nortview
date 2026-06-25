@@ -7,7 +7,7 @@ import {
   Radar,
   ResponsiveContainer,
 } from "recharts";
-import { ShoppingBag, Award, Star, TrendingUp, Apple } from "lucide-react";
+import { ShoppingBag, Award, Star, Apple, Target, BarChart3, TrendingUp, Layers, User } from "lucide-react";
 import React from "react";
 import { calcTargetToDate, calcTodayAchievementPct } from "../../lib/targetAggregations";
 import type { PresetCalcType } from "../../lib/presetTypes";
@@ -155,605 +155,448 @@ export function StaffSection({
       ? activeOfficer7WondersPerformance
       : activeOfficerCategoryPerformance;
 
-  const focusKpiSummary = React.useMemo(() => {
-    const rows = activeOfficerCategoryPerformance.filter((row) => row.category !== "Total" && row.category !== "Average");
-    if (!rows.length) return null;
-    return [...rows].sort((a, b) => b.achDayPercent - a.achDayPercent)[0] ?? null;
-  }, [activeOfficerCategoryPerformance]);
-
   const currentMonthTotalDays = new Date().getDate() ? new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate() : 30;
   const currentDay = Math.min(new Date().getDate(), currentMonthTotalDays);
   const todayTarget = activeOfficer
     ? Math.round(calcTargetToDate(activeOfficer.target, currentDay, currentMonthTotalDays))
     : Number(currentStaff.stats.target) || 0;
   const todayAchPercent = calcTodayAchievementPct(todaySalesTotal, todayTarget);
-  const todayGap = todayTarget - todaySalesTotal;
-  const todayDateDetails = React.useMemo(() => {
-    if (!todayDateLabel) return "";
-    return `วันนี้อ้างอิงจาก ${todayDateLabel}`;
-  }, [todayDateLabel]);
+
+  // PWA / mobile state — runs once on mount
+  const [isMobile, setIsMobile] = React.useState(false);
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 767px)");
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
+  // Reduce animation on small screens for snappier feel
+  const reduceMotion = isMobile;
+
+  const officerName = activeOfficer?.name ?? currentStaff.name;
+  const officerBranch = activeOfficer?.branch ?? currentStaff.store;
+  const firstName = (officerName.split(" ")[0] ?? "").trim();
+  const restName = (officerName.split(" ").slice(1).join(" ") ?? "").trim();
 
   return (
-              <motion.div
-                key="staff"
-                initial={{ opacity: 0, scale: 0.96, filter: "blur(8px)" }}
-                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-                exit={{ opacity: 0, scale: 1.04, filter: "blur(8px)" }}
-                transition={{ duration: 0.4, ease: "easeOut" }}
-                className="flex flex-col w-full h-full gap-6 relative"
+    <motion.div
+      key="staff"
+      initial={reduceMotion ? false : { opacity: 0, scale: 0.96, filter: "blur(8px)" }}
+      animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+      exit={reduceMotion ? undefined : { opacity: 0, scale: 1.04, filter: "blur(8px)" }}
+      transition={{ duration: reduceMotion ? 0 : 0.4, ease: "easeOut" }}
+      className="flex flex-col w-full h-full gap-3 sm:gap-4 lg:gap-6 relative pb-4"
+    >
+      {/* ============ HERO CARD ============ */}
+      <div className="relative bg-gradient-to-br from-[#113a29]/80 via-[#0c291d]/85 to-[#051710]/95 backdrop-blur-xl border border-white/10 shadow-[0_16px_48px_rgba(0,0,0,0.35)] rounded-3xl lg:rounded-[2.5rem] p-4 sm:p-5 lg:p-8 overflow-hidden">
+        {/* Decorative glow */}
+        {!reduceMotion && (
+          <motion.div
+            animate={{ scale: [1, 1.12, 1], opacity: [0.8, 1, 0.8] }}
+            transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+            className="hidden lg:block absolute -top-10 -right-10 w-[400px] h-[400px] bg-emerald-500/15 blur-[85px] rounded-full pointer-events-none -z-0"
+          />
+        )}
+
+        <div className="relative z-10 flex flex-col lg:flex-row items-center lg:items-end gap-4 lg:gap-6">
+          {/* Avatar + name (mobile combined) */}
+          <div className="flex flex-col sm:flex-row items-center gap-3 lg:gap-6 w-full lg:w-[40%]">
+            {/* Avatar */}
+            <div className="relative w-20 h-20 sm:w-28 sm:h-28 lg:w-44 lg:h-44 shrink-0">
+              {!reduceMotion && (
+                <motion.div
+                  animate={{ scale: [1, 1.12, 1], opacity: [0.8, 1, 0.8] }}
+                  transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+                  className="absolute inset-0 bg-emerald-500/20 blur-2xl rounded-full pointer-events-none"
+                />
+              )}
+              <img
+                src={displayStaffAvatar}
+                alt={officerName}
+                className="relative w-full h-full object-cover rounded-full border-2 border-white/20 drop-shadow-[0_8px_24px_rgba(0,0,0,0.5)]"
+              />
+            </div>
+            {/* Name + branch */}
+            <div className="text-center sm:text-left flex-1 min-w-0">
+              <AnimatePresence mode="wait">
+                <motion.h1
+                  key={officerName}
+                  initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={reduceMotion ? undefined : { opacity: 0, y: -10 }}
+                  className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-white leading-tight truncate"
+                >
+                  {firstName}
+                  {restName && <span className="block sm:inline text-white/80 font-medium text-lg sm:text-xl lg:text-2xl ml-0 sm:ml-2">{restName}</span>}
+                </motion.h1>
+              </AnimatePresence>
+              <div className="flex items-center justify-center sm:justify-start gap-1.5 text-white/70 text-sm mt-1 truncate">
+                <Apple className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">{officerBranch}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Radar chart (mobile: smaller, side) */}
+          <div className="w-full lg:w-[30%] flex items-center justify-center relative">
+            <div className="w-[180px] h-[180px] sm:w-[200px] sm:h-[200px] lg:w-[260px] lg:h-[260px] relative">
+              <ResponsiveContainer width="100%" height="100%">
+                <RadarChart
+                  cx="50%"
+                  cy="50%"
+                  outerRadius="55%"
+                  margin={{ top: 16, right: 20, bottom: 16, left: 20 }}
+                  data={dynamicRadarData}
+                >
+                  <PolarGrid gridType="polygon" stroke="rgba(255,255,255,0.15)" strokeWidth={1} />
+                  <PolarAngleAxis dataKey="subject" tick={renderCustomTick} />
+                  <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+                  <Radar
+                    name="Staff"
+                    dataKey="value"
+                    stroke="#10b981"
+                    strokeWidth={2}
+                    fill="#10b981"
+                    fillOpacity={0.15}
+                    isAnimationActive={!reduceMotion}
+                    animationDuration={800}
+                  />
+                </RadarChart>
+              </ResponsiveContainer>
+              {/* Center score */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 lg:w-20 lg:h-20 rounded-full border-2 border-emerald-500/30 flex items-center justify-center bg-emerald-500/10 backdrop-blur-sm">
+                  <AnimatePresence mode="wait">
+                    <motion.span
+                      key={dynamicScore}
+                      initial={reduceMotion ? false : { opacity: 0, scale: 0.5 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={reduceMotion ? undefined : { opacity: 0, scale: 0.5 }}
+                      className="text-white text-lg sm:text-xl lg:text-2xl font-bold"
+                    >
+                      {dynamicScore}
+                    </motion.span>
+                  </AnimatePresence>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick stats (4 cards) */}
+          <div className="w-full lg:w-[30%] grid grid-cols-2 gap-2 sm:gap-3">
+            <StatCard
+              label="ยอดเดือน"
+              value={fmtSalesNum(monthlySalesActual)}
+              subValue={monthlySalesTarget ? `เป้า ${fmtSalesNum(monthlySalesTarget)}` : undefined}
+              badge={fmtSalesPct(monthlySalesPct)}
+              badgeColor={monthlySalesPct >= 100 ? "emerald" : monthlySalesPct >= 80 ? "amber" : "rose"}
+              icon={<ShoppingBag className="w-4 h-4" />}
+              active={activeStat === "sales"}
+              onClick={() => onSetActiveStat("sales")}
+            />
+            <StatCard
+              label="7 Wonder"
+              value={`${sevenWondersScore}%`}
+              icon={<Award className="w-4 h-4" />}
+              active={activeStat === "csat"}
+              onClick={() => onSetActiveStat("csat")}
+            />
+            <StatCard
+              label="ยอดวันนี้"
+              value={fmtSalesNum(todaySalesTotal)}
+              subValue={todayDateLabel ? undefined : `เป้า ${fmtSalesNum(todayTarget)}`}
+              badge={todayAchPercent > 0 ? fmtSalesPct(todayAchPercent) : undefined}
+              badgeColor={todayAchPercent >= 100 ? "emerald" : todayAchPercent >= 80 ? "amber" : "rose"}
+              icon={<Star className="w-4 h-4" />}
+              active={activeStat === "target"}
+              onClick={() => onSetActiveStat("target")}
+            />
+            <StatCard
+              label="สาขา"
+              value={officerBranch?.split(" ").pop()?.slice(0, 8) ?? "—"}
+              subValue={dynamicRole}
+              icon={<User className="w-4 h-4" />}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* ============ CATEGORY TABLE (Responsive) ============ */}
+      <div className="bg-white/10 backdrop-blur-lg rounded-2xl lg:rounded-[2rem] border border-white/10 p-4 sm:p-5 lg:p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+        <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+          <div className="p-1.5 sm:p-2 bg-emerald-500/20 rounded-lg sm:rounded-xl border border-emerald-500/20">
+            {activeStat === "csat" ? (
+              <Award className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" />
+            ) : (
+              <BarChart3 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" />
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-sm sm:text-base font-bold text-white truncate">
+              {activeStat === "csat"
+                ? "7 Wonders Attach Rates"
+                : isTodayView
+                  ? "ยอดขายวันนี้ตามหมวด"
+                  : "Category Performance"}
+            </h2>
+            <p className="text-[10px] text-white/50 truncate">
+              {officerName} • {isCsatView ? "Attach rate breakdown" : isTodayView ? "เป้า/ยอด/ส่วนต่างวันนี้" : "Target / Today / Actual / Ach% / Forecast"}
+            </p>
+          </div>
+        </div>
+
+        {categoryPerformanceHint && activeStat !== "csat" ? (
+          <p
+            className={`mb-3 rounded-lg border px-3 py-2 text-[11px] ${
+              isTodayView
+                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-100/90"
+                : "border-amber-500/30 bg-amber-500/10 text-amber-200/90"
+            }`}
+          >
+            {categoryPerformanceHint}
+          </p>
+        ) : null}
+
+        {/* Mobile: Card view | Tablet+: Table view */}
+        {isCsatView ? (
+          <CsatMobileCards rows={tableRows} />
+        ) : (
+          <CategoryMobileCards
+            rows={tableRows}
+            isTodayView={isTodayView}
+            fmtNum={(v) => v.toLocaleString()}
+            fmtPct={(v) => `${v.toFixed(1)}%`}
+            fmtActualAB={fmtActualAB}
+          />
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+/* ============ Stat Card ============ */
+function StatCard({
+  label,
+  value,
+  subValue,
+  badge,
+  badgeColor = "emerald",
+  icon,
+  active = false,
+  onClick,
+}: {
+  label: string;
+  value: string;
+  subValue?: string;
+  badge?: string;
+  badgeColor?: "emerald" | "amber" | "rose";
+  icon: React.ReactNode;
+  active?: boolean;
+  onClick?: () => void;
+}) {
+  const badgeColorMap = {
+    emerald: "bg-emerald-500/20 text-emerald-300",
+    amber: "bg-amber-500/20 text-amber-300",
+    rose: "bg-rose-500/20 text-rose-300",
+  };
+  const Interactive = onClick ? motion.button : motion.div;
+  return (
+    <Interactive
+      onClick={onClick}
+      whileTap={onClick ? { scale: 0.97 } : undefined}
+      className={`relative rounded-2xl p-2.5 sm:p-3 text-left border transition-all ${
+        active
+          ? "bg-emerald-500/15 border-emerald-500/50 ring-1 ring-emerald-500/30"
+          : "bg-white/5 border-white/10 hover:bg-white/10"
+      }`}
+    >
+      <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-white/60 mb-0.5 font-medium leading-tight uppercase tracking-wider">
+        {icon}
+        <span className="truncate">{label}</span>
+      </div>
+      <div className="text-base sm:text-lg font-bold text-white leading-tight tabular-nums truncate">
+        {value}
+      </div>
+      {subValue ? (
+        <div className="text-[10px] text-white/50 mt-0.5 truncate">{subValue}</div>
+      ) : null}
+      {badge ? (
+        <div
+          className={`mt-1.5 inline-block text-[10px] font-bold px-1.5 py-0.5 rounded ${badgeColorMap[badgeColor]}`}
+        >
+          {badge}
+        </div>
+      ) : null}
+    </Interactive>
+  );
+}
+
+/* ============ Category Mobile Cards ============ */
+function CategoryMobileCards({
+  rows,
+  isTodayView,
+  fmtNum,
+  fmtPct,
+  fmtActualAB,
+}: {
+  rows: PerformanceRow[];
+  isTodayView: boolean;
+  fmtNum: (v: number) => string;
+  fmtPct: (v: number) => string;
+  fmtActualAB: (a?: number, b?: number, calcType?: PresetCalcType) => string;
+}) {
+  const visible = rows.filter(
+    (r) => r.target > 0 || r.actual > 0 || r.actualDay > 0,
+  );
+  if (visible.length === 0) {
+    return (
+      <p className="text-xs text-white/40 text-center py-6">
+        ยังไม่มีข้อมูล
+      </p>
+    );
+  }
+  return (
+    <div className="space-y-2">
+      {visible.map((row, idx) => {
+        const achColor =
+          row.achPercent >= 100
+            ? "text-emerald-400"
+            : row.achPercent >= 80
+              ? "text-amber-400"
+              : "text-rose-400";
+        const isTotal = row.category === "Total";
+        return (
+          <div
+            key={`${row.category}-${idx}`}
+            className={`rounded-xl border p-3 ${
+              isTotal
+                ? "bg-emerald-500/10 border-emerald-500/30"
+                : "bg-white/5 border-white/10"
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="text-sm font-bold text-white truncate pr-2">
+                {row.category}
+              </div>
+              <div
+                className={`text-sm font-mono font-bold ${achColor} shrink-0`}
               >
-                {/* TOP HALF: Person | Radar | Stats */}
-                <div className="flex-1 bg-gradient-to-br from-[#113a29]/80 via-[#0c291d]/85 to-[#051710]/95 backdrop-blur-xl border border-white/10 shadow-[0_16px_48px_rgba(0,0,0,0.35)] rounded-[2.5rem] p-6 lg:p-8 lg:pb-6 flex flex-col lg:flex-row min-h-[360px] lg:min-h-[460px] shrink-0 relative overflow-visible gap-6 lg:gap-0">
-                  {/* Left Column - Image */}
-                  <div className="lg:w-[38%] relative self-stretch flex items-end justify-center z-30 min-h-[320px] sm:min-h-[360px] lg:min-h-0 pointer-events-none -mb-6 lg:-ml-8 lg:-mt-20 xl:-mt-28">
-                    <motion.div
-                      animate={{
-                        scale: [1, 1.12, 1],
-                        opacity: [0.8, 1, 0.8],
-                      }}
-                      transition={{
-                        duration: 8,
-                        repeat: Infinity,
-                        ease: "easeInOut",
-                      }}
-                      className="absolute bottom-[8%] left-1/2 -translate-x-1/2 w-[85%] max-w-[360px] h-[60%] bg-emerald-500/15 blur-[60px] lg:blur-[85px] rounded-full pointer-events-none -z-10 mix-blend-screen"
-                    />
-                    <AnimatePresence mode="wait">
-                      <motion.img
-                        key={displayStaffAvatar}
-                        initial={{ opacity: 0, y: 16, scale: 0.97 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 6, scale: 0.97, filter: "blur(6px)" }}
-                        transition={{ duration: 0.45, type: "spring", bounce: 0.3 }}
-                        src={displayStaffAvatar}
-                        alt={activeOfficer?.name ?? currentStaff.name}
-                        className="relative z-20 mx-auto w-auto h-[105%] max-h-[480px] sm:max-h-[520px] lg:h-[125%] lg:max-h-[640px] xl:h-[130%] lg:scale-105 xl:scale-110 object-contain object-bottom drop-shadow-[0_25px_35px_rgba(0,0,0,0.6)] pointer-events-none"
-                        style={{
-                          WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,1) 60%, rgba(0,0,0,0) 95%)",
-                          maskImage: "linear-gradient(to bottom, rgba(0,0,0,1) 60%, rgba(0,0,0,0) 95%)",
-                        }}
-                      />
-                    </AnimatePresence>
-                  </div>
+                {fmtPct(row.achPercent)}
+              </div>
+            </div>
+            {isTodayView ? (
+              <div className="grid grid-cols-3 gap-2 text-[11px]">
+                <Cell label="เป้าวัน" value={row.targetDay > 0 ? fmtNum(row.targetDay) : "—"} />
+                <Cell label="ยอดวันนี้" value={row.actualDay > 0 ? fmtNum(row.actualDay) : "—"} highlight />
+                <Cell
+                  label="ส่วนต่าง"
+                  value={row.diffDay !== 0 ? (row.diffDay > 0 ? `+${fmtNum(row.diffDay)}` : fmtNum(row.diffDay)) : "—"}
+                  color={row.diffDay > 0 ? "emerald" : row.diffDay < 0 ? "rose" : "white"}
+                />
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 text-[11px] sm:grid-cols-4">
+                <Cell label="Target" value={row.target > 0 ? fmtNum(row.target) : "—"} />
+                <Cell label="Today" value={row.actualDay > 0 ? fmtNum(row.actualDay) : "—"} />
+                <Cell label="Actual" value={row.actual > 0 ? fmtNum(row.actual) : "—"} highlight />
+                <Cell
+                  label="Forecast"
+                  value={row.forecast > 0 ? fmtNum(row.forecast) : "—"}
+                />
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
-                  {/* Center Column - Radar Chart */}
-                  <div className="lg:w-[28%] relative flex items-center justify-center py-4 lg:py-0 z-40 overflow-visible">
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.8, rotate: -10 }}
-                      animate={{ opacity: 1, scale: 1, rotate: 0 }}
-                      transition={{ duration: 0.65, type: "spring", bounce: 0.25, delay: 0.15 }}
-                      className="w-full max-w-[300px] h-[300px] min-h-[300px] relative text-xs overflow-visible [&_.recharts-wrapper]:!overflow-visible [&_svg]:!overflow-visible"
-                    >
-                      <ResponsiveContainer width="100%" height={300} minWidth={0}>
-                        <RadarChart
-                          cx="50%"
-                          cy="50%"
-                          outerRadius="52%"
-                          margin={{ top: 28, right: 36, bottom: 28, left: 36 }}
-                          data={dynamicRadarData}
-                        >
-                          <PolarGrid
-                            gridType="polygon"
-                            stroke="rgba(255,255,255,0.15)"
-                            strokeWidth={1}
-                          />
-                          <PolarAngleAxis
-                            dataKey="subject"
-                            tick={renderCustomTick}
-                          />
-                          <PolarRadiusAxis
-                            angle={30}
-                            domain={[0, 100]}
-                            tick={false}
-                            axisLine={false}
-                          />
-                          <Radar
-                            name="Staff"
-                            dataKey="value"
-                            stroke="#10b981"
-                            strokeWidth={2}
-                            fill="#10b981"
-                            fillOpacity={0.15}
-                            isAnimationActive={true}
-                            animationDuration={800}
-                          />
-                        </RadarChart>
-                      </ResponsiveContainer>
-                      {/* Center Value */}
-                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <div className="w-11 h-11 rounded-full border border-emerald-500/20 flex items-center justify-center bg-emerald-500/5 backdrop-blur-sm">
-                          <AnimatePresence mode="wait">
-                            <motion.span
-                              key={dynamicScore}
-                              initial={{ opacity: 0, scale: 0.5 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              exit={{ opacity: 0, scale: 0.5 }}
-                              className="text-white/55 text-base font-semibold tracking-tighter"
-                            >
-                              {dynamicScore}
-                            </motion.span>
-                          </AnimatePresence>
-                        </div>
-                      </div>
-                    </motion.div>
-                  </div>
+function Cell({
+  label,
+  value,
+  highlight = false,
+  color,
+}: {
+  label: string;
+  value: string;
+  highlight?: boolean;
+  color?: "emerald" | "rose" | "white";
+}) {
+  const colorClass = color === "emerald" ? "text-emerald-300" : color === "rose" ? "text-rose-300" : "text-white";
+  return (
+    <div className="flex flex-col">
+      <span className="text-[9px] uppercase tracking-wider text-white/40 leading-none mb-0.5">
+        {label}
+      </span>
+      <span
+        className={`font-mono font-semibold text-[12px] leading-tight tabular-nums truncate ${
+          highlight ? "text-white" : colorClass
+        }`}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
 
-                  {/* Right Column - Stats Grid */}
-                  <div className="lg:w-[34%] flex flex-col justify-center lg:justify-end pb-4 relative z-40">
-                    <motion.div
-                      initial={{ opacity: 0, x: 30 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.5, type: "spring", bounce: 0.2, delay: 0.1 }}
-                      className="text-center lg:text-right mb-4"
-                    >
-                      <AnimatePresence mode="wait">
-                        <motion.h1
-                          key={activeOfficer?.name ?? currentStaff.name}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -10 }}
-                          className="text-4xl lg:text-5xl font-bold mb-2 tracking-tight text-white"
-                        >
-                          {(activeOfficer?.name ?? currentStaff.name).split(" ")[0]}
-                          <br className="hidden lg:block" />{" "}
-                          {(activeOfficer?.name ?? currentStaff.name).split(" ")[1] || ""}
-                        </motion.h1>
-                      </AnimatePresence>
-                      <AnimatePresence mode="wait">
-                        <motion.div
-                          key={activeOfficer?.branch ?? currentStaff.store}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          className="flex items-center justify-center lg:justify-end gap-2 text-white/80 font-medium"
-                        >
-                          <Apple className="w-4 h-4" /> {activeOfficer?.branch ?? currentStaff.store}
-                        </motion.div>
-                      </AnimatePresence>
-                    </motion.div>
-
-                    {/* Top 3 Stats */}
-                    <div className="flex justify-center lg:justify-end gap-3 mb-3">
-                      <motion.button
-                        onClick={() => onSetActiveStat("sales")}
-                        initial={{ opacity: 0, y: 15 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ type: "spring", stiffness: 120, damping: 14, delay: 0.1 }}
-                        whileHover={{ scale: 1.05, y: -4, boxShadow: "0px 10px 25px rgba(16, 185, 129, 0.2)" }}
-                        whileTap={{ scale: 0.95 }}
-                        className={`rounded-2xl px-2 py-3 w-28 sm:w-32 min-h-[104px] text-center border shadow-lg transition-all duration-200 overflow-visible ${activeStat === "sales" ? "bg-[#0c3123] border-white/30 ring-1 ring-emerald-500/50" : "bg-black/20 border-white/5 hover:bg-black/30"}`}
-                      >
-                        <ShoppingBag
-                          className={`w-5 h-5 mx-auto mb-1.5 shrink-0 ${activeStat === "sales" ? "text-white" : "text-white/60"}`}
-                        />
-                        <div className="text-[10px] text-white/70 mb-1.5 font-medium leading-tight">
-                          Monthly Sales
-                        </div>
-                        <AnimatePresence mode="wait">
-                          <motion.div
-                            key={`${monthlySalesActual}-${monthlySalesTarget}-${monthlySalesPct}`}
-                            initial={{ opacity: 0, y: 5 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -5 }}
-                            className="w-full space-y-1 text-[9px] leading-snug overflow-visible"
-                          >
-                            <div className="flex items-baseline justify-between gap-1 min-w-0">
-                              <span className="text-white/55 shrink-0">ยอดจริง</span>
-                              <span className="font-bold text-white tabular-nums truncate">
-                                {fmtSalesNum(monthlySalesActual)}
-                              </span>
-                            </div>
-                            <div className="flex items-baseline justify-between gap-1 min-w-0">
-                              <span className="text-white/55 shrink-0">เป้า</span>
-                              <span className="font-semibold text-white/85 tabular-nums truncate">
-                                {monthlySalesTarget != null
-                                  ? fmtSalesNum(monthlySalesTarget)
-                                  : "—"}
-                              </span>
-                            </div>
-                            <div className="flex items-baseline justify-between gap-1 min-w-0">
-                              <span className="text-white/55 shrink-0">ถึงเป้า</span>
-                              <span className="font-bold text-emerald-300 tabular-nums">
-                                {fmtSalesPct(monthlySalesPct)}
-                              </span>
-                            </div>
-                          </motion.div>
-                        </AnimatePresence>
-                      </motion.button>
-                      <motion.button
-                        onClick={() => onSetActiveStat("csat")}
-                        initial={{ opacity: 0, y: 15 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ type: "spring", stiffness: 120, damping: 14, delay: 0.15 }}
-                        whileHover={{ scale: 1.05, y: -4, boxShadow: "0px 10px 25px rgba(16, 185, 129, 0.2)" }}
-                        whileTap={{ scale: 0.95 }}
-                        className={`backdrop-blur-md rounded-2xl px-2 py-4 w-28 sm:w-32 text-center border shadow-inner transition-all duration-200 ${activeStat === "csat" ? "bg-white/[0.15] border-white/30 ring-1 ring-emerald-500/50" : "bg-white/5 border-white/10 hover:bg-white/10"}`}
-                      >
-                        <Award
-                          className={`w-5 h-5 mx-auto mb-2 ${activeStat === "csat" ? "text-emerald-300 fill-emerald-300/20" : "text-white/60"}`}
-                        />
-                        <div className="text-[10px] text-white/80 mb-1 font-medium">
-                          7 Wonder
-                        </div>
-                        <AnimatePresence mode="wait">
-                          <motion.div
-                            key={sevenWondersScore}
-                            initial={{ opacity: 0, y: 5 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -5 }}
-                            className="text-xl lg:text-2xl font-bold text-white"
-                          >
-                            {sevenWondersScore}%
-                          </motion.div>
-                        </AnimatePresence>
-                      </motion.button>
-                      <motion.button
-                        onClick={() => onSetActiveStat("target")}
-                        initial={{ opacity: 0, y: 15 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ type: "spring", stiffness: 120, damping: 14, delay: 0.2 }}
-                        whileHover={{ scale: 1.05, y: -4, boxShadow: "0px 10px 25px rgba(16, 185, 129, 0.2)" }}
-                        whileTap={{ scale: 0.95 }}
-                        className={`backdrop-blur-xl rounded-2xl px-2 py-4 w-28 sm:w-32 text-center border shadow-xl relative overflow-hidden transition-all duration-200 ${activeStat === "target" ? "bg-white/20 border-white/40 ring-1 ring-emerald-500/50" : "bg-white/5 border-white/10 hover:bg-white/10"}`}
-                      >
-                        {activeStat === "target" && (
-                          <div className="absolute inset-0 bg-emerald-400/20 mix-blend-overlay"></div>
-                        )}
-                        <Star
-                          className={`w-5 h-5 mx-auto mb-2 relative z-10 ${activeStat === "target" ? "text-emerald-200 fill-emerald-200" : "text-white/60"}`}
-                        />
-                        <div className="text-[10px] relative z-10 text-emerald-100 mb-0.5 font-medium">
-                          ยอดวันนี้
-                        </div>
-                        {todayDateLabel ? (
-                          <div className="text-[8px] relative z-10 text-white/45 mb-1 leading-tight px-0.5">
-                            {todayDateLabel}
-                          </div>
-                        ) : null}
-                        {todayDateDetails ? (
-                          <div className="text-[8px] relative z-10 text-emerald-200/70 mb-1 leading-tight px-0.5">
-                            {todayDateDetails}
-                          </div>
-                        ) : null}
-                        <AnimatePresence mode="wait">
-                          <motion.div
-                            key={todaySalesTotal}
-                            initial={{ opacity: 0, y: 5 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -5 }}
-                            className={`font-bold text-white relative z-10 transition-all ${
-                              fmtSalesNum(todaySalesTotal).length > 7
-                                ? "text-base sm:text-lg lg:text-xl tracking-tighter"
-                                : "text-xl lg:text-2xl"
-                            }`}
-                          >
-                            {fmtSalesNum(todaySalesTotal)}
-                          </motion.div>
-                        </AnimatePresence>
-                      </motion.button>
-                    </div>
-
-                    {/* Bottom 2x2 Stats */}
-                    <div className="grid grid-cols-2 gap-2 lg:gap-3 justify-center lg:justify-end max-w-[340px] w-full mx-auto lg:mx-0 lg:ml-auto">
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ type: "spring", stiffness: 100, delay: 0.25 }}
-                        whileHover={{ scale: 1.05, y: -2, backgroundColor: "rgba(255, 255, 255, 0.15)", borderColor: "rgba(255, 255, 255, 0.2)", boxShadow: "0 8px 20px rgba(16, 185, 129, 0.1)" }}
-                        className="bg-white/10 backdrop-blur-md border border-white/10 rounded-full px-2 lg:px-4 py-2.5 text-center overflow-hidden min-w-0 flex flex-col items-center justify-center transition-colors duration-200"
-                      >
-                        <div className="text-[9px] uppercase tracking-wider text-white/60 mb-0.5 w-full truncate">
-                          Target Today
-                        </div>
-                        <div className="text-[10px] lg:text-xs font-semibold w-full truncate">
-                          ฿{fmtSalesNum(Math.round((monthlySalesTarget ?? 0) / 30))}
-                        </div>
-                      </motion.div>
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ type: "spring", stiffness: 100, delay: 0.3 }}
-                        whileHover={{ scale: 1.05, y: -2, backgroundColor: "rgba(255, 255, 255, 0.15)", borderColor: "rgba(255, 255, 255, 0.2)", boxShadow: "0 8px 20px rgba(16, 185, 129, 0.1)" }}
-                        className="bg-white/10 backdrop-blur-md border border-white/10 rounded-full px-2 lg:px-4 py-2.5 text-center overflow-hidden min-w-0 flex flex-col items-center justify-center transition-colors duration-200"
-                      >
-                        <div className="text-[9px] uppercase tracking-wider text-white/60 mb-0.5 w-full truncate">
-                          Today Ach%
-                        </div>
-                        <div className="text-[10px] lg:text-xs font-semibold w-full truncate">
-                          {fmtSalesPct(monthlySalesPct)}
-                        </div>
-                      </motion.div>
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ type: "spring", stiffness: 100, delay: 0.35 }}
-                        whileHover={{ scale: 1.05, y: -2, backgroundColor: "rgba(255, 255, 255, 0.15)", borderColor: "rgba(255, 255, 255, 0.2)", boxShadow: "0 8px 20px rgba(16, 185, 129, 0.1)" }}
-                        className="bg-white/10 backdrop-blur-md border border-white/10 rounded-full px-2 lg:px-4 py-2.5 text-center overflow-hidden min-w-0 flex flex-col items-center justify-center transition-colors duration-200"
-                      >
-                        <div className="text-[9px] uppercase tracking-wider text-white/60 mb-0.5 w-full truncate">
-                          Top Attach
-                        </div>
-                        <div className="text-[10px] lg:text-xs font-semibold w-full truncate">
-                          —
-                        </div>
-                      </motion.div>
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ type: "spring", stiffness: 100, delay: 0.4 }}
-                        whileHover={{ scale: 1.05, y: -2, backgroundColor: "rgba(255, 255, 255, 0.15)", borderColor: "rgba(255, 255, 255, 0.2)", boxShadow: "0 8px 20px rgba(16, 185, 129, 0.1)" }}
-                        className="bg-white/10 backdrop-blur-md border border-white/10 rounded-full px-2 lg:px-4 py-2.5 text-center flex flex-col items-center justify-center overflow-hidden min-w-0 transition-colors duration-200"
-                      >
-                        <div className="text-[9px] uppercase tracking-wider text-white/60 mb-0.5 w-full truncate">
-                          Language
-                        </div>
-                        <AnimatePresence mode="wait">
-                          <motion.div
-                            key={dynamicLanguages}
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="text-xs font-semibold flex items-center gap-1.5 h-4"
-                          >
-                            <div className="w-[14px] h-[10px] bg-slate-800 rounded-[2px] overflow-hidden flex relative border border-white/20">
-                              <div className="w-full flex flex-col justify-between">
-                                <div className="h-[2px] bg-red-600"></div>
-                                <div className="h-[2px] bg-white"></div>
-                                <div className="h-[2px] bg-blue-800"></div>
-                                <div className="h-[2px] bg-white"></div>
-                                <div className="h-[2px] bg-red-600"></div>
-                              </div>
-                            </div>{" "}
-                            {dynamicLanguages}
-                          </motion.div>
-                        </AnimatePresence>
-                      </motion.div>
-                    </div>
-                  </div>
-                </div>
-
-
-                {/* BOTTOM HALF: Tables */}
-                <div className="relative z-40 flex flex-col lg:flex-row gap-6 min-h-[260px]">
-                  {/* Category Performance or 7 Wonders Attach Rates Table */}
-                  <motion.div
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, delay: 0.25, type: "spring", bounce: 0.15 }}
-                    className="lg:w-full bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-6 flex flex-col shadow-[0_8px_32px_rgba(0,0,0,0.12)] overflow-hidden hover:border-white/20 transition-all duration-300"
-                  >
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="p-2 bg-emerald-500/20 rounded-xl border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
-                        {activeStat === "csat" ? (
-                          <Award className="w-4 h-4 text-emerald-400" />
-                        ) : (
-                          <TrendingUp className="w-4 h-4 text-emerald-400" />
-                        )}
-                      </div>
-                      <div>
-                        <h2 className="text-base font-bold tracking-tight text-white">
-                          {activeStat === "csat"
-                            ? "7 Wonders Attach Rates"
-                            : isTodayView
-                              ? "ยอดขายวันนี้ตามหมวด"
-                              : "Category Performance vs. Target"}
-                        </h2>
-                        <p className="text-[10px] text-white/50">
-                          {activeStat === "csat"
-                            ? `Attach rate breakdown for ${activeOfficer?.name ?? currentStaff.name} against KPI targets`
-                            : isTodayView
-                              ? `ยอดขายของวันปัจจุบัน — ${activeOfficer?.name ?? currentStaff.name}${todayDateLabel ? ` • ${todayDateLabel}` : ""}`
-                              : `Performance breakdown for ${activeOfficer?.name ?? currentStaff.name} by product category`}
-                        </p>
-                      </div>
-                    </div>
-
-                    {categoryPerformanceHint && activeStat !== "csat" ? (
-                      <p
-                        className={`mb-3 rounded-lg border px-3 py-2 text-[11px] ${
-                          isTodayView
-                            ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-100/90"
-                            : "border-amber-500/30 bg-amber-500/10 text-amber-200/90"
-                        }`}
-                      >
-                        {categoryPerformanceHint}
-                      </p>
-                    ) : null}
-                    
-                    <div className="flex-1 overflow-x-auto rounded-xl border border-emerald-500/10">
-                      <table className="w-full text-left border-collapse text-[11px]">
-                        <thead>
-                          <tr className="bg-[#0c3123] border-b border-emerald-500/20 text-white/90">
-                            <th className="py-2.5 px-3 font-bold uppercase tracking-wider">
-                              {activeStat === "csat" ? "Attach Category" : "Group Category"}
-                            </th>
-                            {isCsatView ? (
-                              <>
-                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Target</th>
-                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Actual</th>
-                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-center">Ach. %</th>
-                              </>
-                            ) : isTodayView ? (
-                              <>
-                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">
-                                  เป้าวัน
-                                </th>
-                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">
-                                  ยอดวันนี้
-                                </th>
-                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">
-                                  ส่วนต่าง
-                                </th>
-                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-center">
-                                  % ถึงเป้า
-                                </th>
-                              </>
-                            ) : (
-                              <>
-                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Target</th>
-                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Actual</th>
-                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-center">Ach. %</th>
-                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Forecast</th>
-                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-center">%Forecast</th>
-                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Last Month</th>
-                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-center">% MoM</th>
-                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Last Year</th>
-                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-center">% YoY</th>
-                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Target Day</th>
-                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Actual Day</th>
-                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Diff Day</th>
-                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-center">% Ach Day</th>
-                              </>
-                            )}
-                          </tr>
-                        </thead>
-                        <AnimatePresence mode="wait">
-                          <motion.tbody
-                            key={activeStat}
-                            initial={{ opacity: 0, y: 10, filter: "blur(4px)" }}
-                            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                            exit={{ opacity: 0, y: -10, filter: "blur(4px)" }}
-                            transition={{ duration: 0.25 }}
-                            className="divide-y divide-emerald-500/10 bg-[#052b20]/60"
-                          >
-                            {tableRows.map((row, idx) => {
-                              const isCsat = activeStat === "csat";
-                              const isTotal = row.category === "Total" || row.category === "Average";
-                              const fmtNum = (val: number) => isCsat ? `${val.toFixed(2)}%` : val.toLocaleString();
-                              const fmtPct = (val: number) => `${val.toFixed(2)}%`;
-
-                              // Scale a row's value to be relative to its target
-                              // (0 = zero progress, 100 = hit target). Used for the
-                              // colour band on the Ach.% badge so the colour
-                              // reflects how close the officer is to the target,
-                              // not the raw actual percentage.
-                              const scaledForTarget = (r: typeof row) => {
-                                const isPercentPreset =
-                                  r.calcType === "attach" ||
-                                  r.calcType === "bahtRate" ||
-                                  r.calcType === "catAttach";
-                                if (isPercentPreset && r.target > 0) {
-                                  return (r.actual / r.target) * 100;
-                                }
-                                return r.achPercent;
-                              };
-
-                              const getBadgeClass = (rate: number) => {
-                                if (rate >= 100) return "bg-green-500/20 text-green-400 font-extrabold px-1.5 py-0.5 rounded border border-green-500/20";
-                                if (rate >= 80) return "bg-amber-500/20 text-amber-400 font-extrabold px-1.5 py-0.5 rounded border border-amber-500/20";
-                                return "bg-rose-500/20 text-rose-400 font-extrabold px-1.5 py-0.5 rounded border border-rose-500/20";
-                              };
-
-                              const getDiffClass = (diff: number) => {
-                                if (diff > 0) return "text-green-400 font-bold";
-                                if (diff === 0) return "text-white/60";
-                                return "text-rose-400 font-bold";
-                              };
-
-                              const getDiffText = (diff: number) => {
-                                if (isCsat) return `${diff > 0 ? "+" : ""}${diff.toFixed(2)}%`;
-                                return diff > 0 ? `+${diff.toLocaleString()}` : diff.toLocaleString();
-                              };
-
-                              if (isCsatView) {
-                                return (
-                                  <tr
-                                    key={idx}
-                                    className={`hover:bg-white/5 transition-colors duration-150 text-white/90 ${isTotal ? "bg-[#0c3123]/90 font-bold border-t border-emerald-500/30" : ""}`}
-                                  >
-                                    <td className="py-2.5 px-3 font-bold">{row.category}</td>
-                                    <td className={`py-2.5 px-3 text-right ${isTotal ? "text-white" : "text-white/60"}`}>
-                                      {row.target > 0 ? `${row.target}%` : "—"}
-                                    </td>
-                                    <td className="py-2.5 px-3 text-right font-bold">
-                                      {fmtActualAB(row.actualA, row.actualB, row.calcType)}
-                                    </td>
-                                    <td className="py-2.5 px-3 text-center">
-                                      <span className={getBadgeClass(scaledForTarget(row))}>
-                                        {fmtPct(row.achPercent)}
-                                      </span>
-                                    </td>
-                                  </tr>
-                                );
-                              }
-
-                              if (isTodayView) {
-                                return (
-                                  <tr
-                                    key={idx}
-                                    className={`hover:bg-white/5 transition-colors duration-150 text-white/90 ${isTotal ? "bg-[#0c3123]/90 font-bold border-t border-emerald-500/30" : ""}`}
-                                  >
-                                    <td className="py-2.5 px-3 font-bold">{row.category}</td>
-                                    <td className={`py-2.5 px-3 text-right ${isTotal ? "text-white" : "text-white/60"}`}>
-                                      {fmtNum(row.targetDay)}
-                                    </td>
-                                    <td className="py-2.5 px-3 text-right font-bold">{fmtNum(row.actualDay)}</td>
-                                    <td className="py-2.5 px-3 text-right">
-                                      <span className={getDiffClass(row.diffDay)}>
-                                        {getDiffText(row.diffDay)}
-                                      </span>
-                                    </td>
-                                    <td className="py-2.5 px-3 text-center">
-                                      <span className={getBadgeClass(row.achDayPercent)}>
-                                        {fmtPct(row.achDayPercent)}
-                                      </span>
-                                    </td>
-                                  </tr>
-                                );
-                              }
-
-                              return (
-                                <tr 
-                                  key={idx} 
-                                  className={`hover:bg-white/5 transition-colors duration-150 text-white/90 ${isTotal ? "bg-[#0c3123]/90 font-bold border-t border-emerald-500/30" : ""}`}
-                                >
-                                  <td className="py-2.5 px-3 font-bold">{row.category}</td>
-                                  <td className={`py-2.5 px-3 text-right ${isTotal ? "text-white" : "text-white/60"}`}>{fmtNum(row.target)}</td>
-                                  <td className="py-2.5 px-3 text-right font-bold">{fmtNum(row.actual)}</td>
-                                  <td className="py-2.5 px-3 text-center">
-                                    <span className={getBadgeClass(row.achPercent)}>
-                                      {fmtPct(row.achPercent)}
-                                    </span>
-                                  </td>
-                                  <td className={`py-2.5 px-3 text-right ${isTotal ? "text-white" : "text-white/60"}`}>{fmtNum(row.forecast)}</td>
-                                  <td className="py-2.5 px-3 text-center">
-                                    <span className={getBadgeClass(row.forecastPercent)}>
-                                      {fmtPct(row.forecastPercent)}
-                                    </span>
-                                  </td>
-                                  <td className="py-2.5 px-3 text-right text-white/50">{fmtNum(row.lastMonth)}</td>
-                                  <td className="py-2.5 px-3 text-center">
-                                    <span className={row.momPercent === "New" ? "text-emerald-400 font-bold" : "text-white/80"}>
-                                      {typeof row.momPercent === "number" ? fmtPct(row.momPercent) : row.momPercent}
-                                    </span>
-                                  </td>
-                                  <td className="py-2.5 px-3 text-right text-white/50">{fmtNum(row.lastYear)}</td>
-                                  <td className="py-2.5 px-3 text-center">
-                                    <span className={row.yoyPercent === "New" ? "text-emerald-400 font-bold" : "text-white/80"}>
-                                      {typeof row.yoyPercent === "number" ? fmtPct(row.yoyPercent) : row.yoyPercent}
-                                    </span>
-                                  </td>
-                                  <td className={`py-2.5 px-3 text-right ${isTotal ? "text-white" : "text-white/60"}`}>{fmtNum(row.targetDay)}</td>
-                                  <td className="py-2.5 px-3 text-right font-bold">{fmtNum(row.actualDay)}</td>
-                                  <td className="py-2.5 px-3 text-right">
-                                    <span className={getDiffClass(row.diffDay)}>
-                                      {getDiffText(row.diffDay)}
-                                    </span>
-                                  </td>
-                                  <td className="py-2.5 px-3 text-center">
-                                    <span className={getBadgeClass(row.achDayPercent)}>
-                                      {fmtPct(row.achDayPercent)}
-                                    </span>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </motion.tbody>
-                        </AnimatePresence>
-                      </table>
-                    </div>
-                  </motion.div>
-                </div>
-              </motion.div>
+/* ============ CSAT Mobile Cards ============ */
+function CsatMobileCards({ rows }: { rows: PerformanceRow[] }) {
+  const visible = rows.filter(
+    (r) => r.target > 0 || r.actualA !== undefined || r.actualB !== undefined,
+  );
+  if (visible.length === 0) {
+    return <p className="text-xs text-white/40 text-center py-6">ยังไม่มีข้อมูล</p>;
+  }
+  return (
+    <div className="space-y-2">
+      {visible.map((row, idx) => {
+        const isTotal = row.category === "Total" || row.category === "Average";
+        const scaled =
+          row.calcType === "attach" ||
+          row.calcType === "bahtRate" ||
+          row.calcType === "catAttach"
+            ? row.target > 0
+              ? (row.actual / row.target) * 100
+              : 0
+            : row.achPercent;
+        const achColor =
+          scaled >= 100
+            ? "text-emerald-400 bg-emerald-500/20 border-emerald-500/30"
+            : scaled >= 80
+              ? "text-amber-400 bg-amber-500/20 border-amber-500/30"
+              : "text-rose-400 bg-rose-500/20 border-rose-500/30";
+        return (
+          <div
+            key={`${row.category}-${idx}`}
+            className={`rounded-xl border p-3 flex items-center justify-between gap-3 ${
+              isTotal
+                ? "bg-emerald-500/10 border-emerald-500/30"
+                : "bg-white/5 border-white/10"
+            }`}
+          >
+            <div className="text-sm font-bold text-white truncate flex-1 min-w-0">
+              {row.category}
+            </div>
+            <div className="text-right text-[11px] text-white/60 shrink-0">
+              <div>เป้า {row.target > 0 ? `${row.target}%` : "—"}</div>
+              <div className="text-white">
+                {row.actualA !== undefined
+                  ? `${row.actualA}${row.actualB !== undefined ? `/${row.actualB}` : ""}`
+                  : "—"}
+              </div>
+            </div>
+            <div
+              className={`shrink-0 text-sm font-extrabold px-2.5 py-1 rounded-lg border ${achColor}`}
+            >
+              {scaled.toFixed(1)}%
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
