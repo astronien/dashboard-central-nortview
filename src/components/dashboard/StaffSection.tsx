@@ -7,8 +7,8 @@ import {
   Radar,
   ResponsiveContainer,
 } from "recharts";
-import { ShoppingBag, Award, Star, Apple, Target, BarChart3, TrendingUp, Layers, User } from "lucide-react";
-import React from "react";
+import { ShoppingBag, Award, Star, Apple, BarChart3, User } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
 import { calcTargetToDate, calcTodayAchievementPct } from "../../lib/targetAggregations";
 import type { PresetCalcType } from "../../lib/presetTypes";
 
@@ -66,7 +66,7 @@ const isCurrencyCalcType = (calcType: PresetCalcType | undefined): boolean => {
   return calcType === "baht" || calcType === "bahtRate" || calcType === "catBaht";
 };
 
-export function StaffSection({
+const StaffSectionImpl = function StaffSection({
   displayStaffAvatar,
   activeOfficer,
   currentStaff,
@@ -128,25 +128,37 @@ export function StaffSection({
           return pctMatch ? Number(pctMatch[1]) : 0;
         })());
 
-  const fmtSalesNum = (n: number) => n.toLocaleString();
-  const fmtSalesPct = (n: number) =>
-    `${n >= 100 ? Math.round(n) : n.toFixed(1)}%`;
-  const fmtActualAB = (
-    a: number | undefined,
-    b: number | undefined,
-    calcType: PresetCalcType | undefined,
-  ): string => {
-    if (a === undefined) return "—";
-    const isCurrency = isCurrencyCalcType(calcType);
-    const aStr = isCurrency
-      ? `฿${Math.round(a).toLocaleString()}`
-      : Math.round(a).toLocaleString();
-    if (b === undefined) return aStr;
-    const bStr = isCurrency
-      ? `฿${Math.round(b).toLocaleString()}`
-      : Math.round(b).toLocaleString();
-    return `${aStr}/${bStr}`;
-  };
+  const fmtSalesNum = useMemo(
+    () => (n: number) => n.toLocaleString(),
+    [],
+  );
+  const fmtSalesPct = useMemo(
+    () => (n: number) =>
+      `${n >= 100 ? Math.round(n) : n.toFixed(1)}%`,
+    [],
+  );
+  const fmtActualAB = useMemo(
+    () =>
+      (
+        a: number | undefined,
+        b: number | undefined,
+        calcType: PresetCalcType | undefined,
+      ): string => {
+        if (a === undefined) return "—";
+        const isCurrency = isCurrencyCalcType(calcType);
+        const aStr = isCurrency
+          ? `฿${Math.round(a).toLocaleString()}`
+          : Math.round(a).toLocaleString();
+        if (b === undefined) return aStr;
+        const bStr = isCurrency
+          ? `฿${Math.round(b).toLocaleString()}`
+          : Math.round(b).toLocaleString();
+        return `${aStr}/${bStr}`;
+      },
+    [],
+  );
+  const fmtNum = useMemo(() => (v: number) => v.toLocaleString(), []);
+  const fmtPct = useMemo(() => (v: number) => `${v.toFixed(1)}%`, []);
   const isTodayView = activeStat === "target";
   const isCsatView = activeStat === "csat";
   const tableRows = isTodayView
@@ -155,16 +167,22 @@ export function StaffSection({
       ? activeOfficer7WondersPerformance
       : activeOfficerCategoryPerformance;
 
-  const currentMonthTotalDays = new Date().getDate() ? new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate() : 30;
-  const currentDay = Math.min(new Date().getDate(), currentMonthTotalDays);
+  const todayInfo = useMemo(() => {
+    const now = new Date();
+    const totalDays = now.getDate() > 0
+      ? new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+      : 30;
+    const day = Math.min(now.getDate(), totalDays);
+    return { day, totalDays };
+  }, []);
   const todayTarget = activeOfficer
-    ? Math.round(calcTargetToDate(activeOfficer.target, currentDay, currentMonthTotalDays))
+    ? Math.round(calcTargetToDate(activeOfficer.target, todayInfo.day, todayInfo.totalDays))
     : Number(currentStaff.stats.target) || 0;
   const todayAchPercent = calcTodayAchievementPct(todaySalesTotal, todayTarget);
 
   // PWA / mobile state — runs once on mount
-  const [isMobile, setIsMobile] = React.useState(false);
-  React.useEffect(() => {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
     if (typeof window === "undefined") return;
     const mq = window.matchMedia("(max-width: 767px)");
     const update = () => setIsMobile(mq.matches);
@@ -178,8 +196,17 @@ export function StaffSection({
 
   const officerName = activeOfficer?.name ?? currentStaff.name;
   const officerBranch = activeOfficer?.branch ?? currentStaff.store;
-  const firstName = (officerName.split(" ")[0] ?? "").trim();
-  const restName = (officerName.split(" ").slice(1).join(" ") ?? "").trim();
+  const { firstName, restName } = useMemo(() => {
+    const parts = officerName.split(" ");
+    return {
+      firstName: (parts[0] ?? "").trim(),
+      restName: (parts.slice(1).join(" ") ?? "").trim(),
+    };
+  }, [officerName]);
+  const stableStaffKey = useMemo(
+    () => `${activeOfficer?.name ?? currentStaff.name}`,
+    [activeOfficer?.name, currentStaff.name],
+  );
 
   return (
     <motion.div
@@ -221,9 +248,9 @@ export function StaffSection({
             </div>
             {/* Name + branch */}
             <div className="text-center sm:text-left flex-1 min-w-0">
-              <AnimatePresence mode="wait">
+              <AnimatePresence mode="wait" initial={false}>
                 <motion.h1
-                  key={officerName}
+                  key={stableStaffKey}
                   initial={reduceMotion ? false : { opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={reduceMotion ? undefined : { opacity: 0, y: -10 }}
@@ -269,7 +296,7 @@ export function StaffSection({
               {/* Center score */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="w-14 h-14 sm:w-16 sm:h-16 lg:w-20 lg:h-20 rounded-full border-2 border-emerald-500/30 flex items-center justify-center bg-emerald-500/10 backdrop-blur-sm">
-                  <AnimatePresence mode="wait">
+                  <AnimatePresence mode="wait" initial={false}>
                     <motion.span
                       key={dynamicScore}
                       initial={reduceMotion ? false : { opacity: 0, scale: 0.5 }}
@@ -367,18 +394,20 @@ export function StaffSection({
           <CategoryMobileCards
             rows={tableRows}
             isTodayView={isTodayView}
-            fmtNum={(v) => v.toLocaleString()}
-            fmtPct={(v) => `${v.toFixed(1)}%`}
+            fmtNum={fmtNum}
+            fmtPct={fmtPct}
             fmtActualAB={fmtActualAB}
           />
         )}
       </div>
     </motion.div>
   );
-}
+};
+
+export const StaffSection = React.memo(StaffSectionImpl);
 
 /* ============ Stat Card ============ */
-function StatCard({
+const StatCard = React.memo(function StatCard({
   label,
   value,
   subValue,
@@ -393,7 +422,7 @@ function StatCard({
   subValue?: string;
   badge?: string;
   badgeColor?: "emerald" | "amber" | "rose";
-  icon: React.ReactNode;
+  icon?: React.ReactNode;
   active?: boolean;
   onClick?: () => void;
 }) {
@@ -432,10 +461,10 @@ function StatCard({
       ) : null}
     </Interactive>
   );
-}
+});
 
 /* ============ Category Mobile Cards ============ */
-function CategoryMobileCards({
+const CategoryMobileCards = React.memo(function CategoryMobileCards({
   rows,
   isTodayView,
   fmtNum,
@@ -513,7 +542,7 @@ function CategoryMobileCards({
       })}
     </div>
   );
-}
+});
 
 function Cell({
   label,
@@ -544,7 +573,7 @@ function Cell({
 }
 
 /* ============ CSAT Mobile Cards ============ */
-function CsatMobileCards({ rows }: { rows: PerformanceRow[] }) {
+const CsatMobileCards = React.memo(function CsatMobileCards({ rows }: { rows: PerformanceRow[] }) {
   const visible = rows.filter(
     (r) => r.target > 0 || r.actualA !== undefined || r.actualB !== undefined,
   );
@@ -599,4 +628,4 @@ function CsatMobileCards({ rows }: { rows: PerformanceRow[] }) {
       })}
     </div>
   );
-}
+});

@@ -1699,11 +1699,22 @@ function AppInternal({
     categoryMaster: "Category Master",
   };
 
-  const currentStaff =
-    staffData.find((s) => s.id === activeStaffId) || staffData[0];
-  const currentOfficer = parsedReport.officers[Number(activeStaffId) - 1] ?? parsedReport.officers[0];
-  const activeOfficerIndex = Math.max(Number(activeStaffId) - 1, 0);
-  const activeOfficer = parsedReport.officers[activeOfficerIndex] ?? parsedReport.officers[0];
+  const currentStaff = useMemo(
+    () => staffData.find((s) => s.id === activeStaffId) || staffData[0],
+    [activeStaffId, staffData],
+  );
+  const currentOfficer = useMemo(
+    () => parsedReport.officers[Number(activeStaffId) - 1] ?? parsedReport.officers[0],
+    [parsedReport.officers, activeStaffId],
+  );
+  const activeOfficerIndex = useMemo(
+    () => Math.max(Number(activeStaffId) - 1, 0),
+    [activeStaffId],
+  );
+  const activeOfficer = useMemo(
+    () => parsedReport.officers[activeOfficerIndex] ?? parsedReport.officers[0],
+    [parsedReport.officers, activeOfficerIndex],
+  );
 
   const attachOfficerRows = useMemo<AttachOfficerRow[]>(() => {
     if (!displayUploads.current.length) return [];
