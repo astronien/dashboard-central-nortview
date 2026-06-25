@@ -1309,21 +1309,35 @@ function AppInternal({
       if (role !== "pia") return rows;
       // Build set of PIA officer names from targetRows (single source of truth)
       const piaNames = new Set<string>();
+      const piaIds = new Set<string>();
       uploadedFiles.target.forEach((row) => {
         const pos = String(row.POSISION ?? "").trim().toUpperCase();
         if (pos === "PIA") {
           const name = `${row.NAME ?? ""} ${row.SURNAME ?? ""}`.trim();
           if (name) piaNames.add(name);
+          const id = String(row["STAFF ID"] ?? row.emp_id ?? "").trim();
+          if (id) piaIds.add(id);
         }
       });
-      if (piaNames.size === 0) return rows;
+      if (piaNames.size === 0 && piaIds.size === 0) return rows;
       return rows.filter((row) => {
+        // Sales rows use "Officer (Name)"; target rows use NAME + SURNAME.
+        // Fallback to STAFF ID matching for rows that have one.
         const officer = String(row["Officer (Name)"] ?? "").trim();
-        if (!officer) return false;
-        // Match against any PIA name using matchesOfficer (handles aliases)
-        for (const piaName of piaNames) {
-          if (matchesOfficer(officer, piaName)) return true;
+        if (officer) {
+          for (const piaName of piaNames) {
+            if (matchesOfficer(officer, piaName)) return true;
+          }
         }
+        const nameFromTarget =
+          `${row.NAME ?? row["emp_name"] ?? ""} ${row.SURNAME ?? row["emp_sname"] ?? ""}`.trim();
+        if (nameFromTarget) {
+          for (const piaName of piaNames) {
+            if (matchesOfficer(nameFromTarget, piaName)) return true;
+          }
+        }
+        const staffId = String(row["STAFF ID"] ?? row.emp_id ?? "").trim();
+        if (staffId && piaIds.has(staffId)) return true;
         return false;
       });
     },
