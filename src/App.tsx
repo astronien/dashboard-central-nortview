@@ -3102,13 +3102,13 @@ function AppInternal({
           )}
         </div>
 
-        {/* Top Navigation (Floating Right) */}
+        {/* Top Navigation (Floating Right) — desktop only */}
         <header
-          className="absolute right-4 md:right-8 w-1/2 flex justify-end items-center z-50 pointer-events-none"
+          className="absolute right-4 md:right-8 w-1/2 hidden md:flex justify-end items-center z-50 pointer-events-none"
           style={{ top: "calc(env(safe-area-inset-top, 0px) + 1.5rem)" }}
         >
           <div className="flex items-center gap-6 pointer-events-auto">
-            <nav className="flex items-center space-x-2 lg:space-x-4 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/5 shadow-xl hidden md:flex">
+            <nav className="flex items-center space-x-2 lg:space-x-4 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/5 shadow-xl">
               <button
                 onClick={() => setCurrentView("home")}
                 className={`p-2 rounded-full transition-colors ${currentView === "home" ? "bg-[#0f4430] shadow-inner text-white" : "text-white/60 hover:text-white"}`}
@@ -3236,8 +3236,9 @@ function AppInternal({
               currentView === "home"
                 ? "calc(env(safe-area-inset-top, 0px) + 7rem)"
                 : "calc(env(safe-area-inset-top, 0px) + 6rem)",
+            // Reserve space at the bottom for the mobile tab bar (~64px + safe area)
             paddingBottom:
-              "calc(env(safe-area-inset-bottom, 0px) + 2rem)",
+              "calc(env(safe-area-inset-bottom, 0px) + 4.5rem)",
           }}
         >
           <AnimatePresence mode="wait">
@@ -3350,12 +3351,75 @@ function AppInternal({
                     void handleStaffPhotoRemove(staffId);
                   }}
                   onNavigateToReports={() => setCurrentView("reports")}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </main>
-      </div>
-    </div>
-  );
+                 />
+               </motion.div>
+             )}
+           </AnimatePresence>
+         </main>
+
+        {/* Mobile Bottom Tab Bar (visible only < md) */}
+        <nav
+          className="md:hidden fixed left-0 right-0 z-50 flex justify-around items-stretch bg-[#0a1f17]/95 backdrop-blur-lg border-t border-white/10 shadow-[0_-8px_24px_rgba(0,0,0,0.4)]"
+          style={{ bottom: "env(safe-area-inset-bottom, 0px)" }}
+        >
+          <button
+            onClick={() => setCurrentView("home")}
+            className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-colors ${
+              currentView === "home" ? "text-emerald-300" : "text-white/55"
+            }`}
+            title="Home"
+          >
+            <Home className="w-5 h-5" />
+            <span className="text-[10px] font-medium">Home</span>
+          </button>
+          <button
+            onClick={() => setCurrentView("staff")}
+            className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-colors ${
+              currentView === "staff" ? "text-emerald-300" : "text-white/55"
+            }`}
+            title="Staff Profile"
+          >
+            <User className="w-5 h-5" />
+            <span className="text-[10px] font-medium">Profile</span>
+          </button>
+          {!isPia && (
+            <button
+              onClick={() => setCurrentView("reports")}
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-colors ${
+                currentView === "reports" ? "text-emerald-300" : "text-white/55"
+              }`}
+              title="Reports"
+            >
+              <PieChart className="w-5 h-5" />
+              <span className="text-[10px] font-medium">Reports</span>
+            </button>
+          )}
+          {!isPia && (
+            <button
+              onClick={() => setCurrentView("kpi_preset")}
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-colors ${
+                currentView === "kpi_preset" ? "text-emerald-300" : "text-white/55"
+              }`}
+              title="KPI Preset"
+            >
+              <SlidersHorizontal className="w-5 h-5" />
+              <span className="text-[10px] font-medium">KPI</span>
+            </button>
+          )}
+          {!isPia && (
+            <button
+              onClick={() => setCurrentView("settings")}
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-colors ${
+                currentView === "settings" ? "text-emerald-300" : "text-white/55"
+              }`}
+              title="Settings"
+            >
+              <Settings className="w-5 h-5" />
+              <span className="text-[10px] font-medium">Settings</span>
+            </button>
+          )}
+        </nav>
+       </div>
+     </div>
+   );
 }
