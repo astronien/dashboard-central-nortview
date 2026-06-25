@@ -1517,21 +1517,25 @@ function AppInternal({
   const [activeStaffId, setActiveStaffId] = useState("1");
 
   // PIA: auto-select their own officer in the profile/staff view + default
-  // to home view (shows aggregated PIA data across the branch).
+  // to home view (shows aggregated PIA data across the branch). Re-runs when
+  // either the user (auth) or the parsed report finishes loading — otherwise
+  // a fresh login would race and lock onto officer index 0.
   useEffect(() => {
     if (role !== "pia") return;
     const officers = parsedReport.officers;
     if (officers.length === 0) return;
     const piaName = (user?.name ?? "").trim();
-    const ownIndex = piaName
-      ? officers.findIndex((o) => matchesOfficer(o.name ?? "", piaName))
-      : -1;
-    const newId = ownIndex >= 0 ? String(ownIndex + 1) : "1";
+    if (!piaName) return;
+    const ownIndex = officers.findIndex((o) =>
+      matchesOfficer(o.name ?? "", piaName),
+    );
+    if (ownIndex < 0) return;
+    const newId = String(ownIndex + 1);
     if (activeStaffId !== newId) setActiveStaffId(newId);
     if (currentView !== "home" && currentView !== "staff") {
       setCurrentView("home");
     }
-  }, [role, user?.name, parsedReport.officers, activeStaffId, currentView]);
+  }, [role, user?.name, user?.officerId, parsedReport.officers, activeStaffId, currentView]);
 
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState("iPhone");
@@ -2919,8 +2923,52 @@ function AppInternal({
       if (persisted && hasUploadData(persisted)) {
         setUploadedFiles(persisted);
         rebuildReport(persisted, { skipPersist: true });
+
+        // If no savedBranch on this device, auto-detect the branch from the
+        // loaded data. Without this, a fresh device defaults to "Mega Bangna"
+        // (the initial selectedBranch) and the user sees an empty dashboard
+        // because their real data lives in a different branch.
+        if (!savedBranch && persisted.current && persisted.current.length > 0) {
+          const branchesInData = Array.from(
+            new Set(
+              persisted.current
+                .map((r) => String(r["Branch (Name)"] ?? "").trim())
+                .filter(Boolean),
+            ),
+          );
+          if (branchesInData.length > 0) {
+            // Prefer the branch the user is signed in to (PIA officers are
+            // pinned to one branch); fall back to the most common one.
+            const userBranch = (user?.branch ?? "").trim();
+            const pick =
+              branchesInData.find(
+                (b) =>
+                  userBranch &&
+                  cleanBranchForMatching(b).includes(
+                    cleanBranchForMatching(userBranch),
+                  ),
+              ) ??
+              branchesInData.sort(
+                (a, b) =>
+                  persisted.current!.filter(
+                    (r) => r["Branch (Name)"] === b,
+                  ).length -
+                  persisted.current!.filter(
+                    (r) => r["Branch (Name)"] === a,
+                  ).length,
+              )[0];
+            if (pick && pick !== selectedBranch) {
+              setSelectedBranch(pick);
+              void idbSet("dashboard-selected-branch", pick);
+            }
+            setSelectedBranchLoaded(true);
+          }
+        } else {
+          setSelectedBranchLoaded(true);
+        }
       } else {
         setParsedReport(fallbackReport);
+        setSelectedBranchLoaded(true);
       }
       setIsInitialLoading(false);
     })();
