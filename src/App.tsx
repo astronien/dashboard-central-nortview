@@ -1247,10 +1247,39 @@ const emptyReport: ParsedReport = {
 export default function App() {
   return (
     <AuthProvider>
+      <PwaSafeAreaStyle />
       <AppGate />
     </AuthProvider>
   );
 }
+
+// Global style: respect iOS safe-area (notch / home indicator). The Tailwind
+// classes below only kick in when running as a PWA (display-mode: standalone)
+// so the dev preview in Safari still gets the standard inset.
+const PwaSafeAreaStyle = () => (
+  <style>{`
+    @supports (padding: env(safe-area-inset-top)) {
+      html { background: #051710; }
+      body { background: #051710; }
+    }
+    html, body, #root {
+      -webkit-tap-highlight-color: transparent;
+      overscroll-behavior-y: contain;
+      text-size-adjust: 100%;
+      -webkit-text-size-adjust: 100%;
+    }
+    body {
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+      padding-left: env(safe-area-inset-left, 0px);
+      padding-right: env(safe-area-inset-right, 0px);
+    }
+    /* Prevent oversize text from auto-zooming on focus on iOS */
+    input, textarea, select, button {
+      font-size: 16px;
+    }
+  `}</style>
+);
 
 function AppGate() {
   const { user, loading } = useAuth();
@@ -3074,7 +3103,10 @@ function AppInternal({
         </div>
 
         {/* Top Navigation (Floating Right) */}
-        <header className="absolute top-6 right-8 w-1/2 flex justify-end items-center z-50 pointer-events-none">
+        <header
+          className="absolute right-4 md:right-8 w-1/2 flex justify-end items-center z-50 pointer-events-none"
+          style={{ top: "calc(env(safe-area-inset-top, 0px) + 1.5rem)" }}
+        >
           <div className="flex items-center gap-6 pointer-events-auto">
             <nav className="flex items-center space-x-2 lg:space-x-4 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/5 shadow-xl hidden md:flex">
               <button
@@ -3198,7 +3230,15 @@ function AppInternal({
 
         {/* Main Content */}
         <main
-          className={`relative flex-1 flex flex-col px-4 md:px-8 pb-8 gap-6 z-20 overflow-x-hidden ${currentView === "home" ? "pt-28" : "pt-24"}`}
+          className="relative flex-1 flex flex-col px-4 md:px-8 gap-6 z-20 overflow-x-hidden"
+          style={{
+            paddingTop:
+              currentView === "home"
+                ? "calc(env(safe-area-inset-top, 0px) + 7rem)"
+                : "calc(env(safe-area-inset-top, 0px) + 6rem)",
+            paddingBottom:
+              "calc(env(safe-area-inset-bottom, 0px) + 2rem)",
+          }}
         >
           <AnimatePresence mode="wait">
             {currentView === "home" && (
