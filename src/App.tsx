@@ -36,7 +36,7 @@ import {
 import CategoryTreePicker from "./components/CategoryTreePicker";
 
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { parseCategoryMasterFile } from "./lib/categoryMasterUpload";
 import { parseSalesExcelFile } from "./lib/salesUpload";
 import { parseTargetExcelFile } from "./lib/targetUpload";
@@ -443,9 +443,10 @@ type DerivedAttachRow = {
   avatar: string;
 };
 
-type OfficerPerformance = {
+ type OfficerPerformance = {
   name: string;
   branch: string;
+  position?: string;
   target: number;
   actual: number;
   achPercent: number;
@@ -769,6 +770,7 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
     officerSummary.set(officerKey, {
       name,
       branch,
+      position: String(row.POSISION ?? "").trim(),
       target: toNumber(row.Total),
       actual: 0,
       achPercent: 0,
@@ -1300,16 +1302,44 @@ function AppInternal({
     );
   };
 
+  // PIA: filter sales rows to ALL officers whose position is "PIA" (not just
+  // the single logged-in PIA). Excludes BSM/Asst.BSM/Cashier/PIS/etc.
+  const filterByPia = useCallback(
+    (rows: RawRow[]): RawRow[] => {
+      if (role !== "pia") return rows;
+      // Build set of PIA officer names from targetRows (single source of truth)
+      const piaNames = new Set<string>();
+      uploadedFiles.target.forEach((row) => {
+        const pos = String(row.POSISION ?? "").trim().toUpperCase();
+        if (pos === "PIA") {
+          const name = `${row.NAME ?? ""} ${row.SURNAME ?? ""}`.trim();
+          if (name) piaNames.add(name);
+        }
+      });
+      if (piaNames.size === 0) return rows;
+      return rows.filter((row) => {
+        const officer = String(row["Officer (Name)"] ?? "").trim();
+        if (!officer) return false;
+        // Match against any PIA name using matchesOfficer (handles aliases)
+        for (const piaName of piaNames) {
+          if (matchesOfficer(officer, piaName)) return true;
+        }
+        return false;
+      });
+    },
+    [role, uploadedFiles.target],
+  );
+
   const displayUploads = useMemo<Record<UploadKind, RawRow[]>>(
     () => ({
-      target: filterRowsByBranch(uploadedFiles.target, selectedBranch),
-      current: filterRowsByBranch(uploadedFiles.current, selectedBranch),
-      today: filterRowsByBranch(uploadedFiles.today ?? [], selectedBranch),
-      lastMonth: filterRowsByBranch(uploadedFiles.lastMonth, selectedBranch),
-      lastYear: filterRowsByBranch(uploadedFiles.lastYear, selectedBranch),
+      target: filterByPia(filterRowsByBranch(uploadedFiles.target, selectedBranch)),
+      current: filterByPia(filterRowsByBranch(uploadedFiles.current, selectedBranch)),
+      today: filterByPia(filterRowsByBranch(uploadedFiles.today ?? [], selectedBranch)),
+      lastMonth: filterByPia(filterRowsByBranch(uploadedFiles.lastMonth, selectedBranch)),
+      lastYear: filterByPia(filterRowsByBranch(uploadedFiles.lastYear, selectedBranch)),
       categoryMaster: uploadedFiles.categoryMaster,
     }),
-    [uploadedFiles, selectedBranch],
+    [uploadedFiles, selectedBranch, filterByPia],
   );
 
   const categoryMap = useMemo(() => {
@@ -1472,24 +1502,22 @@ function AppInternal({
   );
   const [activeStaffId, setActiveStaffId] = useState("1");
 
-  // PIA: auto-select their own officer + force "staff" view + restrict navigation
+  // PIA: auto-select their own officer in the profile/staff view + default
+  // to home view (shows aggregated PIA data across the branch).
   useEffect(() => {
     if (role !== "pia") return;
     const officers = parsedReport.officers;
     if (officers.length === 0) return;
-    // Match by name — `userOfficerId` is the emp_id but OfficerPerformance
-    // does not carry an emp_id field, only `name` and `branch`. The PIA's
-    // `user.name` was set from the same officer record so it matches.
     const piaName = (user?.name ?? "").trim();
     const ownIndex = piaName
       ? officers.findIndex((o) => matchesOfficer(o.name ?? "", piaName))
       : -1;
     const newId = ownIndex >= 0 ? String(ownIndex + 1) : "1";
     if (activeStaffId !== newId) setActiveStaffId(newId);
-    if (currentView !== "staff" && currentView !== "home") {
-      setCurrentView("staff");
+    if (currentView !== "home" && currentView !== "staff") {
+      setCurrentView("home");
     }
-  }, [role, userOfficerId, user, parsedReport.officers, activeStaffId, currentView]);
+  }, [role, user?.name, parsedReport.officers, activeStaffId, currentView]);
 
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState("iPhone");
@@ -2135,8 +2163,18 @@ function AppInternal({
           return bTotal - aTotal;
         });
 
-    return { presets: branchPresets, rows };
-  }, [kpiPresets, displayUploads.current, displayUploads.categoryMaster, parsedReport.officers]);
+    // For PIA, keep only rows whose officer is a PIA (not BSM/Cashier/etc).
+    const piaOfficersList = parsedReport.officers.filter(
+      (o) => (o.position ?? "").trim().toUpperCase() === "PIA",
+    );
+    const filteredRows = role === "pia"
+      ? rows.filter((r) =>
+          piaOfficersList.some((p) => matchesOfficer(r.officer.name, p.name)),
+        )
+      : rows;
+
+    return { presets: branchPresets, rows: filteredRows };
+  }, [kpiPresets, displayUploads.current, displayUploads.categoryMaster, parsedReport.officers, role]);
 
   const dynamicRadarData = useMemo(() => {
     if (!displayUploads.current.length && Number(activeStaffId) <= 3 && activeStat === "csat") {
@@ -2221,48 +2259,64 @@ function AppInternal({
   );
 
   const derivedHomeStats = useMemo<DerivedHomeStat[]>(() => {
-    const totalSales = parsedReport.branches.reduce((sum, branch) => sum + branch.actual, 0);
-    const totalTarget = parsedReport.branches.reduce((sum, branch) => sum + branch.target, 0);
+    // PIA: scope stats to ALL PIA officers (not BSM/Cashier/etc).
+    // Non-PIA: use full branch data.
+    const isPiaScope = role === "pia";
+    const piaOfficers = parsedReport.officers.filter(
+      (o) => (o.position ?? "").trim().toUpperCase() === "PIA",
+    );
+    const piaBranches = isPiaScope
+      ? Array.from(new Set(piaOfficers.map((o) => o.branch).filter(Boolean))).map((label) => {
+          const found = parsedReport.branches.find((b) => (b.label ?? "").includes(label));
+          return (
+            found ?? { label, target: 0, actual: 0, lastMonth: 0, lastYear: 0 }
+          );
+        })
+      : parsedReport.branches;
+    const scopeOfficers = isPiaScope ? piaOfficers : parsedReport.officers;
+
+    const totalSales = piaBranches.reduce((sum, branch) => sum + branch.actual, 0);
+    const totalTarget = piaBranches.reduce((sum, branch) => sum + branch.target, 0);
     const avgAch = totalTarget ? (totalSales / totalTarget) * 100 : 0;
-    const avgRate = parsedReport.officers.length
-      ? parsedReport.officers.reduce((sum, officer) => sum + officer.rate, 0) / parsedReport.officers.length
+    const avgRate = scopeOfficers.length
+      ? scopeOfficers.reduce((sum, officer) => sum + officer.rate, 0) / scopeOfficers.length
       : 0;
-    const totalOfficers = parsedReport.officers.length;
-    const totalBranches = parsedReport.branches.length;
-    const lastMonthTotal = parsedReport.branches.reduce((sum, branch) => sum + branch.lastMonth, 0);
+    const totalOfficers = scopeOfficers.length;
+    const totalBranches = isPiaScope ? piaBranches.length : parsedReport.branches.length;
+    const lastMonthTotal = piaBranches.reduce((sum, branch) => sum + branch.lastMonth, 0);
     const trendPercent = lastMonthTotal ? ((totalSales - lastMonthTotal) / lastMonthTotal) * 100 : 0;
 
     return [
       {
-        label: "Total Sales",
+        label: isPiaScope ? "ยอดขาย PIA ทั้งหมด" : "Total Sales",
         value: `฿${Math.round(totalSales).toLocaleString()}`,
         trend: `${trendPercent >= 0 ? "+" : ""}${Math.round(trendPercent)}%`,
         icon: DollarSign,
         isUp: trendPercent >= 0,
       },
       {
-        label: "Store Target",
+        label: isPiaScope ? "เป้า PIA ทั้งหมด" : "Store Target",
         value: `${Math.round(avgAch)}%`,
         trend: `${avgAch >= 100 ? "+" : ""}${Math.round(avgAch - 100)}%`,
         icon: Star,
         isUp: avgAch >= 100,
       },
       {
-        label: "Avg Staff Ach %",
+        label: isPiaScope ? "อัตราบรรลุ PIA เฉลี่ย" : "Avg Staff Ach %",
         value: `${Math.round(avgRate)}%`,
         trend: `${avgRate >= 100 ? "+" : ""}${Math.round(avgRate)}%`,
         icon: Smile,
         isUp: true,
       },
       {
-        label: "Active Staff",
+        label: isPiaScope ? "จำนวน PIA" : "Active Staff",
         value: `${totalOfficers.toLocaleString()}`,
-        trend: `${totalBranches.toLocaleString()} branches`,
+        trend: `${totalBranches.toLocaleString()} ${isPiaScope ? "สาขา" : "branches"}`,
         icon: Users,
         isUp: true,
       },
     ];
-  }, [parsedReport]);
+  }, [parsedReport, role]);
 
   const monthlyPerformance = useMemo(() => {
     const hasData = displayUploads.current.length > 0;
@@ -2399,20 +2453,33 @@ function AppInternal({
   }, [displayUploads, parsedReport, attachOfficerRows]);
 
   const categorySnapshotData = useMemo(
-    () =>
-      buildCategorySnapshots({
+    () => {
+      // Enrich sales rows with catDaily (from Category Master) so that
+      // rowMatchesKpiCategory can match BTB / BTB(Apple) via catDaily first.
+      const lookup = buildCatDailyLookup(displayUploads.categoryMaster ?? []);
+      const enrichedCurrent = enrichSalesRowsWithCatDaily(displayUploads.current, lookup);
+      const enrichedToday = displayUploads.today.length
+        ? enrichSalesRowsWithCatDaily(displayUploads.today, lookup)
+        : [];
+      const enrichedLastMonth = enrichSalesRowsWithCatDaily(displayUploads.lastMonth, lookup);
+      const enrichedLastYear = enrichSalesRowsWithCatDaily(displayUploads.lastYear, lookup);
+      return buildCategorySnapshots({
         targetRows: displayUploads.target,
-        currentRows: displayUploads.current,
-        todayRows: displayUploads.today,
-        lastMonthRows: displayUploads.lastMonth,
-        lastYearRows: displayUploads.lastYear,
-      }),
+        currentRows: enrichedCurrent,
+        todayRows: enrichedToday,
+        lastMonthRows: enrichedLastMonth,
+        lastYearRows: enrichedLastYear,
+        mode: "branch", // PIA: targetRows/currentRows are already filtered to PIA only
+      });
+    },
     [
       displayUploads.target,
       displayUploads.current,
       displayUploads.today,
       displayUploads.lastMonth,
       displayUploads.lastYear,
+      displayUploads.categoryMaster,
+      role,
     ],
   );
 

@@ -148,27 +148,27 @@ function BranchOverviewKpiTable({ data }: { data: BranchOverviewKpiData }) {
           ยังไม่มีข้อมูลเจ้าหน้าที่ — กรุณาอัปโหลดไฟล์ Current
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-white/10">
-          <table className="w-full text-left border-collapse text-[11px]">
+        <div className="rounded-xl border border-white/10">
+          <table className="w-full text-left border-collapse text-[11px] table-fixed">
             <thead>
               <tr className="bg-[#0c3123] border-b border-emerald-500/20 text-white/90">
-                <th className="py-3 px-3 font-bold uppercase tracking-wider sticky left-0 bg-[#0c3123] z-10 min-w-[160px]">
+                <th className="py-2.5 px-2 font-bold uppercase tracking-wider w-[140px]">
                   เจ้าหน้าที่
                 </th>
-                <th className="py-3 px-3 font-bold uppercase tracking-wider min-w-[120px]">
+                <th className="py-2.5 px-2 font-bold uppercase tracking-wider w-[100px]">
                   สาขา
                 </th>
                 {presets.map((p) => (
                   <th
                     key={p.id}
-                    className="py-3 px-3 font-bold uppercase tracking-wider text-right min-w-[120px]"
+                    className="py-2.5 px-2 font-bold uppercase tracking-wider text-right"
                     title={p.labelA + " → " + (p.labelB || "(ไม่มี)")}
                   >
-                    <div className="flex items-center justify-end gap-1.5">
-                      <span className={`w-2 h-2 rounded-full ${colorDotClass(p.color)}`} />
-                      <span>{p.name}</span>
+                    <div className="flex items-center justify-end gap-1">
+                      <span className={`w-1.5 h-1.5 rounded-full ${colorDotClass(p.color)}`} />
+                      <span className="truncate">{p.name}</span>
                     </div>
-                    <div className="text-[9px] text-white/40 font-normal normal-case mt-0.5">
+                    <div className="text-[8px] text-white/40 font-normal normal-case mt-0.5">
                       {calcTypeLabel(p.calcType)}
                     </div>
                   </th>
@@ -181,16 +181,18 @@ function BranchOverviewKpiTable({ data }: { data: BranchOverviewKpiData }) {
                   key={`${row.officer.name}-${idx}`}
                   className="border-b border-white/5 hover:bg-white/5 transition-colors"
                 >
-                  <td className="py-2.5 px-3 font-medium text-white sticky left-0 bg-[#0a1f17] z-10">
+                  <td className="py-2 px-2 font-medium text-white truncate" title={row.officer.name}>
                     {row.officer.name}
                   </td>
-                  <td className="py-2.5 px-3 text-white/70">{row.officer.branch || "-"}</td>
+                  <td className="py-2 px-2 text-white/70 truncate" title={row.officer.branch || ""}>
+                    {row.officer.branch || "-"}
+                  </td>
                   {presets.map((p) => {
                     const val = row.results[p.id] ?? 0;
                     return (
                       <td
                         key={p.id}
-                        className="py-2.5 px-3 text-right font-mono font-semibold text-white"
+                        className="py-2 px-2 text-right font-mono font-semibold text-white"
                       >
                         {formatKpiCell(val, p.calcType)}
                       </td>

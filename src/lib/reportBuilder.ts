@@ -4,6 +4,7 @@ import { getCategoryValue, matchesOfficer, type RawRow } from "./salesAggregatio
 export type OfficerPerformance = {
   name: string;
   branch: string;
+  position?: string;
   target: number;
   actual: number;
   achPercent: number;
