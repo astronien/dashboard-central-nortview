@@ -36,7 +36,7 @@ import {
 import CategoryTreePicker from "./components/CategoryTreePicker";
 
 import { AnimatePresence, motion } from "motion/react";
-import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { parseCategoryMasterFile } from "./lib/categoryMasterUpload";
 import { parseSalesExcelFile } from "./lib/salesUpload";
 import { parseTargetExcelFile } from "./lib/targetUpload";
@@ -102,11 +102,19 @@ import {
   Legend,
 } from "recharts";
 import { HomeDashboardSection } from "./components/dashboard/HomeDashboardSection";
+const LazyStaffSection = lazy(() =>
+  import("./components/dashboard/StaffSection").then((m) => ({ default: m.StaffSection })),
+);
+const LazyReportsSection = lazy(() =>
+  import("./components/dashboard/ReportsSection").then((m) => ({ default: m.ReportsSection })),
+);
+const LazySettingsSection = lazy(() =>
+  import("./components/dashboard/SettingsSection").then((m) => ({ default: m.SettingsSection })),
+);
+const LazyKpiPresetSection = lazy(() =>
+  import("./components/dashboard/KpiPresetSection"),
+);
 
-import { StaffSection } from "./components/dashboard/StaffSection";
-import { ReportsSection } from "./components/dashboard/ReportsSection";
-import { SettingsSection } from "./components/dashboard/SettingsSection";
-import KpiPresetSection from "./components/dashboard/KpiPresetSection";
 import {
   getPresets as getKpiPresets,
   cleanupTestPresets as cleanupKpiPresets,
@@ -1279,6 +1287,15 @@ const PwaSafeAreaStyle = () => (
       font-size: 16px;
     }
   `}</style>
+);
+
+// Lightweight fallback while a lazy view chunk is being downloaded.
+// Keeps the layout stable and gives the user instant feedback.
+const ViewFallback = () => (
+  <div className="flex flex-col items-center justify-center w-full min-h-[40vh] gap-3">
+    <div className="w-10 h-10 border-4 border-white/15 border-t-emerald-400 rounded-full animate-spin" />
+    <p className="text-white/50 text-xs">กำลังโหลด...</p>
+  </div>
 );
 
 function AppGate() {
@@ -3294,27 +3311,29 @@ function AppInternal({
               </motion.div>
             )}
             {currentView === "staff" && (
-              <StaffSection
-                displayStaffAvatar={displayStaffAvatar}
-                activeOfficer={activeOfficer}
-                currentStaff={currentStaff}
-                dynamicRadarData={dynamicRadarData}
-                renderCustomTick={renderCustomTick}
-                dynamicScore={dynamicScore}
-                activeStat={activeStat}
-                onSetActiveStat={setActiveStat}
-                sevenWondersScore={sevenWondersScore}
-                dynamicRole={dynamicRole}
-                dynamicExperience={dynamicExperience}
-                dynamicExpertise={dynamicExpertise}
-                dynamicLanguages={dynamicLanguages}
-                activeOfficer7WondersPerformance={activeOfficer7WondersPerformance}
-                activeOfficerCategoryPerformance={activeOfficerCategoryPerformance}
-                todaySalesTotal={activeOfficerTodaySales}
-                todayDateLabel={todayStats.dateStr}
-                 categoryPerformanceHint={categoryPerformanceHint}
-                 onSetActiveStaffId={setActiveStaffId}
-              />
+              <Suspense fallback={<ViewFallback />}>
+                <LazyStaffSection
+                  displayStaffAvatar={displayStaffAvatar}
+                  activeOfficer={activeOfficer}
+                  currentStaff={currentStaff}
+                  dynamicRadarData={dynamicRadarData}
+                  renderCustomTick={renderCustomTick}
+                  dynamicScore={dynamicScore}
+                  activeStat={activeStat}
+                  onSetActiveStat={setActiveStat}
+                  sevenWondersScore={sevenWondersScore}
+                  dynamicRole={dynamicRole}
+                  dynamicExperience={dynamicExperience}
+                  dynamicExpertise={dynamicExpertise}
+                  dynamicLanguages={dynamicLanguages}
+                  activeOfficer7WondersPerformance={activeOfficer7WondersPerformance}
+                  activeOfficerCategoryPerformance={activeOfficerCategoryPerformance}
+                  todaySalesTotal={activeOfficerTodaySales}
+                  todayDateLabel={todayStats.dateStr}
+                   categoryPerformanceHint={categoryPerformanceHint}
+                   onSetActiveStaffId={setActiveStaffId}
+                />
+              </Suspense>
             )}
             {!isPia && currentView === "reports" && (
               <motion.div
@@ -3325,19 +3344,21 @@ function AppInternal({
                 transition={{ duration: 0.15, ease: "easeOut" }}
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
-                <ReportsSection
-                  uploadedFiles={uploadedFiles}
-                  uploadedFileNames={uploadedFileNames}
-                  isUploadingFile={isUploadingFile}
-                  isSaving={isSaving}
-                  uploadError={uploadError}
-                  uploadStatus={uploadStatus}
-                  onExportCsv={exportCsv}
-                  onClearAll={() => void clearAllUploadData()}
-                  onRemoveFile={removeUploadedFile}
-                  onUploadFile={handleUploadFile}
-                  parsedReport={parsedReport}
-                />
+                <Suspense fallback={<ViewFallback />}>
+                  <LazyReportsSection
+                    uploadedFiles={uploadedFiles}
+                    uploadedFileNames={uploadedFileNames}
+                    isUploadingFile={isUploadingFile}
+                    isSaving={isSaving}
+                    uploadError={uploadError}
+                    uploadStatus={uploadStatus}
+                    onExportCsv={exportCsv}
+                    onClearAll={() => void clearAllUploadData()}
+                    onRemoveFile={removeUploadedFile}
+                    onUploadFile={handleUploadFile}
+                    parsedReport={parsedReport}
+                  />
+                </Suspense>
               </motion.div>
             )}
             {!isPia && currentView === "kpi_preset" && (
@@ -3349,13 +3370,15 @@ function AppInternal({
                 transition={{ duration: 0.15, ease: "easeOut" }}
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
-                <KpiPresetSection
-                  salesRows={displayUploads.current}
-                  categoryMasterRows={displayUploads.categoryMaster}
-                  selectedBranch={selectedBranch}
-                  presets={kpiPresets}
-                  onPresetsChange={setKpiPresets}
-                />
+                <Suspense fallback={<ViewFallback />}>
+                  <LazyKpiPresetSection
+                    salesRows={displayUploads.current}
+                    categoryMasterRows={displayUploads.categoryMaster}
+                    selectedBranch={selectedBranch}
+                    presets={kpiPresets}
+                    onPresetsChange={setKpiPresets}
+                  />
+                </Suspense>
               </motion.div>
             )}
             {!isPia && currentView === "settings" && (
@@ -3367,15 +3390,16 @@ function AppInternal({
                 transition={{ duration: 0.15, ease: "easeOut" }}
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
-                <SettingsSection
-                  selectedBranch={selectedBranch}
-                  onBranchChange={handleBranchChange}
-                  sheetBranches={sheetBranches}
-                  staffRoster={staffRoster}
-                  staffPhotos={Object.fromEntries(
-                    Object.entries(staffPhotos).map(([id, record]) => [id, (record as any).photoUrl]),
-                  )}
-                  uploadingPhotoId={uploadingPhotoId}
+                <Suspense fallback={<ViewFallback />}>
+                  <LazySettingsSection
+                    selectedBranch={selectedBranch}
+                    onBranchChange={handleBranchChange}
+                    sheetBranches={sheetBranches}
+                    staffRoster={staffRoster}
+                    staffPhotos={Object.fromEntries(
+                      Object.entries(staffPhotos).map(([id, record]) => [id, (record as any).photoUrl]),
+                    )}
+                    uploadingPhotoId={uploadingPhotoId}
                   staffPhotoError={staffPhotoError}
                   getStaffAvatar={getStaffAvatar}
                   onPhotoUpload={(entry, file) => {
@@ -3385,10 +3409,11 @@ function AppInternal({
                     void handleStaffPhotoRemove(staffId);
                   }}
                   onNavigateToReports={() => setCurrentView("reports")}
-                 />
-               </motion.div>
-             )}
-           </AnimatePresence>
+                  />
+                </Suspense>
+                </motion.div>
+              )}
+            </AnimatePresence>
          </main>
 
         {/* Mobile Bottom Tab Bar (visible only < md) */}
