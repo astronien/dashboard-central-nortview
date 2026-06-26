@@ -2091,15 +2091,33 @@ function AppInternal({
     return Math.min(100, Math.max(0, Math.round(avg)));
   }, [activeOfficer7WondersPerformance, displayUploads.current, activeStaffId, currentStaff]);
 
-  // Top Attach: the 7-Wonder category the officer is best at (by scaled
-  // progress against target). Used by the "TOP ATTACH" pill on the staff
-  // profile to highlight the focus device/area.
-  const topAttach = useMemo<{ label: string; rate: number } | null>(() => {
+  // Focus Device: the main device (iPhone / iPad / Mac / Apple Watch) the
+  // officer is performing WORST at. Shown on the staff profile so they
+  // know which device to focus on.
+  const focusDevice = useMemo<{ label: string; rate: number } | null>(() => {
+    const deviceNames = ["iPhone", "iPad", "Mac", "Apple Watch"];
+    const rows = activeOfficerCategoryPerformance.filter((r) =>
+      deviceNames.includes(r.category) && r.target > 0,
+    );
+    if (rows.length === 0) return null;
+    let worst: { label: string; rate: number } | null = null;
+    rows.forEach((row) => {
+      const rate = row.achPercent;
+      if (!worst || rate < worst.rate) {
+        worst = { label: row.category, rate };
+      }
+    });
+    return worst;
+  }, [activeOfficerCategoryPerformance]);
+
+  // Focus Wonder: the 7-Wonder KPI the officer is performing WORST at.
+  // Shown on the staff profile so they know which attach metric to focus on.
+  const focusWonder = useMemo<{ label: string; rate: number } | null>(() => {
     const wondersRows = activeOfficer7WondersPerformance.filter(
       (r) => r.category !== "Average" && r.category !== "Total",
     );
     if (wondersRows.length === 0) return null;
-    let best: { label: string; rate: number } | null = null;
+    let worst: { label: string; rate: number } | null = null;
     wondersRows.forEach((row) => {
       const isPercentPreset =
         row.calcType === "attach" ||
@@ -2108,12 +2126,12 @@ function AppInternal({
       const rate = isPercentPreset && row.target > 0
         ? (row.actual / row.target) * 100
         : row.achPercent;
-      if (!best || rate > best.rate) {
-        const label = row.category.replace(/^\d+\.\s*/, "").trim();
-        best = { label, rate };
+      const label = row.category.replace(/^\d+\.\s*/, "").trim();
+      if (!worst || rate < worst.rate) {
+        worst = { label, rate };
       }
     });
-    return best;
+    return worst;
   }, [activeOfficer7WondersPerformance]);
 
   // Branch Overview: per-officer KPI results for presets marked showInBranchOverview
@@ -3123,7 +3141,8 @@ function AppInternal({
                 dynamicExperience={dynamicExperience}
                 dynamicExpertise={dynamicExpertise}
                 dynamicLanguages={dynamicLanguages}
-                topAttach={topAttach}
+                focusDevice={focusDevice}
+                focusWonder={focusWonder}
                 activeOfficer7WondersPerformance={activeOfficer7WondersPerformance}
                 activeOfficerCategoryPerformance={activeOfficerCategoryPerformance}
                 todaySalesTotal={activeOfficerTodaySales}

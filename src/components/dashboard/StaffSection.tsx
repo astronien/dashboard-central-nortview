@@ -80,7 +80,8 @@ export function StaffSection({
   dynamicExperience,
   dynamicExpertise,
   dynamicLanguages,
-  topAttach,
+  focusDevice,
+  focusWonder,
   activeOfficer7WondersPerformance,
   activeOfficerCategoryPerformance,
   todaySalesTotal,
@@ -106,7 +107,8 @@ export function StaffSection({
   dynamicExperience: string;
   dynamicExpertise: string;
   dynamicLanguages: string;
-  topAttach: { label: string; rate: number } | null;
+  focusDevice: { label: string; rate: number } | null;
+  focusWonder: { label: string; rate: number } | null;
   activeOfficer7WondersPerformance: PerformanceRow[];
   activeOfficerCategoryPerformance: PerformanceRow[];
   todaySalesTotal: number;
@@ -435,7 +437,7 @@ export function StaffSection({
                       </motion.button>
                     </div>
 
-                    {/* Top Attach + Language — 2 prominent pill cards */}
+                    {/* Focus Device + Focus Wonder — 2 prominent pill cards */}
                     <div className="flex flex-wrap justify-center lg:justify-end gap-3 mt-4 max-w-[420px] w-full mx-auto lg:mx-0 lg:ml-auto">
                       <motion.div
                         initial={{ opacity: 0, y: 15 }}
@@ -444,23 +446,23 @@ export function StaffSection({
                         className="flex-1 min-w-[140px] max-w-[200px] bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl px-3 lg:px-4 py-3 text-center overflow-hidden flex flex-col items-center justify-center min-h-[88px] transition-all duration-200 hover:bg-white/[0.15] hover:border-white/25 hover:shadow-[0_8px_20px_rgba(16,185,129,0.15)]"
                       >
                         <div className="text-[10px] uppercase tracking-wider text-white/60 mb-1.5 w-full truncate font-medium">
-                          Top Attach
+                          Focus Device
                         </div>
                         <AnimatePresence mode="wait">
                           <motion.div
-                            key={topAttach?.label ?? "none"}
+                            key={focusDevice?.label ?? "none"}
                             initial={{ opacity: 0, y: 4 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -4 }}
                             transition={{ duration: 0.2 }}
                             className="text-sm lg:text-base font-bold text-white w-full truncate"
                           >
-                            {topAttach ? topAttach.label : "—"}
+                            {focusDevice ? focusDevice.label : "—"}
                           </motion.div>
                         </AnimatePresence>
-                        {topAttach ? (
-                          <div className="text-[10px] text-emerald-300 mt-0.5 tabular-nums">
-                            {topAttach.rate.toFixed(0)}% to target
+                        {focusDevice ? (
+                          <div className="text-[10px] text-amber-300 mt-0.5 tabular-nums">
+                            {focusDevice.rate.toFixed(0)}% — needs focus
                           </div>
                         ) : null}
                       </motion.div>
@@ -471,29 +473,25 @@ export function StaffSection({
                         className="flex-1 min-w-[140px] max-w-[200px] bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl px-3 lg:px-4 py-3 text-center overflow-hidden flex flex-col items-center justify-center min-h-[88px] transition-all duration-200 hover:bg-white/[0.15] hover:border-white/25 hover:shadow-[0_8px_20px_rgba(16,185,129,0.15)]"
                       >
                         <div className="text-[10px] uppercase tracking-wider text-white/60 mb-1.5 w-full truncate font-medium">
-                          Language
+                          Focus 7 Wonder
                         </div>
                         <AnimatePresence mode="wait">
                           <motion.div
-                            key={dynamicLanguages}
+                            key={focusWonder?.label ?? "none"}
                             initial={{ opacity: 0, y: 4 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -4 }}
                             transition={{ duration: 0.2 }}
-                            className="text-sm lg:text-base font-bold flex items-center justify-center gap-1.5 text-white"
+                            className="text-sm lg:text-base font-bold text-white w-full truncate"
                           >
-                            <div className="w-[18px] h-[13px] bg-slate-800 rounded-[2px] overflow-hidden flex relative border border-white/25 shadow-sm">
-                              <div className="w-full flex flex-col justify-between">
-                                <div className="h-[2.6px] bg-red-600"></div>
-                                <div className="h-[2.6px] bg-white"></div>
-                                <div className="h-[2.6px] bg-blue-800"></div>
-                                <div className="h-[2.6px] bg-white"></div>
-                                <div className="h-[2.6px] bg-red-600"></div>
-                              </div>
-                            </div>
-                            <span className="tabular-nums">{dynamicLanguages}</span>
+                            {focusWonder ? focusWonder.label : "—"}
                           </motion.div>
                         </AnimatePresence>
+                        {focusWonder ? (
+                          <div className="text-[10px] text-amber-300 mt-0.5 tabular-nums">
+                            {focusWonder.rate.toFixed(0)}% — needs focus
+                          </div>
+                        ) : null}
                       </motion.div>
                     </div>
                   </div>
