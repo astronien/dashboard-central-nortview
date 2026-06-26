@@ -1,6 +1,7 @@
 import type React from "react";
 import type { UploadKind } from "../../lib/dashboardHelpers";
 import type { RawRow } from "../../lib/dashboardUtils";
+import { parseDocDate } from "../../lib/dateParser";
 import { Upload, FileSpreadsheet, Trash2, X, CheckCircle2, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -20,25 +21,7 @@ export type UploadStatus = {
 };
 
 const getRowDate = (row: RawRow): Date | null => {
-  const raw = String(row["Doc Date"] ?? row["doc_date"] ?? row["doc date"] ?? "").trim();
-  if (!raw) return null;
-  const cleaned = raw.replace(/^\S+\.\s*/, "").trim();
-  const dmyMatch = cleaned.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-  if (dmyMatch) {
-    const day = parseInt(dmyMatch[1], 10);
-    const month = parseInt(dmyMatch[2], 10) - 1;
-    let year = parseInt(dmyMatch[3], 10);
-    if (year > 2400) year -= 543;
-    return new Date(year, month, day);
-  }
-  const parsed = Date.parse(cleaned);
-  if (Number.isFinite(parsed)) {
-    const d = new Date(parsed);
-    let year = d.getFullYear();
-    if (year > 2400) d.setFullYear(year - 543);
-    return d;
-  }
-  return null;
+  return parseDocDate(row["Doc Date"] ?? row["doc_date"] ?? row["doc date"] ?? "");
 };
 
 const getDateRangeString = (rows: RawRow[]): string | null => {

@@ -1,4 +1,5 @@
 import type { RawRow } from "./salesAggregations";
+import { parseDocDate } from "./dateParser";
 import {
   calcAchievementPct,
   calcForecastByDays,
@@ -86,10 +87,13 @@ function sumTodayActual(rows: RawRow[], category?: string): number {
   rows.forEach((row) => {
     const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
     if (!rawDate) return;
-    const parsed = Date.parse(rawDate.replace(/^\S+\.\s*/, ""));
-    if (parsed && parsed > maxDateTime) {
-      maxDateTime = parsed;
-      maxDateStr = rawDate;
+    const parsed = parseDocDate(rawDate);
+    if (parsed) {
+      const time = parsed.getTime();
+      if (time > maxDateTime) {
+        maxDateTime = time;
+        maxDateStr = rawDate;
+      }
     }
   });
   if (!maxDateStr) return 0;

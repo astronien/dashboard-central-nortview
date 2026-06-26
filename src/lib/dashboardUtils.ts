@@ -1,3 +1,5 @@
+import { parseDocDate } from "./dateParser";
+
 export type RawRow = Record<string, string | number | undefined>;
 
 export const normalizeText = (value: unknown) =>
@@ -12,8 +14,8 @@ export const toNumber = (value: unknown) =>
 
 export const getSalesDate = (row: RawRow) => {
   const raw = String(row["Doc Date"] ?? row["doc date"] ?? "");
-  const parsed = Date.parse(raw.replace(/^\S+\.\s*/, ""));
-  return Number.isFinite(parsed) ? parsed : 0;
+  const parsed = parseDocDate(raw);
+  return parsed ? parsed.getTime() : 0;
 };
 
 export const cleanOfficerName = (name: string) => {

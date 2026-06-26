@@ -1,5 +1,6 @@
 import { calcAchievementPct, calcForecastByDays, calculateMetrics } from "./targetAggregations";
 import { getCategoryValue, matchesOfficer, type RawRow } from "./salesAggregations";
+import { parseDocDate, parseThaiDate, stripThaiDatePrefix } from "./dateParser";
 
 export type OfficerPerformance = {
   name: string;
@@ -60,8 +61,8 @@ const cleanOfficerName = (name: string) => {
 
 const getSalesDate = (row: RawRow) => {
   const raw = String(row["Doc Date"] ?? row["doc date"] ?? "");
-  const parsed = Date.parse(raw.replace(/^\S+\.\s*/, ""));
-  return Number.isFinite(parsed) ? parsed : 0;
+  const parsed = parseDocDate(raw);
+  return parsed ? parsed.getTime() : 0;
 };
 
 const mapTargetCategoryKey = (category: string, subCategory = "", productName = "") => {
@@ -105,13 +106,15 @@ const deduplicateMerge = (currentRows: RawRow[], todayRows: RawRow[]): RawRow[] 
 const getLatestDataDate = (rows: RawRow[]): { year: number; month: number; day: number } | null => {
   let best: { year: number; month: number; day: number; time: number } | null = null;
   for (const row of rows) {
-    const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
-    if (!rawDate) continue;
-    const cleaned = rawDate.replace(/^\S+\.\s*/, "").trim();
-    const parsed = Date.parse(cleaned);
-    if (!Number.isFinite(parsed)) continue;
-    const d = new Date(parsed);
-    const ymd = { year: d.getFullYear(), month: d.getMonth(), day: d.getDate(), time: parsed };
+    const rawDate = row["Doc Date"] ?? row["doc date"] ?? "";
+    const parsed = parseDocDate(rawDate);
+    if (!parsed) continue;
+    const ymd = {
+      year: parsed.getFullYear(),
+      month: parsed.getMonth(),
+      day: parsed.getDate(),
+      time: parsed.getTime(),
+    };
     if (!best || ymd.time > best.time) best = ymd;
   }
   return best ? { year: best.year, month: best.month, day: best.day } : null;
@@ -272,16 +275,20 @@ export function buildReport(targetRows: RawRow[], currentRows: RawRow[], lastMon
   mergedCurrentRows.forEach((row) => {
     const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
     if (!rawDate) return;
-    const parsed = Date.parse(rawDate.replace(/^\S+\.\s*/, ""));
-    if (parsed && parsed > maxDateTime) { maxDateTime = parsed; maxDateStr = rawDate; }
+    const parsed = parseDocDate(rawDate);
+    if (parsed) {
+      const time = parsed.getTime();
+      if (time > maxDateTime) { maxDateTime = time; maxDateStr = rawDate; }
+    }
   });
 
   const officerDailyActual = new Map<string, number>();
   if (maxDateStr || maxDateTime > 0) {
     mergedCurrentRows.forEach((row) => {
       const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
-      const parsed = Date.parse(rawDate.replace(/^\S+\.\s*/, ""));
-      if ((maxDateStr && rawDate === maxDateStr) || (parsed && parsed === maxDateTime)) {
+      const parsed = parseDocDate(rawDate);
+      const time = parsed ? parsed.getTime() : 0;
+      if ((maxDateStr && rawDate === maxDateStr) || (time && time === maxDateTime)) {
         const officerName = String(row["Officer (Name)"] ?? "").trim();
         if (officerName) {
           const matchedKey = [...officerSummary.keys()].find((k) => matchesOfficer(officerSummary.get(k)!.name, officerName));

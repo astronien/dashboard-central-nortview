@@ -38,6 +38,7 @@ import CategoryTreePicker from "./components/CategoryTreePicker";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { parseCategoryMasterFile } from "./lib/categoryMasterUpload";
+import { parseDocDate } from "./lib/dateParser";
 import { parseSalesExcelFile } from "./lib/salesUpload";
 import { parseTargetExcelFile } from "./lib/targetUpload";
 import {
@@ -540,8 +541,8 @@ const categoryGroupKey = (category: string) => {
 };
 const getSalesDate = (row: RawRow) => {
   const raw = String(row["Doc Date"] ?? row["doc date"] ?? "");
-  const parsed = Date.parse(raw.replace(/^\S+\.\s*/, ""));
-  return Number.isFinite(parsed) ? parsed : 0;
+  const parsed = parseDocDate(raw);
+  return parsed ? parsed.getTime() : 0;
 };
 const isUfundRow = (row: any): boolean => {
   if (!row) return false;
@@ -658,7 +659,8 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
   const parseSalesDate = (row: RawRow) => {
     const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
     if (!rawDate) return 0;
-    return Date.parse(rawDate.replace(/^\S+\.\s*/, "")) || 0;
+    const parsed = parseDocDate(rawDate);
+    return parsed ? parsed.getTime() : 0;
   };
 
   const monthKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
@@ -724,10 +726,10 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
     for (const row of currentRows) {
       const raw = String(row["Doc Date"] ?? row["doc date"] ?? "");
       if (!raw) continue;
-      const cleaned = raw.replace(/^\S+\.\s*/, "").trim();
-      const parsed = Date.parse(cleaned);
-      if (!Number.isFinite(parsed)) continue;
-      if (!best || parsed > best.time) best = { time: parsed };
+      const parsed = parseDocDate(raw);
+      if (!parsed) continue;
+      const time = parsed.getTime();
+      if (!best || time > best.time) best = { time };
     }
     return best ? new Date(best.time) : new Date();
   })();
@@ -883,10 +885,13 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
     currentRows.forEach((row) => {
       const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
       if (!rawDate) return;
-      const parsed = Date.parse(rawDate.replace(/^\S+\.\s*/, ""));
-      if (parsed && parsed > maxDateTime) {
-        maxDateTime = parsed;
-        maxDateStr = rawDate;
+      const parsed = parseDocDate(rawDate);
+      if (parsed) {
+        const time = parsed.getTime();
+        if (time > maxDateTime) {
+          maxDateTime = time;
+          maxDateStr = rawDate;
+        }
       }
     });
   }
@@ -897,8 +902,9 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
     : maxDateStr || maxDateTime > 0
       ? currentRows.filter((row) => {
           const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
-          const parsed = Date.parse(rawDate.replace(/^\S+\.\s*/, ""));
-          return (maxDateStr && rawDate === maxDateStr) || (parsed && parsed === maxDateTime);
+          const parsed = parseDocDate(rawDate);
+          const time = parsed ? parsed.getTime() : 0;
+          return (maxDateStr && rawDate === maxDateStr) || (time && time === maxDateTime);
         })
       : [];
 
@@ -1372,10 +1378,13 @@ function AppInternal({
     displayUploads.current.forEach((row) => {
       const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
       if (!rawDate) return;
-      const parsed = Date.parse(rawDate.replace(/^\S+\.\s*/, ""));
-      if (parsed && parsed > maxDateTime) {
-        maxDateTime = parsed;
-        maxDateStr = rawDate;
+      const parsed = parseDocDate(rawDate);
+      if (parsed) {
+        const time = parsed.getTime();
+        if (time > maxDateTime) {
+          maxDateTime = time;
+          maxDateStr = rawDate;
+        }
       }
     });
     if (!maxDateStr) return [];
@@ -1385,12 +1394,10 @@ function AppInternal({
   }, [displayUploads.today, displayUploads.current]);
 
   const formatTodayDateLabel = (rawDate: string) => {
-    const cleaned = rawDate.replace(/^\S+\.\s*/, "").trim();
-    if (!cleaned) return "";
-    const parsed = Date.parse(cleaned);
-    if (!Number.isFinite(parsed)) return cleaned;
-    const date = new Date(parsed);
-    return date.toLocaleDateString("th-TH", {
+    if (!rawDate) return "";
+    const parsed = parseDocDate(rawDate);
+    if (!parsed) return rawDate;
+    return parsed.toLocaleDateString("th-TH", {
       day: "2-digit",
       month: "long",
       year: "numeric",
@@ -1753,11 +1760,14 @@ function AppInternal({
       for (const row of displayUploads.current) {
         const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
         if (!rawDate) continue;
-        const cleaned = rawDate.replace(/^\S+\.\s*/, "").trim();
-        const parsed = Date.parse(cleaned);
-        if (!Number.isFinite(parsed)) continue;
-        const d = new Date(parsed);
-        const ymd = { year: d.getFullYear(), month: d.getMonth(), day: d.getDate(), time: parsed };
+        const parsed = parseDocDate(rawDate);
+        if (!parsed) continue;
+        const ymd = {
+          year: parsed.getFullYear(),
+          month: parsed.getMonth(),
+          day: parsed.getDate(),
+          time: parsed.getTime(),
+        };
         if (!best || ymd.time > best.time) best = ymd;
       }
       return best;
@@ -1799,10 +1809,13 @@ function AppInternal({
       displayUploads.current.forEach((row) => {
         const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
         if (!rawDate) return;
-        const parsed = Date.parse(rawDate.replace(/^\S+\.\s*/, ""));
-        if (parsed && parsed > maxDateTime) {
-          maxDateTime = parsed;
-          maxDateStr = rawDate;
+        const parsed = parseDocDate(rawDate);
+        if (parsed) {
+          const time = parsed.getTime();
+          if (time > maxDateTime) {
+            maxDateTime = time;
+            maxDateStr = rawDate;
+          }
         }
       });
     }
@@ -1847,8 +1860,9 @@ function AppInternal({
           if (rowCat !== catName) return;
           if (!todaySourceRows.length) {
             const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
-            const parsed = Date.parse(rawDate.replace(/^\S+\.\s*/, ""));
-            if (!((maxDateStr && rawDate === maxDateStr) || (parsed && parsed === maxDateTime))) return;
+            const parsed = parseDocDate(rawDate);
+            const time = parsed ? parsed.getTime() : 0;
+            if (!((maxDateStr && rawDate === maxDateStr) || (time && time === maxDateTime))) return;
           }
           actualDay +=
             kpi.measureType === "quantity"
@@ -2635,10 +2649,9 @@ function AppInternal({
     if (!displayUploads.current.length) return interactionsData;
 
     const formatDocDate = (raw: unknown) => {
-      const text = String(raw ?? "").replace(/^\S+\.\s*/, "");
-      const parsed = Date.parse(text);
-      if (!Number.isFinite(parsed)) return String(raw ?? "-");
-      return new Date(parsed).toLocaleDateString("en-GB", {
+      const parsed = parseDocDate(raw);
+      if (!parsed) return String(raw ?? "-");
+      return parsed.toLocaleDateString("en-GB", {
         day: "2-digit",
         month: "short",
         year: "numeric",
