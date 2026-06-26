@@ -196,10 +196,26 @@ const StaffSectionImpl = function StaffSection({
 
   // Defer chart render until after layout — avoids recharts "width(-1)/height(-1)"
   // warning when the parent flex container is still measuring.
+  // Use ResizeObserver to wait until the parent actually has a non-zero size.
+  const chartContainerRef = React.useRef<HTMLDivElement | null>(null);
   const [chartReady, setChartReady] = useState(false);
   useEffect(() => {
-    const id = requestAnimationFrame(() => setChartReady(true));
-    return () => cancelAnimationFrame(id);
+    const el = chartContainerRef.current;
+    if (!el) return;
+    const tryReady = () => {
+      const { width, height } = el.getBoundingClientRect();
+      if (width > 0 && height > 0) {
+        setChartReady(true);
+        return true;
+      }
+      return false;
+    };
+    if (tryReady()) return;
+    const ro = new ResizeObserver(() => {
+      if (tryReady()) ro.disconnect();
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
 
   const officerName = activeOfficer?.name ?? currentStaff.name;
@@ -276,10 +292,13 @@ const StaffSectionImpl = function StaffSection({
           </div>
 
           {/* Radar chart (mobile: smaller, side) */}
-          <div className="w-full lg:w-[30%] flex items-center justify-center relative">
-            <div className="w-[180px] h-[180px] sm:w-[200px] sm:h-[200px] lg:w-[260px] lg:h-[260px] relative">
+          <div className="w-full lg:w-[30%] flex items-center justify-center relative shrink-0">
+            <div
+              ref={chartContainerRef}
+              className="w-[180px] h-[180px] sm:w-[200px] sm:h-[200px] lg:w-[260px] lg:h-[260px] relative shrink-0"
+            >
               {chartReady ? (
-                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} debounce={50}>
                 <RadarChart
                   cx="50%"
                   cy="50%"
