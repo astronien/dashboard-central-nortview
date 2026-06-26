@@ -717,12 +717,27 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
   const officerSummary = new Map<string, OfficerPerformance>();
   const categorySummary = new Map<string, { actual: number; target: number }>();
 
+  // Use the latest data date for "currentDay" so the daily target /
+  // forecast reflect the data we actually have, not the wall-clock date.
+  const latestDataDateForReport = (() => {
+    let best: { time: number } | null = null;
+    for (const row of currentRows) {
+      const raw = String(row["Doc Date"] ?? row["doc date"] ?? "");
+      if (!raw) continue;
+      const cleaned = raw.replace(/^\S+\.\s*/, "").trim();
+      const parsed = Date.parse(cleaned);
+      if (!Number.isFinite(parsed)) continue;
+      if (!best || parsed > best.time) best = { time: parsed };
+    }
+    return best ? new Date(best.time) : new Date();
+  })();
+
   // Pre-populate branchSummary from target branches
   branchTargets.forEach((info, branchKey) => {
     const targetRow = targetRows.find((row) => normalizeText(row["BRANCH NAME"]) === branchKey);
     const branchName = String(targetRow?.["BRANCH NAME"] ?? "Unknown Branch").trim();
     const totalDays = info.days || 30;
-    const currentDay = Math.min(totalDays, new Date().getDate());
+    const currentDay = Math.min(totalDays, latestDataDateForReport.getDate());
     
     branchSummary.set(branchKey, {
       label: branchName,
@@ -798,7 +813,7 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
       const branchKey = normalizeText(branch);
       const targetInfo = branchTargets.get(branchKey);
       const totalDays = targetInfo?.days || 30;
-      const currentDay = Math.min(totalDays, new Date().getDate());
+      const currentDay = Math.min(totalDays, latestDataDateForReport.getDate());
       const actual = getCategoryValue(row);
       
       // Update Branch summary
@@ -1726,9 +1741,32 @@ function AppInternal({
     const categoriesList: KpiCategoryKey[] = ["Mac", "iPad", "iPhone", "Apple Watch", "BTB", "BTB(Apple)"];
     const hasData = displayUploads.current.length > 0;
     const targetRecords = rawTargetRowsToRecords(displayUploads.target);
-    const now = new Date();
-    const periodYear = now.getFullYear();
-    const periodMonth = now.getMonth();
+
+    // Identify the "current" date for the period. Prefer the latest data
+    // date present in the current uploads (so the daily target / forecast
+    // reflects the data we actually have), but fall back to today.
+    let periodYear = new Date().getFullYear();
+    let periodMonth = new Date().getMonth();
+    const latestDateFromData = (() => {
+      if (!displayUploads.current.length) return null;
+      let best: { year: number; month: number; day: number; time: number } | null = null;
+      for (const row of displayUploads.current) {
+        const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
+        if (!rawDate) continue;
+        const cleaned = rawDate.replace(/^\S+\.\s*/, "").trim();
+        const parsed = Date.parse(cleaned);
+        if (!Number.isFinite(parsed)) continue;
+        const d = new Date(parsed);
+        const ymd = { year: d.getFullYear(), month: d.getMonth(), day: d.getDate(), time: parsed };
+        if (!best || ymd.time > best.time) best = ymd;
+      }
+      return best;
+    })();
+    if (latestDateFromData) {
+      periodYear = latestDateFromData.year;
+      periodMonth = latestDateFromData.month;
+    }
+
     const periodTotalDays = new Date(periodYear, periodMonth + 1, 0).getDate();
     const periodMonthStr = String(periodMonth + 1).padStart(2, "0");
     const periodStart = `${periodYear}-${periodMonthStr}-01`;
@@ -1744,10 +1782,14 @@ function AppInternal({
       displayUploads.current,
       matchesOfficer,
     );
-    
-    // Use the actual current day/month length for daily target comparisons
+
+    // Use the day-of-month from the latest data date (or today if no data)
+    // so the daily target / forecast reflects the data we actually have.
     const currentMonthTotalDays = new Date(periodYear, periodMonth + 1, 0).getDate();
-    const currentDay = Math.min(new Date().getDate(), currentMonthTotalDays);
+    const currentDay = Math.min(
+      latestDateFromData?.day ?? new Date().getDate(),
+      currentMonthTotalDays,
+    );
     const totalDays = currentMonthTotalDays;
     
     const todaySourceRows = todayRows.length ? todayRows : [];

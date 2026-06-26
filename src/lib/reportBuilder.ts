@@ -97,6 +97,26 @@ const deduplicateMerge = (currentRows: RawRow[], todayRows: RawRow[]): RawRow[] 
   return [...currentRows, ...newRows];
 };
 
+/**
+ * Find the latest date in any of the supplied row sets. Used to drive
+ * "today / day-of-month" calculations so they reflect the data we
+ * actually have rather than the real-world wall-clock date.
+ */
+const getLatestDataDate = (rows: RawRow[]): { year: number; month: number; day: number } | null => {
+  let best: { year: number; month: number; day: number; time: number } | null = null;
+  for (const row of rows) {
+    const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
+    if (!rawDate) continue;
+    const cleaned = rawDate.replace(/^\S+\.\s*/, "").trim();
+    const parsed = Date.parse(cleaned);
+    if (!Number.isFinite(parsed)) continue;
+    const d = new Date(parsed);
+    const ymd = { year: d.getFullYear(), month: d.getMonth(), day: d.getDate(), time: parsed };
+    if (!best || ymd.time > best.time) best = ymd;
+  }
+  return best ? { year: best.year, month: best.month, day: best.day } : null;
+};
+
 export function buildReport(targetRows: RawRow[], currentRows: RawRow[], lastMonthRows: RawRow[], lastYearRows: RawRow[], categoryRows: RawRow[], fileName: string, todayRows: RawRow[] = []): ParsedReport {
   // Merge today rows into current if provided (today is a subset of the current month)
   const mergedCurrentRows = todayRows.length > 0
@@ -124,11 +144,18 @@ export function buildReport(targetRows: RawRow[], currentRows: RawRow[], lastMon
   const officerSummary = new Map<string, OfficerPerformance>();
   const categorySummary = new Map<string, { actual: number; target: number }>();
 
+  // Use the latest data date for the "currentDay" calculation so the
+  // daily target / forecast reflect the data we actually have.
+  const latestDataDate = getLatestDataDate(mergedCurrentRows);
+  const effectiveNow = latestDataDate
+    ? new Date(latestDataDate.year, latestDataDate.month, latestDataDate.day)
+    : new Date();
+
   branchTargets.forEach((info, branchKey) => {
     const targetRow = targetRows.find((row) => normalizeText(row["BRANCH NAME"]) === branchKey);
     const branchName = String(targetRow?.["BRANCH NAME"] ?? "Unknown Branch").trim();
     const totalDays = info.days || 30;
-    const currentDay = Math.min(totalDays, new Date().getDate());
+    const currentDay = Math.min(totalDays, effectiveNow.getDate());
     branchSummary.set(branchKey, { label: branchName, target: info.totalTarget, actual: 0, lastMonth: 0, lastYear: 0, currentDay, totalDays });
   });
 
@@ -190,7 +217,7 @@ export function buildReport(targetRows: RawRow[], currentRows: RawRow[], lastMon
       const branchKey = normalizeText(branch);
       const targetInfo = branchTargets.get(branchKey);
       const totalDays = targetInfo?.days || 30;
-      const currentDay = Math.min(totalDays, new Date().getDate());
+      const currentDay = Math.min(totalDays, effectiveNow.getDate());
       const actual = getCategoryValue(row);
 
       const branchItem = branchSummary.get(branchKey) ?? { label: branch, target: 0, actual: 0, lastMonth: 0, lastYear: 0, currentDay, totalDays };
