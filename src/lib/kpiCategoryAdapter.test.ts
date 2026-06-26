@@ -48,13 +48,9 @@ describe("kpiCategoryAdapter", () => {
     assert.equal(getKpiRowValue(btbRow, "BTB"), 790);
   });
 
-  it("rowMatchesKpiCategory filters inventory rows", () => {
+  it("rowMatchesKpiCategory matches basic BTB / SIM rows", () => {
     assert.equal(rowMatchesKpiCategory(simRow, "SIM"), true);
     assert.equal(rowMatchesKpiCategory(btbRow, "BTB"), true);
-    assert.equal(
-      rowMatchesKpiCategory({ ...btbRow, "Product Type": "Service" }, "BTB"),
-      false,
-    );
   });
 
   it("sumKpiActualFromRows aggregates by category rules", () => {
@@ -75,5 +71,111 @@ describe("kpiCategoryAdapter", () => {
     assert.equal(rowMatchesKpiCategory(acPlusRow, "AC+"), true);
     assert.equal(rowMatchesKpiCategory(simRow, "COVER+"), false);
     assert.equal(rowMatchesKpiCategory(simRow, "AC+"), false);
+  });
+});
+
+describe("rowMatchesKpiCategory — data integrity fixes", () => {
+  // The user's actual sales data has the `Product Type` column filled
+  // with Officer IDs (numeric values), not the string "Inventory Item".
+  // The matcher should still pick up BTB / BTB(Apple) rows based on the
+  // text content and/or the enriched `catDaily` field.
+
+  it("does NOT exclude rows based on numeric Product Type", () => {
+    // The old code had: `if (productType && productType !== "Inventory Item") return false;`
+    // which excluded all rows whose Product Type was an Officer ID.
+    // The fix removes that early-return; the text and catDaily checks below
+    // decide the actual match.
+    const row: RawRow = {
+      "Category (Name)": "Adapter",
+      "Sub Category": "WALL CHARGER",
+      "Product Type": "3728",
+    };
+    // Without catDaily or a BTB substring in the text, the row should NOT
+    // be matched as BTB (it would be matched later via catDaily enrichment).
+    assert.equal(rowMatchesKpiCategory(row, "BTB"), false);
+  });
+
+  it("matches BTB via catDaily enrichment even with numeric Product Type", () => {
+    assert.equal(
+      rowMatchesKpiCategory(
+        {
+          "Category (Name)": "Adapter",
+          "Sub Category": "WALL CHARGER",
+          "Product Type": "3728",
+          catDaily: "BTB",
+        },
+        "BTB",
+      ),
+      true,
+    );
+  });
+
+  it("matches BTB(Apple) via catDaily enrichment even with numeric Product Type", () => {
+    assert.equal(
+      rowMatchesKpiCategory(
+        {
+          "Category (Name)": "Apple Acc for iPad & iPhone",
+          "Sub Category": "CASE",
+          "Product Type": "11384",
+          catDaily: "BTB(Apple)",
+        },
+        "BTB(Apple)",
+      ),
+      true,
+    );
+  });
+
+  it("uses catDaily enrichment when available (BTB)", () => {
+    assert.equal(
+      rowMatchesKpiCategory(
+        { "Category (Name)": "Foo Bar", catDaily: "BTB" },
+        "BTB",
+      ),
+      true,
+    );
+  });
+
+  it("uses catDaily enrichment when available (BTB(Apple))", () => {
+    assert.equal(
+      rowMatchesKpiCategory(
+        { "Category (Name)": "Foo Bar", catDaily: "BTB(Apple)" },
+        "BTB(Apple)",
+      ),
+      true,
+    );
+  });
+
+  it("handles 'BTB Apple' (with space) catDaily as BTB(Apple)", () => {
+    assert.equal(
+      rowMatchesKpiCategory(
+        { "Category (Name)": "Foo Bar", catDaily: "BTB Apple" },
+        "BTB(Apple)",
+      ),
+      true,
+    );
+  });
+
+  it("matches BTB(Apple) via Category (Name)='Apple Case & Protection' + sub", () => {
+    assert.equal(
+      rowMatchesKpiCategory(
+        {
+          "Category (Name)": "Apple Case & Protection",
+          "Sub Category": "CASING IPHONE 15 PRO MAX",
+          "Product Type": "11384",
+          catDaily: "BTB(Apple)",
+        },
+        "BTB(Apple)",
+      ),
+      true,
+    );
+  });
+
+  it("BTB and BTB(Apple) are matched by their respective catDaily", () => {
+    const btbAppleRow: RawRow = {
+      "Category (Name)": "Apple Acc for iPad & iPhone",
+      "Sub Category": "CASE",
+      catDaily: "BTB(Apple)",
+    };
+    assert.equal(rowMatchesKpiCategory(btbAppleRow, "BTB(Apple)"), true);
   });
 });

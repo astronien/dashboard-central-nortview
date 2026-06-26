@@ -71,11 +71,20 @@ function rowCategoryText(row: RawRow): string {
 
 /** Whether a sales row counts toward a KPI category (inventory-style rules from source). */
 export function rowMatchesKpiCategory(row: RawRow, category: string): boolean {
-  const productType = String(row["Product Type"] ?? row.product_type ?? "").trim();
-  if (productType && productType !== "Inventory Item") return false;
-
   const text = rowCategoryText(row);
   const catNorm = normalizeText(category);
+
+  // Fast-path: if the row was enriched with `catDaily` by the Category
+  // Master (see enrichSalesRowsWithCatDaily), use that as the most
+  // reliable signal. The source repo uses this as the source of truth.
+  const catDaily = String((row as any).catDaily ?? "").trim();
+  if (catDaily) {
+    if (catDaily === category) return true;
+    // BTB(Apple) ↔ "BTB Apple" / "btb apple" / "btb(apple)" — strip all
+    // whitespace and punctuation before comparing
+    const strip = (s: string) => s.toLowerCase().replace(/[\s()]+/g, "");
+    if (strip(catDaily) === strip(category)) return true;
+  }
 
   if (catNorm === "sim" || catNorm === "smile") {
     const cat = String(row["Category (Name)"] ?? "").trim();

@@ -2560,19 +2560,34 @@ function AppInternal({
     };
   }, [displayUploads, parsedReport, attachOfficerRows]);
 
+  // Enrich sales rows with `catDaily` (from the Category Master) so
+  // rowMatchesKpiCategory can use the most reliable signal when picking
+  // rows into BTB / BTB(Apple) / COVER+ / AC+ / SIM.
+  const enrichedCurrentRows = useMemo(() => {
+    if (!displayUploads.categoryMaster?.length) return displayUploads.current;
+    const lookup = buildCatDailyLookup(displayUploads.categoryMaster);
+    return enrichSalesRowsWithCatDaily(displayUploads.current, lookup);
+  }, [displayUploads.current, displayUploads.categoryMaster]);
+
+  const enrichedTodayRows = useMemo(() => {
+    if (!displayUploads.categoryMaster?.length) return displayUploads.today;
+    const lookup = buildCatDailyLookup(displayUploads.categoryMaster);
+    return enrichSalesRowsWithCatDaily(displayUploads.today, lookup);
+  }, [displayUploads.today, displayUploads.categoryMaster]);
+
   const categorySnapshotData = useMemo(
     () =>
       buildCategorySnapshots({
         targetRows: displayUploads.target,
-        currentRows: displayUploads.current,
-        todayRows: displayUploads.today,
+        currentRows: enrichedCurrentRows,
+        todayRows: enrichedTodayRows,
         lastMonthRows: displayUploads.lastMonth,
         lastYearRows: displayUploads.lastYear,
       }),
     [
       displayUploads.target,
-      displayUploads.current,
-      displayUploads.today,
+      enrichedCurrentRows,
+      enrichedTodayRows,
       displayUploads.lastMonth,
       displayUploads.lastYear,
     ],
