@@ -238,7 +238,13 @@ export function buildReport(targetRows: RawRow[], currentRows: RawRow[], lastMon
       categorySummary.set(catKey, catItem);
 
       const officerKey = cleanOfficerName(officer);
-      const rowStaffId = String(row["STAFF ID"] ?? row.emp_id ?? "").trim();
+      // Staff ID is normalized differently per upload kind:
+      //   - target file:   "STAFF ID"
+      //   - sales file:    "Officer (ID)"
+      // Look up both (plus the raw alias `emp_id`) so we don't miss the value.
+      const rowStaffId = String(
+        row["STAFF ID"] ?? row["Officer (ID)"] ?? row.emp_id ?? row.staff_id ?? "",
+      ).trim();
       let matchedKey = "";
       for (const [existingKey, value] of officerSummary.entries()) {
         if (matchesOfficer(value.name, officer)) { matchedKey = existingKey; break; }
@@ -265,6 +271,11 @@ export function buildReport(targetRows: RawRow[], currentRows: RawRow[], lastMon
           rate: 0,
         };
         officerSummary.set(officerKey, officerState);
+      } else if (!officerState.staffId && rowStaffId) {
+        // Backfill the staff ID from the current sales rows when the
+        // target file didn't supply one (e.g. only the current Excel
+        // was uploaded).
+        officerState.staffId = rowStaffId;
       }
       if (period === "current") officerState.actual += actual;
       else if (period === "lastMonth") officerState.lastMonth += actual;

@@ -447,6 +447,7 @@ type DerivedAttachRow = {
 type OfficerPerformance = {
   name: string;
   branch: string;
+  staffId: string;
   target: number;
   actual: number;
   achPercent: number;
@@ -783,9 +784,11 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
     if (!name) return;
     const officerKey = cleanOfficerName(name);
     const branch = String(row["BRANCH NAME"] ?? "").trim();
+    const staffId = String(row["STAFF ID"] ?? row.emp_id ?? row.staff_id ?? "").trim();
     officerSummary.set(officerKey, {
       name,
       branch,
+      staffId,
       target: toNumber(row.Total),
       actual: 0,
       achPercent: 0,
@@ -842,11 +845,19 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
         }
       }
       
+      // Staff ID can come from either the target ("STAFF ID") or the
+      // current sales rows ("Officer (ID)"). Look up both so the value
+      // is captured regardless of which Excel the user uploaded.
+      const rowStaffId = String(
+        row["STAFF ID"] ?? row["Officer (ID)"] ?? row.emp_id ?? row.staff_id ?? "",
+      ).trim();
+
       let officerState = matchedKey ? officerSummary.get(matchedKey) : undefined;
       if (!officerState) {
         officerState = {
           name: officer,
           branch,
+          staffId: rowStaffId,
           target: 0,
           actual: 0,
           achPercent: 0,
@@ -863,6 +874,10 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
           rate: 0,
         };
         officerSummary.set(officerKey, officerState);
+      } else if (!officerState.staffId && rowStaffId) {
+        // Backfill from the current sales rows when the target file
+        // didn't supply one.
+        officerState.staffId = rowStaffId;
       }
       if (period === "current") {
         officerState.actual += actual;
@@ -977,6 +992,7 @@ const fallbackReport: ParsedReport = {
     {
       name: "สิทธิโชค สิริเฉลิมกุล",
       branch: "645",
+      staffId: "",
       target: 6632444,
       actual: 7118866,
       achPercent: 107.33,
@@ -995,6 +1011,7 @@ const fallbackReport: ParsedReport = {
     {
       name: "ยุทธนา เหมือนปิ๋ว",
       branch: "645",
+      staffId: "",
       target: 6632444,
       actual: 5150670,
       achPercent: 77.66,
@@ -1013,6 +1030,7 @@ const fallbackReport: ParsedReport = {
     {
       name: "ณฐนน นฤพลตระกูล",
       branch: "645",
+      staffId: "",
       target: 6632444,
       actual: 5040387,
       achPercent: 76.00,
@@ -1031,6 +1049,7 @@ const fallbackReport: ParsedReport = {
     {
       name: "ผกายศรี แซ่จิ๋ว",
       branch: "645",
+      staffId: "",
       target: 6632444,
       actual: 4609776,
       achPercent: 69.50,
@@ -1049,6 +1068,7 @@ const fallbackReport: ParsedReport = {
     {
       name: "วิภา คุณะแสน",
       branch: "645",
+      staffId: "",
       target: 6632444,
       actual: 4136991,
       achPercent: 62.38,
@@ -1067,6 +1087,7 @@ const fallbackReport: ParsedReport = {
     {
       name: "ธนภัทร เจตนาภิวัฒน์",
       branch: "645",
+      staffId: "",
       target: 6632444,
       actual: 4083869,
       achPercent: 61.57,
@@ -1085,6 +1106,7 @@ const fallbackReport: ParsedReport = {
     {
       name: "วรักยา สิงห์ตั้น",
       branch: "645",
+      staffId: "",
       target: 6632444,
       actual: 3903181,
       achPercent: 58.85,
@@ -1103,6 +1125,7 @@ const fallbackReport: ParsedReport = {
     {
       name: "วิภาวี ปงรังษี",
       branch: "645",
+      staffId: "",
       target: 6632444,
       actual: 3774022,
       achPercent: 56.90,
@@ -1121,6 +1144,7 @@ const fallbackReport: ParsedReport = {
     {
       name: "ดีพิณ คงทอง",
       branch: "645",
+      staffId: "",
       target: 6632444,
       actual: 3743933,
       achPercent: 56.45,
@@ -1139,6 +1163,7 @@ const fallbackReport: ParsedReport = {
     {
       name: "ธีรพงษ์ ไพรรอน",
       branch: "645",
+      staffId: "",
       target: 6632444,
       actual: 3504307,
       achPercent: 52.84,
@@ -1157,6 +1182,7 @@ const fallbackReport: ParsedReport = {
     {
       name: "กัญญภัทร ชุมประยูร",
       branch: "645",
+      staffId: "",
       target: 6632444,
       actual: 3473762,
       achPercent: 52.38,
@@ -1175,6 +1201,7 @@ const fallbackReport: ParsedReport = {
     {
       name: "แพวนภา หนุยศ",
       branch: "645",
+      staffId: "",
       target: 6632444,
       actual: 3281079,
       achPercent: 49.47,
@@ -1193,6 +1220,7 @@ const fallbackReport: ParsedReport = {
     {
       name: "ต่อศักดิ์ แก้วพลอย",
       branch: "645",
+      staffId: "",
       target: 6632444,
       actual: 2991830,
       achPercent: 45.11,

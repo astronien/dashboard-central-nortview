@@ -305,11 +305,13 @@ export function StaffSection({
                           {(activeOfficer?.name ?? currentStaff.name).split(" ")[1] || ""}
                         </motion.h1>
                       </AnimatePresence>
-                      {/* Staff ID badge (under the name) */}
-                      {(activeOfficer?.staffId || currentStaff.id) ? (
+                      {/* Staff ID badge (under the name) — only show when
+                          a real staff ID is available (don't fall back to
+                          the array index, which would just be "1"). */}
+                      {activeOfficer?.staffId ? (
                         <AnimatePresence mode="wait">
                           <motion.div
-                            key={`id-${activeOfficer?.staffId ?? currentStaff.id}`}
+                            key={`id-${activeOfficer.staffId}`}
                             initial={{ opacity: 0, y: 6 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -6 }}
@@ -318,7 +320,7 @@ export function StaffSection({
                           >
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-400/30 text-emerald-200 text-xs sm:text-sm font-mono font-semibold tracking-wide shadow-[0_0_8px_rgba(16,185,129,0.2)]">
                               <span className="text-[9px] uppercase tracking-wider text-emerald-300/70 font-sans">ID</span>
-                              {activeOfficer?.staffId || currentStaff.id}
+                              {activeOfficer.staffId}
                             </span>
                           </motion.div>
                         </AnimatePresence>
