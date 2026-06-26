@@ -194,6 +194,14 @@ const StaffSectionImpl = function StaffSection({
   // Reduce animation on small screens for snappier feel
   const reduceMotion = isMobile;
 
+  // Defer chart render until after layout — avoids recharts "width(-1)/height(-1)"
+  // warning when the parent flex container is still measuring.
+  const [chartReady, setChartReady] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setChartReady(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
   const officerName = activeOfficer?.name ?? currentStaff.name;
   const officerBranch = activeOfficer?.branch ?? currentStaff.store;
   const { firstName, restName } = useMemo(() => {
@@ -270,7 +278,8 @@ const StaffSectionImpl = function StaffSection({
           {/* Radar chart (mobile: smaller, side) */}
           <div className="w-full lg:w-[30%] flex items-center justify-center relative">
             <div className="w-[180px] h-[180px] sm:w-[200px] sm:h-[200px] lg:w-[260px] lg:h-[260px] relative">
-              <ResponsiveContainer width="100%" height="100%">
+              {chartReady ? (
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                 <RadarChart
                   cx="50%"
                   cy="50%"
@@ -292,7 +301,8 @@ const StaffSectionImpl = function StaffSection({
                     animationDuration={800}
                   />
                 </RadarChart>
-              </ResponsiveContainer>
+                </ResponsiveContainer>
+              ) : null}
               {/* Center score */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="w-14 h-14 sm:w-16 sm:h-16 lg:w-20 lg:h-20 rounded-full border-2 border-emerald-500/30 flex items-center justify-center bg-emerald-500/10 backdrop-blur-sm">

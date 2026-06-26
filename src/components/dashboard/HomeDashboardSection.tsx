@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { TrendingUp, TrendingDown, Building2, User, ChevronDown, ChevronRight, Target, BarChart3, LayoutGrid } from "lucide-react";
 import type { CategorySnapshotItem } from "../../lib/categorySnapshotBuilder";
 import type { DerivedHomeStat } from "./dashboardTypes";
@@ -56,7 +56,7 @@ export type BranchOverviewKpiData = {
   breakdownByOfficer: Record<string, OfficerCategoryBreakdown>;
 };
 
-export function HomeDashboardSection({
+ const HomeDashboardSectionImpl = function HomeDashboardSection({
   derivedHomeStats,
   monthlyPerformance,
   categorySnapshots,
@@ -95,7 +95,9 @@ export function HomeDashboardSection({
       ) : null}
     </>
   );
-}
+};
+
+export const HomeDashboardSection = React.memo(HomeDashboardSectionImpl);
 
 const colorDotClass = (color: string) => {
   const map: Record<string, string> = {

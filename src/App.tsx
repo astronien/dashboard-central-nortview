@@ -2384,9 +2384,7 @@ function AppInternal({
 
   const monthlyPerformance = useMemo(() => {
     const hasData = displayUploads.current.length > 0;
-    
-    // Dynamic calculations or fallback mock values matching user's image exactly!
-    
+
     // Card 1: Overall Score
     let avgScore = 70;
     let scoresList: number[] = [];
@@ -2395,7 +2393,7 @@ function AppInternal({
         const achRate = officer.rate;
         const attachRow = attachOfficerRows.find(row => matchesOfficer(row.name, officer.name));
         const attRate = attachRow ? overallAttachRate(attachRow) : 0;
-        
+
         let soldCategoriesCount = 0;
         if (attachRow && attachRow.attachMap) {
           Object.keys(attachRow.attachMap).forEach((cat) => {
@@ -2404,7 +2402,7 @@ function AppInternal({
             }
           });
         }
-        
+
         const prodKnowledge = Math.min(Math.max(65 + Math.round(achRate * 0.15) + (soldCategoriesCount * 4), 60), 99);
         const custService = Math.min(Math.max(80 + Math.round(achRate * 0.1) + (index % 3) * 3, 75), 100);
         const upselling = Math.min(Math.max(50 + Math.round(attRate * 1.2), 50), 99);
@@ -2418,13 +2416,13 @@ function AppInternal({
         avgScore = scoresList.reduce((a, b) => a + b, 0) / scoresList.length;
       }
     }
-    
+
     // Grade mapping
     let grade = "D";
     if (avgScore >= 90) grade = "A";
     else if (avgScore >= 80) grade = "B";
     else if (avgScore >= 70) grade = "C";
-    
+
     // Grade distribution
     let gradeDist = { A: 0, B: 9, C: 3, D: 1 };
     if (scoresList.length > 0) {
@@ -2436,7 +2434,7 @@ function AppInternal({
         else gradeDist.D++;
       });
     }
-    
+
     // Low Forecast (<70% achievement rate)
     let lowForecastCount = 2;
     if (parsedReport.officers.length > 0) {
@@ -2447,50 +2445,75 @@ function AppInternal({
     const totalSales = parsedReport.branches.reduce((sum, b) => sum + b.actual, 0);
     const totalTarget = parsedReport.branches.reduce((sum, b) => sum + b.target, 0);
     const salesAchRate = calcAchievementPct(totalSales, totalTarget);
-    
-    // Card 3: True Sim
-    const simCount = hasData ? countRows(displayUploads.current, (cat) => cat.includes("sim")) : 153;
-    const iphoneCount = hasData ? countRows(displayUploads.current, (cat) => cat.includes("iphone")) : 744;
+
+    // -------- Single-pass scan of current rows --------
+    // Replaces 7+ separate countRows() calls (each iterating all rows).
+    let simCount = 0;
+    let iphoneCount = 0;
+    let caseCount = 0;
+    let ufundCount = 0;
+    let ufundBase = 0;
+    let coverCount = 0;
+    let pencilCount = 0;
+    let ipadCount = 0;
+    let macCount = 0;
+    let btbSales = 0;
+    if (hasData) {
+      for (const row of displayUploads.current) {
+        const cat = String(row["Category (Name)"] ?? row.category ?? "").toLowerCase();
+        const prod = String(row["Product (Name)"] ?? row.product ?? "").toLowerCase();
+        const sub = String(row["Sub Category"] ?? "").toLowerCase();
+        if (cat.includes("sim")) simCount++;
+        if (cat.includes("iphone")) iphoneCount++;
+        if (cat.includes("case") || prod.includes("case") || sub.includes("case")) caseCount++;
+        if (isUfundRow(row)) ufundCount++;
+        if (cat.includes("ufund") || cat.includes("personal")) ufundBase++;
+        if (cat.includes("cover") || cat.includes("care") || prod.includes("cover") || prod.includes("care")) coverCount++;
+        if (prod.includes("pencil") || prod.includes("pen")) pencilCount++;
+        if (cat.includes("ipad")) ipadCount++;
+        if (cat.includes("mac")) {
+          macCount++;
+          const amt = Number((row as any)["Sales Amount"] ?? (row as any)["Amount"] ?? (row as any).sales ?? 0);
+          if (cat.includes("btb")) btbSales += amt;
+        }
+      }
+    } else {
+      // Fallback mock values (preserve original fallback constants)
+      simCount = 153;
+      iphoneCount = 744;
+      caseCount = 353;
+      ufundCount = 47;
+      coverCount = 104;
+      pencilCount = 325;
+      ipadCount = 471;
+      macCount = 119;
+    }
     const simRate = iphoneCount > 0 ? (simCount / iphoneCount) * 100 : 20.56;
-    
-    // Card 4: Case iPhone
-    const caseCount = hasData ? countRows(displayUploads.current, (cat, prod, sub) => cat.includes("case") || prod.includes("case") || sub.includes("case")) : 353;
     const caseRate = iphoneCount > 0 ? (caseCount / iphoneCount) * 100 : 47.45;
-    
-    // Card 5: UFUND PERSONAL
-    const ufundCount = hasData ? countRows(displayUploads.current, (cat, prod, sub, row) => isUfundRow(row)) : 47;
-    const ufundBase = hasData ? countRows(displayUploads.current, (cat) => cat.includes("ufund") || cat.includes("personal")) : iphoneCount;
     const ufundRate = ufundBase > 0 ? (ufundCount / ufundBase) * 100 : 6.32;
-    
-    // Card 6: COVER + (solid card)
-    const coverCount = hasData ? countRows(displayUploads.current, (cat, prod) => cat.includes("cover") || cat.includes("care") || prod.includes("cover") || prod.includes("care")) : 104;
     const coverRate = iphoneCount > 0 ? (coverCount / iphoneCount) * 100 : 13.98;
-    
-    // Card 7: KPIs Pencil 85%
-    const pencilCount = hasData ? countRows(displayUploads.current, (cat, prod) => prod.includes("pencil") || prod.includes("pen")) : 325;
-    const ipadCount = hasData ? countRows(displayUploads.current, (cat) => cat.includes("ipad")) : 471;
     const pencilRate = ipadCount > 0 ? (pencilCount / ipadCount) * 100 : 69.00;
-    
-    // Card 8: KPIs Mac 10%
-    const macCount = hasData ? countRows(displayUploads.current, (cat) => cat.includes("mac")) : 119;
     const macRate = iphoneCount > 0 ? (macCount / iphoneCount) * 100 : 15.99;
-    
-    // Card 9: KPIs iPad 30%
-    const ipadAttachCount = hasData ? countRows(displayUploads.current, (cat) => cat.includes("ipad")) : 471;
-    const ipadRate = iphoneCount > 0 ? (ipadAttachCount / iphoneCount) * 100 : 63.31;
-    
-    // Card 10: KPIs BTB Mix 10%
-    const btbSales = hasData ? sumSales(displayUploads.current, (cat) => cat.includes("btb")) : 6850000;
+    const ipadRate = iphoneCount > 0 ? (ipadCount / iphoneCount) * 100 : 63.31;
     const btbTotalSales = totalSales || 54300000;
     const btbRate = btbTotalSales > 0 ? (btbSales / btbTotalSales) * 100 : 12.61;
-    
+    if (!hasData) btbSales = 6850000;
+
     // Card 11: Mac Growth YoY
     const currentMacSales = hasData
-      ? parsedReport.categories.find((c) => c.category.toLowerCase() === "mac")?.actual ?? sumSales(displayUploads.current, (cat) => cat.includes("mac"))
+      ? parsedReport.categories.find((c) => c.category.toLowerCase() === "mac")?.actual ?? macCount
       : 5160000;
-    const lastYearMacSales = hasData ? sumSales(displayUploads.lastYear, (cat) => cat.includes("mac")) : 0;
+    let lastYearMacSales = 0;
+    if (hasData) {
+      for (const row of displayUploads.lastYear) {
+        const cat = String(row["Category (Name)"] ?? row.category ?? "").toLowerCase();
+        if (cat.includes("mac")) {
+          lastYearMacSales += Number((row as any)["Sales Amount"] ?? (row as any)["Amount"] ?? (row as any).sales ?? 0);
+        }
+      }
+    }
     const macYoYRate = lastYearMacSales > 0 ? ((currentMacSales - lastYearMacSales) / lastYearMacSales) * 100 : 0.00;
-    
+
     // Card 12: Total Sales Growth YoY (same buildReport aggregation as totalSales)
     const currentTotalSales = totalSales;
     const lastYearTotalSales = hasData
@@ -2507,7 +2530,7 @@ function AppInternal({
       coverPlus: { count: coverCount, base: iphoneCount, rate: coverRate, target: 25 },
       pencil: { count: pencilCount, base: ipadCount, rate: pencilRate, target: 85 },
       kpisMac: { count: macCount, base: iphoneCount, rate: macRate, target: 10 },
-      kpisIpad: { count: ipadAttachCount, base: iphoneCount, rate: ipadRate, target: 30 },
+      kpisIpad: { count: ipadCount, base: iphoneCount, rate: ipadRate, target: 30 },
       btbMix: { btbSales, totalSales: btbTotalSales, rate: btbRate, target: 10 },
       macYoY: { actual: currentMacSales, target: lastYearMacSales || 7270000, rate: macYoYRate, targetRate: 10 },
       totalYoY: { actual: currentTotalSales, target: lastYearTotalSales || 77240000, rate: totalSalesYoYRate, targetRate: 10 },
