@@ -39,7 +39,7 @@ export function SettingsSection({
           <div className="p-3 bg-emerald-500/20 rounded-xl text-emerald-400"><Building2 className="w-6 h-6" /></div>
           <div>
             <h2 className="text-xl font-bold tracking-tight">เลือกสาขาประจำแดชบอร์ด</h2>
-            <p className="text-sm text-white/60 mt-1">เลือกสาขาที่ต้องการดูบนแดชบอร์ด Live Sync ดึงข้อมูลทุกสาขาลงฐานข้อมูล — การเลือกสาขานี้กรองเฉพาะการแสดงผล</p>
+            <p className="text-sm text-white/60 mt-1">เลือกสาขาที่ต้องการดูบนแดชบอร์ด รายชื่อสาขาดึงจากไฟล์ที่อัปโหลด — หากยังไม่มีข้อมูล กรุณาอัปโหลดไฟล์ Target/Current ที่หน้ารายงานเพื่อแสดงผล</p>
           </div>
         </div>
         <div className="w-full lg:w-72 shrink-0">
@@ -48,6 +48,11 @@ export function SettingsSection({
             onChange={(e) => onBranchChange(e.target.value)}
             className="w-full bg-[#051710] border border-white/15 rounded-xl px-4 py-3 text-white text-sm font-semibold focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400 transition-all cursor-pointer shadow-lg"
           >
+            {sheetBranches.length === 0 ? (
+              <option value="" disabled className="bg-[#051710] text-white/60">
+                ยังไม่มีข้อมูล — อัปโหลดไฟล์ที่หน้ารายงานก่อน
+              </option>
+            ) : null}
             {(sheetBranches.length > 0 ? sheetBranches : [
               "Mega Bangna", "Central World", "Central Rama 9", "Iconsiam",
               "Central Phitsanulok", "Central Plaza Rayong", "Central Chiangmai Airport", "Central Plaza Westgate",

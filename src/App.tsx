@@ -1672,6 +1672,42 @@ function AppInternal({
     categoryMaster: "Category Master",
   };
 
+  // Branches present in the uploaded data. This is the primary source
+  // for the branch dropdown — only branches the user has actually
+  // uploaded data for appear, so they can never select a branch with
+  // no rows behind it.
+  const uploadedBranches = useMemo<string[]>(() => {
+    const set = new Set<string>();
+    for (const b of parsedReport.branches) {
+      const label = String(b?.label ?? "").trim();
+      if (label) set.add(label);
+    }
+    // Also fall back to Officer (Branch) values so PIA officers from
+    // branches not present in the target aggregate still show up.
+    for (const o of parsedReport.officers) {
+      const branch = String(o?.branch ?? "").trim();
+      if (branch) set.add(branch);
+    }
+    return Array.from(set).sort();
+  }, [parsedReport.branches, parsedReport.officers]);
+
+  // Combined branch list for the dropdown: uploaded first (primary),
+  // then the Google-Sheet list (secondary) as a fallback for branches
+  // the user might want to switch to even before uploading data.
+  const combinedBranches = useMemo<string[]>(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const b of uploadedBranches) {
+      const key = b.trim().toLowerCase();
+      if (key && !seen.has(key)) { seen.add(key); out.push(b); }
+    }
+    for (const b of sheetBranches) {
+      const key = b.trim().toLowerCase();
+      if (key && !seen.has(key)) { seen.add(key); out.push(b); }
+    }
+    return out;
+  }, [uploadedBranches, sheetBranches]);
+
   const currentStaff =
     staffData.find((s) => s.id === activeStaffId) || staffData[0];
   const currentOfficer = parsedReport.officers[Number(activeStaffId) - 1] ?? parsedReport.officers[0];
@@ -2979,6 +3015,25 @@ function AppInternal({
     }
   }, [selectedBranch, selectedBranchLoaded]);
 
+  // When the user uploads data for a branch that isn't currently
+  // selected, auto-switch to the first uploaded branch so the rest of
+  // the dashboard immediately reflects the new data.
+  useEffect(() => {
+    if (!selectedBranchLoaded) return;
+    if (!uploadedBranches.length) return;
+    const current = (selectedBranch || "").trim().toLowerCase();
+    const isInUploaded = current && uploadedBranches.some(
+      (b) => b.trim().toLowerCase() === current
+        || b.trim().toLowerCase().includes(current)
+        || current.includes(b.trim().toLowerCase()),
+    );
+    if (!isInUploaded) {
+      const first = uploadedBranches[0];
+      setSelectedBranch(first);
+      void idbSet("dashboard-selected-branch", first).catch(() => undefined);
+    }
+  }, [uploadedBranches, selectedBranchLoaded]);
+
 
   const handleStaffPhotoUpload = async (
     entry: { staffId: string; officerKey: string; name: string; branch?: string },
@@ -3287,7 +3342,7 @@ function AppInternal({
                 <SettingsSection
                   selectedBranch={selectedBranch}
                   onBranchChange={handleBranchChange}
-                  sheetBranches={sheetBranches}
+                  sheetBranches={combinedBranches}
                   staffRoster={staffRoster}
                   staffPhotos={Object.fromEntries(
                     Object.entries(staffPhotos).map(([id, record]) => [id, (record as any).photoUrl]),
