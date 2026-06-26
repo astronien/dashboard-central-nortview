@@ -879,7 +879,8 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
   mergeSales(resolvedLastYearRows, "lastYear");
 
   // Daily actual: prefer dedicated today sheet; else last day in current (legacy)
-  let maxDateStr = "";
+  // Compare by parsed time (not raw string) so mixed date formats for the
+  // same calendar day are all included.
   let maxDateTime = 0;
   if (!todayRows.length) {
     currentRows.forEach((row) => {
@@ -888,10 +889,7 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
       const parsed = parseDocDate(rawDate);
       if (parsed) {
         const time = parsed.getTime();
-        if (time > maxDateTime) {
-          maxDateTime = time;
-          maxDateStr = rawDate;
-        }
+        if (time > maxDateTime) maxDateTime = time;
       }
     });
   }
@@ -899,12 +897,12 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
   const officerDailyActual = new Map<string, number>();
   const dailySourceRows = todayRows.length
     ? todayRows
-    : maxDateStr || maxDateTime > 0
+    : maxDateTime > 0
       ? currentRows.filter((row) => {
           const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
           const parsed = parseDocDate(rawDate);
           const time = parsed ? parsed.getTime() : 0;
-          return (maxDateStr && rawDate === maxDateStr) || (time && time === maxDateTime);
+          return time && time === maxDateTime;
         })
       : [];
 
@@ -1373,24 +1371,24 @@ function AppInternal({
   const todayRows = useMemo(() => {
     if (displayUploads.today.length) return displayUploads.today;
     if (!displayUploads.current.length) return [];
-    let maxDateStr = "";
+    // Find the latest date by PARSED TIME (not by string), so rows with
+    // mixed formats (e.g. "26/06/2026" vs "26/06/2569" vs "26 Jun 2026")
+    // for the same calendar day are all included.
     let maxDateTime = 0;
     displayUploads.current.forEach((row) => {
       const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
       if (!rawDate) return;
       const parsed = parseDocDate(rawDate);
-      if (parsed) {
-        const time = parsed.getTime();
-        if (time > maxDateTime) {
-          maxDateTime = time;
-          maxDateStr = rawDate;
-        }
+      if (parsed && parsed.getTime() > maxDateTime) {
+        maxDateTime = parsed.getTime();
       }
     });
-    if (!maxDateStr) return [];
-    return displayUploads.current.filter(
-      (row) => String(row["Doc Date"] ?? "").trim() === maxDateStr.trim(),
-    );
+    if (!maxDateTime) return [];
+    return displayUploads.current.filter((row) => {
+      const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
+      const parsed = parseDocDate(rawDate);
+      return parsed ? parsed.getTime() === maxDateTime : false;
+    });
   }, [displayUploads.today, displayUploads.current]);
 
   const formatTodayDateLabel = (rawDate: string) => {
@@ -1803,7 +1801,8 @@ function AppInternal({
     const totalDays = currentMonthTotalDays;
     
     const todaySourceRows = todayRows.length ? todayRows : [];
-    let maxDateStr = "";
+    // Find latest data date by PARSED TIME so different string formats
+    // for the same day (e.g. "26/06/2026" vs "26/06/2569") all match.
     let maxDateTime = 0;
     if (!todaySourceRows.length && hasData) {
       displayUploads.current.forEach((row) => {
@@ -1812,10 +1811,7 @@ function AppInternal({
         const parsed = parseDocDate(rawDate);
         if (parsed) {
           const time = parsed.getTime();
-          if (time > maxDateTime) {
-            maxDateTime = time;
-            maxDateStr = rawDate;
-          }
+          if (time > maxDateTime) maxDateTime = time;
         }
       });
     }
@@ -1859,10 +1855,13 @@ function AppInternal({
           const rowCat = getCategory(row);
           if (rowCat !== catName) return;
           if (!todaySourceRows.length) {
+            // Compare by parsed time, not by raw string, so rows that
+            // represent the same calendar day but in slightly different
+            // formats (e.g. "26/06/2026" vs "26/06/2569") all match.
             const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
             const parsed = parseDocDate(rawDate);
             const time = parsed ? parsed.getTime() : 0;
-            if (!((maxDateStr && rawDate === maxDateStr) || (time && time === maxDateTime))) return;
+            if (!(time && time === maxDateTime)) return;
           }
           actualDay +=
             kpi.measureType === "quantity"

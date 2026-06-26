@@ -270,7 +270,8 @@ export function buildReport(targetRows: RawRow[], currentRows: RawRow[], lastMon
   mergeSales(lastMonthRows, "lastMonth");
   mergeSales(lastYearRows, "lastYear");
 
-  let maxDateStr = "";
+  // Compare by parsed time, not raw string, so mixed date formats for the
+  // same calendar day are all included.
   let maxDateTime = 0;
   mergedCurrentRows.forEach((row) => {
     const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
@@ -278,17 +279,17 @@ export function buildReport(targetRows: RawRow[], currentRows: RawRow[], lastMon
     const parsed = parseDocDate(rawDate);
     if (parsed) {
       const time = parsed.getTime();
-      if (time > maxDateTime) { maxDateTime = time; maxDateStr = rawDate; }
+      if (time > maxDateTime) maxDateTime = time;
     }
   });
 
   const officerDailyActual = new Map<string, number>();
-  if (maxDateStr || maxDateTime > 0) {
+  if (maxDateTime > 0) {
     mergedCurrentRows.forEach((row) => {
       const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
       const parsed = parseDocDate(rawDate);
       const time = parsed ? parsed.getTime() : 0;
-      if ((maxDateStr && rawDate === maxDateStr) || (time && time === maxDateTime)) {
+      if (time && time === maxDateTime) {
         const officerName = String(row["Officer (Name)"] ?? "").trim();
         if (officerName) {
           const matchedKey = [...officerSummary.keys()].find((k) => matchesOfficer(officerSummary.get(k)!.name, officerName));
