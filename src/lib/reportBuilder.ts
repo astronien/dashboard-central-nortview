@@ -5,6 +5,7 @@ import { parseDocDate, parseThaiDate, stripThaiDatePrefix } from "./dateParser";
 export type OfficerPerformance = {
   name: string;
   branch: string;
+  staffId: string;
   target: number;
   actual: number;
   achPercent: number;
@@ -19,6 +20,8 @@ export type OfficerPerformance = {
   diffDay: number;
   achDayPercent: number;
   rate: number;
+  forecastActual?: number;
+  position?: string;
 };
 
 export type ParsedReport = {
@@ -182,6 +185,7 @@ export function buildReport(targetRows: RawRow[], currentRows: RawRow[], lastMon
     officerSummary.set(officerKey, {
       name,
       branch: String(row["BRANCH NAME"] ?? "").trim(),
+      staffId: String(row["STAFF ID"] ?? row.emp_id ?? "").trim(),
       target: toNumber(row.Total),
       actual: 0,
       achPercent: 0,
@@ -234,6 +238,7 @@ export function buildReport(targetRows: RawRow[], currentRows: RawRow[], lastMon
       categorySummary.set(catKey, catItem);
 
       const officerKey = cleanOfficerName(officer);
+      const rowStaffId = String(row["STAFF ID"] ?? row.emp_id ?? "").trim();
       let matchedKey = "";
       for (const [existingKey, value] of officerSummary.entries()) {
         if (matchesOfficer(value.name, officer)) { matchedKey = existingKey; break; }
@@ -243,6 +248,7 @@ export function buildReport(targetRows: RawRow[], currentRows: RawRow[], lastMon
         officerState = {
           name: officer,
           branch,
+          staffId: rowStaffId,
           target: 0,
           actual: 0,
           achPercent: 0,

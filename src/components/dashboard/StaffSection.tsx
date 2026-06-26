@@ -41,6 +41,7 @@ export type PerformanceRow = {
 
 export type OfficerData = {
   name: string;
+  staffId?: string;
   actual: number;
   target: number;
   achPercent?: number;
@@ -49,6 +50,7 @@ export type OfficerData = {
 };
 
 export type CurrentStaff = {
+  id?: string;
   name: string;
   store: string;
   stats: {
@@ -303,6 +305,24 @@ export function StaffSection({
                           {(activeOfficer?.name ?? currentStaff.name).split(" ")[1] || ""}
                         </motion.h1>
                       </AnimatePresence>
+                      {/* Staff ID badge (under the name) */}
+                      {(activeOfficer?.staffId || currentStaff.id) ? (
+                        <AnimatePresence mode="wait">
+                          <motion.div
+                            key={`id-${activeOfficer?.staffId ?? currentStaff.id}`}
+                            initial={{ opacity: 0, y: 6 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -6 }}
+                            transition={{ duration: 0.25 }}
+                            className="flex items-center justify-center lg:justify-end gap-1.5 mb-1.5"
+                          >
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-400/30 text-emerald-200 text-xs sm:text-sm font-mono font-semibold tracking-wide shadow-[0_0_8px_rgba(16,185,129,0.2)]">
+                              <span className="text-[9px] uppercase tracking-wider text-emerald-300/70 font-sans">ID</span>
+                              {activeOfficer?.staffId || currentStaff.id}
+                            </span>
+                          </motion.div>
+                        </AnimatePresence>
+                      ) : null}
                       <AnimatePresence mode="wait">
                         <motion.div
                           key={activeOfficer?.branch ?? currentStaff.store}
