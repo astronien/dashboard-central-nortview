@@ -425,10 +425,14 @@ export function StaffSection({
                             initial={{ opacity: 0, y: 5 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -5 }}
-                            className={`font-bold text-white relative z-10 transition-all ${
-                              fmtSalesNum(todaySalesTotal).length > 7
-                                ? "text-base sm:text-lg lg:text-xl tracking-tighter"
-                                : "text-xl lg:text-2xl"
+                            className={`font-bold text-white relative z-10 transition-all tabular-nums leading-none ${
+                              (() => {
+                                const len = fmtSalesNum(todaySalesTotal).length;
+                                if (len > 10) return "text-xs sm:text-sm tracking-tighter";
+                                if (len > 8) return "text-sm sm:text-base lg:text-lg tracking-tighter";
+                                if (len > 6) return "text-base sm:text-lg lg:text-xl tracking-tighter";
+                                return "text-xl lg:text-2xl";
+                              })()
                             }`}
                           >
                             {fmtSalesNum(todaySalesTotal)}
