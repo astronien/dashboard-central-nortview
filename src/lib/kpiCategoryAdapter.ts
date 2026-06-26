@@ -84,10 +84,10 @@ export function rowMatchesKpiCategory(row: RawRow, category: string): boolean {
   }
 
   if (catNorm === "btb") {
-    const cat = String(row["Category (Name)"] ?? "");
-    const sub = String(row["Sub Category"] ?? "");
-    const prod = String(row["Product (Name)"] ?? "");
-    return cat.includes("BTB") || sub.includes("BTB") || prod.includes("BTB");
+    const cat = String(row["Category (Name)"] ?? "").toLowerCase();
+    const sub = String(row["Sub Category"] ?? "").toLowerCase();
+    const prod = String(row["Product (Name)"] ?? "").toLowerCase();
+    return cat.includes("btb") || sub.includes("btb") || prod.includes("btb");
   }
 
   if (catNorm === "btb(apple)" || catNorm === "btb apple") {
