@@ -297,7 +297,7 @@ export default function CategoryPicker({
   };
 
   const checkboxClass =
-    "rounded-lg border-white/20 bg-white/5 text-emerald-500 focus:ring-emerald-400 focus:ring-offset-0";
+    "rounded border-white/20 bg-white/5 text-emerald-500 focus:ring-emerald-400 focus:ring-offset-0";
 
   return (
     <div className="space-y-3">
@@ -318,7 +318,7 @@ export default function CategoryPicker({
           onChange={(e) => handleIncludeNonInventoryToggle(e.target.checked)}
           className={checkboxClass}
         />
-        <span className="text-xs font-semibold text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg px-2 py-0.5">
+        <span className="text-xs font-semibold text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded px-2 py-0.5">
           รวม Non-Inventory Item (เช่น ซิม/Promo Operator)
         </span>
       </label>
@@ -330,7 +330,7 @@ export default function CategoryPicker({
             Category <span className="text-white/30">({allCategories.length})</span>
           </label>
           <div className="border border-white/10 rounded-lg p-2 max-h-40 overflow-y-auto bg-white/5">
-            <label className="flex items-center gap-2 p-1 hover:bg-white/5 rounded-lg cursor-pointer">
+            <label className="flex items-center gap-2 p-1 hover:bg-white/5 rounded cursor-pointer">
               <input
                 type="checkbox"
                 checked={!value || !value.categories || value.categories.length === 0}
@@ -342,7 +342,7 @@ export default function CategoryPicker({
             {allCategories.map((cat) => (
               <label
                 key={cat}
-                className="flex items-center gap-2 p-1 hover:bg-white/5 rounded-lg cursor-pointer"
+                className="flex items-center gap-2 p-1 hover:bg-white/5 rounded cursor-pointer"
               >
                 <input
                   type="checkbox"
@@ -365,7 +365,7 @@ export default function CategoryPicker({
             Sub Category <span className="text-white/30">({allSubCategories.length})</span>
           </label>
           <div className="border border-white/10 rounded-lg p-2 max-h-40 overflow-y-auto bg-white/5">
-            <label className="flex items-center gap-2 p-1 hover:bg-white/5 rounded-lg cursor-pointer">
+            <label className="flex items-center gap-2 p-1 hover:bg-white/5 rounded cursor-pointer">
               <input
                 type="checkbox"
                 checked={!value || !value.subCategories || value.subCategories.length === 0}
@@ -377,7 +377,7 @@ export default function CategoryPicker({
             {allSubCategories.map((sub) => (
               <label
                 key={sub}
-                className="flex items-center gap-2 p-1 hover:bg-white/5 rounded-lg cursor-pointer"
+                className="flex items-center gap-2 p-1 hover:bg-white/5 rounded cursor-pointer"
               >
                 <input
                   type="checkbox"
@@ -400,7 +400,7 @@ export default function CategoryPicker({
             Model <span className="text-white/30">({allModels.length})</span>
           </label>
           <div className="border border-white/10 rounded-lg p-2 max-h-40 overflow-y-auto bg-white/5">
-            <label className="flex items-center gap-2 p-1 hover:bg-white/5 rounded-lg cursor-pointer">
+            <label className="flex items-center gap-2 p-1 hover:bg-white/5 rounded cursor-pointer">
               <input
                 type="checkbox"
                 checked={!value || !value.models || value.models.length === 0}
@@ -412,7 +412,7 @@ export default function CategoryPicker({
             {allModels.map((mod) => (
               <label
                 key={mod}
-                className="flex items-center gap-2 p-1 hover:bg-white/5 rounded-lg cursor-pointer"
+                className="flex items-center gap-2 p-1 hover:bg-white/5 rounded cursor-pointer"
               >
                 <input
                   type="checkbox"
@@ -435,7 +435,7 @@ export default function CategoryPicker({
             Brand <span className="text-white/30">({allBrands.length})</span>
           </label>
           <div className="border border-white/10 rounded-lg p-2 max-h-40 overflow-y-auto bg-white/5">
-            <label className="flex items-center gap-2 p-1 hover:bg-white/5 rounded-lg cursor-pointer">
+            <label className="flex items-center gap-2 p-1 hover:bg-white/5 rounded cursor-pointer">
               <input
                 type="checkbox"
                 checked={!value || !value.brands || value.brands.length === 0}
@@ -447,7 +447,7 @@ export default function CategoryPicker({
             {allBrands.map((brand) => (
               <label
                 key={brand}
-                className="flex items-center gap-2 p-1 hover:bg-white/5 rounded-lg cursor-pointer"
+                className="flex items-center gap-2 p-1 hover:bg-white/5 rounded cursor-pointer"
               >
                 <input
                   type="checkbox"
@@ -470,7 +470,7 @@ export default function CategoryPicker({
             Customer Code <span className="text-white/30">({allCustomerCodes.length})</span>
           </label>
           <div className="border border-white/10 rounded-lg p-2 max-h-40 overflow-y-auto bg-white/5">
-            <label className="flex items-center gap-2 p-1 hover:bg-white/5 rounded-lg cursor-pointer">
+            <label className="flex items-center gap-2 p-1 hover:bg-white/5 rounded cursor-pointer">
               <input
                 type="checkbox"
                 checked={!value || !value.customerCodes || value.customerCodes.length === 0}
@@ -482,7 +482,7 @@ export default function CategoryPicker({
             {allCustomerCodes.map((code) => (
               <label
                 key={code}
-                className="flex items-center gap-2 p-1 hover:bg-white/5 rounded-lg cursor-pointer"
+                className="flex items-center gap-2 p-1 hover:bg-white/5 rounded cursor-pointer"
               >
                 <input
                   type="checkbox"
@@ -505,7 +505,7 @@ export default function CategoryPicker({
             Product Name <span className="text-white/30">({allProductNames.length})</span>
           </label>
           <div className="border border-white/10 rounded-lg p-2 max-h-40 overflow-y-auto bg-white/5">
-            <label className="flex items-center gap-2 p-1 hover:bg-white/5 rounded-lg cursor-pointer">
+            <label className="flex items-center gap-2 p-1 hover:bg-white/5 rounded cursor-pointer">
               <input
                 type="checkbox"
                 checked={!value || !value.productNames || value.productNames.length === 0}
@@ -517,7 +517,7 @@ export default function CategoryPicker({
             {allProductNames.map((name) => (
               <label
                 key={name}
-                className="flex items-center gap-2 p-1 hover:bg-white/5 rounded-lg cursor-pointer"
+                className="flex items-center gap-2 p-1 hover:bg-white/5 rounded cursor-pointer"
               >
                 <input
                   type="checkbox"
@@ -540,7 +540,7 @@ export default function CategoryPicker({
             Doc Type (หัวบิล) <span className="text-white/30">({allDocTypes.length})</span>
           </label>
           <div className="border border-white/10 rounded-lg p-2 max-h-40 overflow-y-auto bg-white/5">
-            <label className="flex items-center gap-2 p-1 hover:bg-white/5 rounded-lg cursor-pointer">
+            <label className="flex items-center gap-2 p-1 hover:bg-white/5 rounded cursor-pointer">
               <input
                 type="checkbox"
                 checked={!value || !value.docTypes || value.docTypes.length === 0}
@@ -552,7 +552,7 @@ export default function CategoryPicker({
             {allDocTypes.map((docType) => (
               <label
                 key={docType}
-                className="flex items-center gap-2 p-1 hover:bg-white/5 rounded-lg cursor-pointer"
+                className="flex items-center gap-2 p-1 hover:bg-white/5 rounded cursor-pointer"
               >
                 <input
                   type="checkbox"

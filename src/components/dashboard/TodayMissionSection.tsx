@@ -30,7 +30,7 @@ export function TodayMissionSection({
 }) {
   return (
     <>
-      <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+      <div className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
         <div className="flex justify-between items-center mb-5">
           <div>
             <h3 className="text-lg font-extrabold text-white tracking-tight flex items-center gap-2">
@@ -56,7 +56,7 @@ export function TodayMissionSection({
                     <span className="text-white/60">ยอดขายจริง: <strong className="text-white font-extrabold">฿{Math.round(item.actual).toLocaleString()}</strong></span>
                     {!isTotal && <span className="text-white/60">จำนวน: <strong className="text-white font-extrabold">{item.units} Units</strong></span>}
                     <span className="text-white/40">เป้าวัน: ฿{Math.round(item.target).toLocaleString()}</span>
-                    <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${item.ach >= 100 ? "bg-emerald-500/20 text-emerald-400" : "bg-white/10 text-white/70"}`}>{item.ach.toFixed(1)}%</span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${item.ach >= 100 ? "bg-emerald-500/20 text-emerald-400" : "bg-white/10 text-white/70"}`}>{item.ach.toFixed(1)}%</span>
                   </div>
                 </div>
                 <div className="w-full bg-white/10 rounded-full h-2.5 overflow-hidden border border-white/5 p-[1px]">
@@ -69,7 +69,7 @@ export function TodayMissionSection({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+        <div className="lg:col-span-2 bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
           <div className="flex items-center justify-between mb-5">
             <h3 className="text-lg font-bold tracking-tight text-white">Device Mix & Attach Ratios</h3>
             <span className="text-xs text-white/50">สัดส่วนสินค้าและอัตราการแนบอุปกรณ์วันนี้</span>
@@ -115,7 +115,7 @@ export function TodayMissionSection({
           </div>
         </div>
 
-        <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)] flex flex-col justify-between">
+        <div className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)] flex flex-col justify-between">
           <div>
             <h3 className="text-lg font-bold tracking-tight mb-4 text-white">Quick Links (The Flash)</h3>
             <div className="grid grid-cols-2 gap-2 text-center text-xs font-semibold">

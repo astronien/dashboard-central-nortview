@@ -206,7 +206,7 @@ export default function KpiPresetSection({
             <div className="flex gap-1 bg-white/5 rounded-lg p-1 border border-white/10">
               <button
                 onClick={() => setResultsMode("branch")}
-                className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${
+                className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
                   resultsMode === "branch"
                     ? "bg-white/15 text-white shadow"
                     : "text-emerald-300/80 hover:text-white"
@@ -216,7 +216,7 @@ export default function KpiPresetSection({
               </button>
               <button
                 onClick={() => setResultsMode("officer")}
-                className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${
+                className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
                   resultsMode === "officer"
                     ? "bg-white/15 text-white shadow"
                     : "text-emerald-300/80 hover:text-white"

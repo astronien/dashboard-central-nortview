@@ -269,7 +269,7 @@ export default function KpiPresetManager({
               <button
                 type="button"
                 onClick={toggleAll}
-                className="flex items-center gap-2 text-xs text-white/70 hover:text-white transition-colors px-2 py-1 rounded-lg hover:bg-white/5"
+                className="flex items-center gap-2 text-xs text-white/70 hover:text-white transition-colors px-2 py-1 rounded hover:bg-white/5"
               >
                 {allSelected ? (
                   <CheckSquare className="w-4 h-4 text-emerald-400" />
@@ -354,13 +354,13 @@ export default function KpiPresetManager({
                     </button>
                     <button
                       onClick={() => handleEdit(preset)}
-                      className="px-3 py-1 text-sm bg-white/10 text-white/80 border border-white/10 rounded-lg hover:bg-white/20 transition"
+                      className="px-3 py-1 text-sm bg-white/10 text-white/80 border border-white/10 rounded hover:bg-white/20 transition"
                     >
                       แก้ไข
                     </button>
                     <button
                       onClick={() => handleDelete(preset.id)}
-                      className="px-3 py-1 text-sm bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-lg hover:bg-rose-500/30 transition"
+                      className="px-3 py-1 text-sm bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded hover:bg-rose-500/30 transition"
                     >
                       ลบ
                     </button>

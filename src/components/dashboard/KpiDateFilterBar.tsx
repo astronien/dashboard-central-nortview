@@ -287,7 +287,7 @@ export default function KpiDateFilterBar({
         <div className="flex gap-1 bg-white/5 rounded-lg p-1 border border-white/10">
           <button
             onClick={() => setFilters({ ...filters, mode: "cumulative" })}
-            className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors ${
+            className={`px-3 py-1 text-sm font-medium rounded transition-colors ${
               filters.mode === "cumulative"
                 ? "bg-white/15 text-white shadow"
                 : "text-emerald-300/80 hover:text-white"
@@ -297,7 +297,7 @@ export default function KpiDateFilterBar({
           </button>
           <button
             onClick={() => setFilters({ ...filters, mode: "daily" })}
-            className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors ${
+            className={`px-3 py-1 text-sm font-medium rounded transition-colors ${
               filters.mode === "daily"
                 ? "bg-white/15 text-white shadow"
                 : "text-emerald-300/80 hover:text-white"

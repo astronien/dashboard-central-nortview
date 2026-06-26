@@ -39,27 +39,10 @@ const KPI_CONFIG: Record<KpiCategoryKey, KpiCategoryConfig> = {
   SIM: { targetField: "simTarget", measureType: "quantity", matchNames: ["SIM", "Smile"] },
   Smile: { targetField: "simTarget", measureType: "quantity", matchNames: ["Smile", "SIM"] },
   BTB: { targetField: "btbTarget", measureType: "revenue", matchNames: ["BTB"] },
-  "BTB(Apple)": { targetField: "btbAppleTarget", measureType: "revenue", matchNames: ["BTB(Apple)", "BTB Apple", "BTB(APPLE)"] },
+  "BTB(Apple)": { targetField: "btbAppleTarget", measureType: "revenue", matchNames: ["BTB(Apple)", "BTB Apple"] },
   "COVER+": { targetField: "totalTarget", measureType: "quantity", matchNames: ["COVER+", "Cover+", "cover+"] },
   "AC+": { targetField: "totalTarget", measureType: "quantity", matchNames: ["Apple Care", "AppleCare", "AC+"] },
 };
-
-/**
- * Categories that can ONLY be matched via `row.catDaily` (from Category Master).
- * Raw Category (Name) / Sub Category text from sales never contains these names
- * (e.g. Apple Case & Protection is a "BTB(Apple)" per Cat Master but the raw
- * text doesn't include the word "BTB" or "Apple").
- */
-const CATDAILY_PRIMARY_CATEGORIES = new Set(["BTB", "BTB(Apple)", "BTB Apple", "BTB(APPLE)"]);
-
-function catDailyToKpiCategory(catDaily: string): string {
-  const norm = String(catDaily ?? "").trim().toLowerCase();
-  if (norm === "btb apple" || norm === "btb(apple)" || norm === "btb apple)") {
-    return "BTB(Apple)";
-  }
-  if (norm === "btb") return "BTB";
-  return catDaily;
-}
 
 export function getKpiCategoryConfig(category: string): KpiCategoryConfig | undefined {
   const key = category as KpiCategoryKey;
@@ -76,7 +59,7 @@ const normalizeText = (value: unknown) =>
   String(value ?? "")
     .toLowerCase()
     .replace(/\s+/g, " ")
-    .replace(/[^a-z0-9ก-๙ +]/gi, "")
+    .replace(/[^a-z0-9ก-๙ ]/gi, "")
     .trim();
 
 function rowCategoryText(row: RawRow): string {
@@ -94,22 +77,10 @@ export function rowMatchesKpiCategory(row: RawRow, category: string): boolean {
   const text = rowCategoryText(row);
   const catNorm = normalizeText(category);
 
-  // 0. catDaily first-priority: only when TARGET is in BTB family. Otherwise
-  //    we'd misclassify AppleCare+ rows (which Cat Master wrongly maps to
-  //    BTB(Apple)) as not being AC+.
-  const catDaily = String(row.catDaily ?? "").trim();
-  if (catDaily && CATDAILY_PRIMARY_CATEGORIES.has(category)) {
-    const mapped = catDailyToKpiCategory(catDaily);
-    return normalizeText(mapped) === catNorm;
-  }
-
   if (catNorm === "sim" || catNorm === "smile") {
     const cat = String(row["Category (Name)"] ?? "").trim();
-    const sub = String(row["Sub Category"] ?? "").trim();
     const prod = String(row["Product (Name)"] ?? "").toLowerCase();
-    // Only "Sim Card" category counts (Smile/INSURANCE is COVER+/AppleCare)
-    if (cat === "Sim Card") return true;
-    return false;
+    return cat === "Smile" || prod.includes("sim");
   }
 
   if (catNorm === "btb") {
@@ -124,25 +95,10 @@ export function rowMatchesKpiCategory(row: RawRow, category: string): boolean {
   }
 
   if (catNorm === "cover+" || catNorm === "cover plus") {
-    // COVER+ = product contains "cover+" (paid only) — EXCLUDE "7CARE+ Free
-    // for COVER+ with AppleCare Services" (the bonus/free companion plan).
-    const prodL = String(row["Product (Name)"] ?? "").toLowerCase();
-    if (prodL.includes("7care+") || prodL.includes("7 care+")) return false;
-    if (prodL.includes("cover+")) return true;
-    // Fallback: text contains "cover plus" or "cover+"
     return text.includes("cover+") || text.includes("cover plus");
   }
 
   if (catNorm === "ac+" || catNorm === "apple care") {
-    // AC+ = AppleCare+ only. Exclude COVER+ rows and 7CARE+ Free bonus.
-    const prodL = String(row["Product (Name)"] ?? "").toLowerCase();
-    const catL = String(row["Category (Name)"] ?? "").toLowerCase();
-    if (prodL.includes("7care+") || prodL.includes("7 care+")) return false;
-    if (prodL.includes("cover+")) return false;
-    if (prodL.includes("applecare") || prodL.includes("apple care") || prodL.includes("ac+") || prodL.includes("ac +")) {
-      return true;
-    }
-    if (catL.includes("apple care")) return true;
     return text.includes("apple care") || text.includes("applecare") || text.includes("ac+");
   }
 
@@ -196,33 +152,17 @@ export function getKpiTargetResult(
   endDate: string,
 ): KPITargetResult {
   const cfg = getKpiCategoryConfig(category);
+  const targetField = cfg?.targetField ?? "totalTarget";
   const measureType = cfg?.measureType ?? "revenue";
 
-  // COVER+ and AC+ targets are percent of iPhone target (16% and 30%).
-  // They are measured in units, but the iPhone target in target file is in
-  // baht (revenue). Convert iPhone revenue to units using the average iPhone
-  // sale price observed in the actual sales data, then apply the percent.
-  const ATTACHMENT_PERCENT: Record<string, number> = {
-    "COVER+": 0.16,
-    "AC+": 0.30,
-    SIM: 0.15,
-  };
-  const percent = ATTACHMENT_PERCENT[category];
-
-  let target: number;
-  if (percent !== undefined) {
-    const iPhoneTargetRevenue = getTargetForPeriodByField(
-      targets, entityId, mode, "iPhoneTarget", startDate, endDate,
-    );
-    const avgIphonePrice = computeAvgIphonePrice(salesRows);
-    const iPhoneUnitsTarget = avgIphonePrice > 0 ? iPhoneTargetRevenue / avgIphonePrice : 0;
-    target = iPhoneUnitsTarget * percent;
-  } else {
-    const targetField = cfg?.targetField ?? "totalTarget";
-    target = getTargetForPeriodByField(
-      targets, entityId, mode, targetField, startDate, endDate,
-    );
-  }
+  const target = getTargetForPeriodByField(
+    targets,
+    entityId,
+    mode,
+    targetField,
+    startDate,
+    endDate,
+  );
 
   const filter = mode === "branch" ? { branchId: entityId } : { officerId: entityId };
 
@@ -234,24 +174,6 @@ export function getKpiTargetResult(
     achPct: calcAchievementPct(actual, target),
     measureType,
   };
-}
-
-/** Compute average iPhone sale price from sales rows (used to convert
- *  iPhone revenue target into iPhone units target for COVER+/AC+/SIM). */
-function computeAvgIphonePrice(salesRows: RawRow[]): number {
-  let totalRevenue = 0;
-  let totalUnits = 0;
-  for (const row of salesRows) {
-    const cat = String(row["Category (Name)"] ?? "").trim().toLowerCase();
-    if (cat !== "iphone") continue;
-    const units = Number(String(row.Number ?? row.number ?? row.qty ?? "0").replace(/[^\d.-]/g, "")) || 0;
-    const revenue = getCategoryValue(row);
-    if (units > 0 && revenue > 0) {
-      totalUnits += units;
-      totalRevenue += revenue;
-    }
-  }
-  return totalUnits > 0 ? totalRevenue / totalUnits : 0;
 }
 
 export const KPI_CATEGORY_KEYS = Object.keys(KPI_CONFIG) as KpiCategoryKey[];

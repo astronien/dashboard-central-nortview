@@ -135,28 +135,12 @@ export function buildCategorySnapshots(params: {
   todayRows?: RawRow[];
   lastMonthRows: RawRow[];
   lastYearRows: RawRow[];
-  /** "branch" (default) sums target across all officers in the branch.
-   *  "officer" looks up target for a specific officer only (used for PIA). */
-  mode?: "branch" | "officer";
 }): CategorySnapshotItem[] {
-  const {
-    targetRows,
-    currentRows,
-    todayRows = [],
-    lastMonthRows,
-    lastYearRows,
-    mode = "branch",
-  } = params;
+  const { targetRows, currentRows, todayRows = [], lastMonthRows, lastYearRows } = params;
   const hasData = currentRows.length > 0;
   const { startDate, endDate, currentDay, totalDays } = getMonthPeriod();
   const targets: TargetRecord[] = rawTargetRowsToRecords(targetRows);
   const branchId = resolveBranchId(targetRows, currentRows);
-  // For officer mode, pick the first officer's ID from the (already officer-filtered)
-  // currentRows. This is the PIA's own officer ID.
-  const officerId =
-    mode === "officer" && currentRows[0]
-      ? String(currentRows[0]["Officer (ID)"] ?? "").trim()
-      : "";
 
   return SNAPSHOT_CATEGORIES.map(({ label, kpiKey }) => {
     if (!hasData || !branchId) {
@@ -180,35 +164,21 @@ export function buildCategorySnapshots(params: {
     let measureType: "revenue" | "quantity" | undefined = "revenue";
 
     if (label === "Total Sales") {
-      target =
-        mode === "officer" && officerId
-          ? getTargetForPeriod(targets, officerId, "officer", startDate, endDate)
-          : getTargetForPeriod(targets, branchId, "branch", startDate, endDate);
+      target = getTargetForPeriod(targets, branchId, "branch", startDate, endDate);
       actual = periodActual(currentRows);
       measureType = "revenue";
     } else if (kpiKey) {
       const cfg = getKpiCategoryConfig(kpiKey);
       measureType = cfg?.measureType ?? "revenue";
-      const result =
-        mode === "officer" && officerId
-          ? getKpiTargetResult(
-              targets,
-              currentRows,
-              officerId,
-              "officer",
-              kpiKey,
-              startDate,
-              endDate,
-            )
-          : getKpiTargetResult(
-              targets,
-              currentRows,
-              branchId,
-              "branch",
-              kpiKey,
-              startDate,
-              endDate,
-            );
+      const result = getKpiTargetResult(
+        targets,
+        currentRows,
+        branchId,
+        "branch",
+        kpiKey,
+        startDate,
+        endDate,
+      );
       target = result.target;
       actual = sumKpiActualFromRows(currentRows, kpiKey);
     }

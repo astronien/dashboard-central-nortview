@@ -36,7 +36,7 @@ import {
 import CategoryTreePicker from "./components/CategoryTreePicker";
 
 import { AnimatePresence, motion } from "motion/react";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { parseCategoryMasterFile } from "./lib/categoryMasterUpload";
 import { parseSalesExcelFile } from "./lib/salesUpload";
 import { parseTargetExcelFile } from "./lib/targetUpload";
@@ -102,19 +102,11 @@ import {
   Legend,
 } from "recharts";
 import { HomeDashboardSection } from "./components/dashboard/HomeDashboardSection";
-const LazyStaffSection = lazy(() =>
-  import("./components/dashboard/StaffSection").then((m) => ({ default: m.StaffSection })),
-);
-const LazyReportsSection = lazy(() =>
-  import("./components/dashboard/ReportsSection").then((m) => ({ default: m.ReportsSection })),
-);
-const LazySettingsSection = lazy(() =>
-  import("./components/dashboard/SettingsSection").then((m) => ({ default: m.SettingsSection })),
-);
-const LazyKpiPresetSection = lazy(() =>
-  import("./components/dashboard/KpiPresetSection"),
-);
 
+import { StaffSection } from "./components/dashboard/StaffSection";
+import { ReportsSection } from "./components/dashboard/ReportsSection";
+import { SettingsSection } from "./components/dashboard/SettingsSection";
+import KpiPresetSection from "./components/dashboard/KpiPresetSection";
 import {
   getPresets as getKpiPresets,
   cleanupTestPresets as cleanupKpiPresets,
@@ -451,10 +443,9 @@ type DerivedAttachRow = {
   avatar: string;
 };
 
- type OfficerPerformance = {
+type OfficerPerformance = {
   name: string;
   branch: string;
-  position?: string;
   target: number;
   actual: number;
   achPercent: number;
@@ -778,7 +769,6 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
     officerSummary.set(officerKey, {
       name,
       branch,
-      position: String(row.POSISION ?? "").trim(),
       target: toNumber(row.Total),
       actual: 0,
       achPercent: 0,
@@ -1255,48 +1245,10 @@ const emptyReport: ParsedReport = {
 export default function App() {
   return (
     <AuthProvider>
-      <PwaSafeAreaStyle />
       <AppGate />
     </AuthProvider>
   );
 }
-
-// Global style: respect iOS safe-area (notch / home indicator). The Tailwind
-// classes below only kick in when running as a PWA (display-mode: standalone)
-// so the dev preview in Safari still gets the standard inset.
-const PwaSafeAreaStyle = () => (
-  <style>{`
-    @supports (padding: env(safe-area-inset-top)) {
-      html { background: #051710; }
-      body { background: #051710; }
-    }
-    html, body, #root {
-      -webkit-tap-highlight-color: transparent;
-      overscroll-behavior-y: contain;
-      text-size-adjust: 100%;
-      -webkit-text-size-adjust: 100%;
-    }
-    body {
-      padding-top: env(safe-area-inset-top, 0px);
-      padding-bottom: env(safe-area-inset-bottom, 0px);
-      padding-left: env(safe-area-inset-left, 0px);
-      padding-right: env(safe-area-inset-right, 0px);
-    }
-    /* Prevent oversize text from auto-zooming on focus on iOS */
-    input, textarea, select, button {
-      font-size: 16px;
-    }
-  `}</style>
-);
-
-// Lightweight fallback while a lazy view chunk is being downloaded.
-// Keeps the layout stable and gives the user instant feedback.
-const ViewFallback = () => (
-  <div className="flex flex-col items-center justify-center w-full min-h-[40vh] gap-3">
-    <div className="w-10 h-10 border-4 border-white/15 border-t-emerald-400 rounded-full animate-spin" />
-    <p className="text-white/50 text-xs">กำลังโหลด...</p>
-  </div>
-);
 
 function AppGate() {
   const { user, loading } = useAuth();
@@ -1348,58 +1300,16 @@ function AppInternal({
     );
   };
 
-  // PIA: filter sales rows to ALL officers whose position is "PIA" (not just
-  // the single logged-in PIA). Excludes BSM/Asst.BSM/Cashier/PIS/etc.
-  const filterByPia = useCallback(
-    (rows: RawRow[]): RawRow[] => {
-      if (role !== "pia") return rows;
-      // Build set of PIA officer names from targetRows (single source of truth)
-      const piaNames = new Set<string>();
-      const piaIds = new Set<string>();
-      uploadedFiles.target.forEach((row) => {
-        const pos = String(row.POSISION ?? "").trim().toUpperCase();
-        if (pos === "PIA") {
-          const name = `${row.NAME ?? ""} ${row.SURNAME ?? ""}`.trim();
-          if (name) piaNames.add(name);
-          const id = String(row["STAFF ID"] ?? row.emp_id ?? "").trim();
-          if (id) piaIds.add(id);
-        }
-      });
-      if (piaNames.size === 0 && piaIds.size === 0) return rows;
-      return rows.filter((row) => {
-        // Sales rows use "Officer (Name)"; target rows use NAME + SURNAME.
-        // Fallback to STAFF ID matching for rows that have one.
-        const officer = String(row["Officer (Name)"] ?? "").trim();
-        if (officer) {
-          for (const piaName of piaNames) {
-            if (matchesOfficer(officer, piaName)) return true;
-          }
-        }
-        const nameFromTarget =
-          `${row.NAME ?? row["emp_name"] ?? ""} ${row.SURNAME ?? row["emp_sname"] ?? ""}`.trim();
-        if (nameFromTarget) {
-          for (const piaName of piaNames) {
-            if (matchesOfficer(nameFromTarget, piaName)) return true;
-          }
-        }
-        const staffId = String(row["STAFF ID"] ?? row.emp_id ?? "").trim();
-        if (staffId && piaIds.has(staffId)) return true;
-        return false;
-      });
-    },
-    [role, uploadedFiles.target],
-  );
-
   const displayUploads = useMemo<Record<UploadKind, RawRow[]>>(
     () => ({
-      target: filterByPia(filterRowsByBranch(uploadedFiles.target, selectedBranch)),
-      current: filterByPia(filterRowsByBranch(uploadedFiles.current, selectedBranch)),
-      today: filterByPia(filterRowsByBranch(uploadedFiles.today ?? [], selectedBranch)),
-      lastMonth: filterByPia(filterRowsByBranch(uploadedFiles.lastMonth, selectedBranch)),
-      lastYear: filterByPia(filterRowsByBranch(uploadedFiles.lastYear, selectedBranch)),
+      target: filterRowsByBranch(uploadedFiles.target, selectedBranch),
+      current: filterRowsByBranch(uploadedFiles.current, selectedBranch),
+      today: filterRowsByBranch(uploadedFiles.today ?? [], selectedBranch),
+      lastMonth: filterRowsByBranch(uploadedFiles.lastMonth, selectedBranch),
+      lastYear: filterRowsByBranch(uploadedFiles.lastYear, selectedBranch),
       categoryMaster: uploadedFiles.categoryMaster,
     }),
-    [uploadedFiles, selectedBranch, filterByPia],
+    [uploadedFiles, selectedBranch],
   );
 
   const categoryMap = useMemo(() => {
@@ -1562,26 +1472,24 @@ function AppInternal({
   );
   const [activeStaffId, setActiveStaffId] = useState("1");
 
-  // PIA: auto-select their own officer in the profile/staff view + default
-  // to home view (shows aggregated PIA data across the branch). Re-runs when
-  // either the user (auth) or the parsed report finishes loading — otherwise
-  // a fresh login would race and lock onto officer index 0.
+  // PIA: auto-select their own officer + force "staff" view + restrict navigation
   useEffect(() => {
     if (role !== "pia") return;
     const officers = parsedReport.officers;
     if (officers.length === 0) return;
+    // Match by name — `userOfficerId` is the emp_id but OfficerPerformance
+    // does not carry an emp_id field, only `name` and `branch`. The PIA's
+    // `user.name` was set from the same officer record so it matches.
     const piaName = (user?.name ?? "").trim();
-    if (!piaName) return;
-    const ownIndex = officers.findIndex((o) =>
-      matchesOfficer(o.name ?? "", piaName),
-    );
-    if (ownIndex < 0) return;
-    const newId = String(ownIndex + 1);
+    const ownIndex = piaName
+      ? officers.findIndex((o) => matchesOfficer(o.name ?? "", piaName))
+      : -1;
+    const newId = ownIndex >= 0 ? String(ownIndex + 1) : "1";
     if (activeStaffId !== newId) setActiveStaffId(newId);
-    if (currentView !== "home" && currentView !== "staff") {
-      setCurrentView("home");
+    if (currentView !== "staff" && currentView !== "home") {
+      setCurrentView("staff");
     }
-  }, [role, user?.name, user?.officerId, parsedReport.officers, activeStaffId, currentView]);
+  }, [role, userOfficerId, user, parsedReport.officers, activeStaffId, currentView]);
 
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState("iPhone");
@@ -1716,22 +1624,11 @@ function AppInternal({
     categoryMaster: "Category Master",
   };
 
-  const currentStaff = useMemo(
-    () => staffData.find((s) => s.id === activeStaffId) || staffData[0],
-    [activeStaffId, staffData],
-  );
-  const currentOfficer = useMemo(
-    () => parsedReport.officers[Number(activeStaffId) - 1] ?? parsedReport.officers[0],
-    [parsedReport.officers, activeStaffId],
-  );
-  const activeOfficerIndex = useMemo(
-    () => Math.max(Number(activeStaffId) - 1, 0),
-    [activeStaffId],
-  );
-  const activeOfficer = useMemo(
-    () => parsedReport.officers[activeOfficerIndex] ?? parsedReport.officers[0],
-    [parsedReport.officers, activeOfficerIndex],
-  );
+  const currentStaff =
+    staffData.find((s) => s.id === activeStaffId) || staffData[0];
+  const currentOfficer = parsedReport.officers[Number(activeStaffId) - 1] ?? parsedReport.officers[0];
+  const activeOfficerIndex = Math.max(Number(activeStaffId) - 1, 0);
+  const activeOfficer = parsedReport.officers[activeOfficerIndex] ?? parsedReport.officers[0];
 
   const attachOfficerRows = useMemo<AttachOfficerRow[]>(() => {
     if (!displayUploads.current.length) return [];
@@ -1823,182 +1720,201 @@ function AppInternal({
     return `${maxCat} Specialist`;
   }, [displayUploads.current, activeOfficer, activeStaffId, currentStaff]);
 
-  // Compute per-category breakdown (TARGET / TODAY / ACTUAL / ACH% / FORECAST)
-  // for a single officer by name. Shared by activeOfficerCategoryPerformance
-  // and the per-officer BranchOverviewKpiTable breakdown.
-  const computeCategoryBreakdown = useCallback(
-    (officerName: string): CategoryPerformanceRow[] => {
-      const categoriesList: KpiCategoryKey[] = [
-        "Mac", "iPad", "iPhone", "Apple Watch", "BTB", "BTB(Apple)",
-      ];
-      const hasData = displayUploads.current.length > 0;
-      const targetRecords = rawTargetRowsToRecords(displayUploads.target);
-      const now = new Date();
-      const periodYear = now.getFullYear();
-      const periodMonth = now.getMonth();
-      const periodTotalDays = new Date(periodYear, periodMonth + 1, 0).getDate();
-      const periodMonthStr = String(periodMonth + 1).padStart(2, "0");
-      const periodStart = `${periodYear}-${periodMonthStr}-01`;
-      const periodEnd = `${periodYear}-${periodMonthStr}-${String(periodTotalDays).padStart(2, "0")}`;
-      const officerTargetRow = displayUploads.target.find((row) => {
-        const name = `${row.NAME ?? ""} ${row.SURNAME ?? ""}`.trim();
-        return matchesOfficer(name, officerName);
-      });
-      const officerId = resolveOfficerId(
-        officerName,
-        displayUploads.target,
-        targetRecords,
-        displayUploads.current,
-        matchesOfficer,
-      );
-      const currentMonthTotalDays = new Date(periodYear, periodMonth + 1, 0).getDate();
-      const currentDay = Math.min(new Date().getDate(), currentMonthTotalDays);
-      const totalDays = currentMonthTotalDays;
-
-      const todaySourceRows = todayRows.length ? todayRows : [];
-      let maxDateStr = "";
-      let maxDateTime = 0;
-      if (!todaySourceRows.length && hasData) {
-        displayUploads.current.forEach((row) => {
-          const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
-          if (!rawDate) return;
-          const parsed = Date.parse(rawDate.replace(/^\S+\.\s*/, ""));
-          if (parsed && parsed > maxDateTime) {
-            maxDateTime = parsed;
-            maxDateStr = rawDate;
-          }
-        });
-      }
-
-      const rows: CategoryPerformanceRow[] = categoriesList.map((catName) => {
-        let target = 0;
-        let actual = 0;
-        let lastMonth = 0;
-        let lastYear = 0;
-        let actualDay = 0;
-
-        if (hasData) {
-          const kpi = getOfficerCategoryKpi({
-            category: catName,
-            officerName,
-            officerId,
-            officerTargetRow,
-            targetRecords,
-            currentRows: displayUploads.current,
-            lastMonthRows: displayUploads.lastMonth,
-            lastYearRows: displayUploads.lastYear,
-            periodStart,
-            periodEnd,
-            getCategory,
-            matchesOfficer,
-          });
-          target = kpi.target;
-          actual = kpi.actual;
-          lastMonth = kpi.lastMonth;
-          lastYear = kpi.lastYear;
-
-          const dailyRows = todaySourceRows.length ? todaySourceRows : displayUploads.current;
-          dailyRows.forEach((row) => {
-            const rowOfficerId = String(row["STAFF ID"] ?? row.emp_id ?? "").trim();
-            const officer = String(row["Officer (Name)"] ?? "").trim();
-            const officerMatch =
-              (officerId && rowOfficerId && normalizeId(rowOfficerId) === normalizeId(officerId)) ||
-              matchesOfficer(officer, officerName);
-            if (!officerMatch) return;
-            const rowCat = getCategory(row);
-            if (rowCat !== catName) return;
-            if (!todaySourceRows.length) {
-              const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
-              const parsed = Date.parse(rawDate.replace(/^\S+\.\s*/, ""));
-              if (!((maxDateStr && rawDate === maxDateStr) || (parsed && parsed === maxDateTime))) return;
-            }
-            actualDay +=
-              kpi.measureType === "quantity"
-                ? toNumber(row.Number ?? row.number ?? row.qty ?? 0)
-                : getCategoryValue(row);
-          });
-        } else if (!hasData) {
-          const targetRates: Record<string, number> = {
-            "iPhone": 0.54, "Mac": 0.11, "iPad": 0.18,
-            "Apple Watch": 0.05, "BTB(Apple)": 0.07, "BTB": 0.05,
-          };
-          const actualRates: Record<string, number> = {
-            "iPhone": 0.53, "Mac": 0.10, "iPad": 0.20,
-            "Apple Watch": 0.05, "BTB(Apple)": 0.07, "BTB": 0.05,
-          };
-          // Without sales data, fall back to a mock distribution scaled
-          // by the officer's known totals. Use the activeOfficer for
-          // these mocks; otherwise zero.
-          const fallbackOfficer = parsedReport.officers.find(
-            (o) => matchesOfficer(o.name ?? "", officerName),
-          );
-          if (fallbackOfficer) {
-            target = Math.round(fallbackOfficer.target * (targetRates[catName] ?? 0.1));
-            actual = Math.round(fallbackOfficer.actual * (actualRates[catName] ?? 0.1));
-            actualDay = Math.round(fallbackOfficer.actualDay * (actualRates[catName] ?? 0.1));
-          }
-        }
-
-        const achPercent = calcAchievementPct(actual, target);
-        const forecast = calcForecastByDays(actual, currentDay, totalDays);
-        const forecastPercent = calcAchievementPct(forecast, target);
-        const targetDay = calcTargetToDate(target, currentDay, totalDays);
-        const diffDay = actualDay - targetDay;
-        const achDayPercent = calcTodayAchievementPct(actualDay, targetDay);
-
-        return {
-          category: catName,
-          target,
-          actual,
-          achPercent,
-          forecast,
-          forecastPercent,
-          lastMonth,
-          momPercent:
-            lastMonth > 0 ? ((actual - lastMonth) / lastMonth) * 100 : "New",
-          lastYear,
-          yoyPercent:
-            lastYear > 0 ? ((actual - lastYear) / lastYear) * 100 : "New",
-          targetDay,
-          actualDay,
-          diffDay,
-          achDayPercent,
-        };
-      });
-
-      const totalTarget = rows.reduce((s, r) => s + r.target, 0);
-      const totalActual = rows.reduce((s, r) => s + r.actual, 0);
-      const totalForecast = rows.reduce((s, r) => s + r.forecast, 0);
-      const totalTargetDay = rows.reduce((s, r) => s + r.targetDay, 0);
-      const totalActualDay = rows.reduce((s, r) => s + r.actualDay, 0);
-
-      return [
-        ...rows,
-        {
-          category: "Total",
-          target: totalTarget,
-          actual: totalActual,
-          achPercent: totalTarget ? (totalActual / totalTarget) * 100 : 0,
-          forecast: totalForecast,
-          forecastPercent: totalTarget ? (totalForecast / totalTarget) * 100 : 0,
-          lastMonth: 0,
-          momPercent: "New",
-          lastYear: 0,
-          yoyPercent: "New",
-          targetDay: totalTargetDay,
-          actualDay: totalActualDay,
-          diffDay: totalActualDay - totalTargetDay,
-          achDayPercent: calcTodayAchievementPct(totalActualDay, totalTargetDay),
-        } as CategoryPerformanceRow,
-      ];
-    },
-    [displayUploads, parsedReport, getCategory, todayRows],
-  );
-
   const activeOfficerCategoryPerformance = useMemo<CategoryPerformanceRow[]>(() => {
     if (!activeOfficer) return [];
-    return computeCategoryBreakdown(activeOfficer.name);
-  }, [activeOfficer, computeCategoryBreakdown]);
+    
+    const categoriesList: KpiCategoryKey[] = ["Mac", "iPad", "iPhone", "Apple Watch", "BTB", "BTB(Apple)"];
+    const hasData = displayUploads.current.length > 0;
+    const targetRecords = rawTargetRowsToRecords(displayUploads.target);
+    const now = new Date();
+    const periodYear = now.getFullYear();
+    const periodMonth = now.getMonth();
+    const periodTotalDays = new Date(periodYear, periodMonth + 1, 0).getDate();
+    const periodMonthStr = String(periodMonth + 1).padStart(2, "0");
+    const periodStart = `${periodYear}-${periodMonthStr}-01`;
+    const periodEnd = `${periodYear}-${periodMonthStr}-${String(periodTotalDays).padStart(2, "0")}`;
+    const officerTargetRow = displayUploads.target.find((row) => {
+      const name = `${row.NAME ?? ""} ${row.SURNAME ?? ""}`.trim();
+      return matchesOfficer(name, activeOfficer.name);
+    });
+    const officerId = resolveOfficerId(
+      activeOfficer.name,
+      displayUploads.target,
+      targetRecords,
+      displayUploads.current,
+      matchesOfficer,
+    );
+    
+    // Use the actual current day/month length for daily target comparisons
+    const currentMonthTotalDays = new Date(periodYear, periodMonth + 1, 0).getDate();
+    const currentDay = Math.min(new Date().getDate(), currentMonthTotalDays);
+    const totalDays = currentMonthTotalDays;
+    
+    const todaySourceRows = todayRows.length ? todayRows : [];
+    let maxDateStr = "";
+    let maxDateTime = 0;
+    if (!todaySourceRows.length && hasData) {
+      displayUploads.current.forEach((row) => {
+        const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
+        if (!rawDate) return;
+        const parsed = Date.parse(rawDate.replace(/^\S+\.\s*/, ""));
+        if (parsed && parsed > maxDateTime) {
+          maxDateTime = parsed;
+          maxDateStr = rawDate;
+        }
+      });
+    }
+
+    // 3. For each category, compute target, actual, forecast, lastMonth, lastYear, actualDay
+    const rows: CategoryPerformanceRow[] = categoriesList.map((catName) => {
+      let target = 0;
+      let actual = 0;
+      let lastMonth = 0;
+      let lastYear = 0;
+      let actualDay = 0;
+      
+      if (hasData) {
+        const kpi = getOfficerCategoryKpi({
+          category: catName,
+          officerName: activeOfficer.name,
+          officerId,
+          officerTargetRow,
+          targetRecords,
+          currentRows: displayUploads.current,
+          lastMonthRows: displayUploads.lastMonth,
+          lastYearRows: displayUploads.lastYear,
+          periodStart,
+          periodEnd,
+          getCategory,
+          matchesOfficer,
+        });
+        target = kpi.target;
+        actual = kpi.actual;
+        lastMonth = kpi.lastMonth;
+        lastYear = kpi.lastYear;
+
+        const dailyRows = todaySourceRows.length ? todaySourceRows : displayUploads.current;
+        dailyRows.forEach((row) => {
+          const rowOfficerId = String(row["STAFF ID"] ?? row.emp_id ?? "").trim();
+          const officer = String(row["Officer (Name)"] ?? "").trim();
+          const officerMatch =
+            (officerId && rowOfficerId && normalizeId(rowOfficerId) === normalizeId(officerId)) ||
+            matchesOfficer(officer, activeOfficer.name);
+          if (!officerMatch) return;
+          const rowCat = getCategory(row);
+          if (rowCat !== catName) return;
+          if (!todaySourceRows.length) {
+            const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
+            const parsed = Date.parse(rawDate.replace(/^\S+\.\s*/, ""));
+            if (!((maxDateStr && rawDate === maxDateStr) || (parsed && parsed === maxDateTime))) return;
+          }
+          actualDay +=
+            kpi.measureType === "quantity"
+              ? toNumber(row.Number ?? row.number ?? row.qty ?? 0)
+              : getCategoryValue(row);
+        });
+      } else if (!hasData) {
+        // Fallback/Mock distribution matching activeOfficer total values!
+        const targetRates: Record<string, number> = {
+          "iPhone": 0.54,
+          "Mac": 0.11,
+          "iPad": 0.18,
+          "Apple Watch": 0.05,
+          "BTB(Apple)": 0.07,
+          "BTB": 0.05,
+        };
+        const actualRates: Record<string, number> = {
+          "iPhone": 0.53,
+          "Mac": 0.10,
+          "iPad": 0.20,
+          "Apple Watch": 0.05,
+          "BTB(Apple)": 0.07,
+          "BTB": 0.05,
+        };
+        
+        target = Math.round(activeOfficer.target * (targetRates[catName] ?? 0.1));
+        actual = Math.round(activeOfficer.actual * (actualRates[catName] ?? 0.1));
+        lastMonth = 0;
+        lastYear = 0;
+        actualDay = Math.round(activeOfficer.actualDay * (actualRates[catName] ?? 0.1));
+      }
+      
+      const achPercent = calcAchievementPct(actual, target);
+      const forecast = calcForecastByDays(actual, currentDay, totalDays);
+      const forecastPercent = calcAchievementPct(forecast, target);
+      
+      let momPercent: number | string = "New";
+      if (lastMonth > 0) {
+        momPercent = ((actual - lastMonth) / lastMonth) * 100;
+      }
+      
+      let yoyPercent: number | string = "New";
+      if (lastYear > 0) {
+        yoyPercent = ((actual - lastYear) / lastYear) * 100;
+      }
+      
+      const targetDay = calcTargetToDate(target, currentDay, totalDays);
+      const diffDay = actualDay - targetDay;
+      const achDayPercent = calcTodayAchievementPct(actualDay, targetDay);
+      
+      return {
+        category: catName,
+        target,
+        actual,
+        achPercent,
+        forecast,
+        forecastPercent,
+        lastMonth,
+        momPercent,
+        lastYear,
+        yoyPercent,
+        targetDay,
+        actualDay,
+        diffDay,
+        achDayPercent,
+      };
+    });
+    
+    // 4. Calculate Total row
+    const totalTarget = rows.reduce((s, r) => s + r.target, 0);
+    const totalActual = rows.reduce((s, r) => s + r.actual, 0);
+    const totalAchPercent = totalTarget ? (totalActual / totalTarget) * 100 : 0;
+    const totalForecast = rows.reduce((s, r) => s + r.forecast, 0);
+    const totalForecastPercent = totalTarget ? (totalForecast / totalTarget) * 100 : 0;
+    const totalLastMonth = rows.reduce((s, r) => s + r.lastMonth, 0);
+    let totalMomPercent: number | string = "New";
+    if (totalLastMonth > 0) {
+      totalMomPercent = ((totalActual - totalLastMonth) / totalLastMonth) * 100;
+    }
+    const totalLastYear = rows.reduce((s, r) => s + r.lastYear, 0);
+    let totalYoyPercent: number | string = "New";
+    if (totalLastYear > 0) {
+      totalYoyPercent = ((totalActual - totalLastYear) / totalLastYear) * 100;
+    }
+    const totalTargetDay = rows.reduce((s, r) => s + r.targetDay, 0);
+    const totalActualDay = rows.reduce((s, r) => s + r.actualDay, 0);
+    const totalDiffDay = totalActualDay - totalTargetDay;
+    const totalAchDayPercent = calcTodayAchievementPct(totalActualDay, totalTargetDay);
+    
+    const totalRow: CategoryPerformanceRow = {
+      category: "Total",
+      target: totalTarget,
+      actual: totalActual,
+      achPercent: totalAchPercent,
+      forecast: totalForecast,
+      forecastPercent: totalForecastPercent,
+      lastMonth: totalLastMonth,
+      momPercent: totalMomPercent,
+      lastYear: totalLastYear,
+      yoyPercent: totalYoyPercent,
+      targetDay: totalTargetDay,
+      actualDay: totalActualDay,
+      diffDay: totalDiffDay,
+      achDayPercent: totalAchDayPercent,
+    };
+    
+    return [...rows, totalRow];
+  }, [activeOfficer, displayUploads, parsedReport, getCategory, todayRows]);
 
   const activeOfficerTodaySales = useMemo(() => {
     if (!activeOfficer) return 0;
@@ -2175,22 +2091,39 @@ function AppInternal({
     return Math.min(100, Math.max(0, Math.round(avg)));
   }, [activeOfficer7WondersPerformance, displayUploads.current, activeStaffId, currentStaff]);
 
+  // Top Attach: the 7-Wonder category the officer is best at (by scaled
+  // progress against target). Used by the "TOP ATTACH" pill on the staff
+  // profile to highlight the focus device/area.
+  const topAttach = useMemo<{ label: string; rate: number } | null>(() => {
+    const wondersRows = activeOfficer7WondersPerformance.filter(
+      (r) => r.category !== "Average" && r.category !== "Total",
+    );
+    if (wondersRows.length === 0) return null;
+    let best: { label: string; rate: number } | null = null;
+    wondersRows.forEach((row) => {
+      const isPercentPreset =
+        row.calcType === "attach" ||
+        row.calcType === "bahtRate" ||
+        row.calcType === "catAttach";
+      const rate = isPercentPreset && row.target > 0
+        ? (row.actual / row.target) * 100
+        : row.achPercent;
+      if (!best || rate > best.rate) {
+        const label = row.category.replace(/^\d+\.\s*/, "").trim();
+        best = { label, rate };
+      }
+    });
+    return best;
+  }, [activeOfficer7WondersPerformance]);
+
   // Branch Overview: per-officer KPI results for presets marked showInBranchOverview
   const branchOverviewKpiData = useMemo<{
     presets: KpiPreset[];
     rows: { officer: { name: string; branch: string }; results: Record<string, number> }[];
-    breakdownByOfficer: Record<
-      string,
-      { officer: { name: string; branch: string }; rows: CategoryPerformanceRow[] }
-    >;
   }>(() => {
     const branchPresets = kpiPresets.filter((p) => p.showInBranchOverview);
-    if (branchPresets.length === 0) {
-      return { presets: [], rows: [], breakdownByOfficer: {} };
-    }
-    if (displayUploads.current.length === 0) {
-      return { presets: branchPresets, rows: [], breakdownByOfficer: {} };
-    }
+    if (branchPresets.length === 0) return { presets: [], rows: [] };
+    if (displayUploads.current.length === 0) return { presets: branchPresets, rows: [] };
 
     const lookup = buildCatDailyLookup(displayUploads.categoryMaster);
     const enriched = enrichSalesRowsWithCatDaily(displayUploads.current, lookup);
@@ -2227,35 +2160,8 @@ function AppInternal({
           return bTotal - aTotal;
         });
 
-    // For PIA, keep only rows whose officer is a PIA (not BSM/Cashier/etc).
-    const piaOfficersList = parsedReport.officers.filter(
-      (o) => (o.position ?? "").trim().toUpperCase() === "PIA",
-    );
-    const filteredRows = role === "pia"
-      ? rows.filter((r) =>
-          piaOfficersList.some((p) => matchesOfficer(r.officer.name, p.name)),
-        )
-      : rows;
-
-    // Per-officer category breakdown (TARGET / TODAY / ACTUAL / ACH% / FORECAST)
-    // — mirrors the structure in the user's reference screenshot.
-    const breakdownByOfficer: Record<
-      string,
-      { officer: { name: string; branch: string }; rows: CategoryPerformanceRow[] }
-    > = {};
-    for (const row of filteredRows) {
-      breakdownByOfficer[row.officer.name] = {
-        officer: row.officer,
-        rows: computeCategoryBreakdown(row.officer.name),
-      };
-    }
-
-    return {
-      presets: branchPresets,
-      rows: filteredRows,
-      breakdownByOfficer,
-    };
-  }, [kpiPresets, displayUploads.current, displayUploads.categoryMaster, parsedReport.officers, role, computeCategoryBreakdown]);
+    return { presets: branchPresets, rows };
+  }, [kpiPresets, displayUploads.current, displayUploads.categoryMaster, parsedReport.officers]);
 
   const dynamicRadarData = useMemo(() => {
     if (!displayUploads.current.length && Number(activeStaffId) <= 3 && activeStat === "csat") {
@@ -2340,68 +2246,54 @@ function AppInternal({
   );
 
   const derivedHomeStats = useMemo<DerivedHomeStat[]>(() => {
-    // PIA: scope stats to ALL PIA officers (not BSM/Cashier/etc).
-    // Non-PIA: use full branch data.
-    const isPiaScope = role === "pia";
-    const piaOfficers = parsedReport.officers.filter(
-      (o) => (o.position ?? "").trim().toUpperCase() === "PIA",
-    );
-    const piaBranches = isPiaScope
-      ? Array.from(new Set(piaOfficers.map((o) => o.branch).filter(Boolean))).map((label) => {
-          const found = parsedReport.branches.find((b) => (b.label ?? "").includes(label));
-          return (
-            found ?? { label, target: 0, actual: 0, lastMonth: 0, lastYear: 0 }
-          );
-        })
-      : parsedReport.branches;
-    const scopeOfficers = isPiaScope ? piaOfficers : parsedReport.officers;
-
-    const totalSales = piaBranches.reduce((sum, branch) => sum + branch.actual, 0);
-    const totalTarget = piaBranches.reduce((sum, branch) => sum + branch.target, 0);
+    const totalSales = parsedReport.branches.reduce((sum, branch) => sum + branch.actual, 0);
+    const totalTarget = parsedReport.branches.reduce((sum, branch) => sum + branch.target, 0);
     const avgAch = totalTarget ? (totalSales / totalTarget) * 100 : 0;
-    const avgRate = scopeOfficers.length
-      ? scopeOfficers.reduce((sum, officer) => sum + officer.rate, 0) / scopeOfficers.length
+    const avgRate = parsedReport.officers.length
+      ? parsedReport.officers.reduce((sum, officer) => sum + officer.rate, 0) / parsedReport.officers.length
       : 0;
-    const totalOfficers = scopeOfficers.length;
-    const totalBranches = isPiaScope ? piaBranches.length : parsedReport.branches.length;
-    const lastMonthTotal = piaBranches.reduce((sum, branch) => sum + branch.lastMonth, 0);
+    const totalOfficers = parsedReport.officers.length;
+    const totalBranches = parsedReport.branches.length;
+    const lastMonthTotal = parsedReport.branches.reduce((sum, branch) => sum + branch.lastMonth, 0);
     const trendPercent = lastMonthTotal ? ((totalSales - lastMonthTotal) / lastMonthTotal) * 100 : 0;
 
     return [
       {
-        label: isPiaScope ? "ยอดขาย PIA ทั้งหมด" : "Total Sales",
+        label: "Total Sales",
         value: `฿${Math.round(totalSales).toLocaleString()}`,
         trend: `${trendPercent >= 0 ? "+" : ""}${Math.round(trendPercent)}%`,
         icon: DollarSign,
         isUp: trendPercent >= 0,
       },
       {
-        label: isPiaScope ? "เป้า PIA ทั้งหมด" : "Store Target",
+        label: "Store Target",
         value: `${Math.round(avgAch)}%`,
         trend: `${avgAch >= 100 ? "+" : ""}${Math.round(avgAch - 100)}%`,
         icon: Star,
         isUp: avgAch >= 100,
       },
       {
-        label: isPiaScope ? "อัตราบรรลุ PIA เฉลี่ย" : "Avg Staff Ach %",
+        label: "Avg Staff Ach %",
         value: `${Math.round(avgRate)}%`,
         trend: `${avgRate >= 100 ? "+" : ""}${Math.round(avgRate)}%`,
         icon: Smile,
         isUp: true,
       },
       {
-        label: isPiaScope ? "จำนวน PIA" : "Active Staff",
+        label: "Active Staff",
         value: `${totalOfficers.toLocaleString()}`,
-        trend: `${totalBranches.toLocaleString()} ${isPiaScope ? "สาขา" : "branches"}`,
+        trend: `${totalBranches.toLocaleString()} branches`,
         icon: Users,
         isUp: true,
       },
     ];
-  }, [parsedReport, role]);
+  }, [parsedReport]);
 
   const monthlyPerformance = useMemo(() => {
     const hasData = displayUploads.current.length > 0;
-
+    
+    // Dynamic calculations or fallback mock values matching user's image exactly!
+    
     // Card 1: Overall Score
     let avgScore = 70;
     let scoresList: number[] = [];
@@ -2410,7 +2302,7 @@ function AppInternal({
         const achRate = officer.rate;
         const attachRow = attachOfficerRows.find(row => matchesOfficer(row.name, officer.name));
         const attRate = attachRow ? overallAttachRate(attachRow) : 0;
-
+        
         let soldCategoriesCount = 0;
         if (attachRow && attachRow.attachMap) {
           Object.keys(attachRow.attachMap).forEach((cat) => {
@@ -2419,7 +2311,7 @@ function AppInternal({
             }
           });
         }
-
+        
         const prodKnowledge = Math.min(Math.max(65 + Math.round(achRate * 0.15) + (soldCategoriesCount * 4), 60), 99);
         const custService = Math.min(Math.max(80 + Math.round(achRate * 0.1) + (index % 3) * 3, 75), 100);
         const upselling = Math.min(Math.max(50 + Math.round(attRate * 1.2), 50), 99);
@@ -2433,13 +2325,13 @@ function AppInternal({
         avgScore = scoresList.reduce((a, b) => a + b, 0) / scoresList.length;
       }
     }
-
+    
     // Grade mapping
     let grade = "D";
     if (avgScore >= 90) grade = "A";
     else if (avgScore >= 80) grade = "B";
     else if (avgScore >= 70) grade = "C";
-
+    
     // Grade distribution
     let gradeDist = { A: 0, B: 9, C: 3, D: 1 };
     if (scoresList.length > 0) {
@@ -2451,7 +2343,7 @@ function AppInternal({
         else gradeDist.D++;
       });
     }
-
+    
     // Low Forecast (<70% achievement rate)
     let lowForecastCount = 2;
     if (parsedReport.officers.length > 0) {
@@ -2462,75 +2354,50 @@ function AppInternal({
     const totalSales = parsedReport.branches.reduce((sum, b) => sum + b.actual, 0);
     const totalTarget = parsedReport.branches.reduce((sum, b) => sum + b.target, 0);
     const salesAchRate = calcAchievementPct(totalSales, totalTarget);
-
-    // -------- Single-pass scan of current rows --------
-    // Replaces 7+ separate countRows() calls (each iterating all rows).
-    let simCount = 0;
-    let iphoneCount = 0;
-    let caseCount = 0;
-    let ufundCount = 0;
-    let ufundBase = 0;
-    let coverCount = 0;
-    let pencilCount = 0;
-    let ipadCount = 0;
-    let macCount = 0;
-    let btbSales = 0;
-    if (hasData) {
-      for (const row of displayUploads.current) {
-        const cat = String(row["Category (Name)"] ?? row.category ?? "").toLowerCase();
-        const prod = String(row["Product (Name)"] ?? row.product ?? "").toLowerCase();
-        const sub = String(row["Sub Category"] ?? "").toLowerCase();
-        if (cat.includes("sim")) simCount++;
-        if (cat.includes("iphone")) iphoneCount++;
-        if (cat.includes("case") || prod.includes("case") || sub.includes("case")) caseCount++;
-        if (isUfundRow(row)) ufundCount++;
-        if (cat.includes("ufund") || cat.includes("personal")) ufundBase++;
-        if (cat.includes("cover") || cat.includes("care") || prod.includes("cover") || prod.includes("care")) coverCount++;
-        if (prod.includes("pencil") || prod.includes("pen")) pencilCount++;
-        if (cat.includes("ipad")) ipadCount++;
-        if (cat.includes("mac")) {
-          macCount++;
-          const amt = Number((row as any)["Sales Amount"] ?? (row as any)["Amount"] ?? (row as any).sales ?? 0);
-          if (cat.includes("btb")) btbSales += amt;
-        }
-      }
-    } else {
-      // Fallback mock values (preserve original fallback constants)
-      simCount = 153;
-      iphoneCount = 744;
-      caseCount = 353;
-      ufundCount = 47;
-      coverCount = 104;
-      pencilCount = 325;
-      ipadCount = 471;
-      macCount = 119;
-    }
+    
+    // Card 3: True Sim
+    const simCount = hasData ? countRows(displayUploads.current, (cat) => cat.includes("sim")) : 153;
+    const iphoneCount = hasData ? countRows(displayUploads.current, (cat) => cat.includes("iphone")) : 744;
     const simRate = iphoneCount > 0 ? (simCount / iphoneCount) * 100 : 20.56;
+    
+    // Card 4: Case iPhone
+    const caseCount = hasData ? countRows(displayUploads.current, (cat, prod, sub) => cat.includes("case") || prod.includes("case") || sub.includes("case")) : 353;
     const caseRate = iphoneCount > 0 ? (caseCount / iphoneCount) * 100 : 47.45;
+    
+    // Card 5: UFUND PERSONAL
+    const ufundCount = hasData ? countRows(displayUploads.current, (cat, prod, sub, row) => isUfundRow(row)) : 47;
+    const ufundBase = hasData ? countRows(displayUploads.current, (cat) => cat.includes("ufund") || cat.includes("personal")) : iphoneCount;
     const ufundRate = ufundBase > 0 ? (ufundCount / ufundBase) * 100 : 6.32;
+    
+    // Card 6: COVER + (solid card)
+    const coverCount = hasData ? countRows(displayUploads.current, (cat, prod) => cat.includes("cover") || cat.includes("care") || prod.includes("cover") || prod.includes("care")) : 104;
     const coverRate = iphoneCount > 0 ? (coverCount / iphoneCount) * 100 : 13.98;
+    
+    // Card 7: KPIs Pencil 85%
+    const pencilCount = hasData ? countRows(displayUploads.current, (cat, prod) => prod.includes("pencil") || prod.includes("pen")) : 325;
+    const ipadCount = hasData ? countRows(displayUploads.current, (cat) => cat.includes("ipad")) : 471;
     const pencilRate = ipadCount > 0 ? (pencilCount / ipadCount) * 100 : 69.00;
+    
+    // Card 8: KPIs Mac 10%
+    const macCount = hasData ? countRows(displayUploads.current, (cat) => cat.includes("mac")) : 119;
     const macRate = iphoneCount > 0 ? (macCount / iphoneCount) * 100 : 15.99;
-    const ipadRate = iphoneCount > 0 ? (ipadCount / iphoneCount) * 100 : 63.31;
+    
+    // Card 9: KPIs iPad 30%
+    const ipadAttachCount = hasData ? countRows(displayUploads.current, (cat) => cat.includes("ipad")) : 471;
+    const ipadRate = iphoneCount > 0 ? (ipadAttachCount / iphoneCount) * 100 : 63.31;
+    
+    // Card 10: KPIs BTB Mix 10%
+    const btbSales = hasData ? sumSales(displayUploads.current, (cat) => cat.includes("btb")) : 6850000;
     const btbTotalSales = totalSales || 54300000;
     const btbRate = btbTotalSales > 0 ? (btbSales / btbTotalSales) * 100 : 12.61;
-    if (!hasData) btbSales = 6850000;
-
+    
     // Card 11: Mac Growth YoY
     const currentMacSales = hasData
-      ? parsedReport.categories.find((c) => c.category.toLowerCase() === "mac")?.actual ?? macCount
+      ? parsedReport.categories.find((c) => c.category.toLowerCase() === "mac")?.actual ?? sumSales(displayUploads.current, (cat) => cat.includes("mac"))
       : 5160000;
-    let lastYearMacSales = 0;
-    if (hasData) {
-      for (const row of displayUploads.lastYear) {
-        const cat = String(row["Category (Name)"] ?? row.category ?? "").toLowerCase();
-        if (cat.includes("mac")) {
-          lastYearMacSales += Number((row as any)["Sales Amount"] ?? (row as any)["Amount"] ?? (row as any).sales ?? 0);
-        }
-      }
-    }
+    const lastYearMacSales = hasData ? sumSales(displayUploads.lastYear, (cat) => cat.includes("mac")) : 0;
     const macYoYRate = lastYearMacSales > 0 ? ((currentMacSales - lastYearMacSales) / lastYearMacSales) * 100 : 0.00;
-
+    
     // Card 12: Total Sales Growth YoY (same buildReport aggregation as totalSales)
     const currentTotalSales = totalSales;
     const lastYearTotalSales = hasData
@@ -2547,7 +2414,7 @@ function AppInternal({
       coverPlus: { count: coverCount, base: iphoneCount, rate: coverRate, target: 25 },
       pencil: { count: pencilCount, base: ipadCount, rate: pencilRate, target: 85 },
       kpisMac: { count: macCount, base: iphoneCount, rate: macRate, target: 10 },
-      kpisIpad: { count: ipadCount, base: iphoneCount, rate: ipadRate, target: 30 },
+      kpisIpad: { count: ipadAttachCount, base: iphoneCount, rate: ipadRate, target: 30 },
       btbMix: { btbSales, totalSales: btbTotalSales, rate: btbRate, target: 10 },
       macYoY: { actual: currentMacSales, target: lastYearMacSales || 7270000, rate: macYoYRate, targetRate: 10 },
       totalYoY: { actual: currentTotalSales, target: lastYearTotalSales || 77240000, rate: totalSalesYoYRate, targetRate: 10 },
@@ -2557,33 +2424,20 @@ function AppInternal({
   }, [displayUploads, parsedReport, attachOfficerRows]);
 
   const categorySnapshotData = useMemo(
-    () => {
-      // Enrich sales rows with catDaily (from Category Master) so that
-      // rowMatchesKpiCategory can match BTB / BTB(Apple) via catDaily first.
-      const lookup = buildCatDailyLookup(displayUploads.categoryMaster ?? []);
-      const enrichedCurrent = enrichSalesRowsWithCatDaily(displayUploads.current, lookup);
-      const enrichedToday = displayUploads.today.length
-        ? enrichSalesRowsWithCatDaily(displayUploads.today, lookup)
-        : [];
-      const enrichedLastMonth = enrichSalesRowsWithCatDaily(displayUploads.lastMonth, lookup);
-      const enrichedLastYear = enrichSalesRowsWithCatDaily(displayUploads.lastYear, lookup);
-      return buildCategorySnapshots({
+    () =>
+      buildCategorySnapshots({
         targetRows: displayUploads.target,
-        currentRows: enrichedCurrent,
-        todayRows: enrichedToday,
-        lastMonthRows: enrichedLastMonth,
-        lastYearRows: enrichedLastYear,
-        mode: "branch", // PIA: targetRows/currentRows are already filtered to PIA only
-      });
-    },
+        currentRows: displayUploads.current,
+        todayRows: displayUploads.today,
+        lastMonthRows: displayUploads.lastMonth,
+        lastYearRows: displayUploads.lastYear,
+      }),
     [
       displayUploads.target,
       displayUploads.current,
       displayUploads.today,
       displayUploads.lastMonth,
       displayUploads.lastYear,
-      displayUploads.categoryMaster,
-      role,
     ],
   );
 
@@ -3003,52 +2857,8 @@ function AppInternal({
       if (persisted && hasUploadData(persisted)) {
         setUploadedFiles(persisted);
         rebuildReport(persisted, { skipPersist: true });
-
-        // If no savedBranch on this device, auto-detect the branch from the
-        // loaded data. Without this, a fresh device defaults to "Mega Bangna"
-        // (the initial selectedBranch) and the user sees an empty dashboard
-        // because their real data lives in a different branch.
-        if (!savedBranch && persisted.current && persisted.current.length > 0) {
-          const branchesInData = Array.from(
-            new Set(
-              persisted.current
-                .map((r) => String(r["Branch (Name)"] ?? "").trim())
-                .filter(Boolean),
-            ),
-          );
-          if (branchesInData.length > 0) {
-            // Prefer the branch the user is signed in to (PIA officers are
-            // pinned to one branch); fall back to the most common one.
-            const userBranch = (user?.branch ?? "").trim();
-            const pick =
-              branchesInData.find(
-                (b) =>
-                  userBranch &&
-                  cleanBranchForMatching(b).includes(
-                    cleanBranchForMatching(userBranch),
-                  ),
-              ) ??
-              branchesInData.sort(
-                (a, b) =>
-                  persisted.current!.filter(
-                    (r) => r["Branch (Name)"] === b,
-                  ).length -
-                  persisted.current!.filter(
-                    (r) => r["Branch (Name)"] === a,
-                  ).length,
-              )[0];
-            if (pick && pick !== selectedBranch) {
-              setSelectedBranch(pick);
-              void idbSet("dashboard-selected-branch", pick);
-            }
-            setSelectedBranchLoaded(true);
-          }
-        } else {
-          setSelectedBranchLoaded(true);
-        }
       } else {
         setParsedReport(fallbackReport);
-        setSelectedBranchLoaded(true);
       }
       setIsInitialLoading(false);
     })();
@@ -3153,13 +2963,10 @@ function AppInternal({
           )}
         </div>
 
-        {/* Top Navigation (Floating Right) — desktop only */}
-        <header
-          className="absolute right-4 md:right-8 w-1/2 hidden md:flex justify-end items-center z-50 pointer-events-none"
-          style={{ top: "calc(env(safe-area-inset-top, 0px) + 1.5rem)" }}
-        >
+        {/* Top Navigation (Floating Right) */}
+        <header className="absolute top-6 right-8 w-1/2 flex justify-end items-center z-50 pointer-events-none">
           <div className="flex items-center gap-6 pointer-events-auto">
-            <nav className="flex items-center space-x-2 lg:space-x-4 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/5 shadow-xl">
+            <nav className="flex items-center space-x-2 lg:space-x-4 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/5 shadow-xl hidden md:flex">
               <button
                 onClick={() => setCurrentView("home")}
                 className={`p-2 rounded-full transition-colors ${currentView === "home" ? "bg-[#0f4430] shadow-inner text-white" : "text-white/60 hover:text-white"}`}
@@ -3281,25 +3088,16 @@ function AppInternal({
 
         {/* Main Content */}
         <main
-          className="relative flex-1 flex flex-col px-4 md:px-8 gap-6 z-20 overflow-x-hidden"
-          style={{
-            paddingTop:
-              currentView === "home"
-                ? "calc(env(safe-area-inset-top, 0px) + 7rem)"
-                : "calc(env(safe-area-inset-top, 0px) + 6rem)",
-            // Reserve space at the bottom for the mobile tab bar (~64px + safe area)
-            paddingBottom:
-              "calc(env(safe-area-inset-bottom, 0px) + 4.5rem)",
-          }}
+          className={`relative flex-1 flex flex-col px-4 md:px-8 pb-8 gap-6 z-20 overflow-x-hidden ${currentView === "home" ? "pt-28" : "pt-24"}`}
         >
           <AnimatePresence mode="wait">
             {currentView === "home" && (
               <motion.div
                 key="home"
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 1.02 }}
-                transition={{ duration: 0.15, ease: "easeOut" }}
+                initial={{ opacity: 0, scale: 0.96, filter: "blur(8px)" }}
+                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+                exit={{ opacity: 0, scale: 1.04, filter: "blur(8px)" }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
                 <HomeDashboardSection
@@ -3311,95 +3109,89 @@ function AppInternal({
               </motion.div>
             )}
             {currentView === "staff" && (
-              <Suspense fallback={<ViewFallback />}>
-                <LazyStaffSection
-                  displayStaffAvatar={displayStaffAvatar}
-                  activeOfficer={activeOfficer}
-                  currentStaff={currentStaff}
-                  dynamicRadarData={dynamicRadarData}
-                  renderCustomTick={renderCustomTick}
-                  dynamicScore={dynamicScore}
-                  activeStat={activeStat}
-                  onSetActiveStat={setActiveStat}
-                  sevenWondersScore={sevenWondersScore}
-                  dynamicRole={dynamicRole}
-                  dynamicExperience={dynamicExperience}
-                  dynamicExpertise={dynamicExpertise}
-                  dynamicLanguages={dynamicLanguages}
-                  activeOfficer7WondersPerformance={activeOfficer7WondersPerformance}
-                  activeOfficerCategoryPerformance={activeOfficerCategoryPerformance}
-                  todaySalesTotal={activeOfficerTodaySales}
-                  todayDateLabel={todayStats.dateStr}
-                   categoryPerformanceHint={categoryPerformanceHint}
-                   onSetActiveStaffId={setActiveStaffId}
-                />
-              </Suspense>
+              <StaffSection
+                displayStaffAvatar={displayStaffAvatar}
+                activeOfficer={activeOfficer}
+                currentStaff={currentStaff}
+                dynamicRadarData={dynamicRadarData}
+                renderCustomTick={renderCustomTick}
+                dynamicScore={dynamicScore}
+                activeStat={activeStat}
+                onSetActiveStat={setActiveStat}
+                sevenWondersScore={sevenWondersScore}
+                dynamicRole={dynamicRole}
+                dynamicExperience={dynamicExperience}
+                dynamicExpertise={dynamicExpertise}
+                dynamicLanguages={dynamicLanguages}
+                topAttach={topAttach}
+                activeOfficer7WondersPerformance={activeOfficer7WondersPerformance}
+                activeOfficerCategoryPerformance={activeOfficerCategoryPerformance}
+                todaySalesTotal={activeOfficerTodaySales}
+                todayDateLabel={todayStats.dateStr}
+                 categoryPerformanceHint={categoryPerformanceHint}
+                 onSetActiveStaffId={setActiveStaffId}
+              />
             )}
             {!isPia && currentView === "reports" && (
               <motion.div
                 key="reports"
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 1.02 }}
-                transition={{ duration: 0.15, ease: "easeOut" }}
+                initial={{ opacity: 0, scale: 0.96, filter: "blur(8px)" }}
+                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+                exit={{ opacity: 0, scale: 1.04, filter: "blur(8px)" }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
-                <Suspense fallback={<ViewFallback />}>
-                  <LazyReportsSection
-                    uploadedFiles={uploadedFiles}
-                    uploadedFileNames={uploadedFileNames}
-                    isUploadingFile={isUploadingFile}
-                    isSaving={isSaving}
-                    uploadError={uploadError}
-                    uploadStatus={uploadStatus}
-                    onExportCsv={exportCsv}
-                    onClearAll={() => void clearAllUploadData()}
-                    onRemoveFile={removeUploadedFile}
-                    onUploadFile={handleUploadFile}
-                    parsedReport={parsedReport}
-                  />
-                </Suspense>
+                <ReportsSection
+                  uploadedFiles={uploadedFiles}
+                  uploadedFileNames={uploadedFileNames}
+                  isUploadingFile={isUploadingFile}
+                  isSaving={isSaving}
+                  uploadError={uploadError}
+                  uploadStatus={uploadStatus}
+                  onExportCsv={exportCsv}
+                  onClearAll={() => void clearAllUploadData()}
+                  onRemoveFile={removeUploadedFile}
+                  onUploadFile={handleUploadFile}
+                  parsedReport={parsedReport}
+                />
               </motion.div>
             )}
             {!isPia && currentView === "kpi_preset" && (
               <motion.div
                 key="kpi_preset"
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 1.02 }}
-                transition={{ duration: 0.15, ease: "easeOut" }}
+                initial={{ opacity: 0, scale: 0.96, filter: "blur(8px)" }}
+                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+                exit={{ opacity: 0, scale: 1.04, filter: "blur(8px)" }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
-                <Suspense fallback={<ViewFallback />}>
-                  <LazyKpiPresetSection
-                    salesRows={displayUploads.current}
-                    categoryMasterRows={displayUploads.categoryMaster}
-                    selectedBranch={selectedBranch}
-                    presets={kpiPresets}
-                    onPresetsChange={setKpiPresets}
-                  />
-                </Suspense>
+                <KpiPresetSection
+                  salesRows={displayUploads.current}
+                  categoryMasterRows={displayUploads.categoryMaster}
+                  selectedBranch={selectedBranch}
+                  presets={kpiPresets}
+                  onPresetsChange={setKpiPresets}
+                />
               </motion.div>
             )}
             {!isPia && currentView === "settings" && (
               <motion.div
                 key="settings"
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 1.02 }}
-                transition={{ duration: 0.15, ease: "easeOut" }}
+                initial={{ opacity: 0, scale: 0.96, filter: "blur(8px)" }}
+                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+                exit={{ opacity: 0, scale: 1.04, filter: "blur(8px)" }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
-                <Suspense fallback={<ViewFallback />}>
-                  <LazySettingsSection
-                    selectedBranch={selectedBranch}
-                    onBranchChange={handleBranchChange}
-                    sheetBranches={sheetBranches}
-                    staffRoster={staffRoster}
-                    staffPhotos={Object.fromEntries(
-                      Object.entries(staffPhotos).map(([id, record]) => [id, (record as any).photoUrl]),
-                    )}
-                    uploadingPhotoId={uploadingPhotoId}
+                <SettingsSection
+                  selectedBranch={selectedBranch}
+                  onBranchChange={handleBranchChange}
+                  sheetBranches={sheetBranches}
+                  staffRoster={staffRoster}
+                  staffPhotos={Object.fromEntries(
+                    Object.entries(staffPhotos).map(([id, record]) => [id, (record as any).photoUrl]),
+                  )}
+                  uploadingPhotoId={uploadingPhotoId}
                   staffPhotoError={staffPhotoError}
                   getStaffAvatar={getStaffAvatar}
                   onPhotoUpload={(entry, file) => {
@@ -3409,76 +3201,12 @@ function AppInternal({
                     void handleStaffPhotoRemove(staffId);
                   }}
                   onNavigateToReports={() => setCurrentView("reports")}
-                  />
-                </Suspense>
-                </motion.div>
-              )}
-            </AnimatePresence>
-         </main>
-
-        {/* Mobile Bottom Tab Bar (visible only < md) */}
-        <nav
-          className="md:hidden fixed left-0 right-0 z-50 flex justify-around items-stretch bg-[#0a1f17]/95 backdrop-blur-lg border-t border-white/10 shadow-[0_-8px_24px_rgba(0,0,0,0.4)]"
-          style={{ bottom: "env(safe-area-inset-bottom, 0px)" }}
-        >
-          <button
-            onClick={() => setCurrentView("home")}
-            className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-colors ${
-              currentView === "home" ? "text-emerald-300" : "text-white/55"
-            }`}
-            title="Home"
-          >
-            <Home className="w-5 h-5" />
-            <span className="text-[10px] font-medium">Home</span>
-          </button>
-          <button
-            onClick={() => setCurrentView("staff")}
-            className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-colors ${
-              currentView === "staff" ? "text-emerald-300" : "text-white/55"
-            }`}
-            title="Staff Profile"
-          >
-            <User className="w-5 h-5" />
-            <span className="text-[10px] font-medium">Profile</span>
-          </button>
-          {!isPia && (
-            <button
-              onClick={() => setCurrentView("reports")}
-              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-colors ${
-                currentView === "reports" ? "text-emerald-300" : "text-white/55"
-              }`}
-              title="Reports"
-            >
-              <PieChart className="w-5 h-5" />
-              <span className="text-[10px] font-medium">Reports</span>
-            </button>
-          )}
-          {!isPia && (
-            <button
-              onClick={() => setCurrentView("kpi_preset")}
-              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-colors ${
-                currentView === "kpi_preset" ? "text-emerald-300" : "text-white/55"
-              }`}
-              title="KPI Preset"
-            >
-              <SlidersHorizontal className="w-5 h-5" />
-              <span className="text-[10px] font-medium">KPI</span>
-            </button>
-          )}
-          {!isPia && (
-            <button
-              onClick={() => setCurrentView("settings")}
-              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-colors ${
-                currentView === "settings" ? "text-emerald-300" : "text-white/55"
-              }`}
-              title="Settings"
-            >
-              <Settings className="w-5 h-5" />
-              <span className="text-[10px] font-medium">Settings</span>
-            </button>
-          )}
-        </nav>
-       </div>
-     </div>
-   );
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </main>
+      </div>
+    </div>
+  );
 }
