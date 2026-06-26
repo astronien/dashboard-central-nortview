@@ -277,7 +277,7 @@ export default function KpiResultsTable({
                     return (
                       <td key={preset.id} className="py-3 px-4 text-center">
                         <span
-                          className={`px-2 py-0.5 rounded font-bold text-xs border ${achBg(r.attachRate)}`}
+                          className={`px-2 py-0.5 rounded-lg font-bold text-xs border ${achBg(r.attachRate)}`}
                         >
                           {v.text}
                         </span>
@@ -308,7 +308,7 @@ export default function KpiResultsTable({
                 </td>
                 <td className="py-3 px-4 text-center">
                   <span
-                    className={`px-2 py-0.5 rounded font-bold text-xs border ${achBg(row.totalAchRate)}`}
+                    className={`px-2 py-0.5 rounded-lg font-bold text-xs border ${achBg(row.totalAchRate)}`}
                   >
                     {row.totalAchRate.toFixed(1)}%
                   </span>

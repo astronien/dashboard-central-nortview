@@ -47,7 +47,7 @@ export function CategorySnapshotSection({ items }: { items: CategorySnapshotItem
   if (!visible.length) return null;
 
   return (
-    <div className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+    <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
       <div className="flex items-center justify-between mb-5">
         <div>
           <h3 className="text-lg font-bold tracking-tight text-white">Category KPI Snapshot</h3>

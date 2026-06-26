@@ -32,7 +32,7 @@ export function KpiCard({
   const isHighlight = variant === "highlight";
   return (
     <div
-      className={`rounded-[1.5rem] border p-5 shadow-lg flex flex-col justify-between transition-all duration-300 min-h-[220px] group relative overflow-hidden ${
+      className={`rounded-2xl border p-5 shadow-lg flex flex-col justify-between transition-all duration-300 min-h-[220px] group relative overflow-hidden ${
         isHighlight
           ? "bg-[#032e1f] border-[#10b981]/30 hover:bg-[#043d29] hover:border-[#10b981]/50"
           : "bg-white/5 backdrop-blur-md border-white/10 hover:bg-white/[0.08] hover:border-white/20"

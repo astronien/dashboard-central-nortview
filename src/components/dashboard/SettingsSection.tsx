@@ -71,7 +71,7 @@ export function SettingsSection({
         {staffPhotoError && <p className="text-sm text-amber-300 lg:max-w-xs">{staffPhotoError}</p>}
       </div>
 
-      <div className="flex-1 bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)] relative z-10 w-full min-h-[400px] overflow-hidden flex flex-col">
+      <div className="flex-1 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)] relative z-10 w-full min-h-[400px] overflow-hidden flex flex-col">
         {staffRoster.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center py-12">
             <Users className="w-14 h-14 text-white/20 mb-4" />

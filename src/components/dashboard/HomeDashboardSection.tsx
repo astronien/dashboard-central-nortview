@@ -164,7 +164,7 @@ function BranchOverviewKpiTable({ data }: { data: BranchOverviewKpiData }) {
 
   if (rows.length === 0 && breakdownEntries.length === 0) {
     return (
-      <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+      <div className="bg-white/10 backdrop-blur-lg rounded-2xl border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
         <p className="text-sm text-white/50 text-center py-8">
           ยังไม่มีข้อมูลเจ้าหน้าที่ — กรุณาอัปโหลดไฟล์ Current
         </p>
@@ -173,7 +173,7 @@ function BranchOverviewKpiTable({ data }: { data: BranchOverviewKpiData }) {
   }
 
   return (
-    <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+    <div className="bg-white/10 backdrop-blur-lg rounded-2xl border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
       {/* Header + view toggle */}
       <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
         <div className="flex items-center gap-3">

@@ -238,7 +238,7 @@ export function ReportsSection({
       <div className="text-xs font-semibold tracking-wider text-teal-400/80 uppercase mb-1">
         File Upload
       </div>
-      <div className="bg-white/10 backdrop-blur-md rounded-[2rem] p-6 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+      <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-5">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-teal-500/20 rounded-xl text-teal-400 shrink-0">
@@ -413,7 +413,7 @@ export function ReportsSection({
 
       {/* Branch summary table */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+        <div className="lg:col-span-2 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
           <div className="flex items-center justify-between mb-5">
             <h3 className="text-lg font-semibold tracking-tight">Branch Summary</h3>
             <span className="text-xs text-white/50">Target, actual, achievement, MoM, YoY</span>
@@ -468,7 +468,7 @@ export function ReportsSection({
           </div>
         </div>
 
-        <div className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+        <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
           <h3 className="text-lg font-semibold tracking-tight mb-5">Report Logic Rules</h3>
           <div className="space-y-4 text-sm text-white/80">
             <div className="rounded-2xl bg-white/5 border border-white/5 p-4">
@@ -497,7 +497,7 @@ export function ReportsSection({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+        <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
           <div className="flex items-center justify-between mb-5">
             <h3 className="text-lg font-semibold tracking-tight">Category Summary</h3>
             <span className="text-xs text-white/50">Main category totals</span>
@@ -531,7 +531,7 @@ export function ReportsSection({
           </div>
         </div>
 
-        <div className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+        <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
           <div className="flex items-center justify-between mb-5">
             <h3 className="text-lg font-semibold tracking-tight">Officer Summary</h3>
             <span className="text-xs text-white/50">Name matching + target alignment</span>

@@ -219,14 +219,14 @@ const StaffSectionImpl = function StaffSection({
   return (
     <motion.div
       key="staff"
-      initial={reduceMotion ? false : { opacity: 0, scale: 0.96, filter: "blur(8px)" }}
-      animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-      exit={reduceMotion ? undefined : { opacity: 0, scale: 1.04, filter: "blur(8px)" }}
-      transition={{ duration: reduceMotion ? 0 : 0.4, ease: "easeOut" }}
+      initial={reduceMotion ? false : { opacity: 0, scale: 0.98 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={reduceMotion ? undefined : { opacity: 0, scale: 1.02 }}
+      transition={{ duration: reduceMotion ? 0 : 0.15, ease: "easeOut" }}
       className="flex flex-col w-full h-full gap-3 sm:gap-4 lg:gap-6 relative pb-4"
     >
       {/* ============ HERO CARD ============ */}
-      <div className="relative bg-gradient-to-br from-[#113a29]/80 via-[#0c291d]/85 to-[#051710]/95 backdrop-blur-xl border border-white/10 shadow-[0_16px_48px_rgba(0,0,0,0.35)] rounded-3xl lg:rounded-[2.5rem] p-4 sm:p-5 lg:p-8 overflow-hidden">
+      <div className="relative bg-gradient-to-br from-[#113a29]/80 via-[#0c291d]/85 to-[#051710]/95 backdrop-blur-xl border border-white/10 shadow-[0_16px_48px_rgba(0,0,0,0.35)] rounded-2xl p-4 sm:p-5 lg:p-8 overflow-hidden">
         {/* Decorative glow */}
         {!reduceMotion && (
           <motion.div
@@ -362,7 +362,7 @@ const StaffSectionImpl = function StaffSection({
       </div>
 
       {/* ============ CATEGORY TABLE (Responsive) ============ */}
-      <div className="bg-white/10 backdrop-blur-lg rounded-2xl lg:rounded-[2rem] border border-white/10 p-4 sm:p-5 lg:p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+      <div className="bg-white/10 backdrop-blur-lg rounded-2xl border border-white/10 p-4 sm:p-5 lg:p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
         <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
           <div className="p-1.5 sm:p-2 bg-emerald-500/20 rounded-lg sm:rounded-xl border border-emerald-500/20">
             {activeStat === "csat" ? (
@@ -464,7 +464,7 @@ const StatCard = React.memo(function StatCard({
       ) : null}
       {badge ? (
         <div
-          className={`mt-1.5 inline-block text-[10px] font-bold px-1.5 py-0.5 rounded ${badgeColorMap[badgeColor]}`}
+          className={`mt-1.5 inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-lg ${badgeColorMap[badgeColor]}`}
         >
           {badge}
         </div>

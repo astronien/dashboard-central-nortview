@@ -3279,10 +3279,10 @@ function AppInternal({
             {currentView === "home" && (
               <motion.div
                 key="home"
-                initial={{ opacity: 0, scale: 0.96, filter: "blur(8px)" }}
-                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-                exit={{ opacity: 0, scale: 1.04, filter: "blur(8px)" }}
-                transition={{ duration: 0.4, ease: "easeOut" }}
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 1.02 }}
+                transition={{ duration: 0.15, ease: "easeOut" }}
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
                 <HomeDashboardSection
@@ -3319,10 +3319,10 @@ function AppInternal({
             {!isPia && currentView === "reports" && (
               <motion.div
                 key="reports"
-                initial={{ opacity: 0, scale: 0.96, filter: "blur(8px)" }}
-                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-                exit={{ opacity: 0, scale: 1.04, filter: "blur(8px)" }}
-                transition={{ duration: 0.4, ease: "easeOut" }}
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 1.02 }}
+                transition={{ duration: 0.15, ease: "easeOut" }}
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
                 <ReportsSection
@@ -3343,10 +3343,10 @@ function AppInternal({
             {!isPia && currentView === "kpi_preset" && (
               <motion.div
                 key="kpi_preset"
-                initial={{ opacity: 0, scale: 0.96, filter: "blur(8px)" }}
-                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-                exit={{ opacity: 0, scale: 1.04, filter: "blur(8px)" }}
-                transition={{ duration: 0.4, ease: "easeOut" }}
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 1.02 }}
+                transition={{ duration: 0.15, ease: "easeOut" }}
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
                 <KpiPresetSection
@@ -3361,10 +3361,10 @@ function AppInternal({
             {!isPia && currentView === "settings" && (
               <motion.div
                 key="settings"
-                initial={{ opacity: 0, scale: 0.96, filter: "blur(8px)" }}
-                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-                exit={{ opacity: 0, scale: 1.04, filter: "blur(8px)" }}
-                transition={{ duration: 0.4, ease: "easeOut" }}
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 1.02 }}
+                transition={{ duration: 0.15, ease: "easeOut" }}
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
                 <SettingsSection
