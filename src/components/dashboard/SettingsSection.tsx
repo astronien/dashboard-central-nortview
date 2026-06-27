@@ -1,4 +1,5 @@
 import { Building2, ImagePlus, Trash2, Users } from "lucide-react";
+import { LineUserManager } from "./admin/LineUserManager";
 
 export type StaffRosterEntry = {
   name: string;
@@ -19,6 +20,7 @@ export function SettingsSection({
   onPhotoUpload,
   onPhotoRemove,
   onNavigateToReports,
+  isAdmin,
 }: {
   selectedBranch: string;
   onBranchChange: (branch: string) => void;
@@ -31,6 +33,7 @@ export function SettingsSection({
   onPhotoUpload: (entry: StaffRosterEntry, file: File) => void;
   onPhotoRemove: (staffId: string) => void;
   onNavigateToReports: () => void;
+  isAdmin: boolean;
 }) {
   return (
     <>
@@ -115,6 +118,8 @@ export function SettingsSection({
           </div>
         )}
       </div>
+
+      {isAdmin ? <LineUserManager /> : null}
     </>
   );
 }

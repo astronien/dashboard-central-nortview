@@ -107,6 +107,7 @@ import { HomeDashboardSection } from "./components/dashboard/HomeDashboardSectio
 import { StaffSection } from "./components/dashboard/StaffSection";
 import { ReportsSection } from "./components/dashboard/ReportsSection";
 import { SettingsSection } from "./components/dashboard/SettingsSection";
+import { LineUserManager } from "./components/dashboard/admin/LineUserManager";
 import KpiPresetSection from "./components/dashboard/KpiPresetSection";
 import {
   getPresets as getKpiPresets,
@@ -3396,6 +3397,7 @@ function AppInternal({
                     void handleStaffPhotoRemove(staffId);
                   }}
                   onNavigateToReports={() => setCurrentView("reports")}
+                  isAdmin={role === "admin"}
                 />
               </motion.div>
             )}
