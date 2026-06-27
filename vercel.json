@@ -13,6 +13,18 @@
       "destination": "/api/uploads?kind=:kind"
     },
     {
+      "source": "/api/line-bot/users",
+      "destination": "/api/line-bot?route=users"
+    },
+    {
+      "source": "/api/line-bot/last-modified",
+      "destination": "/api/line-bot?route=last-modified"
+    },
+    {
+      "source": "/api/line-bot/cron/cleanup",
+      "destination": "/api/line-bot?route=cron/cleanup"
+    },
+    {
       "source": "/api/cron/audit-cleanup",
       "destination": "/api/line-bot?route=cron/cleanup"
     },

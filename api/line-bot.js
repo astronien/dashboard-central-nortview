@@ -32,8 +32,20 @@ import {
 } from "./_lib/lineAuth.js";
 import { detectBranchFromRows } from "./_lib/branchDetector.js";
 import { buildReplyMessage, buildErrorFlex } from "./_lib/lineMessage.js";
-import { getTursoClient } from "./_lib/tursoClient.js";
+import { getTursoClient, initLineBotSchema } from "./_lib/tursoClient.js";
 import * as XLSX from "xlsx";
+
+// Ensure LINE Bot tables exist on first request (idempotent CREATE IF NOT EXISTS)
+let schemaReady = null;
+function ensureSchema() {
+  if (!schemaReady) {
+    schemaReady = initLineBotSchema().catch((e) => {
+      schemaReady = null;
+      throw e;
+    });
+  }
+  return schemaReady;
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -51,6 +63,7 @@ function applyCors(res) {
 
 async function isAuthorizedUser(lineUserId) {
   try {
+    await ensureSchema();
     const client = getTursoClient();
     const res = await client.execute({
       sql: "SELECT role, branch_id, display_name FROM line_user_allowlist WHERE line_user_id = ? AND is_active = 1",
@@ -183,6 +196,7 @@ async function handleWebhookEvent(event, accessToken) {
 // ============================================================
 
 async function handleUsers(req, res, userId) {
+  await ensureSchema();
   const client = getTursoClient();
   const method = req.method;
 
@@ -269,6 +283,7 @@ async function handleLastModified(req, res) {
   res.setHeader("Pragma", "no-cache");
 
   try {
+    await ensureSchema();
     const client = getTursoClient();
     const result = await client.execute({
       sql: "SELECT MAX(updated_at) AS lastModified, kind, branch_id FROM upload_chunks WHERE line_user_id IS NOT NULL GROUP BY kind, branch_id ORDER BY MAX(updated_at) DESC LIMIT 1",
@@ -299,6 +314,7 @@ async function handleCronCleanup(req, res) {
     return res.status(401).json({ error: "Unauthorized" });
   }
   try {
+    await ensureSchema();
     const client = getTursoClient();
     const strip = await client.execute({
       sql: "UPDATE upload_audit_log SET file_data = NULL WHERE created_at < datetime('now', '-30 days') AND created_at >= datetime('now', '-90 days') AND file_data IS NOT NULL",
@@ -327,12 +343,16 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(204).end();
 
   const url = req.url || "";
-  // Match sub-paths: /api/line-bot/users, /api/line-bot/last-modified, /api/line-bot/cron/cleanup
-  // Note: vercel rewrites /api/line-bot/users/:id to /api/line-bot?userId=…
+  // Vercel rewrites sub-paths to query params:
+  //   /api/line-bot/users         → /api/line-bot?route=users
+  //   /api/line-bot/last-modified → /api/line-bot?route=last-modified
+  //   /api/line-bot/cron/cleanup  → /api/line-bot?route=cron/cleanup
+  //   /api/line-bot?userId=…      → /api/line-bot?route=users&userId=…
+  const route = req.query?.route ?? null;
   const userId = req.query?.userId ?? null;
 
-  // 1. Webhook: POST /api/line-bot (no query.userId)
-  if (!userId && req.method === "POST" && !url.includes("/users") && !url.includes("/cron/")) {
+  // 1. Webhook: POST /api/line-bot (no route, no userId)
+  if (!route && !userId && req.method === "POST") {
     const channelSecret = process.env.LINE_CHANNEL_SECRET;
     const accessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
     if (!channelSecret || !accessToken) {
@@ -357,18 +377,18 @@ export default async function handler(req, res) {
   }
 
   // 2. Users: GET/POST/PATCH/DELETE /api/line-bot/users or /api/line-bot?userId=…
-  if (url.includes("/users") || userId) {
+  if (route === "users" || userId) {
     return handleUsers(req, res, userId);
   }
 
   // 3. Last-modified: GET /api/line-bot/last-modified
-  if (url.includes("/last-modified")) {
+  if (route === "last-modified") {
     if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
     return handleLastModified(req, res);
   }
 
   // 4. Cron cleanup: /api/line-bot?route=cron/cleanup (GET from Vercel cron)
-  if (url.includes("cron/cleanup") || req.query?.route === "cron/cleanup") {
+  if (route === "cron/cleanup" || url.includes("cron/cleanup")) {
     return handleCronCleanup(req, res);
   }
 

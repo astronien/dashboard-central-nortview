@@ -21,6 +21,19 @@ import { Buffer } from "node:buffer";
 import * as XLSX from "xlsx";
 import { getTursoClient } from "./tursoClient.js";
 
+// Ensure schema tables exist on first upload (idempotent CREATE IF NOT EXISTS)
+let schemaReady = null;
+async function ensureSchema() {
+  if (!schemaReady) {
+    const { initLineBotSchema } = require("./tursoClient.js");
+    schemaReady = initLineBotSchema().catch((e) => {
+      schemaReady = null;
+      throw e;
+    });
+  }
+  return schemaReady;
+}
+
 export const REQUIRED_COLUMNS = {
   current: ["Doc Date", "Category (Name)", "Officer (Name)", "Branch (Name)", "ราคาขายตามบิล"],
   today: ["Doc Date", "Category (Name)", "Officer (Name)", "Branch (Name)", "ราคาขายตามบิล"],
@@ -370,6 +383,7 @@ export async function processUpload(params) {
   const actualTotal = kind === "categoryMaster" || kind === "target" ? 0 : sumActualAmount(rows);
 
   // 7. Transaction: DELETE existing + INSERT new chunks (Q-G: replace เสมอ)
+  await ensureSchema();
   const client = getTursoClient();
   const chunks = [];
   for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
