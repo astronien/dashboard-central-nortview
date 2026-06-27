@@ -99,9 +99,12 @@ async function detectBranchFromExcel(buf) {
 // ============================================================
 
 async function replyToLine(replyToken, messages, accessToken) {
-  if (!replyToken || !messages) return;
+  if (!replyToken || !messages) {
+    console.warn("[line-bot] replyToLine skipped:", { hasToken: !!replyToken, hasMessages: !!messages });
+    return;
+  }
   try {
-    await fetch("https://api.line.me/v2/bot/message/reply", {
+    const res = await fetch("https://api.line.me/v2/bot/message/reply", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -109,8 +112,14 @@ async function replyToLine(replyToken, messages, accessToken) {
       },
       body: JSON.stringify({ replyToken, messages: Array.isArray(messages) ? messages : [messages] }),
     });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      console.error("[line-bot] replyToLine failed:", res.status, errText);
+    } else {
+      console.log("[line-bot] replyToLine ok");
+    }
   } catch (e) {
-    console.error("[line-bot] replyToLine failed:", e);
+    console.error("[line-bot] replyToLine exception:", e);
   }
 }
 

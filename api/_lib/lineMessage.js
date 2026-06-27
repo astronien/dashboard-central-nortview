@@ -134,13 +134,13 @@ function buildSuccessFlex({ fileName, rows, branchId, targetTotal, actualTotal, 
         spacing: "sm",
         paddingAll: "lg",
         contents: [
-          officerRows.length > 0
+          ...(officerRows.length > 0
             ? [
                 { type: "separator", color: "#e5e7eb" },
                 { type: "text", text: "🏆 Top Officers", size: "xs", color: "#6b7280", margin: "sm" },
                 ...officerRows,
               ]
-            : [],
+            : []),
           {
             type: "text",
             text: "✅ บันทึกเรียบร้อย",
