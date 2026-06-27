@@ -13,8 +13,18 @@
       "destination": "/api/uploads?kind=:kind"
     },
     {
+      "source": "/api/cron/audit-cleanup",
+      "destination": "/api/line-bot?route=cron/cleanup"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/audit-cleanup",
+      "schedule": "0 2 * * *"
     }
   ]
 }

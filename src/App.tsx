@@ -120,6 +120,8 @@ import { syncPiaFromOfficers } from "./lib/auth/piSync";
 import { calcPreset, presetDisplayValue, computePresetAchPercent } from "./lib/presetEngine";
 import { parseBills, type BillSummary } from "./lib/presetBills";
 import { enrichSalesRowsWithCatDaily, buildCatDailyLookup } from "./lib/presetCatDaily";
+import { startUploadWatcher, type LastModified } from "./lib/uploadWatcher";
+import { UploadNotification, type UploadNotificationInfo } from "./components/dashboard/UploadNotification";
 
 
 type Staff = {
@@ -3107,8 +3109,30 @@ function AppInternal({
     }
   };
 
+  // --- LINE Bot upload watcher: poll every 30s for new uploads ---
+  const [uploadNotice, setUploadNotice] = useState<UploadNotificationInfo | null>(null);
+  useEffect(() => {
+    const stop = startUploadWatcher({
+      intervalMs: 30_000,
+      onUpdate: (info) => {
+        setUploadNotice(info);
+        // Re-fetch latest uploads + rebuild report
+        if (uploadedFiles && hasUploadData(uploadedFiles)) {
+          rebuildReport(uploadedFiles, { skipPersist: true });
+        }
+      },
+      onError: (err) => {
+        // Silent — polling errors are non-critical
+        console.warn("[uploadWatcher]", err);
+      },
+    });
+    return stop;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uploadedFiles, selectedBranch]);
+
   return (
     <div className="min-h-screen bg-[#1c2722] p-4 font-sans text-white md:p-8 flex flex-col items-center">
+      <UploadNotification info={uploadNotice} onDismiss={() => setUploadNotice(null)} />
       {isInitialLoading && (
         <div className="fixed inset-0 z-[999] bg-[#1c2722] flex items-center justify-center">
           <div className="flex flex-col items-center gap-4">

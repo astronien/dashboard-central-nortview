@@ -46,6 +46,41 @@ CREATE TABLE IF NOT EXISTS upload_chunks (
 );
 
 CREATE INDEX IF NOT EXISTS idx_upload_chunks_kind ON upload_chunks(kind);
+
+-- LINE Bot uploads: allowlist of authorized LINE users (BSM/Asst.BSM)
+CREATE TABLE IF NOT EXISTS line_user_allowlist (
+  line_user_id   TEXT PRIMARY KEY,
+  display_name   TEXT NOT NULL,
+  role           TEXT NOT NULL CHECK(role IN ('BSM', 'Asst.BSM')),
+  branch_id      TEXT NOT NULL,
+  added_by       TEXT NOT NULL,
+  added_at       TEXT NOT NULL DEFAULT (datetime('now')),
+  is_active      INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE INDEX IF NOT EXISTS idx_allowlist_role ON line_user_allowlist(role, is_active);
+
+-- LINE Bot uploads: audit log for every file uploaded via LINE
+CREATE TABLE IF NOT EXISTS upload_audit_log (
+  id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+  line_user_id        TEXT,
+  branch_id           TEXT NOT NULL,
+  kind                TEXT NOT NULL,
+  file_name           TEXT,
+  file_size           INTEGER,
+  file_data           BLOB,
+  row_count           INTEGER,
+  target_total        REAL,
+  actual_total        REAL,
+  branch_id_detected  TEXT,
+  status              TEXT NOT NULL CHECK(status IN ('success', 'error')),
+  error_message       TEXT,
+  created_at          TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_created ON upload_audit_log(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_branch ON upload_audit_log(branch_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_user ON upload_audit_log(line_user_id, created_at DESC);
 `;
 
 /**

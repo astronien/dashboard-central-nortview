@@ -6,7 +6,23 @@
  * Schema lives in tursoClient.ts SCHEMA_SQL. The browser hits Turso
  * directly via libSQL's HTTP transport; no API server needed.
  */
-import { getTursoClient } from "./auth/tursoClient";
+import { getTursoClient, initSchema } from "./auth/tursoClient";
+
+// Run schema migration once on module load. CREATE TABLE IF NOT EXISTS
+// is idempotent so this is safe to call on every page load.
+let schemaReady: Promise<void> | null = null;
+function ensureSchema(): Promise<void> {
+  if (!schemaReady) {
+    schemaReady = initSchema().catch((e) => {
+      // Reset so a future call can retry (e.g. if Turso was temporarily down)
+      schemaReady = null;
+      throw e;
+    });
+  }
+  return schemaReady;
+}
+// Fire-and-forget: don't block module load, but ensure the call kicks off
+ensureSchema().catch((e) => console.warn("[cloudStorage] initSchema failed:", e));
 
 export type RawRow = Record<string, string | number | undefined>;
 export type UploadKind =
