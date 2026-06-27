@@ -33,6 +33,8 @@ import {
 import { detectBranchFromRows } from "./_lib/branchDetector.js";
 import { buildReplyMessage, buildErrorFlex } from "./_lib/lineMessage.js";
 import { getTursoClient, initLineBotSchema } from "./_lib/tursoClient.js";
+import { getPiaListForBranch, buildPiaReport } from "./_lib/piaReportBuilder.js";
+import { uploadToR2 } from "./_lib/imageStorage.js";
 import * as XLSX from "xlsx";
 
 // Ensure LINE Bot tables exist on first request (idempotent CREATE IF NOT EXISTS)
@@ -128,6 +130,28 @@ async function replyToLine(replyToken, messages, accessToken) {
 // ============================================================
 
 async function handleWebhookEvent(event, accessToken) {
+  // Text message: "report" or "รายงาน" → show PIA Quick Reply
+  if (event.type === "message" && event.message.type === "text") {
+    const text = String(event.message.text ?? "").toLowerCase().trim();
+    if (text === "report" || text === "รายงาน") {
+      return handleReportMenu(event, accessToken);
+    }
+    return;
+  }
+
+  // Postback: user clicked a Quick Reply button
+  if (event.type === "postback") {
+    const data = String(event.postback?.data ?? "");
+    if (data.startsWith("report_pia:")) {
+      const staffId = data.slice("report_pia:".length);
+      return handleReportRequest(event, staffId, accessToken);
+    }
+    if (data === "report_more") {
+      return handleReportMore(event, accessToken);
+    }
+    return;
+  }
+
   if (event.type !== "message" || event.message.type !== "file") return;
 
   const messageId = event.message.id;
@@ -198,6 +222,237 @@ async function handleWebhookEvent(event, accessToken) {
     topOfficers: result.topOfficers || [],
   });
   await replyToLine(replyToken, messages, accessToken);
+}
+
+// ============================================================
+//  PIA REPORT (Quick Reply + screenshot)
+// ============================================================
+
+function buildPiaQuickReply(piaList) {
+  const first12 = piaList.slice(0, 12);
+  const remaining = piaList.slice(12);
+  const items = first12.map((pia) => {
+    const label = `${pia.staffId} ${pia.name}`.slice(0, 20);
+    return {
+      type: "action",
+      action: {
+        type: "postback",
+        label,
+        data: `report_pia:${pia.staffId}`,
+      },
+    };
+  });
+  if (remaining.length > 0) {
+    items.push({
+      type: "action",
+      action: {
+        type: "postback",
+        label: `📄 ดูเพิ่มเติม (${remaining.length})`,
+        data: "report_more",
+      },
+    });
+  }
+  return { items };
+}
+
+async function handleReportMenu(event, accessToken) {
+  const userId = event.source?.userId;
+  const replyToken = event.replyToken;
+
+  const user = await isAuthorizedUser(userId);
+  if (!user) {
+    return replyToLine(
+      replyToken,
+      buildErrorFlex("คุณไม่มีสิทธิ์ใช้คำสั่งนี้"),
+      accessToken,
+    );
+  }
+
+  const piaList = await getPiaListForBranch(user.branchId);
+  if (piaList.length === 0) {
+    return replyToLine(
+      replyToken,
+      [
+        {
+          type: "text",
+          text: `❌ ไม่พบ PIA ในสาขา ${user.branchId}\n(อัปโหลดไฟล์ Target ก่อน)`,
+        },
+      ],
+      accessToken,
+    );
+  }
+
+  const quickReply = buildPiaQuickReply(piaList);
+  await replyToLine(
+    replyToken,
+    [
+      {
+        type: "text",
+        text: `📊 PIA ในสาขา ${user.branchId} (${piaList.length} คน):`,
+        quickReply,
+      },
+    ],
+    accessToken,
+  );
+}
+
+async function handleReportMore(event, accessToken) {
+  const userId = event.source?.userId;
+  const replyToken = event.replyToken;
+  const user = await isAuthorizedUser(userId);
+  if (!user) return;
+
+  const piaList = await getPiaListForBranch(user.branchId);
+  const remaining = piaList.slice(12);
+  if (remaining.length === 0) {
+    return replyToLine(
+      replyToken,
+      [{ type: "text", text: "ไม่มี PIA เพิ่มเติม" }],
+      accessToken,
+    );
+  }
+
+  const quickReply = {
+    items: remaining.map((pia) => {
+      const label = `${pia.staffId} ${pia.name}`.slice(0, 20);
+      return {
+        type: "action",
+        action: {
+          type: "postback",
+          label,
+          data: `report_pia:${pia.staffId}`,
+        },
+      };
+    }),
+  };
+  await replyToLine(
+    replyToken,
+    [
+      {
+        type: "text",
+        text: `📊 PIA เพิ่มเติม (${remaining.length} คน):`,
+        quickReply,
+      },
+    ],
+    accessToken,
+  );
+}
+
+async function handleReportRequest(event, staffId, accessToken) {
+  const userId = event.source?.userId;
+  const replyToken = event.replyToken;
+
+  const user = await isAuthorizedUser(userId);
+  if (!user) {
+    return replyToLine(
+      replyToken,
+      buildErrorFlex("คุณไม่มีสิทธิ์"),
+      accessToken,
+    );
+  }
+
+  // Reply "loading" (1 message, fast) — must be within LINE 1s timeout
+  await replyToLine(
+    replyToken,
+    [{ type: "text", text: "📊 กำลังสร้างรายงาน..." }],
+    accessToken,
+  );
+
+  // Background: generate + upload + multicast (don't await)
+  generateAndSendPiaReport(userId, staffId, user.branchId, accessToken).catch(
+    (e) => {
+      console.error("[line-bot] report generation failed:", e);
+      pushLineMessage(
+        userId,
+        `❌ สร้างรายงานไม่สำเร็จ: ${e instanceof Error ? e.message : String(e)}`,
+        accessToken,
+      );
+    },
+  );
+}
+
+async function generateAndSendPiaReport(userId, staffId, branchId, accessToken) {
+  // 1. Build PIA report
+  const pia = await buildPiaReport(staffId, branchId);
+  if (!pia) {
+    await pushLineMessage(userId, `❌ ไม่พบข้อมูล PIA (ID ${staffId})`, accessToken);
+    return;
+  }
+
+  // 2. Generate 3 PNGs in parallel
+  const workerUrl = process.env.CLOUDFLARE_WORKER_URL;
+  if (!workerUrl) {
+    await pushLineMessage(
+      userId,
+      "❌ CLOUDFLARE_WORKER_URL ยังไม่ได้ตั้งค่า",
+      accessToken,
+    );
+    return;
+  }
+
+  const [kpiBuf, wonderBuf, categoryBuf] = await Promise.all([
+    generatePng(workerUrl, "kpi", pia),
+    generatePng(workerUrl, "wonder", pia),
+    generatePng(workerUrl, "category", pia),
+  ]);
+
+  // 3. Upload to R2
+  const [kpiUrl, wonderUrl, categoryUrl] = await Promise.all([
+    uploadToR2(kpiBuf, `${pia.staffId}-kpi.png`),
+    uploadToR2(wonderBuf, `${pia.staffId}-wonder.png`),
+    uploadToR2(categoryBuf, `${pia.staffId}-category.png`),
+  ]);
+
+  // 4. Multicast 3 images (3 messages, 3 quota)
+  await fetch("https://api.line.me/v2/bot/message/multicast", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      to: [userId],
+      messages: [
+        { type: "image", originalContentUrl: kpiUrl, previewImageUrl: kpiUrl },
+        { type: "image", originalContentUrl: wonderUrl, previewImageUrl: wonderUrl },
+        { type: "image", originalContentUrl: categoryUrl, previewImageUrl: categoryUrl },
+      ],
+    }),
+  });
+
+  await pushLineMessage(
+    userId,
+    `✅ ส่งรายงาน ${pia.name} (ID ${pia.staffId}) เรียบร้อย`,
+    accessToken,
+  );
+}
+
+async function generatePng(workerUrl, template, data) {
+  const res = await fetch(`${workerUrl}/screenshot`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ template, data }),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`Worker ${template} failed: ${res.status} ${errText}`);
+  }
+  const buffer = await res.arrayBuffer();
+  return Buffer.from(buffer);
+}
+
+async function pushLineMessage(userId, text, accessToken) {
+  await fetch("https://api.line.me/v2/bot/message/push", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      to: userId,
+      messages: [{ type: "text", text }],
+    }),
+  });
 }
 
 // ============================================================
