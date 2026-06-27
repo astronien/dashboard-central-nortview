@@ -3115,11 +3115,19 @@ function AppInternal({
   useEffect(() => {
     const stop = startUploadWatcher({
       intervalMs: 30_000,
-      onUpdate: (info) => {
+      onUpdate: async (info) => {
         setUploadNotice(info);
-        // Re-fetch latest uploads + rebuild report
-        if (uploadedFiles && hasUploadData(uploadedFiles)) {
-          rebuildReport(uploadedFiles, { skipPersist: true });
+        // Re-fetch fresh data from Turso (not stale local state)
+        try {
+          const fresh = await loadPersistedUploads();
+          if (fresh) {
+            rebuildReport(fresh, { skipPersist: true });
+          } else if (uploadedFiles && hasUploadData(uploadedFiles)) {
+            // Fallback: rebuild with existing local state
+            rebuildReport(uploadedFiles, { skipPersist: true });
+          }
+        } catch (e) {
+          console.warn("[uploadWatcher] re-fetch failed:", e);
         }
       },
       onError: (err) => {

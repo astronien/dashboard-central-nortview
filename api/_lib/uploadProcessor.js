@@ -399,13 +399,14 @@ export async function processUpload(params) {
       // INSERT new chunks
       ...chunks.map((data, i) => ({
         sql:
-          "INSERT INTO upload_chunks (kind, chunk_index, row_count, data, file_name, line_user_id, updated_at) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))",
+          "INSERT INTO upload_chunks (kind, chunk_index, row_count, data, file_name, branch_id, line_user_id, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))",
         args: [
           kind,
           i,
           Math.min(CHUNK_SIZE, rows.length - i * CHUNK_SIZE),
           data,
           fileName,
+          branchId ?? null,
           lineUserId ?? null,
         ],
       })),
