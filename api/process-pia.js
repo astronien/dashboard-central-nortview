@@ -1,12 +1,11 @@
 /**
- * QStash Worker — processes 1 PIA → screenshot from web → sends to Telegram.
+ * QStash Worker — processes 1 PIA → 3 screenshots from web → sends to Telegram.
  *
  * Called by Upstash QStash at scheduled times (with delay).
  * Verifies QStash HMAC signature before processing.
  *
- * Uses the new /screenshot-url flow: render the web app dashboard, then
- * send the screenshot to Telegram. This guarantees the data shown in
- * Telegram matches exactly what the user sees in the browser.
+ * Captures 3 sections of the web dashboard (KPI / 7 Wonders / Category)
+ * via a single browser session and sends them as 3 separate photos.
  *
  * Free tier: 500 QStash messages/day.
  */
@@ -18,6 +17,10 @@ import { getPiaListForBranch } from "./_lib/piaReportBuilder.js";
 const WORKER_URL = process.env.CLOUDFLARE_WORKER_URL;
 const WEB_BOT_TOKEN = process.env.WEB_BOT_TOKEN;
 const BRANCH_DISPLAY = process.env.TELEGRAM_BRANCH_DISPLAY ?? "ID645 : Studio 7-Central-Westgate";
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
 export default async function handler(req, res) {
   // 1. Verify QStash signature
@@ -45,29 +48,47 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, skipped: true });
   }
 
-  // 3. Cap the web app page via the worker
-  let png;
+  // 3. Cap 3 sections of the web app via the worker
+  let sections;
   try {
     const url = `https://dashboard-central-nortview.vercel.app/?bot=1&token=${encodeURIComponent(WEB_BOT_TOKEN)}&staffId=${encodeURIComponent(staffId)}&branch=${encodeURIComponent(BRANCH_DISPLAY)}`;
     const res = await fetch(`${WORKER_URL}/screenshot-url`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url, token: process.env.WORKER_BOT_TOKEN ?? "pia-bot-secret" }),
+      body: JSON.stringify({
+        url,
+        token: process.env.WORKER_BOT_TOKEN ?? "pia-bot-secret",
+        sections: ["kpi", "wonder", "category"],
+      }),
     });
     if (!res.ok) {
       const errText = await res.text().catch(() => "");
       throw new Error(`Worker failed: ${res.status} ${errText}`);
     }
-    png = Buffer.from(await res.arrayBuffer());
+    const json = await res.json();
+    sections = {};
+    for (const [k, v] of Object.entries(json.results ?? {})) {
+      sections[k] = Buffer.from(v, "base64");
+    }
   } catch (e) {
     console.error(`[process-pia] capUrl failed for ${staffId}:`, e);
     await sendMessage(chatId, `❌ ${pia.name}: สร้างรูปไม่สำเร็จ — ${e instanceof Error ? e.message : String(e)}`);
     return res.status(200).json({ ok: false, error: e.message });
   }
 
-  // 4. Send the photo
+  // 4. Send 3 photos
   try {
-    await sendPhoto(chatId, png, `📊 ${pia.name} (ID ${pia.staffId})`);
+    if (sections.kpi) {
+      await sendPhoto(chatId, sections.kpi, `📊 KPI Overview - ${pia.name} (${pia.staffId})`);
+      await sleep(400);
+    }
+    if (sections.wonder) {
+      await sendPhoto(chatId, sections.wonder, `🏆 7 Wonders - ${pia.name}`);
+      await sleep(400);
+    }
+    if (sections.category) {
+      await sendPhoto(chatId, sections.category, `📈 Category Detail - ${pia.name}`);
+    }
   } catch (e) {
     console.error(`[process-pia] sendPhoto failed for ${staffId}:`, e);
     return res.status(200).json({ ok: false, error: e.message });

@@ -199,15 +199,25 @@ async function handleDirectPiaReport(chatId, staffId) {
     return sendMessage(chatId, `❌ ไม่พบ PIA (ID ${staffId})`);
   }
 
-  await sendMessage(chatId, "📊 กำลังสร้างรายงาน... (~10 วินาที)");
+  await sendMessage(chatId, "📊 กำลังสร้างรายงาน 3 รูป... (~25 วินาที)");
 
   try {
-    // Use the new /screenshot-url flow — web app renders the page, worker takes a screenshot.
-    // Result is a single PNG that matches exactly what the user sees in the browser.
     const url = `https://dashboard-central-nortview.vercel.app/?bot=1&token=${encodeURIComponent(process.env.WEB_BOT_TOKEN)}&staffId=${encodeURIComponent(staffId)}&branch=${encodeURIComponent("ID645 : Studio 7-Central-Westgate")}`;
-    const png = await capUrl(url);
-    await sendPhoto(chatId, png, `📊 ${pia.name} (ID ${pia.staffId})`);
-    return sendMessage(chatId, `✅ ส่งรายงาน ${pia.name} (ID ${pia.staffId}) เรียบร้อย`);
+    const sections = await capUrl(url, ["kpi", "wonder", "category"]);
+
+    if (sections.kpi) {
+      await sendPhoto(chatId, sections.kpi, `📊 KPI Overview - ${pia.name} (${pia.staffId})`);
+      await sleep(400);
+    }
+    if (sections.wonder) {
+      await sendPhoto(chatId, sections.wonder, `🏆 7 Wonders - ${pia.name}`);
+      await sleep(400);
+    }
+    if (sections.category) {
+      await sendPhoto(chatId, sections.category, `📈 Category Detail - ${pia.name}`);
+    }
+
+    return sendMessage(chatId, `✅ ส่งรายงาน ${pia.name} (ID ${pia.staffId}) 3 รูปเรียบร้อย`);
   } catch (e) {
     return sendMessage(chatId, `❌ สร้างรูปไม่สำเร็จ: ${e instanceof Error ? e.message : String(e)}`);
   }
@@ -280,21 +290,34 @@ async function detectBranchFromExcel(buf) {
   }
 }
 
-async function capUrl(url) {
+async function capUrl(url, sections = null) {
   const workerUrl = process.env.CLOUDFLARE_WORKER_URL;
   const token = process.env.WEB_BOT_TOKEN;
   if (!workerUrl) throw new Error("CLOUDFLARE_WORKER_URL not set");
   if (!token) throw new Error("WEB_BOT_TOKEN not set");
 
+  const body = { url, token };
+  if (sections) body.sections = sections;
+
   const res = await fetch(`${workerUrl}/screenshot-url`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url, token }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
     throw new Error(`Worker failed: ${res.status} ${errText}`);
   }
+  // New format: { results: { kpi: base64, wonder: base64, category: base64 } }
+  const json = await res.json();
+  if (json.results) {
+    const out = {};
+    for (const [key, b64] of Object.entries(json.results)) {
+      out[key] = Buffer.from(b64, "base64");
+    }
+    return out;
+  }
+  // Legacy: raw PNG (backward compat)
   const buffer = await res.arrayBuffer();
   return Buffer.from(buffer);
 }
