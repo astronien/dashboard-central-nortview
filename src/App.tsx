@@ -1361,8 +1361,8 @@ function BotApp() {
       } finally {
         if (!cancelled) {
           setLoaded(true);
-          // Mark ready for screenshot
-          setTimeout(() => document.body.setAttribute("data-bot-ready", "1"), 200);
+          // Mark ready for screenshot — wait for charts to render
+          setTimeout(() => document.body.setAttribute("data-bot-ready", "1"), 3000);
         }
       }
     })();
