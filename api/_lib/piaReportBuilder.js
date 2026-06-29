@@ -108,13 +108,15 @@ export async function buildPiaReport(staffId, branchId) {
     sql: "SELECT data FROM upload_chunks WHERE kind = 'current' ORDER BY chunk_index",
   });
 
+  // Normalize staffId for comparison (current rows may have "23,510" while target has "23510")
+  const staffIdNormalized = staffId.replace(/,/g, "");
   const piaCurrent = [];
   for (const row of currentRes.rows) {
     const data = JSON.parse(String(row.data));
     for (const c of data) {
-      const officerId = String(c["Officer (ID)"] ?? "").trim();
+      const officerId = String(c["Officer (ID)"] ?? "").trim().replace(/,/g, "");
       const officerName = String(c["Officer (Name)"] ?? "").trim();
-      if (officerId === staffId || officerName === piaName) {
+      if (officerId === staffIdNormalized || officerName === piaName) {
         piaCurrent.push(c);
       }
     }

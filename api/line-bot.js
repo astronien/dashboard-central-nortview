@@ -379,7 +379,7 @@ async function generateAndSendPiaReport(userId, staffId, branchId, accessToken) 
     return;
   }
 
-  // 2. Generate 3 PNGs in parallel
+  // 2. Generate 3 PNGs (serialize to avoid Cloudflare browser rate limit)
   const workerUrl = process.env.CLOUDFLARE_WORKER_URL;
   if (!workerUrl) {
     await pushLineMessage(
@@ -390,11 +390,12 @@ async function generateAndSendPiaReport(userId, staffId, branchId, accessToken) 
     return;
   }
 
-  const [kpiBuf, wonderBuf, categoryBuf] = await Promise.all([
-    generatePng(workerUrl, "kpi", pia),
-    generatePng(workerUrl, "wonder", pia),
-    generatePng(workerUrl, "category", pia),
-  ]);
+  // Sequential to avoid 429 rate limit
+  const kpiBuf = await generatePng(workerUrl, "kpi", pia);
+  await new Promise((r) => setTimeout(r, 500));
+  const wonderBuf = await generatePng(workerUrl, "wonder", pia);
+  await new Promise((r) => setTimeout(r, 500));
+  const categoryBuf = await generatePng(workerUrl, "category", pia);
 
   // 3. Upload to R2
   const [kpiUrl, wonderUrl, categoryUrl] = await Promise.all([
