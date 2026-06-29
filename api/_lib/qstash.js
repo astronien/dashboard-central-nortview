@@ -33,8 +33,12 @@ export function getReceiver() {
 }
 
 function getVercelUrl() {
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-  return "https://dashboard-central-nortview.vercel.app";
+  // Always use the stable production URL — VERCEL_URL is a deployment-specific
+  // URL (e.g. dashboard-xxx.vercel.app) that changes on every deploy, making
+  // old QStash jobs hit dead URLs.
+  return process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : "https://dashboard-central-nortview.vercel.app";
 }
 
 /**
