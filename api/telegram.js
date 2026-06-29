@@ -26,7 +26,7 @@ import {
 import { schedulePiaJob } from "./_lib/qstash.js";
 import { processUpload } from "./_lib/uploadProcessor.js";
 import { detectBranchFromRows } from "./_lib/branchDetector.js";
-import { capturePiaSections, capturePiaSingle } from "./_lib/microlink.js";
+import { capturePiaSections } from "./_lib/microlink.js";
 
 const BRANCH_ID = process.env.TELEGRAM_BRANCH_ID ?? "645";
 const BRANCH_DISPLAY = process.env.TELEGRAM_BRANCH_DISPLAY ?? "ID645 : Studio 7-Central-Westgate";
@@ -202,9 +202,10 @@ async function handleDirectPiaReport(chatId, staffId) {
 
   const url = `https://dashboard-central-nortview.vercel.app/?bot=1&token=${encodeURIComponent(process.env.WEB_BOT_TOKEN)}&staffId=${encodeURIComponent(staffId)}&branch=${encodeURIComponent(BRANCH_DISPLAY)}`;
 
-  await sendMessage(chatId, "📊 กำลังสร้างรายงาน 3 รูป... (~15-25 วินาที)");
+  await sendMessage(chatId, "📊 กำลังสร้างรายงาน 3 รูป... (~30-45 วินาที)");
 
-  // Capture 3 sections in parallel via Microlink
+  // Capture 3 sections sequentially via Microlink
+  // (sequential to avoid free-tier concurrency limit; no retry to stay under 60s)
   let sections = {};
   try {
     sections = await capturePiaSections(url);
@@ -214,21 +215,12 @@ async function handleDirectPiaReport(chatId, staffId) {
     return sendMicrolinkError(chatId, msg);
   }
 
-  // Fallback: if all 3 failed, try single full-page
+  // Send whatever sections succeeded (no fallback single — would exceed 60s)
   const validSections = Object.entries(sections).filter(([, buf]) => buf);
   if (validSections.length === 0) {
-    try {
-      const png = await capturePiaSingle(url);
-      await sendPhoto(chatId, png, `📊 ${pia.name} (ID ${pia.staffId}) - รายงานเต็ม`);
-      return sendMessage(chatId, `✅ ส่งรายงาน ${pia.name} (ID ${pia.staffId}) 1 รูปเรียบร้อย`);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.error(`[bot] fallback single also failed:`, msg);
-      return sendMicrolinkError(chatId, msg);
-    }
+    return sendMicrolinkError(chatId, "ไม่สามารถสร้างรูปได้ (Microlink ไม่ตอบ)");
   }
 
-  // Send the 3 photos
   let count = 0;
   if (sections.kpi) {
     await sendPhoto(chatId, sections.kpi, `📊 KPI Overview - ${pia.name} (${pia.staffId})`);
@@ -245,10 +237,13 @@ async function handleDirectPiaReport(chatId, staffId) {
     count++;
   }
 
-  if (count > 0) {
-    return sendMessage(chatId, `✅ ส่งรายงาน ${pia.name} (ID ${pia.staffId}) ${count} รูปเรียบร้อย`);
+  if (count > 0 && count < 3) {
+    return sendMessage(chatId, `⚠️ ส่งรายงาน ${pia.name} (ID ${pia.staffId}) ${count}/3 รูป (บางส่วนไม่สำเร็จ)`);
   }
-  return sendMicrolinkError(chatId, "ไม่สามารถสร้างรูปได้");
+  if (count === 3) {
+    return sendMessage(chatId, `✅ ส่งรายงาน ${pia.name} (ID ${pia.staffId}) 3 รูปเรียบร้อย`);
+  }
+  return sendMessage(chatId, `✅ ส่งรายงาน ${pia.name} (ID ${pia.staffId}) ${count} รูปเรียบร้อย`);
 }
 
 function sendMicrolinkError(chatId, rawMsg) {

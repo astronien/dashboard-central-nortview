@@ -13,6 +13,11 @@
  *   - viewport.width / viewport.height / viewport.deviceScaleFactor  (NOT 'screenshot.*')
  *   - timeout          (top-level, format "30s", NOT 'screenshot.timeout')
  *   - waitForTimeout   (ms to wait AFTER selector appears, for chart animation)
+ *
+ * Timing budget for Vercel 60s function limit:
+ *   - 3 sequential captures × ~12s = 36s
+ *   - sendPhoto × 3 + sendMessage = ~3s
+ *   - Total: ~39s (comfortable margin)
  */
 
 const MICROLINK_API = "https://api.microlink.io";
@@ -27,8 +32,8 @@ const MICROLINK_API = "https://api.microlink.io";
  * @param {number} [opts.height=1200] - viewport height
  * @param {number} [opts.deviceScaleFactor=2] - device pixel ratio (2x retina)
  * @param {string} [opts.waitForSelector='body[data-bot-ready="1"]'] - CSS selector to wait for
- * @param {number} [opts.waitForTimeout=3000] - ms to wait AFTER selector appears (chart animation)
- * @param {number} [opts.timeoutSec=30] - max seconds for Microlink request
+ * @param {number} [opts.waitForTimeout=1500] - ms to wait AFTER selector appears (chart animation)
+ * @param {number} [opts.timeoutSec=15] - max seconds for Microlink request
  * @returns {Promise<Buffer>} PNG buffer
  */
 export async function captureWithMicrolink({
@@ -38,8 +43,8 @@ export async function captureWithMicrolink({
   height = 1200,
   deviceScaleFactor = 2,
   waitForSelector = 'body[data-bot-ready="1"]',
-  waitForTimeout = 3000,
-  timeoutSec = 30,
+  waitForTimeout = 1500,
+  timeoutSec = 15,
 }) {
   const apiKey = process.env.MICROLINK_API_KEY; // optional, not required
   const sep = url.includes("?") ? "&" : "?";
@@ -59,7 +64,7 @@ export async function captureWithMicrolink({
   u.searchParams.set("viewport.height", String(height));
   u.searchParams.set("viewport.deviceScaleFactor", String(deviceScaleFactor));
   u.searchParams.set("screenshot.fullPage", "true");
-  // Top-level timeout (format "30s"), NOT screenshot.timeout
+  // Top-level timeout (format "15s"), NOT screenshot.timeout
   u.searchParams.set("timeout", `${timeoutSec}s`);
   if (apiKey) u.searchParams.set("apiKey", apiKey);
 
@@ -88,7 +93,7 @@ function sleep(ms) {
  *
  * Free tier Microlink has concurrency limits — parallel requests cause
  * one of the 3 to fail (the "only 2 images" bug). Sequential is slower
- * (~3x) but reliable. Each section has 1 retry on failure.
+ * but reliable. No retry here (keeps total under Vercel's 60s limit).
  *
  * Each section uses a different ?view= so the web app shows a different table.
  * Returns { kpi: Buffer|null, wonder: Buffer|null, category: Buffer|null }.
@@ -102,24 +107,15 @@ export async function capturePiaSections(url) {
   const results = {};
 
   for (const { key, view } of sections) {
-    // 1 retry on failure
-    let buf = null;
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        buf = await captureWithMicrolink({ url, view });
-        break;
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        console.error(`[microlink] ${key} attempt ${attempt} failed:`, msg);
-        if (attempt < 2) {
-          // short backoff before retry
-          await sleep(1500);
-        }
-      }
+    try {
+      results[key] = await captureWithMicrolink({ url, view });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[microlink] ${key} failed:`, msg);
+      results[key] = null;
     }
-    results[key] = buf;
     // brief pause between sections to be gentle on free tier
-    if (buf) await sleep(500);
+    await sleep(300);
   }
   return results;
 }
