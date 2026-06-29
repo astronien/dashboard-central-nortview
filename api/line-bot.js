@@ -358,28 +358,38 @@ async function handleReportRequest(event, staffId, accessToken) {
     accessToken,
   );
 
-  // Background: generate + upload + multicast (don't await)
-  generateAndSendPiaReport(userId, staffId, user.branchId, accessToken).catch(
-    (e) => {
-      console.error("[line-bot] report generation failed:", e);
-      pushLineMessage(
-        userId,
-        `❌ สร้างรายงานไม่สำเร็จ: ${e instanceof Error ? e.message : String(e)}`,
-        accessToken,
-      );
+  // Background: fire-and-forget to /api/pia-report-generate
+  // (Vercel serverless kills the process after response — must use a separate endpoint)
+  const vercelUrl = process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : "https://dashboard-central-nortview.vercel.app";
+  const internalSecret = process.env.REPORT_INTERNAL_SECRET ?? "pia-secret";
+
+  fetch(`${vercelUrl}/api/pia-report-generate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${internalSecret}`,
     },
-  );
+    body: JSON.stringify({ userId, staffId, branchId: user.branchId }),
+  }).catch((e) => {
+    console.error("[line-bot] fire-and-forget failed:", e);
+    pushLineMessage(
+      userId,
+      `❌ เริ่มสร้างรายงานไม่สำเร็จ: ${e instanceof Error ? e.message : String(e)}`,
+      accessToken,
+    );
+  });
 }
 
 async function generateAndSendPiaReport(userId, staffId, branchId, accessToken) {
-  // 1. Build PIA report
+  // Deprecated — kept for backward compat. Now uses /api/pia-report-generate endpoint.
   const pia = await buildPiaReport(staffId, branchId);
   if (!pia) {
     await pushLineMessage(userId, `❌ ไม่พบข้อมูล PIA (ID ${staffId})`, accessToken);
     return;
   }
 
-  // 2. Generate 3 PNGs (serialize to avoid Cloudflare browser rate limit)
   const workerUrl = process.env.CLOUDFLARE_WORKER_URL;
   if (!workerUrl) {
     await pushLineMessage(
