@@ -119,9 +119,13 @@ function TelegramSendButton({
   const captureEl = async (el: HTMLDivElement | null, refForSize: React.RefObject<HTMLDivElement | null>): Promise<string | null> => {
     if (!el) return null;
     const sizeEl = refForSize.current || el;
-    const w = sizeEl.offsetWidth;
-    const h = sizeEl.offsetHeight;
-    await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 1800)));
+    const w = sizeEl.scrollWidth;
+    const h = sizeEl.scrollHeight;
+    await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 2500)));
+    // Hide scrollbars during capture
+    const styleTag = document.createElement("style");
+    styleTag.textContent = `* { scrollbar-width: none !important; } *::-webkit-scrollbar { display: none !important; }`;
+    document.head.appendChild(styleTag);
     try {
       const dataUrl = await toJpeg(el, {
         quality: 0.92,
@@ -135,6 +139,7 @@ function TelegramSendButton({
           width: `${w}px`,
           height: `${h}px`,
           boxSizing: "border-box",
+          overflow: "hidden",
         },
         fetchRequestInit: { mode: "cors" },
       });
@@ -142,6 +147,8 @@ function TelegramSendButton({
     } catch (e) {
       console.error("[TelegramSendButton] capture failed:", e);
       return null;
+    } finally {
+      styleTag.remove();
     }
   };
 
