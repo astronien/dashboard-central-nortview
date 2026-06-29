@@ -116,11 +116,10 @@ function TelegramSendButton({
     { stat: "target", name: "Today" },
   ];
 
-  const captureEl = async (el: HTMLDivElement | null, refForSize: React.RefObject<HTMLDivElement | null>): Promise<string | null> => {
+  const captureEl = async (el: HTMLDivElement | null): Promise<string | null> => {
     if (!el) return null;
-    const sizeEl = refForSize.current || el;
-    const w = sizeEl.scrollWidth;
-    const h = sizeEl.scrollHeight;
+    // Let the clone expand to full content height (remove h-full constraint)
+    const w = el.offsetWidth || 1200;
     await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 2500)));
     // Hide scrollbars during capture
     const styleTag = document.createElement("style");
@@ -132,14 +131,16 @@ function TelegramSendButton({
         pixelRatio: 1.5,
         cacheBust: false,
         backgroundColor: "#1c2722",
-        width: w,
-        height: h,
         style: {
           padding: "32px",
           width: `${w}px`,
-          height: `${h}px`,
+          height: "auto",
+          minHeight: "auto",
+          overflow: "visible",
+          position: "relative",
+          left: "0",
+          top: "0",
           boxSizing: "border-box",
-          overflow: "hidden",
         },
         fetchRequestInit: { mode: "cors" },
       });
@@ -152,13 +153,13 @@ function TelegramSendButton({
     }
   };
 
-  const captureView = async (): Promise<string | null> => captureEl(containerRef.current, containerRef);
+  const captureView = async (): Promise<string | null> => captureEl(containerRef.current);
 
   const captureOneStaff = async (sid: string, staffIndex: number, totalStaff: number, includeHome = false): Promise<Array<{ name: string; base64: string; caption: string }> | null> => {
     const imgs: Array<{ name: string; base64: string; caption: string }> = [];
     if (includeHome) {
       setProgress(totalStaff > 1 ? `คนที่ ${staffIndex}/${totalStaff}: หน้า Home…` : "หน้า Home…");
-      const homeBase64 = await captureEl(homeCaptureRef.current, homeCaptureRef);
+      const homeBase64 = await captureEl(homeCaptureRef.current);
       if (homeBase64) {
         imgs.push({ name: `${sid}-home.jpeg`, base64: homeBase64, caption: "Home" });
       }
