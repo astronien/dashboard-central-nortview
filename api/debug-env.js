@@ -1,11 +1,12 @@
 export default async function handler(req, res) {
+  // Temporary: expose full token for debugging (remove after)
+  if (req.query?.reveal === '1') {
+    return res.status(200).json({
+      qstashToken: process.env.QSTASH_TOKEN,
+      qstashUrl: process.env.QSTASH_URL,
+    });
+  }
   return res.status(200).json({
     qstashTokenLen: process.env.QSTASH_TOKEN?.length ?? 0,
-    qstashTokenStart: process.env.QSTASH_TOKEN?.slice(0, 6) ?? "",
-    qstashUrl: process.env.QSTASH_URL ?? "",
-    curKeyLen: process.env.QSTASH_CURRENT_SIGNING_KEY?.length ?? 0,
-    nextKeyLen: process.env.QSTASH_NEXT_SIGNING_KEY?.length ?? 0,
-    webBotTokenLen: process.env.WEB_BOT_TOKEN?.length ?? 0,
-    telegramBotTokenLen: process.env.TELEGRAM_BOT_TOKEN?.length ?? 0,
   });
 }
