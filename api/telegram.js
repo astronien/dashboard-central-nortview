@@ -199,27 +199,49 @@ async function handleDirectPiaReport(chatId, staffId) {
     return sendMessage(chatId, `❌ ไม่พบ PIA (ID ${staffId})`);
   }
 
+  const url = `https://dashboard-central-nortview.vercel.app/?bot=1&token=${encodeURIComponent(process.env.WEB_BOT_TOKEN)}&staffId=${encodeURIComponent(staffId)}&branch=${encodeURIComponent("ID645 : Studio 7-Central-Westgate")}`;
+
+  // Try 3-section report first (~25s, requires more browser time)
   await sendMessage(chatId, "📊 กำลังสร้างรายงาน 3 รูป... (~25 วินาที)");
-
   try {
-    const url = `https://dashboard-central-nortview.vercel.app/?bot=1&token=${encodeURIComponent(process.env.WEB_BOT_TOKEN)}&staffId=${encodeURIComponent(staffId)}&branch=${encodeURIComponent("ID645 : Studio 7-Central-Westgate")}`;
     const sections = await capUrl(url, ["kpi", "wonder", "category"]);
-
+    let count = 0;
     if (sections.kpi) {
       await sendPhoto(chatId, sections.kpi, `📊 KPI Overview - ${pia.name} (${pia.staffId})`);
+      count++;
       await sleep(400);
     }
     if (sections.wonder) {
       await sendPhoto(chatId, sections.wonder, `🏆 7 Wonders - ${pia.name}`);
+      count++;
       await sleep(400);
     }
     if (sections.category) {
       await sendPhoto(chatId, sections.category, `📈 Category Detail - ${pia.name}`);
+      count++;
     }
-
-    return sendMessage(chatId, `✅ ส่งรายงาน ${pia.name} (ID ${pia.staffId}) 3 รูปเรียบร้อย`);
+    if (count === 3) {
+      return sendMessage(chatId, `✅ ส่งรายงาน ${pia.name} (ID ${pia.staffId}) 3 รูปเรียบร้อย`);
+    }
+    // Some failed, try fallback to 1 image
+    if (count === 0) throw new Error("no sections");
   } catch (e) {
-    return sendMessage(chatId, `❌ สร้างรูปไม่สำเร็จ: ${e instanceof Error ? e.message : String(e)}`);
+    const msg = e instanceof Error ? e.message : String(e);
+    console.log(`[bot] 3-section failed: ${msg}, falling back to 1 image`);
+    await sendMessage(chatId, `⚠️ ใช้ 3 รูปไม่ได้ (CF rate limit) — ลอง 1 รูปเต็มหน้า`);
+  }
+
+  // Fallback: single full-page screenshot
+  try {
+    const png = await capUrl(url, ["all"]);
+    if (png && png.all) {
+      await sendPhoto(chatId, png.all, `📊 ${pia.name} (ID ${pia.staffId}) - รายงานเต็ม`);
+      return sendMessage(chatId, `✅ ส่งรายงาน ${pia.name} (ID ${pia.staffId}) 1 รูปเรียบร้อย`);
+    }
+    throw new Error("no image in fallback");
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return sendMessage(chatId, `❌ สร้างรูปไม่สำเร็จ: ${msg}\n(อาจติด CF Browser rate limit — รอ 1-2 นาทีแล้วลองใหม่)`);
   }
 }
 

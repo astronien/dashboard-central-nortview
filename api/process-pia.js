@@ -48,17 +48,25 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, skipped: true });
   }
 
-  // 3. Cap 3 sections of the web app via the worker
-  let sections;
+  // 3. Cap web app via worker — try 3 sections first, fallback to 1
+  const url = `https://dashboard-central-nortview.vercel.app/?bot=1&token=${encodeURIComponent(WEB_BOT_TOKEN)}&staffId=${encodeURIComponent(staffId)}&branch=${encodeURIComponent(BRANCH_DISPLAY)}`;
+  const workerToken = process.env.WORKER_BOT_TOKEN ?? "pia-bot-secret";
+
+  // Try 3 sections
+  let sections = {};
+  let usedFallback = false;
   try {
-    const url = `https://dashboard-central-nortview.vercel.app/?bot=1&token=${encodeURIComponent(WEB_BOT_TOKEN)}&staffId=${encodeURIComponent(staffId)}&branch=${encodeURIComponent(BRANCH_DISPLAY)}`;
     const res = await fetch(`${WORKER_URL}/screenshot-url`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         url,
-        token: process.env.WORKER_BOT_TOKEN ?? "pia-bot-secret",
-        sections: ["kpi", "wonder", "category"],
+        token: workerToken,
+        urlsBySection: {
+          kpi: url + "&view=sales",
+          wonder: url + "&view=csat",
+          category: url + "&view=today",
+        },
       }),
     });
     if (!res.ok) {
@@ -66,17 +74,42 @@ export default async function handler(req, res) {
       throw new Error(`Worker failed: ${res.status} ${errText}`);
     }
     const json = await res.json();
-    sections = {};
     for (const [k, v] of Object.entries(json.results ?? {})) {
       sections[k] = Buffer.from(v, "base64");
     }
+    if (Object.keys(sections).length < 3) {
+      throw new Error(`only ${Object.keys(sections).length} sections`);
+    }
   } catch (e) {
-    console.error(`[process-pia] capUrl failed for ${staffId}:`, e);
-    await sendMessage(chatId, `❌ ${pia.name}: สร้างรูปไม่สำเร็จ — ${e instanceof Error ? e.message : String(e)}`);
-    return res.status(200).json({ ok: false, error: e.message });
+    console.log(`[process-pia] 3-section failed for ${staffId}:`, e.message);
+    // Fallback to 1 image
+    usedFallback = true;
+    try {
+      const res = await fetch(`${WORKER_URL}/screenshot-url`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url,
+          token: workerToken,
+          sections: ["all"],
+        }),
+      });
+      if (!res.ok) {
+        const errText = await res.text().catch(() => "");
+        throw new Error(`Worker failed: ${res.status} ${errText}`);
+      }
+      const json = await res.json();
+      if (json.results?.all) {
+        sections.all = Buffer.from(json.results.all, "base64");
+      }
+    } catch (e2) {
+      console.error(`[process-pia] fallback failed for ${staffId}:`, e2);
+      await sendMessage(chatId, `❌ ${pia.name}: สร้างรูปไม่สำเร็จ — ${e2 instanceof Error ? e2.message : String(e2)}`);
+      return res.status(200).json({ ok: false, error: e2.message });
+    }
   }
 
-  // 4. Send 3 photos
+  // 4. Send photos
   try {
     if (sections.kpi) {
       await sendPhoto(chatId, sections.kpi, `📊 KPI Overview - ${pia.name} (${pia.staffId})`);
@@ -89,10 +122,15 @@ export default async function handler(req, res) {
     if (sections.category) {
       await sendPhoto(chatId, sections.category, `📈 Category Detail - ${pia.name}`);
     }
+    if (sections.all) {
+      await sendPhoto(chatId, sections.all, `📊 ${pia.name} (ID ${pia.staffId}) - รายงานเต็ม`);
+    }
   } catch (e) {
     console.error(`[process-pia] sendPhoto failed for ${staffId}:`, e);
     return res.status(200).json({ ok: false, error: e.message });
   }
 
-  return res.status(200).json({ ok: true, staffId });
+  const count = Object.keys(sections).length;
+  await sendMessage(chatId, `✅ ส่งรายงาน ${pia.name} (ID ${pia.staffId}) ${count} รูปเรียบร้อย`);
+  return res.status(200).json({ ok: true, staffId, count, fallback: usedFallback });
 }
