@@ -9,7 +9,7 @@ import {
 } from "recharts";
 import { ShoppingBag, Award, Star, TrendingUp, Apple, Send, Loader2, CheckCircle2 } from "lucide-react";
 import React from "react";
-import html2canvas from "html2canvas";
+import { toJpeg } from "html-to-image";
 import { calcTargetToDate, calcTodayAchievementPct } from "../../lib/targetAggregations";
 import type { PresetCalcType } from "../../lib/presetTypes";
 
@@ -93,17 +93,15 @@ function TelegramSendButton({
     const el = containerRef.current;
     if (!el) return null;
     try {
-      const canvas = await html2canvas(el, {
-        scale: 1.5,
-        useCORS: true,
-        allowTaint: false,
-        backgroundColor: null,
-        logging: false,
+      const dataUrl = await toJpeg(el, {
+        quality: 0.92,
+        pixelRatio: 1.5,
+        cacheBust: true,
+        backgroundColor: "#1c2722",
       });
-      // JPEG quality 0.92 — much smaller than PNG, good quality for text/UI
-      return canvas.toDataURL("image/jpeg", 0.92).replace(/^data:image\/jpeg;base64,/, "");
+      return dataUrl.replace(/^data:image\/jpeg;base64,/, "");
     } catch (e) {
-      console.error("[TelegramSendButton] html2canvas failed:", e);
+      console.error("[TelegramSendButton] capture failed:", e);
       return null;
     }
   };
