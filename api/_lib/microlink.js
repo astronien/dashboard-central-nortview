@@ -2,11 +2,17 @@
  * Microlink.io screenshot API helper.
  *
  * Free tier: 50 requests/day, no API key required.
- * Docs: https://microlink.io/docs/api
+ * Docs: https://microlink.io/docs/api/parameters
  *
  * Returns a PNG buffer for a given URL with the specified viewport and
- * CSS selectors to wait for. Used by the Telegram bot to render the
+ * CSS selector to wait for. Used by the Telegram bot to render the
  * PIA dashboard for a single PIA, then send the resulting image.
+ *
+ * IMPORTANT parameter names (per docs):
+ *   - waitForSelector  (NOT 'waitFor')
+ *   - viewport.width / viewport.height / viewport.deviceScaleFactor  (NOT 'screenshot.*')
+ *   - timeout          (top-level, format "30s", NOT 'screenshot.timeout')
+ *   - waitForTimeout   (ms to wait AFTER selector appears, for chart animation)
  */
 
 const MICROLINK_API = "https://api.microlink.io";
@@ -20,8 +26,9 @@ const MICROLINK_API = "https://api.microlink.io";
  * @param {number} [opts.width=1600] - viewport width
  * @param {number} [opts.height=1200] - viewport height
  * @param {number} [opts.deviceScaleFactor=2] - device pixel ratio (2x retina)
- * @param {string} [opts.waitFor='body[data-bot-ready="1"]'] - CSS selector to wait for
- * @param {number} [opts.timeout=25] - max seconds to wait
+ * @param {string} [opts.waitForSelector='body[data-bot-ready="1"]'] - CSS selector to wait for
+ * @param {number} [opts.waitForTimeout=3000] - ms to wait AFTER selector appears (chart animation)
+ * @param {number} [opts.timeoutSec=30] - max seconds for Microlink request
  * @returns {Promise<Buffer>} PNG buffer
  */
 export async function captureWithMicrolink({
@@ -30,8 +37,9 @@ export async function captureWithMicrolink({
   width = 1600,
   height = 1200,
   deviceScaleFactor = 2,
-  waitFor = 'body[data-bot-ready="1"]',
-  timeout = 25,
+  waitForSelector = 'body[data-bot-ready="1"]',
+  waitForTimeout = 3000,
+  timeoutSec = 30,
 }) {
   const apiKey = process.env.MICROLINK_API_KEY; // optional, not required
   const sep = url.includes("?") ? "&" : "?";
@@ -43,14 +51,16 @@ export async function captureWithMicrolink({
   u.searchParams.set("meta", "false");
   // NOTE: do NOT pass `embed=screenshot.url` — without it, Microlink returns JSON
   // with `data.screenshot.url` (CDN). We then download the PNG from that URL.
-  // With `embed`, Microlink returns the raw PNG directly (single request).
   u.searchParams.set("waitUntil", "domcontentloaded");
-  u.searchParams.set("screenshot.width", String(width));
-  u.searchParams.set("screenshot.height", String(height));
-  u.searchParams.set("screenshot.deviceScaleFactor", String(deviceScaleFactor));
+  u.searchParams.set("waitForSelector", waitForSelector);
+  u.searchParams.set("waitForTimeout", String(waitForTimeout));
+  // Viewport params (NOT screenshot.* — per docs they live under viewport.*)
+  u.searchParams.set("viewport.width", String(width));
+  u.searchParams.set("viewport.height", String(height));
+  u.searchParams.set("viewport.deviceScaleFactor", String(deviceScaleFactor));
   u.searchParams.set("screenshot.fullPage", "true");
-  u.searchParams.set("waitFor", waitFor);
-  u.searchParams.set("screenshot.timeout", String(timeout));
+  // Top-level timeout (format "30s"), NOT screenshot.timeout
+  u.searchParams.set("timeout", `${timeoutSec}s`);
   if (apiKey) u.searchParams.set("apiKey", apiKey);
 
   const res = await fetch(u.toString());
@@ -69,11 +79,19 @@ export async function captureWithMicrolink({
   return Buffer.from(await img.arrayBuffer());
 }
 
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 /**
- * Capture 3 sections of a PIA report in parallel.
+ * Capture 3 sections of a PIA report SEQUENTIALLY (not parallel).
+ *
+ * Free tier Microlink has concurrency limits — parallel requests cause
+ * one of the 3 to fail (the "only 2 images" bug). Sequential is slower
+ * (~3x) but reliable. Each section has 1 retry on failure.
+ *
  * Each section uses a different ?view= so the web app shows a different table.
- * Returns { kpi: Buffer, wonder: Buffer, category: Buffer }.
- * Missing sections are null (caller decides how to handle).
+ * Returns { kpi: Buffer|null, wonder: Buffer|null, category: Buffer|null }.
  */
 export async function capturePiaSections(url) {
   const sections = [
@@ -82,16 +100,27 @@ export async function capturePiaSections(url) {
     { key: "category", view: "today" },
   ];
   const results = {};
-  await Promise.all(
-    sections.map(async ({ key, view }) => {
+
+  for (const { key, view } of sections) {
+    // 1 retry on failure
+    let buf = null;
+    for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        results[key] = await captureWithMicrolink({ url, view });
+        buf = await captureWithMicrolink({ url, view });
+        break;
       } catch (e) {
-        console.error(`[microlink] ${key} failed:`, e instanceof Error ? e.message : String(e));
-        results[key] = null;
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error(`[microlink] ${key} attempt ${attempt} failed:`, msg);
+        if (attempt < 2) {
+          // short backoff before retry
+          await sleep(1500);
+        }
       }
-    })
-  );
+    }
+    results[key] = buf;
+    // brief pause between sections to be gentle on free tier
+    if (buf) await sleep(500);
+  }
   return results;
 }
 
