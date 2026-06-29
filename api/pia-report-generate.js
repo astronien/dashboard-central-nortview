@@ -34,14 +34,18 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Missing fields" });
   }
 
-  // Acknowledge immediately so caller knows we received it
-  res.status(202).json({ accepted: true, staffId });
-
-  // Process in background (don't await — Vercel will keep this handler alive
-  // until the promise resolves because we already sent a response)
-  process
-    .generateAndSend(userId, staffId, branchId)
-    .catch((e) => console.error("[pia-report-generate] failed:", e));
+  // Process synchronously — Vercel will keep the function alive
+  // until the promise resolves. We return 200 only after completion.
+  try {
+    await generateAndSend(userId, staffId, branchId);
+    res.status(200).json({ ok: true, staffId });
+  } catch (e) {
+    console.error("[pia-report-generate] failed:", e);
+    // We can't change status if response already partially sent
+    if (!res.headersSent) {
+      res.status(500).json({ error: String(e?.message ?? e) });
+    }
+  }
 }
 
 async function generateAndSend(userId, staffId, branchId) {
