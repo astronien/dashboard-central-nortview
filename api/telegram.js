@@ -26,6 +26,7 @@ import {
 import { schedulePiaJob } from "./_lib/qstash.js";
 import { processUpload } from "./_lib/uploadProcessor.js";
 import { detectBranchFromRows } from "./_lib/branchDetector.js";
+import { upsertTelegramChat } from "./_lib/tursoClient.js";
 
 const BRANCH_ID = process.env.TELEGRAM_BRANCH_ID ?? "645";
 const BRANCH_DISPLAY = process.env.TELEGRAM_BRANCH_DISPLAY ?? "ID645 : Studio 7-Central-Westgate";
@@ -57,6 +58,15 @@ export default async function handler(req, res) {
 async function handleMessage(msg) {
   const chatId = msg.chat.id;
   const text = String(msg.text ?? "").trim();
+
+  // Store chat_id for web app "ส่งไป Telegram" button (fire-and-forget)
+  if (msg.chat?.type === "private") {
+    upsertTelegramChat({
+      chatId,
+      username: msg.from?.username ?? null,
+      firstName: msg.from?.first_name ?? null,
+    }).catch((e) => console.error("[telegram] upsertTelegramChat failed:", e));
+  }
 
   if (!text && !msg.document) return;
 

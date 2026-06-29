@@ -80,6 +80,16 @@ CREATE TABLE IF NOT EXISTS upload_audit_log (
 CREATE INDEX IF NOT EXISTS idx_audit_created ON upload_audit_log(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_branch ON upload_audit_log(branch_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_user ON upload_audit_log(line_user_id, created_at DESC);
+
+-- Telegram bot: store chat IDs of users who have messaged the bot.
+-- Used by /api/telegram-report to find the most recent chat to send
+-- screenshots to (triggered by the web app "ส่งไป Telegram" button).
+CREATE TABLE IF NOT EXISTS telegram_chats (
+  chat_id     TEXT PRIMARY KEY,
+  username    TEXT,
+  first_name  TEXT,
+  last_seen   TEXT NOT NULL DEFAULT (datetime('now'))
+);
 `;
 
 // Migrations to run separately (because ALTER TABLE doesn't support
@@ -113,4 +123,41 @@ module.exports = {
   getTursoClient,
   getTursoConfig,
   initLineBotSchema,
+  upsertTelegramChat,
+  getMostRecentTelegramChatId,
 };
+
+/**
+ * Upsert a Telegram chat (chat_id + username + first_name) so the web
+ * app can later find the most recent chat to send screenshots to.
+ */
+async function upsertTelegramChat({ chatId, username, firstName }) {
+  const client = getTursoClient();
+  await client.execute({
+    sql: `INSERT INTO telegram_chats (chat_id, username, first_name, last_seen)
+          VALUES (?, ?, ?, datetime('now'))
+          ON CONFLICT(chat_id) DO UPDATE SET
+            username = excluded.username,
+            first_name = excluded.first_name,
+            last_seen = datetime('now')`,
+    args: [String(chatId), username ?? null, firstName ?? null],
+  });
+}
+
+/**
+ * Return the most recently active Telegram chat_id, or null if none.
+ * (Waits until initLineBotSchema has been run at least once.)
+ */
+async function getMostRecentTelegramChatId() {
+  const client = getTursoClient();
+  try {
+    const result = await client.execute(
+      `SELECT chat_id FROM telegram_chats ORDER BY last_seen DESC LIMIT 1`,
+    );
+    if (result.rows.length === 0) return null;
+    return result.rows[0].chat_id;
+  } catch {
+    // Table might not exist yet on first run
+    return null;
+  }
+}

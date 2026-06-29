@@ -7,7 +7,7 @@ import {
   Radar,
   ResponsiveContainer,
 } from "recharts";
-import { ShoppingBag, Award, Star, TrendingUp, Apple, Send } from "lucide-react";
+import { ShoppingBag, Award, Star, TrendingUp, Apple, Send, Loader2, CheckCircle2 } from "lucide-react";
 import React from "react";
 import { calcTargetToDate, calcTodayAchievementPct } from "../../lib/targetAggregations";
 import type { PresetCalcType } from "../../lib/presetTypes";
@@ -67,6 +67,93 @@ export type RadarDatum = {
 const isCurrencyCalcType = (calcType: PresetCalcType | undefined): boolean => {
   return calcType === "baht" || calcType === "bahtRate" || calcType === "catBaht";
 };
+
+/**
+ * "ส่งไป Telegram" button — calls /api/telegram-report to schedule a
+ * QStash job that captures 3 screenshot views and sends them to the
+ * most recently active Telegram chat. No need to open Telegram manually.
+ */
+function TelegramSendButton({ staffId }: { staffId: string }) {
+  const [status, setStatus] = React.useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [errorMsg, setErrorMsg] = React.useState("");
+
+  const handleClick = async () => {
+    if (status === "sending") return;
+    setStatus("sending");
+    setErrorMsg("");
+    try {
+      const res = await fetch("/api/telegram-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ staffId }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setStatus("sent");
+        // Reset to idle after 8 seconds
+        setTimeout(() => setStatus("idle"), 8000);
+      } else {
+        setStatus("error");
+        setErrorMsg(data.error ?? "ส่งไม่สำเร็จ");
+        setTimeout(() => setStatus("idle"), 8000);
+      }
+    } catch (e) {
+      setStatus("error");
+      setErrorMsg("เครือข่ายมีปัญหา");
+      setTimeout(() => setStatus("idle"), 8000);
+    }
+  };
+
+  const baseClass =
+    "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs sm:text-sm font-semibold transition-colors";
+  if (status === "sending") {
+    return (
+      <button
+        disabled
+        className={`${baseClass} bg-sky-500/15 border border-sky-400/30 text-sky-200/60`}
+      >
+        <Loader2 className="w-3 h-3 animate-spin" />
+        <span className="hidden sm:inline">กำลังส่ง...</span>
+      </button>
+    );
+  }
+  if (status === "sent") {
+    return (
+      <button
+        disabled
+        className={`${baseClass} bg-emerald-500/15 border border-emerald-400/40 text-emerald-200`}
+      >
+        <CheckCircle2 className="w-3 h-3" />
+        <span className="hidden sm:inline">ส่งแล้ว! รอใน Telegram</span>
+        <span className="sm:hidden">ส่งแล้ว</span>
+      </button>
+    );
+  }
+  if (status === "error") {
+    return (
+      <button
+        onClick={handleClick}
+        title={errorMsg}
+        className={`${baseClass} bg-red-500/15 border border-red-400/30 text-red-200 hover:bg-red-500/25 hover:border-red-400/50`}
+      >
+        <Send className="w-3 h-3" />
+        <span className="hidden sm:inline">ลองใหม่</span>
+        <span className="sm:hidden">ลองใหม่</span>
+      </button>
+    );
+  }
+  return (
+    <button
+      onClick={handleClick}
+      title="ส่งรายงาน 3 หน้าไป Telegram"
+      className={`${baseClass} bg-sky-500/15 border border-sky-400/30 text-sky-200 shadow-[0_0_8px_rgba(56,189,248,0.2)] hover:bg-sky-500/25 hover:border-sky-400/50`}
+    >
+      <Send className="w-3 h-3" />
+      <span className="hidden sm:inline">ส่งไป Telegram</span>
+      <span className="sm:hidden">Telegram</span>
+    </button>
+  );
+}
 
 export function StaffSection({
   displayStaffAvatar,
@@ -322,17 +409,7 @@ export function StaffSection({
                               <span className="text-[9px] uppercase tracking-wider text-emerald-300/70 font-sans">ID</span>
                               {activeOfficer.staffId}
                             </span>
-                            <a
-                              href={`https://t.me/kakanajana_pia_bot?start=report_${activeOfficer.staffId}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              title="ส่งรายงาน 3 รูปไป Telegram"
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-500/15 border border-sky-400/30 text-sky-200 text-xs sm:text-sm font-semibold shadow-[0_0_8px_rgba(56,189,248,0.2)] hover:bg-sky-500/25 hover:border-sky-400/50 transition-colors"
-                            >
-                              <Send className="w-3 h-3" />
-                              <span className="hidden sm:inline">ส่งไป Telegram</span>
-                              <span className="sm:hidden">Telegram</span>
-                            </a>
+                            <TelegramSendButton staffId={activeOfficer.staffId} />
                           </motion.div>
                         </AnimatePresence>
                       ) : null}
