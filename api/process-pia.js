@@ -1,17 +1,23 @@
 /**
- * QStash Worker — processes 1 PIA → 3 images → sends to Telegram.
+ * QStash Worker — processes 1 PIA → screenshot from web → sends to Telegram.
  *
  * Called by Upstash QStash at scheduled times (with delay).
  * Verifies QStash HMAC signature before processing.
+ *
+ * Uses the new /screenshot-url flow: render the web app dashboard, then
+ * send the screenshot to Telegram. This guarantees the data shown in
+ * Telegram matches exactly what the user sees in the browser.
  *
  * Free tier: 500 QStash messages/day.
  */
 
 import { verifyQStashRequest } from "./_lib/qstash.js";
 import { sendMessage, sendPhoto } from "./_lib/telegramBot.js";
-import { buildPiaReport } from "./_lib/piaReportBuilder.js";
+import { getPiaListForBranch } from "./_lib/piaReportBuilder.js";
 
 const WORKER_URL = process.env.CLOUDFLARE_WORKER_URL;
+const WEB_BOT_TOKEN = process.env.WEB_BOT_TOKEN;
+const BRANCH_DISPLAY = process.env.TELEGRAM_BRANCH_DISPLAY ?? "ID645 : Studio 7-Central-Westgate";
 
 export default async function handler(req, res) {
   // 1. Verify QStash signature
@@ -31,64 +37,41 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Missing staffId/branchId/chatId" });
   }
 
-  // 2. Build PIA data
-  const pia = await buildPiaReport(staffId, branchId);
+  // 2. Look up the PIA's display name
+  const piaList = await getPiaListForBranch(branchId);
+  const pia = piaList.find((p) => p.staffId === staffId);
   if (!pia) {
     await sendMessage(chatId, `❌ ไม่พบข้อมูล PIA (ID ${staffId})`);
     return res.status(200).json({ ok: true, skipped: true });
   }
 
-  // 3. Generate 3 PNGs
-  let kpi, wonder, category;
+  // 3. Cap the web app page via the worker
+  let png;
   try {
-    const result = await generateAllPngs(WORKER_URL, pia);
-    kpi = result.kpi;
-    wonder = result.wonder;
-    category = result.category;
+    const url = `https://dashboard-central-nortview.vercel.app/?bot=1&token=${encodeURIComponent(WEB_BOT_TOKEN)}&staffId=${encodeURIComponent(staffId)}&branch=${encodeURIComponent(BRANCH_DISPLAY)}`;
+    const res = await fetch(`${WORKER_URL}/screenshot-url`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url, token: process.env.WORKER_BOT_TOKEN ?? "pia-bot-secret" }),
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      throw new Error(`Worker failed: ${res.status} ${errText}`);
+    }
+    png = Buffer.from(await res.arrayBuffer());
   } catch (e) {
-    console.error(`[process-pia] generate failed for ${staffId}:`, e);
-    await sendMessage(chatId, `❌ ${pia.name}: สร้างรูปไม่สำเร็จ`);
+    console.error(`[process-pia] capUrl failed for ${staffId}:`, e);
+    await sendMessage(chatId, `❌ ${pia.name}: สร้างรูปไม่สำเร็จ — ${e instanceof Error ? e.message : String(e)}`);
     return res.status(200).json({ ok: false, error: e.message });
   }
 
-  // 4. Send 3 photos
+  // 4. Send the photo
   try {
-    await sendPhoto(chatId, kpi, `📊 KPI - ${pia.name} (${pia.staffId})`);
-    await sleep(500);
-    await sendPhoto(chatId, wonder, `🏆 7 Wonders - ${pia.name}`);
-    await sleep(500);
-    await sendPhoto(chatId, category, `📈 Category - ${pia.name}`);
+    await sendPhoto(chatId, png, `📊 ${pia.name} (ID ${pia.staffId})`);
   } catch (e) {
     console.error(`[process-pia] sendPhoto failed for ${staffId}:`, e);
     return res.status(200).json({ ok: false, error: e.message });
   }
 
   return res.status(200).json({ ok: true, staffId });
-}
-
-async function generateAllPngs(workerUrl, data) {
-  if (!workerUrl) throw new Error("CLOUDFLARE_WORKER_URL not set");
-  const res = await fetch(`${workerUrl}/screenshot`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      templates: ["kpi", "wonder", "category"],
-      data,
-    }),
-  });
-  if (!res.ok) {
-    const errText = await res.text().catch(() => "");
-    throw new Error(`Worker failed: ${res.status} ${errText}`);
-  }
-  const json = await res.json();
-  if (!json.results) throw new Error("Worker returned no results");
-  return {
-    kpi: Buffer.from(json.results.kpi, "base64"),
-    wonder: Buffer.from(json.results.wonder, "base64"),
-    category: Buffer.from(json.results.category, "base64"),
-  };
-}
-
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
 }

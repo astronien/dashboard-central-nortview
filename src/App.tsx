@@ -1291,7 +1291,6 @@ const emptyReport: ParsedReport = {
   officers: [],
 };
 
-
 export default function App() {
   return (
     <AuthProvider>
@@ -1522,6 +1521,36 @@ function AppInternal({
     "sales",
   );
   const [activeStaffId, setActiveStaffId] = useState("1");
+
+  // Bot mode (?bot=1&token=xxx&staffId=yyy&branch=zzz):
+  // Inject branch + view + staff into state from URL params, then clean URL.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("bot") !== "1") return;
+    const token = params.get("token");
+    const expected = import.meta.env.VITE_BOT_TOKEN;
+    if (!token || !expected || token !== expected) return;
+
+    const branch = params.get("branch");
+    const staffId = params.get("staffId");
+    if (branch) {
+      void idbSet("dashboard-selected-branch", branch).catch(() => {});
+      setSelectedBranch(branch);
+      setSelectedBranchLoaded(true);
+    }
+    if (staffId) {
+      setActiveStaffId(staffId);
+    }
+    setCurrentView("staff");
+    // Mark rendered so screenshot can wait for it
+    setTimeout(() => {
+      document.body.setAttribute("data-bot-ready", "1");
+    }, 100);
+    // Clean URL
+    const cleanUrl = window.location.pathname;
+    window.history.replaceState({}, "", cleanUrl);
+  }, []);
 
   // PIA: auto-select their own officer + force "staff" view + restrict navigation
   useEffect(() => {

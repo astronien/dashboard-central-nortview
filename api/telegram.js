@@ -22,7 +22,6 @@ import {
 } from "./_lib/telegramBot.js";
 import {
   getPiaListForBranch,
-  buildPiaReport,
 } from "./_lib/piaReportBuilder.js";
 import { schedulePiaJob } from "./_lib/qstash.js";
 import { processUpload } from "./_lib/uploadProcessor.js";
@@ -200,20 +199,14 @@ async function handleDirectPiaReport(chatId, staffId) {
     return sendMessage(chatId, `❌ ไม่พบ PIA (ID ${staffId})`);
   }
 
-  await sendMessage(chatId, "📊 กำลังสร้างรายงาน... (~15 วินาที)");
-
-  const report = await buildPiaReport(staffId, BRANCH_ID);
-  if (!report) {
-    return sendMessage(chatId, "❌ ไม่พบข้อมูล PIA ใน Target");
-  }
+  await sendMessage(chatId, "📊 กำลังสร้างรายงาน... (~10 วินาที)");
 
   try {
-    const { kpi, wonder, category } = await generateAllPngs(WORKER_URL, report);
-    await sendPhoto(chatId, kpi, `📊 KPI - ${pia.name}`);
-    await sleep(500);
-    await sendPhoto(chatId, wonder, `🏆 7 Wonders - ${pia.name}`);
-    await sleep(500);
-    await sendPhoto(chatId, category, `📈 Category - ${pia.name}`);
+    // Use the new /screenshot-url flow — web app renders the page, worker takes a screenshot.
+    // Result is a single PNG that matches exactly what the user sees in the browser.
+    const url = `https://dashboard-central-nortview.vercel.app/?bot=1&token=${encodeURIComponent(process.env.WEB_BOT_TOKEN)}&staffId=${encodeURIComponent(staffId)}&branch=${encodeURIComponent("ID645 : Studio 7-Central-Westgate")}`;
+    const png = await capUrl(url);
+    await sendPhoto(chatId, png, `📊 ${pia.name} (ID ${pia.staffId})`);
     return sendMessage(chatId, `✅ ส่งรายงาน ${pia.name} (ID ${pia.staffId}) เรียบร้อย`);
   } catch (e) {
     return sendMessage(chatId, `❌ สร้างรูปไม่สำเร็จ: ${e instanceof Error ? e.message : String(e)}`);
@@ -287,27 +280,23 @@ async function detectBranchFromExcel(buf) {
   }
 }
 
-async function generateAllPngs(workerUrl, data) {
+async function capUrl(url) {
+  const workerUrl = process.env.CLOUDFLARE_WORKER_URL;
+  const token = process.env.WEB_BOT_TOKEN;
   if (!workerUrl) throw new Error("CLOUDFLARE_WORKER_URL not set");
-  const res = await fetch(`${workerUrl}/screenshot`, {
+  if (!token) throw new Error("WEB_BOT_TOKEN not set");
+
+  const res = await fetch(`${workerUrl}/screenshot-url`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      templates: ["kpi", "wonder", "category"],
-      data,
-    }),
+    body: JSON.stringify({ url, token }),
   });
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
     throw new Error(`Worker failed: ${res.status} ${errText}`);
   }
-  const json = await res.json();
-  if (!json.results) throw new Error("Worker returned no results");
-  return {
-    kpi: Buffer.from(json.results.kpi, "base64"),
-    wonder: Buffer.from(json.results.wonder, "base64"),
-    category: Buffer.from(json.results.category, "base64"),
-  };
+  const buffer = await res.arrayBuffer();
+  return Buffer.from(buffer);
 }
 
 function sleep(ms) {
