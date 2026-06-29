@@ -83,12 +83,14 @@ function TelegramSendButton({
   onSetActiveStat,
   onSetActiveStaffId,
   piaIndices,
+  homeCaptureRef,
 }: {
   staffId: string;
   containerRef: React.RefObject<HTMLDivElement | null>;
   onSetActiveStat: (stat: string) => void;
   onSetActiveStaffId: (id: string) => void;
   piaIndices: string[];
+  homeCaptureRef: React.RefObject<HTMLDivElement | null>;
 }) {
   const [status, setStatus] = React.useState<"idle" | "capturing" | "sending" | "sent" | "error">("idle");
   const [progress, setProgress] = React.useState("");
@@ -114,13 +116,13 @@ function TelegramSendButton({
     { stat: "target", name: "Today" },
   ];
 
-  const captureView = async (): Promise<string | null> => {
-    await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 1800)));
-    const el = containerRef.current;
+  const captureEl = async (el: HTMLDivElement | null, refForSize: React.RefObject<HTMLDivElement | null>): Promise<string | null> => {
     if (!el) return null;
+    const sizeEl = refForSize.current || el;
+    const w = sizeEl.offsetWidth;
+    const h = sizeEl.offsetHeight;
+    await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 1800)));
     try {
-      const w = el.offsetWidth;
-      const h = el.offsetHeight;
       const dataUrl = await toJpeg(el, {
         quality: 0.92,
         pixelRatio: 1.5,
@@ -143,8 +145,17 @@ function TelegramSendButton({
     }
   };
 
-  const captureOneStaff = async (sid: string, staffIndex: number, totalStaff: number): Promise<Array<{ name: string; base64: string; caption: string }> | null> => {
+  const captureView = async (): Promise<string | null> => captureEl(containerRef.current, containerRef);
+
+  const captureOneStaff = async (sid: string, staffIndex: number, totalStaff: number, includeHome = false): Promise<Array<{ name: string; base64: string; caption: string }> | null> => {
     const imgs: Array<{ name: string; base64: string; caption: string }> = [];
+    if (includeHome) {
+      setProgress(totalStaff > 1 ? `คนที่ ${staffIndex}/${totalStaff}: หน้า Home…` : "หน้า Home…");
+      const homeBase64 = await captureEl(homeCaptureRef.current, homeCaptureRef);
+      if (homeBase64) {
+        imgs.push({ name: `${sid}-home.jpeg`, base64: homeBase64, caption: "Home" });
+      }
+    }
     for (let v = 0; v < views.length; v++) {
       const view = views[v];
       if (totalStaff > 1) {
@@ -200,7 +211,7 @@ function TelegramSendButton({
     const totalImages: Array<{ name: string; base64: string; caption: string }> = [];
 
     if (mode === "single") {
-      const imgs = await captureOneStaff(staffId, 1, 1);
+      const imgs = await captureOneStaff(staffId, 1, 1, true);
       if (!imgs) { setTimeout(() => setStatus("idle"), 6000); return; }
       totalImages.push(...imgs);
     } else {
@@ -208,7 +219,7 @@ function TelegramSendButton({
         const sid = piaIndices[idx];
         setProgress(`คนที่ ${idx + 1}/${piaIndices.length}…`);
         onSetActiveStaffId(sid);
-        const imgs = await captureOneStaff(sid, idx + 1, piaIndices.length);
+        const imgs = await captureOneStaff(sid, idx + 1, piaIndices.length, idx === 0);
         if (!imgs) { setTimeout(() => setStatus("idle"), 6000); return; }
         totalImages.push(...imgs);
       }
@@ -320,6 +331,7 @@ export function StaffSection({
   categoryPerformanceHint,
   onSetActiveStaffId,
   piaIndices,
+  homeCaptureRef,
 }: {
   displayStaffAvatar: string;
   activeOfficer?: OfficerData;
@@ -348,6 +360,7 @@ export function StaffSection({
   categoryPerformanceHint?: string | null;
   onSetActiveStaffId: (id: string) => void;
   piaIndices: string[];
+  homeCaptureRef: React.RefObject<HTMLDivElement | null>;
 }) {
   const monthlySalesActual = activeOfficer
     ? Math.round(activeOfficer.actual)
@@ -556,7 +569,7 @@ export function StaffSection({
                               <span className="text-[9px] uppercase tracking-wider text-emerald-300/70 font-sans">ID</span>
                               {activeOfficer.staffId}
                             </span>
-                            <TelegramSendButton staffId={activeOfficer.staffId} containerRef={staffSectionRef} onSetActiveStat={onSetActiveStat} onSetActiveStaffId={onSetActiveStaffId} piaIndices={piaIndices} />
+                            <TelegramSendButton staffId={activeOfficer.staffId} containerRef={staffSectionRef} onSetActiveStat={onSetActiveStat} onSetActiveStaffId={onSetActiveStaffId} piaIndices={piaIndices} homeCaptureRef={homeCaptureRef} />
                           </motion.div>
                         </AnimatePresence>
                       ) : null}

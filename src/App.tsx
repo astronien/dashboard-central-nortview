@@ -36,7 +36,7 @@ import {
 import CategoryTreePicker from "./components/CategoryTreePicker";
 
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useState, useRef, type ChangeEvent } from "react";
 import { parseCategoryMasterFile } from "./lib/categoryMasterUpload";
 import { parseDocDate } from "./lib/dateParser";
 import { parseSalesExcelFile } from "./lib/salesUpload";
@@ -3237,6 +3237,7 @@ function AppInternal({
     if (String(o.position ?? "").toUpperCase() === "PIA") acc.push(String(idx + 1));
     return acc;
   }, []);
+  const homeCaptureRef = useRef<HTMLDivElement>(null);
 
   return (
     <div className="min-h-screen bg-[#1c2722] p-4 font-sans text-white md:p-8 flex flex-col items-center">
@@ -3433,6 +3434,7 @@ function AppInternal({
                  categoryPerformanceHint={categoryPerformanceHint}
                  onSetActiveStaffId={setActiveStaffId}
                  piaIndices={piaIndices}
+                 homeCaptureRef={homeCaptureRef}
               />
             )}
             {!isPia && currentView === "reports" && (
@@ -3509,6 +3511,18 @@ function AppInternal({
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Hidden home view for Telegram screenshot capture (always rendered) */}
+          <div ref={homeCaptureRef} style={{ position: "fixed", left: "-9999px", top: 0, width: "1200px", pointerEvents: "none" }}>
+            <div className="flex flex-col gap-6 w-full h-full relative z-20 p-6 bg-[#1c2722]">
+              <HomeDashboardSection
+                derivedHomeStats={derivedHomeStats}
+                monthlyPerformance={monthlyPerformance}
+                categorySnapshots={categorySnapshotData}
+                branchOverviewKpiData={branchOverviewKpiData}
+              />
+            </div>
+          </div>
         </main>
       </div>
     </div>
