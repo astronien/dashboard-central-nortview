@@ -98,6 +98,9 @@ function TelegramSendButton({
         pixelRatio: 1.5,
         cacheBust: true,
         backgroundColor: "#1c2722",
+        style: {
+          padding: "32px",
+        },
       });
       return dataUrl.replace(/^data:image\/jpeg;base64,/, "");
     } catch (e) {
