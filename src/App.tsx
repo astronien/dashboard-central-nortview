@@ -1300,16 +1300,24 @@ export default function App() {
     if (params.get("bot") === "1" && params.get("token")) {
       const expected = import.meta.env.VITE_BOT_TOKEN;
       if (params.get("token") === expected) {
-        // Inject fake admin session so the main app flow takes over
-        const session = {
-          userId: "admin",
+        // Build the session token (matches the format from createSessionToken in lib/auth/session.ts)
+        const sessionPayload = {
+          userId: 1,           // any existing admin user
           username: "admin",
-          role: "admin",
-          officerId: null,
-          expiresAt: Date.now() + 5 * 60 * 1000, // 5 min
+          role: "admin" as const,
+          name: "Admin",
+          exp: Date.now() + 5 * 60 * 1000, // 5 min
         };
+        // UTF-8 safe base64 encoding (same as utf8ToBase64 in session.ts)
+        const bytes = new TextEncoder().encode(JSON.stringify(sessionPayload));
+        let binary = "";
+        for (let i = 0; i < bytes.length; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        const token = btoa(binary);
+
         try {
-          window.localStorage.setItem("studio7_auth_session", btoa(JSON.stringify(session)));
+          window.localStorage.setItem("studio7_auth_session", token);
           // Also pre-set the branch so the right data is loaded
           const branch = params.get("branch");
           if (branch) {
