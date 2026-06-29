@@ -9,7 +9,7 @@
  * No 60s timeout issue (schedules QStash, returns immediately).
  */
 import { schedulePiaJob } from "./_lib/qstash.js";
-import { getMostRecentTelegramChatId } from "./_lib/tursoClient.js";
+import { getMostRecentTelegramChatId, initLineBotSchema } from "./_lib/tursoClient.js";
 
 const BRANCH_ID = process.env.TELEGRAM_BRANCH_ID ?? "645";
 
@@ -21,6 +21,11 @@ export default async function handler(req, res) {
   const { staffId } = req.body ?? {};
   if (!staffId) {
     return res.status(400).json({ error: "Missing staffId" });
+  }
+
+  // Ensure telegram_chats table exists (idempotent)
+  try { await initLineBotSchema(); } catch (e) {
+    console.error("[telegram-report] schema init failed:", e);
   }
 
   // Find the most recently active Telegram chat

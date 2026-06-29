@@ -26,7 +26,7 @@ import {
 import { schedulePiaJob } from "./_lib/qstash.js";
 import { processUpload } from "./_lib/uploadProcessor.js";
 import { detectBranchFromRows } from "./_lib/branchDetector.js";
-import { upsertTelegramChat } from "./_lib/tursoClient.js";
+import { upsertTelegramChat, initLineBotSchema } from "./_lib/tursoClient.js";
 
 const BRANCH_ID = process.env.TELEGRAM_BRANCH_ID ?? "645";
 const BRANCH_DISPLAY = process.env.TELEGRAM_BRANCH_DISPLAY ?? "ID645 : Studio 7-Central-Westgate";
@@ -37,6 +37,11 @@ export default async function handler(req, res) {
 
   const update = req.body;
   if (!update) return res.status(200).json({ ok: true });
+
+  // Ensure telegram_chats table exists (idempotent)
+  try { await initLineBotSchema(); } catch (e) {
+    console.error("[telegram] schema init failed:", e);
+  }
 
   try {
     if (update.message) {
