@@ -41,7 +41,9 @@ export async function captureWithMicrolink({
   u.searchParams.set("url", targetUrl);
   u.searchParams.set("screenshot", "true");
   u.searchParams.set("meta", "false");
-  u.searchParams.set("embed", "screenshot.url");
+  // NOTE: do NOT pass `embed=screenshot.url` — without it, Microlink returns JSON
+  // with `data.screenshot.url` (CDN). We then download the PNG from that URL.
+  // With `embed`, Microlink returns the raw PNG directly (single request).
   u.searchParams.set("waitUntil", "domcontentloaded");
   u.searchParams.set("screenshot.width", String(width));
   u.searchParams.set("screenshot.height", String(height));
