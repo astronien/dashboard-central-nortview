@@ -3,6 +3,7 @@
  *
  * Single endpoint handling:
  *   /start, /help          → welcome + help
+ *   /start report_<id>     → deep link from web app button (triggers /report <id>)
  *   /report                → PIA list (inline keyboard)
  *   /report <staffId>      → 3 photos in 15s
  *   /report all            → schedule 13 PIAs via QStash (5 min)
@@ -59,7 +60,30 @@ async function handleMessage(msg) {
 
   if (!text && !msg.document) return;
 
-  if (text === "/start" || text === "/help") {
+  // /start handles both plain start and deep link payloads:
+  //   /start                    → welcome help
+  //   /start report_<staffId>   → trigger report (from web app button)
+  if (text === "/help" || text === "/start") {
+    return sendMessage(chatId,
+      "🤖 PIA Report Bot\n\n" +
+      "Commands:\n" +
+      "/report — เลือก PIA ที่ต้องการ\n" +
+      "/report <staffId> — ขอ PIA โดยตรง (เช่น /report 23510)\n" +
+      "/report all — ส่งทุก PIA (39 รูป, รอ ~5 นาที)\n\n" +
+      "📎 ส่งไฟล์ Excel (.xlsx) เพื่ออัปโหลดข้อมูลยอดขาย"
+    );
+  }
+
+  // Deep link from web app: /start report_<staffId>
+  if (text.startsWith("/start ")) {
+    const payload = text.replace(/^\/start\s+/, "").trim();
+    if (payload.startsWith("report_")) {
+      const staffId = payload.replace(/^report_/, "").trim();
+      if (staffId) {
+        return handleDirectPiaReport(chatId, staffId);
+      }
+    }
+    // Unknown /start payload — fall through to help
     return sendMessage(chatId,
       "🤖 PIA Report Bot\n\n" +
       "Commands:\n" +

@@ -7,7 +7,7 @@ import {
   Radar,
   ResponsiveContainer,
 } from "recharts";
-import { ShoppingBag, Award, Star, TrendingUp, Apple } from "lucide-react";
+import { ShoppingBag, Award, Star, TrendingUp, Apple, Send } from "lucide-react";
 import React from "react";
 import { calcTargetToDate, calcTodayAchievementPct } from "../../lib/targetAggregations";
 import type { PresetCalcType } from "../../lib/presetTypes";
@@ -322,6 +322,17 @@ export function StaffSection({
                               <span className="text-[9px] uppercase tracking-wider text-emerald-300/70 font-sans">ID</span>
                               {activeOfficer.staffId}
                             </span>
+                            <a
+                              href={`https://t.me/kakanajana_pia_bot?start=report_${activeOfficer.staffId}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="ส่งรายงาน 3 รูปไป Telegram"
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-500/15 border border-sky-400/30 text-sky-200 text-xs sm:text-sm font-semibold shadow-[0_0_8px_rgba(56,189,248,0.2)] hover:bg-sky-500/25 hover:border-sky-400/50 transition-colors"
+                            >
+                              <Send className="w-3 h-3" />
+                              <span className="hidden sm:inline">ส่งไป Telegram</span>
+                              <span className="sm:hidden">Telegram</span>
+                            </a>
                           </motion.div>
                         </AnimatePresence>
                       ) : null}
