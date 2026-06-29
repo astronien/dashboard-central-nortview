@@ -71,35 +71,68 @@ const isCurrencyCalcType = (calcType: PresetCalcType | undefined): boolean => {
 
 /**
  * "ส่งไป Telegram" button — captures 3 views (sales / csat / target)
- * via html2canvas, then POSTs the images to /api/telegram-report which
+ * via html-to-image, then POSTs the images to /api/telegram-report which
  * forwards them to the most recently active Telegram chat.
+ *
+ * Clicking the button shows a small menu: send for this staff only,
+ * or send for all staff.
  */
 function TelegramSendButton({
   staffId,
   containerRef,
   onSetActiveStat,
+  onSetActiveStaffId,
+  allStaffCount,
 }: {
   staffId: string;
   containerRef: React.RefObject<HTMLDivElement | null>;
   onSetActiveStat: (stat: string) => void;
+  onSetActiveStaffId: (id: string) => void;
+  allStaffCount: number;
 }) {
   const [status, setStatus] = React.useState<"idle" | "capturing" | "sending" | "sent" | "error">("idle");
   const [progress, setProgress] = React.useState("");
   const [errorMsg, setErrorMsg] = React.useState("");
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const menuRef = React.useRef<HTMLDivElement>(null);
+
+  // Close menu on outside click
+  React.useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [menuOpen]);
+
+  const views: Array<{ stat: string; name: string }> = [
+    { stat: "sales", name: "KPI" },
+    { stat: "csat", name: "7 Wonders" },
+    { stat: "target", name: "Today" },
+  ];
 
   const captureView = async (): Promise<string | null> => {
-    // Wait for React to commit the DOM + AnimatePresence transitions
-    await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 1000)));
+    await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 1800)));
     const el = containerRef.current;
     if (!el) return null;
     try {
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
       const dataUrl = await toJpeg(el, {
         quality: 0.92,
         pixelRatio: 1.5,
         cacheBust: true,
         backgroundColor: "#1c2722",
+        width: w,
+        height: h,
         style: {
           padding: "32px",
+          width: `${w}px`,
+          height: `${h}px`,
+          boxSizing: "border-box",
         },
       });
       return dataUrl.replace(/^data:image\/jpeg;base64,/, "");
@@ -109,43 +142,29 @@ function TelegramSendButton({
     }
   };
 
-  const handleClick = async () => {
-    if (status === "capturing" || status === "sending") return;
-    const views: Array<{ stat: string; name: string }> = [
-      { stat: "sales", name: "KPI" },
-      { stat: "csat", name: "7 Wonders" },
-      { stat: "target", name: "Today" },
-    ];
-
-    setStatus("capturing");
-    setErrorMsg("");
-
-    const images: Array<{ name: string; base64: string; caption: string }> = [];
-
-    for (let i = 0; i < views.length; i++) {
-      const v = views[i];
-      setProgress(`(${i + 1}/${views.length}) ${v.name}…`);
-      onSetActiveStat(v.stat);
+  const captureOneStaff = async (sid: string, staffIndex: number, totalStaff: number): Promise<Array<{ name: string; base64: string; caption: string }> | null> => {
+    const imgs: Array<{ name: string; base64: string; caption: string }> = [];
+    for (let v = 0; v < views.length; v++) {
+      const view = views[v];
+      if (totalStaff > 1) {
+        setProgress(`คนที่ ${staffIndex}/${totalStaff}: (${v + 1}/${views.length}) ${view.name}…`);
+      } else {
+        setProgress(`(${v + 1}/${views.length}) ${view.name}…`);
+      }
+      onSetActiveStat(view.stat);
       const base64 = await captureView();
       if (!base64) {
         setStatus("error");
-        setErrorMsg(`จับภาพ ${v.name} ไม่สำเร็จ — เปิด console ดู`);
-        setTimeout(() => setStatus("idle"), 6000);
-        return;
+        setErrorMsg(`จับภาพ ${view.name} ไม่สำเร็จ`);
+        return null;
       }
-      console.log(`[TelegramSendButton] ${v.name} base64 length:`, base64.length);
-      images.push({
-        name: `${staffId}-${v.stat}.jpeg`,
-        base64,
-        caption: `${v.name}`,
-      });
+      imgs.push({ name: `${sid}-${view.stat}.jpeg`, base64, caption: `${view.name}` });
     }
+    return imgs;
+  };
 
-    setStatus("sending");
-    setProgress("กำลังส่งไป Telegram…");
-
-    // Send images one at a time to avoid Vercel 4.5MB body limit
-    let sentCount = 0;
+  const sendImages = async (images: Array<{ name: string; base64: string; caption: string }>, sid: string): Promise<{ sent: number; errs: string[] }> => {
+    let sent = 0;
     const errs: string[] = [];
     for (let i = 0; i < images.length; i++) {
       const img = images[i];
@@ -154,11 +173,11 @@ function TelegramSendButton({
         const res = await fetch("/api/telegram-report", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ staffId, images: [img] }),
+          body: JSON.stringify({ staffId: sid, images: [img] }),
         });
         const data = await res.json();
         if (res.ok && data.ok) {
-          sentCount++;
+          sent++;
         } else {
           errs.push(`${img.caption}: ${data.error ?? res.status}`);
         }
@@ -167,32 +186,64 @@ function TelegramSendButton({
         errs.push(`${img.caption}: ${msg}`);
       }
     }
+    return { sent, errs };
+  };
 
-    if (sentCount === images.length) {
+  const runCapture = async (mode: "single" | "all") => {
+    setMenuOpen(false);
+    if (status === "capturing" || status === "sending") return;
+
+    setStatus("capturing");
+    setErrorMsg("");
+
+    const totalImages: Array<{ name: string; base64: string; caption: string }> = [];
+
+    if (mode === "single") {
+      const imgs = await captureOneStaff(staffId, 1, 1);
+      if (!imgs) { setTimeout(() => setStatus("idle"), 6000); return; }
+      totalImages.push(...imgs);
+    } else {
+      for (let i = 1; i <= allStaffCount; i++) {
+        const sid = String(i);
+        setProgress(`คนที่ ${i}/${allStaffCount}…`);
+        onSetActiveStaffId(sid);
+        const imgs = await captureOneStaff(sid, i, allStaffCount);
+        if (!imgs) { setTimeout(() => setStatus("idle"), 6000); return; }
+        totalImages.push(...imgs);
+      }
+    }
+
+    // All captures done — send
+    setStatus("sending");
+    setProgress("กำลังส่งไป Telegram…");
+
+    let totalSent = 0;
+    const allErrs: string[] = [];
+    for (const img of totalImages) {
+      const result = await sendImages([img], staffId);
+      totalSent += result.sent;
+      allErrs.push(...result.errs);
+    }
+
+    if (totalSent === totalImages.length) {
       setStatus("sent");
       setProgress("");
-    } else if (sentCount > 0) {
+    } else if (totalSent > 0) {
       setStatus("sent");
-      setProgress(`ส่ง ${sentCount}/${images.length} รูป`);
+      setProgress(`ส่ง ${totalSent}/${totalImages.length} รูป`);
     } else {
       setStatus("error");
-      setErrorMsg(errs[0] ?? "ส่งไม่สำเร็จ");
-      console.error("[TelegramSendButton] errors:", errs);
+      setErrorMsg(allErrs[0] ?? "ส่งไม่สำเร็จ");
     }
-    setTimeout(() => {
-      setStatus("idle");
-      setProgress("");
-    }, 8000);
+    setTimeout(() => { setStatus("idle"); setProgress(""); }, 8000);
   };
 
   const baseClass =
     "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs sm:text-sm font-semibold transition-colors";
+
   if (status === "capturing" || status === "sending") {
     return (
-      <button
-        disabled
-        className={`${baseClass} bg-sky-500/15 border border-sky-400/30 text-sky-200/60`}
-      >
+      <button disabled className={`${baseClass} bg-sky-500/15 border border-sky-400/30 text-sky-200/60`}>
         <Loader2 className="w-3 h-3 animate-spin" />
         <span className="hidden sm:inline">{progress}</span>
         <span className="sm:hidden">...</span>
@@ -201,10 +252,7 @@ function TelegramSendButton({
   }
   if (status === "sent") {
     return (
-      <button
-        disabled
-        className={`${baseClass} bg-emerald-500/15 border border-emerald-400/40 text-emerald-200`}
-      >
+      <button disabled className={`${baseClass} bg-emerald-500/15 border border-emerald-400/40 text-emerald-200`}>
         <CheckCircle2 className="w-3 h-3" />
         <span className="hidden sm:inline">ส่งแล้ว! ตรวจสอบ Telegram</span>
         <span className="sm:hidden">ส่งแล้ว</span>
@@ -213,27 +261,38 @@ function TelegramSendButton({
   }
   if (status === "error") {
     return (
-      <button
-        onClick={handleClick}
-        title={errorMsg}
-        className={`${baseClass} bg-red-500/15 border border-red-400/30 text-red-200 hover:bg-red-500/25 hover:border-red-400/50`}
-      >
+      <button onClick={() => runCapture("single")} title={errorMsg}
+        className={`${baseClass} bg-red-500/15 border border-red-400/30 text-red-200 hover:bg-red-500/25 hover:border-red-400/50`}>
         <Send className="w-3 h-3" />
         <span className="hidden sm:inline">ลองใหม่</span>
         <span className="sm:hidden">ลองใหม่</span>
       </button>
     );
   }
+
   return (
-    <button
-      onClick={handleClick}
-      title="ส่งรายงาน 3 หน้าไป Telegram"
-      className={`${baseClass} bg-sky-500/15 border border-sky-400/30 text-sky-200 shadow-[0_0_8px_rgba(56,189,248,0.2)] hover:bg-sky-500/25 hover:border-sky-400/50`}
-    >
-      <Send className="w-3 h-3" />
-      <span className="hidden sm:inline">ส่งไป Telegram</span>
-      <span className="sm:hidden">Telegram</span>
-    </button>
+    <div className="relative" ref={menuRef}>
+      <button onClick={() => setMenuOpen(!menuOpen)}
+        title="ส่งรายงาน 3 หน้าไป Telegram"
+        className={`${baseClass} bg-sky-500/15 border border-sky-400/30 text-sky-200 shadow-[0_0_8px_rgba(56,189,248,0.2)] hover:bg-sky-500/25 hover:border-sky-400/50`}>
+        <Send className="w-3 h-3" />
+        <span className="hidden sm:inline">ส่งไป Telegram</span>
+        <span className="sm:hidden">Telegram</span>
+      </button>
+
+      {menuOpen && (
+        <div className="absolute right-0 top-full mt-1 z-50 min-w-[180px] bg-[#0c291d] border border-white/15 rounded-xl p-1 shadow-xl">
+          <button onClick={() => runCapture("single")}
+            className="w-full text-left px-3 py-2 rounded-lg text-sm text-white/90 hover:bg-white/10 transition-colors">
+            ส่งเฉพาะคนนี้
+          </button>
+          <button onClick={() => runCapture("all")}
+            className="w-full text-left px-3 py-2 rounded-lg text-sm text-white/90 hover:bg-white/10 transition-colors">
+            ส่งทั้งหมด ({allStaffCount} คน)
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -259,6 +318,7 @@ export function StaffSection({
   todayDateLabel,
   categoryPerformanceHint,
   onSetActiveStaffId,
+  allStaffCount,
 }: {
   displayStaffAvatar: string;
   activeOfficer?: OfficerData;
@@ -286,6 +346,7 @@ export function StaffSection({
   todayDateLabel?: string;
   categoryPerformanceHint?: string | null;
   onSetActiveStaffId: (id: string) => void;
+  allStaffCount: number;
 }) {
   const monthlySalesActual = activeOfficer
     ? Math.round(activeOfficer.actual)
@@ -494,7 +555,7 @@ export function StaffSection({
                               <span className="text-[9px] uppercase tracking-wider text-emerald-300/70 font-sans">ID</span>
                               {activeOfficer.staffId}
                             </span>
-                            <TelegramSendButton staffId={activeOfficer.staffId} containerRef={staffSectionRef} onSetActiveStat={onSetActiveStat} />
+                            <TelegramSendButton staffId={activeOfficer.staffId} containerRef={staffSectionRef} onSetActiveStat={onSetActiveStat} onSetActiveStaffId={onSetActiveStaffId} allStaffCount={allStaffCount} />
                           </motion.div>
                         </AnimatePresence>
                       ) : null}

@@ -3424,6 +3424,7 @@ function AppInternal({
                 todayDateLabel={todayStats.dateStr}
                  categoryPerformanceHint={categoryPerformanceHint}
                  onSetActiveStaffId={setActiveStaffId}
+                 allStaffCount={parsedReport.officers.length}
               />
             )}
             {!isPia && currentView === "reports" && (
