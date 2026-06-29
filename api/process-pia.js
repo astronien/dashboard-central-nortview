@@ -85,10 +85,12 @@ export default async function handler(req, res) {
   }
 
   // 5. Send whatever sections succeeded
-  const validSections = Object.entries(sections).filter(([, buf]) => buf);
+  const validSections = Object.entries(sections).filter(([k, buf]) => k !== "errors" && buf);
   if (validSections.length === 0) {
-    await sendMicrolinkError(chatId, "ไม่สามารถสร้างรูปได้ (Microlink ไม่ตอบ)");
-    return res.status(200).json({ ok: false, error: "all sections failed" });
+    // Include actual Microlink errors for debugging
+    const errorDetails = sections.errors?.length > 0 ? sections.errors.join(" | ") : "Microlink ไม่ตอบ";
+    await sendMessage(chatId, `❌ สร้างรูปไม่สำเร็จ\n📋 Error: ${errorDetails.slice(0, 300)}`);
+    return res.status(200).json({ ok: false, error: errorDetails });
   }
 
   // 6. Send photos

@@ -96,7 +96,7 @@ function sleep(ms) {
  * but reliable. No retry here (keeps total under Vercel's 60s limit).
  *
  * Each section uses a different ?view= so the web app shows a different table.
- * Returns { kpi: Buffer|null, wonder: Buffer|null, category: Buffer|null }.
+ * Returns { kpi: Buffer|null, wonder: Buffer|null, category: Buffer|null, errors: string[] }.
  */
 export async function capturePiaSections(url) {
   const sections = [
@@ -104,7 +104,7 @@ export async function capturePiaSections(url) {
     { key: "wonder", view: "csat" },
     { key: "category", view: "today" },
   ];
-  const results = {};
+  const results = { errors: [] };
 
   for (const { key, view } of sections) {
     try {
@@ -113,6 +113,7 @@ export async function capturePiaSections(url) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error(`[microlink] ${key} failed:`, msg);
       results[key] = null;
+      results.errors.push(`${key}: ${msg}`);
     }
     // brief pause between sections to be gentle on free tier
     await sleep(300);
