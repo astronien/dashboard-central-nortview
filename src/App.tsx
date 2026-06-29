@@ -1328,6 +1328,11 @@ export default function App() {
           if (staffId) {
             window.localStorage.setItem("dashboard-bot-staff", staffId);
           }
+          // Pre-set the active view (sales/today/csat) for the table
+          const view = params.get("view");
+          if (view) {
+            window.localStorage.setItem("dashboard-bot-view", view);
+          }
           // Strip bot params from URL to avoid noise
           const cleanUrl = window.location.pathname;
           window.history.replaceState({}, "", cleanUrl);
@@ -1588,11 +1593,19 @@ function AppInternal({
     if (idx >= 0) {
       setActiveStaffId(String(idx + 1));
       setCurrentView("staff");
+      // Apply bot view override (sales / target / csat)
+      const botView = window.localStorage.getItem("dashboard-bot-view");
+      if (botView === "target" || botView === "csat" || botView === "sales") {
+        setActiveStat(botView);
+      }
       // Mark ready for screenshot after a delay (let charts render)
       setTimeout(() => document.body.setAttribute("data-bot-ready", "1"), 4000);
       // Clean up localStorage so subsequent loads are clean
       setTimeout(() => {
-        try { window.localStorage.removeItem("dashboard-bot-staff"); } catch {}
+        try {
+          window.localStorage.removeItem("dashboard-bot-staff");
+          window.localStorage.removeItem("dashboard-bot-view");
+        } catch {}
       }, 5000);
     }
   }, [parsedReport.officers]);

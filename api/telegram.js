@@ -296,8 +296,23 @@ async function capUrl(url, sections = null) {
   if (!workerUrl) throw new Error("CLOUDFLARE_WORKER_URL not set");
   if (!token) throw new Error("WEB_BOT_TOKEN not set");
 
-  const body = { url, token };
-  if (sections) body.sections = sections;
+  // For each section, append a different ?view= so the web app shows a
+  // different table (sales/today/csat). The worker takes 3 full-page
+  // screenshots, one per URL.
+  const SECTION_TO_VIEW = { kpi: "sales", wonder: "csat", category: "today" };
+  const urls = {};
+  for (const section of sections ?? Object.keys(SECTION_TO_VIEW)) {
+    const sep = url.includes("?") ? "&" : "?";
+    urls[section] = `${url}${sep}view=${SECTION_TO_VIEW[section] ?? "sales"}`;
+  }
+
+  const body = {
+    url: urls.kpi ?? url,
+    token,
+    sections: Object.keys(urls),
+    // Pass alternate URLs via per-section array
+    urlsBySection: urls,
+  };
 
   const res = await fetch(`${workerUrl}/screenshot-url`, {
     method: "POST",
@@ -308,7 +323,6 @@ async function capUrl(url, sections = null) {
     const errText = await res.text().catch(() => "");
     throw new Error(`Worker failed: ${res.status} ${errText}`);
   }
-  // New format: { results: { kpi: base64, wonder: base64, category: base64 } }
   const json = await res.json();
   if (json.results) {
     const out = {};
@@ -317,7 +331,6 @@ async function capUrl(url, sections = null) {
     }
     return out;
   }
-  // Legacy: raw PNG (backward compat)
   const buffer = await res.arrayBuffer();
   return Buffer.from(buffer);
 }
