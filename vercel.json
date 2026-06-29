@@ -8,15 +8,7 @@
     }
   },
   "rewrites": [
-    {
-      "source": "/api/uploads/:kind",
-      "destination": "/api/uploads?kind=:kind"
-    },
-
-    {
-      "source": "/((?!api/).*)",
-      "destination": "/index.html"
-    }
-  ],
-
+    { "source": "/api/uploads/:kind", "destination": "/api/uploads?kind=:kind" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
 }
