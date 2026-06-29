@@ -202,7 +202,9 @@ async function handleDirectPiaReport(chatId, staffId) {
   // for the Vercel 60s webhook limit. QStash calls process-pia.js which
   // does the 3 captures + sendPhoto. Webhook returns immediately.
   try {
-    await schedulePiaJob({ staffId, branchId: BRANCH_ID, chatId, delay: 0 });
+    console.log(`[bot] /report ${staffId} → scheduling QStash job, QSTASH_TOKEN set: ${!!process.env.QSTASH_TOKEN}`);
+    const jobId = await schedulePiaJob({ staffId, branchId: BRANCH_ID, chatId, delay: 0 });
+    console.log(`[bot] /report ${staffId} → QStash job scheduled:`, jobId);
     return sendMessage(chatId,
       `📊 กำลังสร้างรายงาน ${pia.name} (ID ${staffId})...\n` +
       `⏳ รอประมาณ 1 นาที รูปจะส่งมาในแชตอัตโนมัติ`,
@@ -210,7 +212,7 @@ async function handleDirectPiaReport(chatId, staffId) {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[bot] schedulePiaJob ${staffId} failed:`, msg);
-    return sendMessage(chatId, `❌ ไม่สามารถสร้างรายงานได้ (QStash error) — ลองอีกครั้ง`);
+    return sendMessage(chatId, `❌ ไม่สามารถสร้างรายงานได้ (QStash error: ${msg.slice(0, 100)}) — ลองอีกครั้ง`);
   }
 }
 
