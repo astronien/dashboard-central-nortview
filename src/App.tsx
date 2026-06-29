@@ -1292,142 +1292,47 @@ const emptyReport: ParsedReport = {
 };
 
 export default function App() {
-  // Bot mode (?bot=1&token=xxx): render BotApp directly, bypass auth
+  // Bot mode: pre-set a fake admin session in localStorage so the
+  // existing AuthProvider/AuthContext treats the request as logged in.
+  // The bot URL params control the branch + PIA that get loaded.
   if (typeof window !== "undefined") {
     const params = new URLSearchParams(window.location.search);
     if (params.get("bot") === "1" && params.get("token")) {
-      return <BotApp />;
+      const expected = import.meta.env.VITE_BOT_TOKEN;
+      if (params.get("token") === expected) {
+        // Inject fake admin session so the main app flow takes over
+        const session = {
+          userId: "admin",
+          username: "admin",
+          role: "admin",
+          officerId: null,
+          expiresAt: Date.now() + 5 * 60 * 1000, // 5 min
+        };
+        try {
+          window.localStorage.setItem("studio7_auth_session", btoa(JSON.stringify(session)));
+          // Also pre-set the branch so the right data is loaded
+          const branch = params.get("branch");
+          if (branch) {
+            window.localStorage.setItem("dashboard-selected-branch", branch);
+          }
+          // Pre-set the active staff so the right PIA shows
+          const staffId = params.get("staffId");
+          if (staffId) {
+            window.localStorage.setItem("dashboard-bot-staff", staffId);
+          }
+          // Strip bot params from URL to avoid noise
+          const cleanUrl = window.location.pathname;
+          window.history.replaceState({}, "", cleanUrl);
+        } catch {
+          // ignore
+        }
+      }
     }
   }
   return (
     <AuthProvider>
       <AppGate />
     </AuthProvider>
-  );
-}
-
-/**
- * BotApp — minimal app shell for Telegram bot screenshot.
- * Renders the same data and StaffSection as the main app,
- * but without auth, navigation, or other UI chrome.
- * Access via ?bot=1&token=xxx&staffId=yyy&branch=zzz
- */
-function BotApp() {
-  const [params] = useState(() => {
-    if (typeof window === "undefined") return null;
-    const p = new URLSearchParams(window.location.search);
-    return {
-      staffId: p.get("staffId") ?? "",
-      branch: p.get("branch") ?? "",
-    };
-  });
-  const [parsedReport, setParsedReport] = useState<ParsedReport>(emptyReport);
-  const [loaded, setLoaded] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [activeStaffId, setActiveStaffId] = useState<string>("1");
-
-  // Load data from Turso (no IndexedDB dependency)
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const remote = await fetchUploads();
-        if (cancelled) return;
-        if (!remote) {
-          setLoadError("ไม่พบข้อมูล — กรุณาอัปโหลดไฟล์ผ่านเว็บก่อน");
-          setLoaded(true);
-          return;
-        }
-        const report = buildReport(
-          filterRowsByBranch(remote.target, params?.branch ?? ""),
-          filterRowsByBranch(remote.current, params?.branch ?? ""),
-          filterRowsByBranch(remote.lastMonth ?? [], params?.branch ?? ""),
-          filterRowsByBranch(remote.lastYear ?? [], params?.branch ?? ""),
-          remote.categoryMaster,
-          "bot",
-          filterRowsByBranch(remote.today ?? [], params?.branch ?? ""),
-        );
-        setParsedReport(report);
-
-        // Find staff by staffId
-        const sid = params?.staffId ?? "";
-        if (sid) {
-          const idx = report.officers.findIndex((o) => o.staffId === sid);
-          if (idx >= 0) setActiveStaffId(String(idx + 1));
-          else setLoadError(`ไม่พบ PIA ID ${sid}`);
-        }
-      } catch (e) {
-        setLoadError(e instanceof Error ? e.message : String(e));
-      } finally {
-        if (!cancelled) {
-          setLoaded(true);
-          // Mark ready for screenshot — wait for charts to render
-          setTimeout(() => document.body.setAttribute("data-bot-ready", "1"), 3000);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [params]);
-
-  if (loadError) {
-    return (
-      <div className="min-h-screen bg-[#1c2722] flex items-center justify-center text-white">
-        <p className="text-red-400">❌ {loadError}</p>
-      </div>
-    );
-  }
-
-  if (!loaded) {
-    return (
-      <div className="min-h-screen bg-[#1c2722] flex items-center justify-center text-white">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-2 border-white/20 border-t-emerald-400 rounded-full animate-spin" />
-          <p className="text-white/60 text-sm">Loading PIA data...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const officers = parsedReport.officers;
-  const idx = Math.max(Number(activeStaffId) - 1, 0);
-  const activeOfficer = officers[idx] ?? officers[0];
-
-  if (!activeOfficer) {
-    return (
-      <div className="min-h-screen bg-[#1c2722] flex items-center justify-center text-white">
-        <p className="text-red-400">❌ ไม่พบ PIA ในข้อมูล</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-[#1c2722] p-6">
-      <StaffSection
-        displayStaffAvatar={undefined}
-        activeOfficer={activeOfficer}
-        currentStaff={null}
-        dynamicRadarData={[]}
-        renderCustomTick={() => ""}
-        dynamicScore={0}
-        activeStat="sales"
-        onSetActiveStat={() => {}}
-        sevenWondersScore={0}
-        dynamicRole=""
-        dynamicExperience=""
-        dynamicExpertise=""
-        dynamicLanguages=""
-        focusDevice={{ label: "—", rate: 0 }}
-        focusWonder={{ label: "—", rate: 0 }}
-        activeOfficer7WondersPerformance={[]}
-        activeOfficerCategoryPerformance={[]}
-        todaySalesTotal={0}
-        todayDateLabel=""
-        categoryPerformanceHint=""
-        onSetActiveStaffId={() => {}}
-      />
-    </div>
   );
 }
 
@@ -1653,6 +1558,36 @@ function AppInternal({
     "sales",
   );
   const [activeStaffId, setActiveStaffId] = useState("1");
+
+  // Bot mode (read from localStorage set by App component):
+  // Force "staff" view + select the requested PIA + mark ready when data is loaded.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const botStaff = window.localStorage.getItem("dashboard-bot-staff");
+    if (!botStaff) return;
+    // Only act once
+    if (sessionStorage.getItem("dashboard-bot-active")) return;
+    sessionStorage.setItem("dashboard-bot-active", "1");
+    setCurrentView("staff");
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const botStaff = window.localStorage.getItem("dashboard-bot-staff");
+    if (!botStaff) return;
+    if (parsedReport.officers.length === 0) return;
+    const idx = parsedReport.officers.findIndex((o) => o.staffId === botStaff);
+    if (idx >= 0) {
+      setActiveStaffId(String(idx + 1));
+      setCurrentView("staff");
+      // Mark ready for screenshot after a delay (let charts render)
+      setTimeout(() => document.body.setAttribute("data-bot-ready", "1"), 4000);
+      // Clean up localStorage so subsequent loads are clean
+      setTimeout(() => {
+        try { window.localStorage.removeItem("dashboard-bot-staff"); } catch {}
+      }, 5000);
+    }
+  }, [parsedReport.officers]);
 
   // PIA: auto-select their own officer + force "staff" view + restrict navigation
   useEffect(() => {
