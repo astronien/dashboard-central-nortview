@@ -82,13 +82,13 @@ function TelegramSendButton({
   containerRef,
   onSetActiveStat,
   onSetActiveStaffId,
-  allStaffCount,
+  piaIndices,
 }: {
   staffId: string;
   containerRef: React.RefObject<HTMLDivElement | null>;
   onSetActiveStat: (stat: string) => void;
   onSetActiveStaffId: (id: string) => void;
-  allStaffCount: number;
+  piaIndices: string[];
 }) {
   const [status, setStatus] = React.useState<"idle" | "capturing" | "sending" | "sent" | "error">("idle");
   const [progress, setProgress] = React.useState("");
@@ -124,7 +124,7 @@ function TelegramSendButton({
       const dataUrl = await toJpeg(el, {
         quality: 0.92,
         pixelRatio: 1.5,
-        cacheBust: true,
+        cacheBust: false,
         backgroundColor: "#1c2722",
         width: w,
         height: h,
@@ -134,6 +134,7 @@ function TelegramSendButton({
           height: `${h}px`,
           boxSizing: "border-box",
         },
+        fetchRequestInit: { mode: "cors" },
       });
       return dataUrl.replace(/^data:image\/jpeg;base64,/, "");
     } catch (e) {
@@ -203,11 +204,11 @@ function TelegramSendButton({
       if (!imgs) { setTimeout(() => setStatus("idle"), 6000); return; }
       totalImages.push(...imgs);
     } else {
-      for (let i = 1; i <= allStaffCount; i++) {
-        const sid = String(i);
-        setProgress(`คนที่ ${i}/${allStaffCount}…`);
+      for (let idx = 0; idx < piaIndices.length; idx++) {
+        const sid = piaIndices[idx];
+        setProgress(`คนที่ ${idx + 1}/${piaIndices.length}…`);
         onSetActiveStaffId(sid);
-        const imgs = await captureOneStaff(sid, i, allStaffCount);
+        const imgs = await captureOneStaff(sid, idx + 1, piaIndices.length);
         if (!imgs) { setTimeout(() => setStatus("idle"), 6000); return; }
         totalImages.push(...imgs);
       }
@@ -288,7 +289,7 @@ function TelegramSendButton({
           </button>
           <button onClick={() => runCapture("all")}
             className="w-full text-left px-3 py-2 rounded-lg text-sm text-white/90 hover:bg-white/10 transition-colors">
-            ส่งทั้งหมด ({allStaffCount} คน)
+            ส่งทั้งหมด ({piaIndices.length} คน)
           </button>
         </div>
       )}
@@ -318,7 +319,7 @@ export function StaffSection({
   todayDateLabel,
   categoryPerformanceHint,
   onSetActiveStaffId,
-  allStaffCount,
+  piaIndices,
 }: {
   displayStaffAvatar: string;
   activeOfficer?: OfficerData;
@@ -346,7 +347,7 @@ export function StaffSection({
   todayDateLabel?: string;
   categoryPerformanceHint?: string | null;
   onSetActiveStaffId: (id: string) => void;
-  allStaffCount: number;
+  piaIndices: string[];
 }) {
   const monthlySalesActual = activeOfficer
     ? Math.round(activeOfficer.actual)
@@ -555,7 +556,7 @@ export function StaffSection({
                               <span className="text-[9px] uppercase tracking-wider text-emerald-300/70 font-sans">ID</span>
                               {activeOfficer.staffId}
                             </span>
-                            <TelegramSendButton staffId={activeOfficer.staffId} containerRef={staffSectionRef} onSetActiveStat={onSetActiveStat} onSetActiveStaffId={onSetActiveStaffId} allStaffCount={allStaffCount} />
+                            <TelegramSendButton staffId={activeOfficer.staffId} containerRef={staffSectionRef} onSetActiveStat={onSetActiveStat} onSetActiveStaffId={onSetActiveStaffId} piaIndices={piaIndices} />
                           </motion.div>
                         </AnimatePresence>
                       ) : null}

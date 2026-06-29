@@ -462,6 +462,7 @@ type OfficerPerformance = {
   diffDay: number;
   achDayPercent: number;
   rate: number;
+  position?: string;
 };
 
 type ParsedReport = {
@@ -803,6 +804,7 @@ const buildReport = (targetRows: RawRow[], currentRows: RawRow[], lastMonthRows:
       diffDay: 0,
       achDayPercent: 0,
       rate: 0,
+      position: String(row["POSISION"] ?? "").trim(),
     });
   });
 
@@ -3230,6 +3232,12 @@ function AppInternal({
     }
   };
 
+  // Find 1-based indices of PIA officers for "ส่งทั้งหมด" feature
+  const piaIndices = parsedReport.officers.reduce<string[]>((acc, o, idx) => {
+    if (String(o.position ?? "").toUpperCase() === "PIA") acc.push(String(idx + 1));
+    return acc;
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#1c2722] p-4 font-sans text-white md:p-8 flex flex-col items-center">
       {isInitialLoading && (
@@ -3424,7 +3432,7 @@ function AppInternal({
                 todayDateLabel={todayStats.dateStr}
                  categoryPerformanceHint={categoryPerformanceHint}
                  onSetActiveStaffId={setActiveStaffId}
-                 allStaffCount={parsedReport.officers.length}
+                 piaIndices={piaIndices}
               />
             )}
             {!isPia && currentView === "reports" && (
