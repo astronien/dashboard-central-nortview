@@ -1598,8 +1598,8 @@ function AppInternal({
       if (botView === "target" || botView === "csat" || botView === "sales") {
         setActiveStat(botView);
       }
-      // Mark ready for screenshot after a delay (let data + charts fully render)
-      setTimeout(() => document.body.setAttribute("data-bot-ready", "1"), 6000);
+      // Mark ready for screenshot after data renders (charts animate in <1s)
+      setTimeout(() => document.body.setAttribute("data-bot-ready", "1"), 2000);
       // Clean up localStorage so subsequent loads are clean
       setTimeout(() => {
         try {

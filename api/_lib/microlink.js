@@ -33,7 +33,7 @@ const MICROLINK_API = "https://api.microlink.io";
  * @param {number} [opts.deviceScaleFactor=2] - device pixel ratio (2x retina)
  * @param {string} [opts.waitForSelector='body[data-bot-ready="1"]'] - CSS selector to wait for
  * @param {number} [opts.waitForTimeout=1500] - ms to wait AFTER selector appears (chart animation)
- * @param {number} [opts.timeoutSec=15] - max seconds for Microlink request
+ * @param {number} [opts.timeoutSec=20] - max seconds for Microlink request
  * @returns {Promise<Buffer>} PNG buffer
  */
 export async function captureWithMicrolink({
@@ -44,7 +44,7 @@ export async function captureWithMicrolink({
   deviceScaleFactor = 2,
   waitForSelector = 'body[data-bot-ready="1"]',
   waitForTimeout = 1500,
-  timeoutSec = 15,
+  timeoutSec = 20,
 }) {
   const apiKey = process.env.MICROLINK_API_KEY; // optional, not required
   const sep = url.includes("?") ? "&" : "?";

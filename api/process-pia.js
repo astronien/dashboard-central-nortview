@@ -12,7 +12,7 @@
 import { verifyQStashRequest } from "./_lib/qstash.js";
 import { sendMessage, sendPhoto } from "./_lib/telegramBot.js";
 import { getPiaListForBranch } from "./_lib/piaReportBuilder.js";
-import { capturePiaSections, capturePiaSingle } from "./_lib/microlink.js";
+import { capturePiaSections } from "./_lib/microlink.js";
 
 const WEB_BOT_TOKEN = process.env.WEB_BOT_TOKEN;
 const BRANCH_DISPLAY = process.env.TELEGRAM_BRANCH_DISPLAY ?? "ID645 : Studio 7-Central-Westgate";
@@ -24,17 +24,20 @@ function sleep(ms) {
 function sendMicrolinkError(chatId, rawMsg) {
   if (rawMsg.includes("429") || rawMsg.includes("rate") || rawMsg.includes("limit")) {
     return sendMessage(chatId,
-      `❌ Microlink free tier หมดแล้ว (50 req/day) — รอ 1-2 นาที`,
+      `❌ Microlink free tier หมดแล้ว (50 req/day)\n` +
+      `⏰ รอ 1-2 นาทีแล้วลองใหม่ หรือลองพรุ่งนี้`,
     );
   }
   if (rawMsg.includes("500") || rawMsg.includes("Unable to")) {
     return sendMessage(chatId,
-      `❌ สร้างรูปไม่สำเร็จ (เซิร์ฟเวอร์มีปัญหา) — รอ 30 วินาที`,
+      `❌ สร้างรูปไม่สำเร็จ (เซิร์ฟเวอร์มีปัญหา)\n` +
+      `⏰ รอ 30 วินาทีแล้วลองใหม่`,
     );
   }
-  if (rawMsg.includes("timeout") || rawMsg.includes("Timeout")) {
+  if (rawMsg.includes("EBRWSRTIMEOUT") || rawMsg.includes("timeout") || rawMsg.includes("Timeout") || rawMsg.includes("navigation timeout")) {
     return sendMessage(chatId,
-      `❌ สร้างรูปไม่สำเร็จ (timeout) — ลองอีกครั้งใน 1 นาที`,
+      `❌ หน้าเว็บโหลดช้าเกินไป (timeout)\n` +
+      `⏰ ลองอีกครั้งในอีก 1-2 นาที`,
     );
   }
   return sendMessage(chatId, `❌ สร้างรูปไม่สำเร็จ — ลองอีกครั้งใน 1 นาที`);
@@ -69,7 +72,8 @@ export default async function handler(req, res) {
   // 3. Build bot URL
   const url = `https://dashboard-central-nortview.vercel.app/?bot=1&token=${encodeURIComponent(WEB_BOT_TOKEN)}&staffId=${encodeURIComponent(staffId)}&branch=${encodeURIComponent(BRANCH_DISPLAY)}`;
 
-  // 4. Capture 3 sections in parallel via Microlink
+  // 4. Capture 3 sections sequentially via Microlink
+  //    (sequential to avoid free-tier concurrency limit)
   let sections = {};
   try {
     sections = await capturePiaSections(url);
@@ -80,23 +84,14 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: false, error: e.message });
   }
 
-  // 5. Fallback: if all 3 failed, try single full-page
+  // 5. Send whatever sections succeeded
   const validSections = Object.entries(sections).filter(([, buf]) => buf);
   if (validSections.length === 0) {
-    try {
-      const png = await capturePiaSingle(url);
-      await sendPhoto(chatId, png, `📊 ${pia.name} (ID ${pia.staffId}) - รายงานเต็ม`);
-      await sendMessage(chatId, `✅ ส่งรายงาน ${pia.name} (ID ${pia.staffId}) 1 รูปเรียบร้อย`);
-      return res.status(200).json({ ok: true, staffId, count: 1 });
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.error(`[process-pia] ${staffId} fallback single failed:`, msg);
-      await sendMicrolinkError(chatId, msg);
-      return res.status(200).json({ ok: false, error: e.message });
-    }
+    await sendMicrolinkError(chatId, "ไม่สามารถสร้างรูปได้ (Microlink ไม่ตอบ)");
+    return res.status(200).json({ ok: false, error: "all sections failed" });
   }
 
-  // 6. Send 3 photos
+  // 6. Send photos
   let count = 0;
   try {
     if (sections.kpi) {
@@ -118,8 +113,10 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: false, error: e.message });
   }
 
-  if (count > 0) {
-    await sendMessage(chatId, `✅ ส่งรายงาน ${pia.name} (ID ${pia.staffId}) ${count} รูปเรียบร้อย`);
+  if (count > 0 && count < 3) {
+    await sendMessage(chatId, `⚠️ ส่งรายงาน ${pia.name} (ID ${pia.staffId}) ${count}/3 รูป (บางส่วนไม่สำเร็จ)`);
+  } else if (count === 3) {
+    await sendMessage(chatId, `✅ ส่งรายงาน ${pia.name} (ID ${pia.staffId}) 3 รูปเรียบร้อย`);
   }
   return res.status(200).json({ ok: true, staffId, count });
 }
