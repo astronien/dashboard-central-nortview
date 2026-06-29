@@ -42,6 +42,25 @@ export async function sendPhoto(chatId, photoBuffer, caption) {
   return res.json();
 }
 
+/**
+ * Send an image as a Telegram document (no compression).
+ * Use this for high-resolution screenshots where sendPhoto would compress.
+ * Telegram shows the image inline as a preview but lets users open the
+ * uncompressed original by tapping.
+ */
+export async function sendDocument(chatId, fileBuffer, filename, caption) {
+  const form = new FormData();
+  form.append("chat_id", String(chatId));
+  form.append("document", new Blob([fileBuffer], { type: "image/png" }), filename || "report.png");
+  if (caption) form.append("caption", caption);
+
+  const res = await fetch(`${baseUrl()}/sendDocument`, {
+    method: "POST",
+    body: form,
+  });
+  return res.json();
+}
+
 export async function answerCallbackQuery(callbackQueryId, text, showAlert = false) {
   const res = await fetch(`${baseUrl()}/answerCallbackQuery`, {
     method: "POST",

@@ -10,9 +10,10 @@
  */
 
 import { verifyQStashRequest } from "./_lib/qstash.js";
-import { sendMessage, sendPhoto } from "./_lib/telegramBot.js";
+import { sendMessage, sendDocument } from "./_lib/telegramBot.js";
 import { getPiaListForBranch } from "./_lib/piaReportBuilder.js";
 import { capturePiaSections } from "./_lib/microlink.js";
+import { sendDocument } from "./_lib/telegramBot.js";
 
 const WEB_BOT_TOKEN = process.env.WEB_BOT_TOKEN;
 const BRANCH_DISPLAY = process.env.TELEGRAM_BRANCH_DISPLAY ?? "ID645 : Studio 7-Central-Westgate";
@@ -97,21 +98,21 @@ export default async function handler(req, res) {
   let count = 0;
   try {
     if (sections.kpi) {
-      await sendPhoto(chatId, sections.kpi, `📊 KPI Overview - ${pia.name} (${pia.staffId})`);
+      await sendDocument(chatId, sections.kpi, `kpi-${pia.staffId}.png`, `📊 KPI Overview - ${pia.name} (${pia.staffId})`);
       count++;
       await sleep(400);
     }
     if (sections.wonder) {
-      await sendPhoto(chatId, sections.wonder, `🏆 7 Wonders - ${pia.name}`);
+      await sendDocument(chatId, sections.wonder, `wonders-${pia.staffId}.png`, `🏆 7 Wonders - ${pia.name}`);
       count++;
       await sleep(400);
     }
     if (sections.category) {
-      await sendPhoto(chatId, sections.category, `📈 Category Detail - ${pia.name}`);
+      await sendDocument(chatId, sections.category, `category-${pia.staffId}.png`, `📈 Category Detail - ${pia.name}`);
       count++;
     }
   } catch (e) {
-    console.error(`[process-pia] sendPhoto failed:`, e);
+    console.error(`[process-pia] sendDocument failed:`, e);
     return res.status(200).json({ ok: false, error: e.message });
   }
 

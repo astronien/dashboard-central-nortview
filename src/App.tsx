@@ -1571,6 +1571,8 @@ function AppInternal({
     "sales",
   );
   const [activeStaffId, setActiveStaffId] = useState("1");
+  const [staffPhotosLoaded, setStaffPhotosLoaded] = useState(false);
+  const [kpiPresetsLoaded, setKpiPresetsLoaded] = useState(false);
 
   // Bot mode (read from localStorage set by App component):
   // Force "staff" view + select the requested PIA + mark ready when data is loaded.
@@ -1598,8 +1600,6 @@ function AppInternal({
       if (botView === "target" || botView === "csat" || botView === "sales") {
         setActiveStat(botView);
       }
-      // Mark ready for screenshot after data renders (charts animate in <1s)
-      setTimeout(() => document.body.setAttribute("data-bot-ready", "1"), 2000);
       // Clean up localStorage so subsequent loads are clean
       setTimeout(() => {
         try {
@@ -1609,6 +1609,39 @@ function AppInternal({
       }, 5000);
     }
   }, [parsedReport.officers]);
+
+  // Bot mode: mark screenshot-ready when KPI presets + staff photos + officers
+  // all loaded (so 7 Wonders table and avatar render correctly). Safety timeout
+  // at 10s ensures screenshots still trigger even if a load hangs.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const botStaff = window.localStorage.getItem("dashboard-bot-staff");
+    if (!botStaff) return;
+    if (parsedReport.officers.length === 0) return;
+    if (!kpiPresetsLoaded || !staffPhotosLoaded) return;
+
+    // Everything is loaded — wait a bit more for chart animation to settle
+    const t = setTimeout(() => {
+      document.body.setAttribute("data-bot-ready", "1");
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [parsedReport.officers, kpiPresetsLoaded, staffPhotosLoaded]);
+
+  // Bot mode: safety fallback — if presets/photos take longer than 10s,
+  // mark ready anyway so screenshots don't hang indefinitely.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const botStaff = window.localStorage.getItem("dashboard-bot-staff");
+    if (!botStaff) return;
+    if (parsedReport.officers.length === 0) return;
+    if (kpiPresetsLoaded && staffPhotosLoaded) return;
+
+    const t = setTimeout(() => {
+      document.body.setAttribute("data-bot-ready", "1");
+      console.warn("[bot] data-bot-ready safety fallback triggered after 10s");
+    }, 10000);
+    return () => clearTimeout(t);
+  }, [parsedReport.officers, kpiPresetsLoaded, staffPhotosLoaded]);
 
   // PIA: auto-select their own officer + force "staff" view + restrict navigation
   useEffect(() => {
@@ -1673,8 +1706,10 @@ function AppInternal({
         }
         const presets = await getKpiPresets();
         setKpiPresets(presets);
+        setKpiPresetsLoaded(true);
       } catch (e) {
         console.warn("[App] load KPI presets failed:", e);
+        setKpiPresetsLoaded(true);
       }
     })();
   }, []);
@@ -3079,6 +3114,7 @@ function AppInternal({
       }
 
       if (photos) setStaffPhotos(photos);
+      setStaffPhotosLoaded(true);
       if (branchesRes && branchesRes.ok && Array.isArray(branchesRes.branches)) {
         setSheetBranches(branchesRes.branches);
 

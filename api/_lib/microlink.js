@@ -28,8 +28,8 @@ const MICROLINK_API = "https://api.microlink.io";
  * @param {object} opts
  * @param {string} opts.url - URL to capture (must be publicly reachable)
  * @param {"sales"|"csat"|"today"|"target"} [opts.view="sales"] - view param appended to URL
- * @param {number} [opts.width=1600] - viewport width
- * @param {number} [opts.height=1200] - viewport height
+ * @param {number} [opts.width=1920] - viewport width
+ * @param {number} [opts.height=1600] - viewport height
  * @param {number} [opts.deviceScaleFactor=2] - device pixel ratio (2x retina)
  * @param {string} [opts.waitForSelector='body[data-bot-ready="1"]'] - CSS selector to wait for
  * @param {number} [opts.waitForTimeout=1500] - ms to wait AFTER selector appears (chart animation)
@@ -39,8 +39,8 @@ const MICROLINK_API = "https://api.microlink.io";
 export async function captureWithMicrolink({
   url,
   view = "sales",
-  width = 1600,
-  height = 1200,
+  width = 1920,
+  height = 1600,
   deviceScaleFactor = 2,
   waitForSelector = 'body[data-bot-ready="1"]',
   waitForTimeout = 1500,
@@ -64,6 +64,8 @@ export async function captureWithMicrolink({
   u.searchParams.set("viewport.height", String(height));
   u.searchParams.set("viewport.deviceScaleFactor", String(deviceScaleFactor));
   u.searchParams.set("screenshot.fullPage", "true");
+  u.searchParams.set("screenshot.type", "png");
+  u.searchParams.set("screenshot.quality", "100");
   // Top-level timeout (format "15s"), NOT screenshot.timeout
   u.searchParams.set("timeout", `${timeoutSec}s`);
   if (apiKey) u.searchParams.set("apiKey", apiKey);
