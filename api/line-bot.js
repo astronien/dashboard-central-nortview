@@ -33,8 +33,7 @@ import {
 import { detectBranchFromRows } from "./_lib/branchDetector.js";
 import { buildReplyMessage, buildErrorFlex } from "./_lib/lineMessage.js";
 import { getTursoClient, initLineBotSchema } from "./_lib/tursoClient.js";
-import { getPiaListForBranch, buildPiaReport } from "./_lib/piaReportBuilder.js";
-import { uploadToR2 } from "./_lib/imageStorage.js";
+import { getPiaListForBranch } from "./_lib/piaReportBuilder.js";
 import * as XLSX from "xlsx";
 
 // Ensure LINE Bot tables exist on first request (idempotent CREATE IF NOT EXISTS)
@@ -380,76 +379,6 @@ async function handleReportRequest(event, staffId, accessToken) {
       accessToken,
     );
   });
-}
-
-async function generateAndSendPiaReport(userId, staffId, branchId, accessToken) {
-  // Deprecated — kept for backward compat. Now uses /api/pia-report-generate endpoint.
-  const pia = await buildPiaReport(staffId, branchId);
-  if (!pia) {
-    await pushLineMessage(userId, `❌ ไม่พบข้อมูล PIA (ID ${staffId})`, accessToken);
-    return;
-  }
-
-  const workerUrl = process.env.CLOUDFLARE_WORKER_URL;
-  if (!workerUrl) {
-    await pushLineMessage(
-      userId,
-      "❌ CLOUDFLARE_WORKER_URL ยังไม่ได้ตั้งค่า",
-      accessToken,
-    );
-    return;
-  }
-
-  // Sequential to avoid 429 rate limit
-  const kpiBuf = await generatePng(workerUrl, "kpi", pia);
-  await new Promise((r) => setTimeout(r, 500));
-  const wonderBuf = await generatePng(workerUrl, "wonder", pia);
-  await new Promise((r) => setTimeout(r, 500));
-  const categoryBuf = await generatePng(workerUrl, "category", pia);
-
-  // 3. Upload to R2
-  const [kpiUrl, wonderUrl, categoryUrl] = await Promise.all([
-    uploadToR2(kpiBuf, `${pia.staffId}-kpi.png`),
-    uploadToR2(wonderBuf, `${pia.staffId}-wonder.png`),
-    uploadToR2(categoryBuf, `${pia.staffId}-category.png`),
-  ]);
-
-  // 4. Multicast 3 images (3 messages, 3 quota)
-  await fetch("https://api.line.me/v2/bot/message/multicast", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify({
-      to: [userId],
-      messages: [
-        { type: "image", originalContentUrl: kpiUrl, previewImageUrl: kpiUrl },
-        { type: "image", originalContentUrl: wonderUrl, previewImageUrl: wonderUrl },
-        { type: "image", originalContentUrl: categoryUrl, previewImageUrl: categoryUrl },
-      ],
-    }),
-  });
-
-  await pushLineMessage(
-    userId,
-    `✅ ส่งรายงาน ${pia.name} (ID ${pia.staffId}) เรียบร้อย`,
-    accessToken,
-  );
-}
-
-async function generatePng(workerUrl, template, data) {
-  const res = await fetch(`${workerUrl}/screenshot`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ template, data }),
-  });
-  if (!res.ok) {
-    const errText = await res.text().catch(() => "");
-    throw new Error(`Worker ${template} failed: ${res.status} ${errText}`);
-  }
-  const buffer = await res.arrayBuffer();
-  return Buffer.from(buffer);
 }
 
 async function pushLineMessage(userId, text, accessToken) {

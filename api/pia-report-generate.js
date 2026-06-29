@@ -37,11 +37,10 @@ export default async function handler(req, res) {
   // Process synchronously — Vercel will keep the function alive
   // until the promise resolves. We return 200 only after completion.
   try {
-    await generateAndSend(userId, staffId, branchId);
-    res.status(200).json({ ok: true, staffId });
+    const result = await generateAndSend(userId, staffId, branchId);
+    res.status(200).json({ ok: true, staffId, result });
   } catch (e) {
     console.error("[pia-report-generate] failed:", e);
-    // We can't change status if response already partially sent
     if (!res.headersSent) {
       res.status(500).json({ error: String(e?.message ?? e) });
     }
@@ -69,14 +68,13 @@ async function generateAndSend(userId, staffId, branchId) {
     return;
   }
 
-  // 2. Generate 3 PNGs (sequential to avoid 429)
+  // 2. Generate 3 PNGs in a single browser session (avoids 429 rate limit)
   let kpiBuf, wonderBuf, categoryBuf;
   try {
-    kpiBuf = await generatePng(workerUrl, "kpi", pia);
-    await sleep(500);
-    wonderBuf = await generatePng(workerUrl, "wonder", pia);
-    await sleep(500);
-    categoryBuf = await generatePng(workerUrl, "category", pia);
+    const result = await generateAllPngs(workerUrl, pia);
+    kpiBuf = result.kpi;
+    wonderBuf = result.wonder;
+    categoryBuf = result.category;
   } catch (e) {
     console.error("[pia-report-generate] generatePng failed:", e);
     await pushText(
@@ -84,7 +82,7 @@ async function generateAndSend(userId, staffId, branchId) {
       `❌ สร้างรูปไม่สำเร็จ: ${e instanceof Error ? e.message : String(e)}`,
       accessToken,
     );
-    return;
+    return { error: e.message };
   }
 
   // 3. Upload to R2
@@ -117,20 +115,31 @@ async function generateAndSend(userId, staffId, branchId) {
     `✅ ส่งรายงาน ${pia.name} (ID ${pia.staffId}) เรียบร้อย`,
     accessToken,
   );
+  return { kpiUrl, wonderUrl, categoryUrl };
 }
 
-async function generatePng(workerUrl, template, data) {
+async function generateAllPngs(workerUrl, data) {
   const res = await fetch(`${workerUrl}/screenshot`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ template, data }),
+    body: JSON.stringify({
+      templates: ["kpi", "wonder", "category"],
+      data,
+    }),
   });
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
-    throw new Error(`Worker ${template} failed: ${res.status} ${errText}`);
+    throw new Error(`Worker failed: ${res.status} ${errText}`);
   }
-  const buffer = await res.arrayBuffer();
-  return Buffer.from(buffer);
+  const json = await res.json();
+  if (!json.results) {
+    throw new Error("Worker returned no results");
+  }
+  return {
+    kpi: Buffer.from(json.results.kpi, "base64"),
+    wonder: Buffer.from(json.results.wonder, "base64"),
+    category: Buffer.from(json.results.category, "base64"),
+  };
 }
 
 async function pushText(userId, text, accessToken) {
