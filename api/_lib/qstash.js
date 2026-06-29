@@ -15,7 +15,10 @@ export function getQStash() {
   if (!_client) {
     const token = process.env.QSTASH_TOKEN;
     if (!token) throw new Error("QSTASH_TOKEN not set");
-    _client = new Client({ token });
+    // Use the URL from env (e.g. https://qstash-us-east-1.upstash.io)
+    // If not set, default to the SDK's auto-detection
+    const baseUrl = process.env.QSTASH_URL;
+    _client = baseUrl ? new Client({ token, baseUrl }) : new Client({ token });
   }
   return _client;
 }
