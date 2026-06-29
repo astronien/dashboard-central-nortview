@@ -16,6 +16,23 @@ import { getTursoClient } from "./tursoClient.js";
  * @param {string} branchId - Branch ID (e.g. "645")
  * @returns {Promise<Array<{name: string, surname: string, staffId: string, branch: string}>>}
  */
+/**
+ * Normalize branchId to match `BRANCH NAME` in target data.
+ * The allowlist stores branchId as "645" but the target row stores
+ * "ID645 : Studio 7-Central-Westgate". We check both formats.
+ */
+function branchMatches(branchName, branchId) {
+  const bn = String(branchName ?? "").trim();
+  const bi = String(branchId ?? "").trim();
+  if (!bi) return false;
+  if (bn === bi) return true;
+  // "645" matches "ID645 : Studio 7-Central-Westgate"
+  if (bn.toLowerCase().startsWith(`id${bi.toLowerCase()}`)) return true;
+  // "645" matches "ID 645 ..."
+  if (bn.replace(/\s+/g, "").toLowerCase().startsWith(`id${bi}`)) return true;
+  return false;
+}
+
 export async function getPiaListForBranch(branchId) {
   if (!branchId) return [];
   const client = getTursoClient();
@@ -29,7 +46,7 @@ export async function getPiaListForBranch(branchId) {
   for (const row of res.rows) {
     const data = JSON.parse(String(row.data));
     for (const t of data) {
-      if (String(t["BRANCH NAME"] ?? "").trim() !== branchId) continue;
+      if (!branchMatches(t["BRANCH NAME"], branchId)) continue;
       if (String(t["POSISION"] ?? "").toUpperCase() !== "PIA") continue;
 
       const staffId = String(t["STAFF ID"] ?? "").trim();
@@ -72,7 +89,7 @@ export async function buildPiaReport(staffId, branchId) {
     for (const t of data) {
       if (
         String(t["STAFF ID"] ?? "").trim() === staffId &&
-        String(t["BRANCH NAME"] ?? "").trim() === branchId &&
+        branchMatches(t["BRANCH NAME"], branchId) &&
         String(t["POSISION"] ?? "").toUpperCase() === "PIA"
       ) {
         piaTarget = t;
