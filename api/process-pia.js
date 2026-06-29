@@ -1,11 +1,10 @@
 /**
- * QStash Worker — processes 1 PIA → 3 screenshots from web → sends to Telegram.
+ * QStash Worker — processes 1 PIA → 3 screenshots via Microlink → sends to Telegram.
  *
  * Called by Upstash QStash at scheduled times (with delay).
  * Verifies QStash HMAC signature before processing.
  *
- * Captures 3 sections of the web dashboard (KPI / 7 Wonders / Category)
- * via a single browser session and sends them as 3 separate photos.
+ * Uses Microlink.io (50 req/day free tier) instead of CF Worker.
  *
  * Free tier: 500 QStash messages/day.
  */
@@ -13,13 +12,32 @@
 import { verifyQStashRequest } from "./_lib/qstash.js";
 import { sendMessage, sendPhoto } from "./_lib/telegramBot.js";
 import { getPiaListForBranch } from "./_lib/piaReportBuilder.js";
+import { capturePiaSections, capturePiaSingle } from "./_lib/microlink.js";
 
-const WORKER_URL = process.env.CLOUDFLARE_WORKER_URL;
 const WEB_BOT_TOKEN = process.env.WEB_BOT_TOKEN;
 const BRANCH_DISPLAY = process.env.TELEGRAM_BRANCH_DISPLAY ?? "ID645 : Studio 7-Central-Westgate";
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+function sendMicrolinkError(chatId, rawMsg) {
+  if (rawMsg.includes("429") || rawMsg.includes("rate") || rawMsg.includes("limit")) {
+    return sendMessage(chatId,
+      `❌ Microlink free tier หมดแล้ว (50 req/day) — รอ 1-2 นาที`,
+    );
+  }
+  if (rawMsg.includes("500") || rawMsg.includes("Unable to")) {
+    return sendMessage(chatId,
+      `❌ สร้างรูปไม่สำเร็จ (เซิร์ฟเวอร์มีปัญหา) — รอ 30 วินาที`,
+    );
+  }
+  if (rawMsg.includes("timeout") || rawMsg.includes("Timeout")) {
+    return sendMessage(chatId,
+      `❌ สร้างรูปไม่สำเร็จ (timeout) — ลองอีกครั้งใน 1 นาที`,
+    );
+  }
+  return sendMessage(chatId, `❌ สร้างรูปไม่สำเร็จ — ลองอีกครั้งใน 1 นาที`);
 }
 
 export default async function handler(req, res) {
@@ -40,7 +58,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Missing staffId/branchId/chatId" });
   }
 
-  // 2. Look up the PIA's display name
+  // 2. Look up PIA
   const piaList = await getPiaListForBranch(branchId);
   const pia = piaList.find((p) => p.staffId === staffId);
   if (!pia) {
@@ -48,89 +66,60 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, skipped: true });
   }
 
-  // 3. Cap web app via worker — try 3 sections first, fallback to 1
+  // 3. Build bot URL
   const url = `https://dashboard-central-nortview.vercel.app/?bot=1&token=${encodeURIComponent(WEB_BOT_TOKEN)}&staffId=${encodeURIComponent(staffId)}&branch=${encodeURIComponent(BRANCH_DISPLAY)}`;
-  const workerToken = process.env.WORKER_BOT_TOKEN ?? "pia-bot-secret";
 
-  // Try 3 sections
+  // 4. Capture 3 sections in parallel via Microlink
   let sections = {};
-  let usedFallback = false;
   try {
-    const res = await fetch(`${WORKER_URL}/screenshot-url`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        url,
-        token: workerToken,
-        urlsBySection: {
-          kpi: url + "&view=sales",
-          wonder: url + "&view=csat",
-          category: url + "&view=today",
-        },
-      }),
-    });
-    if (!res.ok) {
-      const errText = await res.text().catch(() => "");
-      throw new Error(`Worker failed: ${res.status} ${errText}`);
-    }
-    const json = await res.json();
-    for (const [k, v] of Object.entries(json.results ?? {})) {
-      sections[k] = Buffer.from(v, "base64");
-    }
-    if (Object.keys(sections).length < 3) {
-      throw new Error(`only ${Object.keys(sections).length} sections`);
-    }
+    sections = await capturePiaSections(url);
   } catch (e) {
-    console.log(`[process-pia] 3-section failed for ${staffId}:`, e.message);
-    // Fallback to 1 image
-    usedFallback = true;
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[process-pia] ${staffId} capturePiaSections failed:`, msg);
+    await sendMicrolinkError(chatId, msg);
+    return res.status(200).json({ ok: false, error: e.message });
+  }
+
+  // 5. Fallback: if all 3 failed, try single full-page
+  const validSections = Object.entries(sections).filter(([, buf]) => buf);
+  if (validSections.length === 0) {
     try {
-      const res = await fetch(`${WORKER_URL}/screenshot-url`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          url,
-          token: workerToken,
-          sections: ["all"],
-        }),
-      });
-      if (!res.ok) {
-        const errText = await res.text().catch(() => "");
-        throw new Error(`Worker failed: ${res.status} ${errText}`);
-      }
-      const json = await res.json();
-      if (json.results?.all) {
-        sections.all = Buffer.from(json.results.all, "base64");
-      }
-    } catch (e2) {
-      console.error(`[process-pia] fallback failed for ${staffId}:`, e2);
-      await sendMessage(chatId, `❌ ${pia.name}: สร้างรูปไม่สำเร็จ — ${e2 instanceof Error ? e2.message : String(e2)}`);
-      return res.status(200).json({ ok: false, error: e2.message });
+      const png = await capturePiaSingle(url);
+      await sendPhoto(chatId, png, `📊 ${pia.name} (ID ${pia.staffId}) - รายงานเต็ม`);
+      await sendMessage(chatId, `✅ ส่งรายงาน ${pia.name} (ID ${pia.staffId}) 1 รูปเรียบร้อย`);
+      return res.status(200).json({ ok: true, staffId, count: 1 });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[process-pia] ${staffId} fallback single failed:`, msg);
+      await sendMicrolinkError(chatId, msg);
+      return res.status(200).json({ ok: false, error: e.message });
     }
   }
 
-  // 4. Send photos
+  // 6. Send 3 photos
+  let count = 0;
   try {
     if (sections.kpi) {
       await sendPhoto(chatId, sections.kpi, `📊 KPI Overview - ${pia.name} (${pia.staffId})`);
+      count++;
       await sleep(400);
     }
     if (sections.wonder) {
       await sendPhoto(chatId, sections.wonder, `🏆 7 Wonders - ${pia.name}`);
+      count++;
       await sleep(400);
     }
     if (sections.category) {
       await sendPhoto(chatId, sections.category, `📈 Category Detail - ${pia.name}`);
-    }
-    if (sections.all) {
-      await sendPhoto(chatId, sections.all, `📊 ${pia.name} (ID ${pia.staffId}) - รายงานเต็ม`);
+      count++;
     }
   } catch (e) {
-    console.error(`[process-pia] sendPhoto failed for ${staffId}:`, e);
+    console.error(`[process-pia] sendPhoto failed:`, e);
     return res.status(200).json({ ok: false, error: e.message });
   }
 
-  const count = Object.keys(sections).length;
-  await sendMessage(chatId, `✅ ส่งรายงาน ${pia.name} (ID ${pia.staffId}) ${count} รูปเรียบร้อย`);
-  return res.status(200).json({ ok: true, staffId, count, fallback: usedFallback });
+  if (count > 0) {
+    await sendMessage(chatId, `✅ ส่งรายงาน ${pia.name} (ID ${pia.staffId}) ${count} รูปเรียบร้อย`);
+  }
+  return res.status(200).json({ ok: true, staffId, count });
 }

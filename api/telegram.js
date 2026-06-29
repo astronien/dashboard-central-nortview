@@ -26,9 +26,10 @@ import {
 import { schedulePiaJob } from "./_lib/qstash.js";
 import { processUpload } from "./_lib/uploadProcessor.js";
 import { detectBranchFromRows } from "./_lib/branchDetector.js";
+import { capturePiaSections, capturePiaSingle } from "./_lib/microlink.js";
 
 const BRANCH_ID = process.env.TELEGRAM_BRANCH_ID ?? "645";
-const WORKER_URL = process.env.CLOUDFLARE_WORKER_URL;
+const BRANCH_DISPLAY = process.env.TELEGRAM_BRANCH_DISPLAY ?? "ID645 : Studio 7-Central-Westgate";
 const DELAY_BETWEEN_PIAS_SEC = 25;
 
 export default async function handler(req, res) {
@@ -199,50 +200,79 @@ async function handleDirectPiaReport(chatId, staffId) {
     return sendMessage(chatId, `❌ ไม่พบ PIA (ID ${staffId})`);
   }
 
-  const url = `https://dashboard-central-nortview.vercel.app/?bot=1&token=${encodeURIComponent(process.env.WEB_BOT_TOKEN)}&staffId=${encodeURIComponent(staffId)}&branch=${encodeURIComponent("ID645 : Studio 7-Central-Westgate")}`;
+  const url = `https://dashboard-central-nortview.vercel.app/?bot=1&token=${encodeURIComponent(process.env.WEB_BOT_TOKEN)}&staffId=${encodeURIComponent(staffId)}&branch=${encodeURIComponent(BRANCH_DISPLAY)}`;
 
-  // Try 3-section report first (~25s, requires more browser time)
-  await sendMessage(chatId, "📊 กำลังสร้างรายงาน 3 รูป... (~25 วินาที)");
+  await sendMessage(chatId, "📊 กำลังสร้างรายงาน 3 รูป... (~15-25 วินาที)");
+
+  // Capture 3 sections in parallel via Microlink
+  let sections = {};
   try {
-    const sections = await capUrl(url, ["kpi", "wonder", "category"]);
-    let count = 0;
-    if (sections.kpi) {
-      await sendPhoto(chatId, sections.kpi, `📊 KPI Overview - ${pia.name} (${pia.staffId})`);
-      count++;
-      await sleep(400);
-    }
-    if (sections.wonder) {
-      await sendPhoto(chatId, sections.wonder, `🏆 7 Wonders - ${pia.name}`);
-      count++;
-      await sleep(400);
-    }
-    if (sections.category) {
-      await sendPhoto(chatId, sections.category, `📈 Category Detail - ${pia.name}`);
-      count++;
-    }
-    if (count === 3) {
-      return sendMessage(chatId, `✅ ส่งรายงาน ${pia.name} (ID ${pia.staffId}) 3 รูปเรียบร้อย`);
-    }
-    // Some failed, try fallback to 1 image
-    if (count === 0) throw new Error("no sections");
+    sections = await capturePiaSections(url);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.log(`[bot] 3-section failed: ${msg}, falling back to 1 image`);
-    await sendMessage(chatId, `⚠️ ใช้ 3 รูปไม่ได้ (CF rate limit) — ลอง 1 รูปเต็มหน้า`);
+    console.error(`[bot] /report ${staffId} failed:`, msg);
+    return sendMicrolinkError(chatId, msg);
   }
 
-  // Fallback: single full-page screenshot
-  try {
-    const png = await capUrl(url, ["all"]);
-    if (png && png.all) {
-      await sendPhoto(chatId, png.all, `📊 ${pia.name} (ID ${pia.staffId}) - รายงานเต็ม`);
+  // Fallback: if all 3 failed, try single full-page
+  const validSections = Object.entries(sections).filter(([, buf]) => buf);
+  if (validSections.length === 0) {
+    try {
+      const png = await capturePiaSingle(url);
+      await sendPhoto(chatId, png, `📊 ${pia.name} (ID ${pia.staffId}) - รายงานเต็ม`);
       return sendMessage(chatId, `✅ ส่งรายงาน ${pia.name} (ID ${pia.staffId}) 1 รูปเรียบร้อย`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[bot] fallback single also failed:`, msg);
+      return sendMicrolinkError(chatId, msg);
     }
-    throw new Error("no image in fallback");
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return sendMessage(chatId, `❌ สร้างรูปไม่สำเร็จ: ${msg}\n(อาจติด CF Browser rate limit — รอ 1-2 นาทีแล้วลองใหม่)`);
   }
+
+  // Send the 3 photos
+  let count = 0;
+  if (sections.kpi) {
+    await sendPhoto(chatId, sections.kpi, `📊 KPI Overview - ${pia.name} (${pia.staffId})`);
+    count++;
+    await sleep(400);
+  }
+  if (sections.wonder) {
+    await sendPhoto(chatId, sections.wonder, `🏆 7 Wonders - ${pia.name}`);
+    count++;
+    await sleep(400);
+  }
+  if (sections.category) {
+    await sendPhoto(chatId, sections.category, `📈 Category Detail - ${pia.name}`);
+    count++;
+  }
+
+  if (count > 0) {
+    return sendMessage(chatId, `✅ ส่งรายงาน ${pia.name} (ID ${pia.staffId}) ${count} รูปเรียบร้อย`);
+  }
+  return sendMicrolinkError(chatId, "ไม่สามารถสร้างรูปได้");
+}
+
+function sendMicrolinkError(chatId, rawMsg) {
+  if (rawMsg.includes("429") || rawMsg.includes("rate") || rawMsg.includes("limit")) {
+    return sendMessage(chatId,
+      `❌ Microlink free tier หมดแล้ว (50 req/day)\n` +
+      `⏰ รอ 1-2 นาทีแล้วลองใหม่ หรือลองพรุ่งนี้`,
+    );
+  }
+  if (rawMsg.includes("500") || rawMsg.includes("Unable to")) {
+    return sendMessage(chatId,
+      `❌ สร้างรูปไม่สำเร็จ (เซิร์ฟเวอร์มีปัญหา)\n` +
+      `⏰ รอ 30 วินาทีแล้วลองใหม่`,
+    );
+  }
+  if (rawMsg.includes("timeout") || rawMsg.includes("Timeout")) {
+    return sendMessage(chatId,
+      `❌ สร้างรูปไม่สำเร็จ (timeout)\n` +
+      `⏰ ลองอีกครั้งในอีก 1 นาที`,
+    );
+  }
+  return sendMessage(chatId,
+    `❌ สร้างรูปไม่สำเร็จ\n⏰ ลองอีกครั้งในอีก 1 นาที`,
+  );
 }
 
 async function handleFileUpload(msg) {
@@ -310,51 +340,6 @@ async function detectBranchFromExcel(buf) {
   } catch (e) {
     return { branchId: null, error: `อ่านไฟล์ไม่ได้: ${e instanceof Error ? e.message : String(e)}` };
   }
-}
-
-async function capUrl(url, sections = null) {
-  const workerUrl = process.env.CLOUDFLARE_WORKER_URL;
-  const token = process.env.WEB_BOT_TOKEN;
-  if (!workerUrl) throw new Error("CLOUDFLARE_WORKER_URL not set");
-  if (!token) throw new Error("WEB_BOT_TOKEN not set");
-
-  // For each section, append a different ?view= so the web app shows a
-  // different table (sales/today/csat). The worker takes 3 full-page
-  // screenshots, one per URL.
-  const SECTION_TO_VIEW = { kpi: "sales", wonder: "csat", category: "today" };
-  const urls = {};
-  for (const section of sections ?? Object.keys(SECTION_TO_VIEW)) {
-    const sep = url.includes("?") ? "&" : "?";
-    urls[section] = `${url}${sep}view=${SECTION_TO_VIEW[section] ?? "sales"}`;
-  }
-
-  const body = {
-    url: urls.kpi ?? url,
-    token,
-    sections: Object.keys(urls),
-    // Pass alternate URLs via per-section array
-    urlsBySection: urls,
-  };
-
-  const res = await fetch(`${workerUrl}/screenshot-url`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const errText = await res.text().catch(() => "");
-    throw new Error(`Worker failed: ${res.status} ${errText}`);
-  }
-  const json = await res.json();
-  if (json.results) {
-    const out = {};
-    for (const [key, b64] of Object.entries(json.results)) {
-      out[key] = Buffer.from(b64, "base64");
-    }
-    return out;
-  }
-  const buffer = await res.arrayBuffer();
-  return Buffer.from(buffer);
 }
 
 function sleep(ms) {
