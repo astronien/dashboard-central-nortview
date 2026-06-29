@@ -1,30 +1,34 @@
 /**
- * Web app → Telegram report trigger.
+ * Web app → Telegram report sender.
  *
- * Called by the "ส่งไป Telegram" button in StaffSection.
- * POST { staffId } → looks up most recent Telegram chat_id from Turso
- * → schedules QStash job → process-pia.js captures 3 screenshots
- * → sends to that chat.
+ * Called by the "ส่งไป Telegram" button in StaffSection. The web app
+ * captures 3 views (KPI / 7 Wonders / Today) via html2canvas, converts
+ * each to PNG, then POSTs them here. This endpoint forwards them to
+ * Telegram via sendDocument (uncompressed).
  *
- * No 60s timeout issue (schedules QStash, returns immediately).
+ * Body (JSON):
+ *   { staffId, images: [{ name, base64, caption }] }
+ *
+ * No QStash, no external screenshot service — just image forwarding.
  */
-import { schedulePiaJob } from "./_lib/qstash.js";
-import { getMostRecentTelegramChatId, initLineBotSchema } from "./_lib/tursoClient.js";
-
-const BRANCH_ID = process.env.TELEGRAM_BRANCH_ID ?? "645";
+import { sendDocument, sendMessage } from "./_lib/telegramBot.js";
+import { getMostRecentTelegramChatId, initTelegramSchema } from "./_lib/tursoClient.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { staffId } = req.body ?? {};
+  const { staffId, images } = req.body ?? {};
   if (!staffId) {
     return res.status(400).json({ error: "Missing staffId" });
   }
+  if (!Array.isArray(images) || images.length === 0) {
+    return res.status(400).json({ error: "Missing images" });
+  }
 
-  // Ensure telegram_chats table exists (idempotent)
-  try { await initLineBotSchema(); } catch (e) {
+  // Ensure telegram_chats table exists
+  try { await initTelegramSchema(); } catch (e) {
     console.error("[telegram-report] schema init failed:", e);
   }
 
@@ -36,13 +40,33 @@ export default async function handler(req, res) {
     });
   }
 
-  // Schedule the QStash job (process-pia.js will do the captures + sendPhoto)
-  try {
-    await schedulePiaJob({ staffId, branchId: BRANCH_ID, chatId, delay: 0 });
-    return res.status(200).json({ ok: true, chatId });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error("[telegram-report] schedulePiaJob failed:", msg);
-    return res.status(500).json({ error: "ส่งไม่สำเร็จ (QStash error)" });
+  // Send each image as an uncompressed document (Telegram renders PNG inline)
+  let count = 0;
+  const errors = [];
+  for (const img of images) {
+    try {
+      const buf = Buffer.from(img.base64, "base64");
+      const filename = img.name || `report-${staffId}.jpeg`;
+      const caption = img.caption || "";
+      // Determine MIME type from filename extension
+      const mime = filename.endsWith(".png") ? "image/png" : "image/jpeg";
+      await sendDocument(chatId, buf, filename, caption, mime);
+      count++;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("[telegram-report] sendDocument failed:", msg);
+      errors.push(msg);
+    }
   }
+
+  if (count === 0) {
+    return res.status(500).json({ error: "ส่งรูปไม่สำเร็จ — ลองอีกครั้ง" });
+  }
+
+  // Send a small summary message
+  try {
+    await sendMessage(chatId, `✅ ส่งรายงาน ${count}/${images.length} รูปเรียบร้อย`);
+  } catch {}
+
+  return res.status(200).json({ ok: true, count, errors });
 }

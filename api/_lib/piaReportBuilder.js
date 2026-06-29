@@ -6,7 +6,7 @@
  *   - buildPiaReport: full report (target + current + computed KPI/Wonder/Category)
  *
  * Used by:
- *   - api/line-bot.js (Quick Reply + screenshot trigger)
+ *   - api/telegram.js (report generation)
  */
 
 import { getTursoClient } from "./tursoClient.js";

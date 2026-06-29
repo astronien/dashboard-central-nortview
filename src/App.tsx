@@ -107,7 +107,6 @@ import { HomeDashboardSection } from "./components/dashboard/HomeDashboardSectio
 import { StaffSection } from "./components/dashboard/StaffSection";
 import { ReportsSection } from "./components/dashboard/ReportsSection";
 import { SettingsSection } from "./components/dashboard/SettingsSection";
-import { LineUserManager } from "./components/dashboard/admin/LineUserManager";
 import KpiPresetSection from "./components/dashboard/KpiPresetSection";
 import {
   getPresets as getKpiPresets,
@@ -121,8 +120,6 @@ import { syncPiaFromOfficers } from "./lib/auth/piSync";
 import { calcPreset, presetDisplayValue, computePresetAchPercent } from "./lib/presetEngine";
 import { parseBills, type BillSummary } from "./lib/presetBills";
 import { enrichSalesRowsWithCatDaily, buildCatDailyLookup } from "./lib/presetCatDaily";
-import { startUploadWatcher, type LastModified } from "./lib/uploadWatcher";
-import { UploadNotification, type UploadNotificationInfo } from "./components/dashboard/UploadNotification";
 
 
 type Staff = {
@@ -3233,38 +3230,8 @@ function AppInternal({
     }
   };
 
-  // --- LINE Bot upload watcher: poll every 30s for new uploads ---
-  const [uploadNotice, setUploadNotice] = useState<UploadNotificationInfo | null>(null);
-  useEffect(() => {
-    const stop = startUploadWatcher({
-      intervalMs: 30_000,
-      onUpdate: async (info) => {
-        setUploadNotice(info);
-        // Re-fetch fresh data from Turso (not stale local state)
-        try {
-          const fresh = await loadPersistedUploads();
-          if (fresh) {
-            rebuildReport(fresh, { skipPersist: true });
-          } else if (uploadedFiles && hasUploadData(uploadedFiles)) {
-            // Fallback: rebuild with existing local state
-            rebuildReport(uploadedFiles, { skipPersist: true });
-          }
-        } catch (e) {
-          console.warn("[uploadWatcher] re-fetch failed:", e);
-        }
-      },
-      onError: (err) => {
-        // Silent — polling errors are non-critical
-        console.warn("[uploadWatcher]", err);
-      },
-    });
-    return stop;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [uploadedFiles, selectedBranch]);
-
   return (
     <div className="min-h-screen bg-[#1c2722] p-4 font-sans text-white md:p-8 flex flex-col items-center">
-      <UploadNotification info={uploadNotice} onDismiss={() => setUploadNotice(null)} />
       {isInitialLoading && (
         <div className="fixed inset-0 z-[999] bg-[#1c2722] flex items-center justify-center">
           <div className="flex flex-col items-center gap-4">

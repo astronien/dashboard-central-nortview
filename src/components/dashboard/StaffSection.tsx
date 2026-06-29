@@ -9,6 +9,7 @@ import {
 } from "recharts";
 import { ShoppingBag, Award, Star, TrendingUp, Apple, Send, Loader2, CheckCircle2 } from "lucide-react";
 import React from "react";
+import html2canvas from "html2canvas";
 import { calcTargetToDate, calcTodayAchievementPct } from "../../lib/targetAggregations";
 import type { PresetCalcType } from "../../lib/presetTypes";
 
@@ -69,51 +70,131 @@ const isCurrencyCalcType = (calcType: PresetCalcType | undefined): boolean => {
 };
 
 /**
- * "ส่งไป Telegram" button — calls /api/telegram-report to schedule a
- * QStash job that captures 3 screenshot views and sends them to the
- * most recently active Telegram chat. No need to open Telegram manually.
+ * "ส่งไป Telegram" button — captures 3 views (sales / csat / target)
+ * via html2canvas, then POSTs the images to /api/telegram-report which
+ * forwards them to the most recently active Telegram chat.
  */
-function TelegramSendButton({ staffId }: { staffId: string }) {
-  const [status, setStatus] = React.useState<"idle" | "sending" | "sent" | "error">("idle");
+function TelegramSendButton({
+  staffId,
+  containerRef,
+  onSetActiveStat,
+}: {
+  staffId: string;
+  containerRef: React.RefObject<HTMLDivElement | null>;
+  onSetActiveStat: (stat: string) => void;
+}) {
+  const [status, setStatus] = React.useState<"idle" | "capturing" | "sending" | "sent" | "error">("idle");
+  const [progress, setProgress] = React.useState("");
   const [errorMsg, setErrorMsg] = React.useState("");
 
-  const handleClick = async () => {
-    if (status === "sending") return;
-    setStatus("sending");
-    setErrorMsg("");
+  const captureView = async (): Promise<string | null> => {
+    // Wait for React to commit the DOM + AnimatePresence transitions
+    await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 1000)));
+    const el = containerRef.current;
+    if (!el) return null;
     try {
-      const res = await fetch("/api/telegram-report", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ staffId }),
+      const canvas = await html2canvas(el, {
+        scale: 1.5,
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: null,
+        logging: false,
       });
-      const data = await res.json();
-      if (res.ok && data.ok) {
-        setStatus("sent");
-        // Reset to idle after 8 seconds
-        setTimeout(() => setStatus("idle"), 8000);
-      } else {
-        setStatus("error");
-        setErrorMsg(data.error ?? "ส่งไม่สำเร็จ");
-        setTimeout(() => setStatus("idle"), 8000);
-      }
+      // JPEG quality 0.92 — much smaller than PNG, good quality for text/UI
+      return canvas.toDataURL("image/jpeg", 0.92).replace(/^data:image\/jpeg;base64,/, "");
     } catch (e) {
-      setStatus("error");
-      setErrorMsg("เครือข่ายมีปัญหา");
-      setTimeout(() => setStatus("idle"), 8000);
+      console.error("[TelegramSendButton] html2canvas failed:", e);
+      return null;
     }
+  };
+
+  const handleClick = async () => {
+    if (status === "capturing" || status === "sending") return;
+    const views: Array<{ stat: string; name: string }> = [
+      { stat: "sales", name: "KPI" },
+      { stat: "csat", name: "7 Wonders" },
+      { stat: "target", name: "Today" },
+    ];
+
+    setStatus("capturing");
+    setErrorMsg("");
+
+    const images: Array<{ name: string; base64: string; caption: string }> = [];
+
+    for (let i = 0; i < views.length; i++) {
+      const v = views[i];
+      setProgress(`(${i + 1}/${views.length}) ${v.name}…`);
+      onSetActiveStat(v.stat);
+      const base64 = await captureView();
+      if (!base64) {
+        setStatus("error");
+        setErrorMsg(`จับภาพ ${v.name} ไม่สำเร็จ — เปิด console ดู`);
+        setTimeout(() => setStatus("idle"), 6000);
+        return;
+      }
+      console.log(`[TelegramSendButton] ${v.name} base64 length:`, base64.length);
+      images.push({
+        name: `${staffId}-${v.stat}.jpeg`,
+        base64,
+        caption: `${v.name}`,
+      });
+    }
+
+    setStatus("sending");
+    setProgress("กำลังส่งไป Telegram…");
+
+    // Send images one at a time to avoid Vercel 4.5MB body limit
+    let sentCount = 0;
+    const errs: string[] = [];
+    for (let i = 0; i < images.length; i++) {
+      const img = images[i];
+      try {
+        setProgress(`(${i + 1}/${images.length}) กำลังส่ง…`);
+        const res = await fetch("/api/telegram-report", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ staffId, images: [img] }),
+        });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+          sentCount++;
+        } else {
+          errs.push(`${img.caption}: ${data.error ?? res.status}`);
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        errs.push(`${img.caption}: ${msg}`);
+      }
+    }
+
+    if (sentCount === images.length) {
+      setStatus("sent");
+      setProgress("");
+    } else if (sentCount > 0) {
+      setStatus("sent");
+      setProgress(`ส่ง ${sentCount}/${images.length} รูป`);
+    } else {
+      setStatus("error");
+      setErrorMsg(errs[0] ?? "ส่งไม่สำเร็จ");
+      console.error("[TelegramSendButton] errors:", errs);
+    }
+    setTimeout(() => {
+      setStatus("idle");
+      setProgress("");
+    }, 8000);
   };
 
   const baseClass =
     "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs sm:text-sm font-semibold transition-colors";
-  if (status === "sending") {
+  if (status === "capturing" || status === "sending") {
     return (
       <button
         disabled
         className={`${baseClass} bg-sky-500/15 border border-sky-400/30 text-sky-200/60`}
       >
         <Loader2 className="w-3 h-3 animate-spin" />
-        <span className="hidden sm:inline">กำลังส่ง...</span>
+        <span className="hidden sm:inline">{progress}</span>
+        <span className="sm:hidden">...</span>
       </button>
     );
   }
@@ -124,7 +205,7 @@ function TelegramSendButton({ staffId }: { staffId: string }) {
         className={`${baseClass} bg-emerald-500/15 border border-emerald-400/40 text-emerald-200`}
       >
         <CheckCircle2 className="w-3 h-3" />
-        <span className="hidden sm:inline">ส่งแล้ว! รอใน Telegram</span>
+        <span className="hidden sm:inline">ส่งแล้ว! ตรวจสอบ Telegram</span>
         <span className="sm:hidden">ส่งแล้ว</span>
       </button>
     );
@@ -248,6 +329,8 @@ export function StaffSection({
       ? activeOfficer7WondersPerformance
       : activeOfficerCategoryPerformance;
 
+  const staffSectionRef = React.useRef<HTMLDivElement>(null);
+
   const focusKpiSummary = React.useMemo(() => {
     const rows = activeOfficerCategoryPerformance.filter((row) => row.category !== "Total" && row.category !== "Average");
     if (!rows.length) return null;
@@ -269,6 +352,7 @@ export function StaffSection({
   return (
               <motion.div
                 key="staff"
+                ref={staffSectionRef}
                 initial={{ opacity: 0, scale: 0.96, filter: "blur(8px)" }}
                 animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
                 exit={{ opacity: 0, scale: 1.04, filter: "blur(8px)" }}
@@ -409,7 +493,7 @@ export function StaffSection({
                               <span className="text-[9px] uppercase tracking-wider text-emerald-300/70 font-sans">ID</span>
                               {activeOfficer.staffId}
                             </span>
-                            <TelegramSendButton staffId={activeOfficer.staffId} />
+                            <TelegramSendButton staffId={activeOfficer.staffId} containerRef={staffSectionRef} onSetActiveStat={onSetActiveStat} />
                           </motion.div>
                         </AnimatePresence>
                       ) : null}

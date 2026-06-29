@@ -48,10 +48,10 @@ export async function sendPhoto(chatId, photoBuffer, caption) {
  * Telegram shows the image inline as a preview but lets users open the
  * uncompressed original by tapping.
  */
-export async function sendDocument(chatId, fileBuffer, filename, caption) {
+export async function sendDocument(chatId, fileBuffer, filename, caption, mime) {
   const form = new FormData();
   form.append("chat_id", String(chatId));
-  form.append("document", new Blob([fileBuffer], { type: "image/png" }), filename || "report.png");
+  form.append("document", new Blob([fileBuffer], { type: mime || "image/jpeg" }), filename || "report.jpeg");
   if (caption) form.append("caption", caption);
 
   const res = await fetch(`${baseUrl()}/sendDocument`, {

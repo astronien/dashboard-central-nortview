@@ -3,15 +3,13 @@
  *
  * Used by:
  *   - Web app (POST /api/uploads via fetch)
- *   - LINE Bot (POST /api/line-webhook via internal call)
  *
  * Responsibilities:
  *   1. Parse Excel (.xlsx) into RawRow[]
  *   2. Validate columns, branch, date range
  *   3. Chunk to 1500 rows/chunk
  *   4. Transaction: DELETE existing chunks for (kind) → INSERT new
- *   5. Compute target vs actual (for Flex Message summary)
- *   6. Write upload_audit_log entry
+ *   5. Write upload_audit_log entry
  *
  * Returns: UploadResult { ok, rows, totalAmount, targetTotal, branch,
  *                          error?, topOfficers? }
@@ -20,19 +18,6 @@
 import { Buffer } from "node:buffer";
 import * as XLSX from "xlsx";
 import { getTursoClient } from "./tursoClient.js";
-
-// Ensure schema tables exist on first upload (idempotent CREATE IF NOT EXISTS)
-let schemaReady = null;
-async function ensureSchema() {
-  if (!schemaReady) {
-    const { initLineBotSchema } = require("./tursoClient.js");
-    schemaReady = initLineBotSchema().catch((e) => {
-      schemaReady = null;
-      throw e;
-    });
-  }
-  return schemaReady;
-}
 
 export const REQUIRED_COLUMNS = {
   current: ["Doc Date", "Category (Name)", "Officer (Name)", "Branch (Name)", "ราคาขายตามบิล"],
@@ -305,10 +290,9 @@ async function logAudit(params) {
     const client = getTursoClient();
     const res = await client.execute({
       sql: `INSERT INTO upload_audit_log
-        (line_user_id, branch_id, kind, file_name, file_size, row_count, target_total, actual_total, status, error_message, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+        (branch_id, kind, file_name, file_size, row_count, target_total, actual_total, status, error_message, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
       args: [
-        params.lineUserId ?? null,
         params.branchId,
         params.kind,
         params.fileName,
@@ -330,7 +314,7 @@ async function logAudit(params) {
 // --- Main API ---
 
 export async function processUpload(params) {
-  const { fileBase64, kind, branchId, lineUserId, fileName } = params;
+  const { fileBase64, kind, branchId, fileName } = params;
 
   // 1. Decode file
   let buf;

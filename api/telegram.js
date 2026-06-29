@@ -23,14 +23,12 @@ import {
 import {
   getPiaListForBranch,
 } from "./_lib/piaReportBuilder.js";
-import { schedulePiaJob } from "./_lib/qstash.js";
 import { processUpload } from "./_lib/uploadProcessor.js";
 import { detectBranchFromRows } from "./_lib/branchDetector.js";
-import { upsertTelegramChat, initLineBotSchema } from "./_lib/tursoClient.js";
+import { upsertTelegramChat, initTelegramSchema } from "./_lib/tursoClient.js";
 
 const BRANCH_ID = process.env.TELEGRAM_BRANCH_ID ?? "645";
 const BRANCH_DISPLAY = process.env.TELEGRAM_BRANCH_DISPLAY ?? "ID645 : Studio 7-Central-Westgate";
-const DELAY_BETWEEN_PIAS_SEC = 25;
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(200).end();
@@ -39,7 +37,7 @@ export default async function handler(req, res) {
   if (!update) return res.status(200).json({ ok: true });
 
   // Ensure telegram_chats table exists (idempotent)
-  try { await initLineBotSchema(); } catch (e) {
+  try { await initTelegramSchema(); } catch (e) {
     console.error("[telegram] schema init failed:", e);
   }
 
@@ -82,14 +80,16 @@ async function handleMessage(msg) {
     return sendMessage(chatId,
       "🤖 PIA Report Bot\n\n" +
       "Commands:\n" +
-      "/report — เลือก PIA ที่ต้องการ\n" +
-      "/report <staffId> — ขอ PIA โดยตรง (เช่น /report 23510)\n" +
-      "/report all — ส่งทุก PIA (39 รูป, รอ ~5 นาที)\n\n" +
-      "📎 ส่งไฟล์ Excel (.xlsx) เพื่ออัปโหลดข้อมูลยอดขาย"
+      "/report — เลือก PIA ที่ต้องการ (ส่งรายงานจากเว็บแดชบอร์ด)\n" +
+      "/report <staffId> — ดูวิธีส่งรายงาน PIA\n" +
+      "/report all — ดูวิธีส่งรายงานทุก PIA\n\n" +
+      "📎 ส่งไฟล์ Excel (.xlsx) เพื่ออัปโหลดข้อมูลยอดขาย\n\n" +
+      "💡 สำหรับรายงานรูป screenshot ให้เข้าเว็บแดชบอร์ดแล้วกดปุ่ม \"ส่งไป Telegram\" ในหน้า Staff Section"
     );
   }
 
-  // Deep link from web app: /start report_<staffId>
+  // Deep link from web app: /start report_<staffId> (legacy — still works,
+  // just shows instructions since screenshots are now captured client-side)
   if (text.startsWith("/start ")) {
     const payload = text.replace(/^\/start\s+/, "").trim();
     if (payload.startsWith("report_")) {
@@ -102,10 +102,11 @@ async function handleMessage(msg) {
     return sendMessage(chatId,
       "🤖 PIA Report Bot\n\n" +
       "Commands:\n" +
-      "/report — เลือก PIA ที่ต้องการ\n" +
-      "/report <staffId> — ขอ PIA โดยตรง (เช่น /report 23510)\n" +
-      "/report all — ส่งทุก PIA (39 รูป, รอ ~5 นาที)\n\n" +
-      "📎 ส่งไฟล์ Excel (.xlsx) เพื่ออัปโหลดข้อมูลยอดขาย"
+      "/report — เลือก PIA ที่ต้องการ (ส่งรายงานจากเว็บแดชบอร์ด)\n" +
+      "/report <staffId> — ดูวิธีส่งรายงาน PIA\n" +
+      "/report all — ดูวิธีส่งรายงานทุก PIA\n\n" +
+      "📎 ส่งไฟล์ Excel (.xlsx) เพื่ออัปโหลดข้อมูลยอดขาย\n\n" +
+      "💡 สำหรับรายงานรูป screenshot ให้เข้าเว็บแดชบอร์ดแล้วกดปุ่ม \"ส่งไป Telegram\" ในหน้า Staff Section"
     );
   }
 
@@ -203,54 +204,26 @@ async function handleReportMore(chatId) {
 }
 
 async function handleReportAll(chatId) {
-  const piaList = await getPiaListForBranch(BRANCH_ID);
-  if (piaList.length === 0) {
-    return sendMessage(chatId, "❌ ไม่พบ PIA");
-  }
-
-  const totalMin = Math.ceil(piaList.length * DELAY_BETWEEN_PIAS_SEC / 60);
-  await sendMessage(chatId,
-    `📊 กำลังส่ง ${piaList.length} PIAs (รอ ~${totalMin} นาที)\n` +
-    `แต่ละคนจะได้รับ 3 รูป ทุก ๆ ${DELAY_BETWEEN_PIAS_SEC} วินาที`
+  // Screenshots are now captured client-side via html2canvas in the web app.
+  // Use the web dashboard to send reports for individual PIAs.
+  return sendMessage(chatId,
+    `📊 รายงาน PIA ทั้งหมดต้องสร้างจากเว็บแดชบอร์ด\n\n` +
+    `เข้า https://dashboard-central-nortview.vercel.app\n` +
+    `ไปหน้า Staff Section ของแต่ละ PIA แล้วกดปุ่ม "ส่งไป Telegram"`,
   );
-
-  for (let i = 0; i < piaList.length; i++) {
-    const pia = piaList[i];
-    try {
-      await schedulePiaJob({
-        staffId: pia.staffId,
-        branchId: BRANCH_ID,
-        chatId,
-        delay: i * DELAY_BETWEEN_PIAS_SEC,
-      });
-    } catch (e) {
-      console.error(`[telegram] schedulePiaJob ${pia.staffId} failed:`, e);
-    }
-  }
 }
 
 async function handleDirectPiaReport(chatId, staffId) {
-  const piaList = await getPiaListForBranch(BRANCH_ID);
-  const pia = piaList.find((p) => p.staffId === staffId);
-
-  if (!pia) {
-    return sendMessage(chatId, `❌ ไม่พบ PIA (ID ${staffId})`);
-  }
-
-  // Schedule via QStash — the capture takes ~45-55s which is too long
-  // for the Vercel 60s webhook limit. QStash calls process-pia.js which
-  // does the 3 captures + sendPhoto. Webhook returns immediately.
-  try {
-    await schedulePiaJob({ staffId, branchId: BRANCH_ID, chatId, delay: 0 });
-    return sendMessage(chatId,
-      `📊 กำลังสร้างรายงาน ${pia.name} (ID ${staffId})...\n` +
-      `⏳ รอประมาณ 1 นาที รูปจะส่งมาในแชตอัตโนมัติ`,
-    );
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error(`[bot] schedulePiaJob ${staffId} failed:`, msg);
-    return sendMessage(chatId, `❌ ไม่สามารถสร้างรายงานได้ (QStash error) — ลองอีกครั้ง`);
-  }
+  // Screenshots are now captured client-side via html2canvas in the web app.
+  // The /report <staffId> command from Telegram can't trigger a browser
+  // capture, so instruct the user to use the web dashboard button instead.
+  return sendMessage(chatId,
+    `📋 รายงาน PIA (ID ${staffId}) ต้องสร้างจากเว็บแดชบอร์ด\n\n` +
+    `1. เข้า https://dashboard-central-nortview.vercel.app\n` +
+    `2. ไปหน้า Staff Section ของ PIA คนนี้\n` +
+    `3. กดปุ่ม "ส่งไป Telegram" (สีฟ้า) ถัดจาก ID\n` +
+    `4. รูป 3 หน้าจะส่งมาในแชตนี้อัตโนมัติ`,
+  );
 }
 
 async function handleFileUpload(msg) {

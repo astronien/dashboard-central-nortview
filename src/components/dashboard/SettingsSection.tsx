@@ -1,5 +1,4 @@
 import { Building2, ImagePlus, Trash2, Users } from "lucide-react";
-import { LineUserManager } from "./admin/LineUserManager";
 
 export type StaffRosterEntry = {
   name: string;
@@ -119,7 +118,6 @@ export function SettingsSection({
         )}
       </div>
 
-      {isAdmin ? <LineUserManager /> : null}
     </>
   );
 }
