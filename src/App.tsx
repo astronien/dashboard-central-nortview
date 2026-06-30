@@ -3512,9 +3512,22 @@ function AppInternal({
             )}
           </AnimatePresence>
 
-          {/* Hidden home view for Telegram screenshot capture (always rendered) */}
-          <div ref={homeCaptureRef} style={{ position: "fixed", left: "-9999px", top: 0, width: "1200px", pointerEvents: "none" }}>
-            <div className="flex flex-col gap-6 w-full h-full relative z-20 p-6 bg-[#1c2722]">
+          {/* Hidden home view for Telegram screenshot capture (always rendered,
+              visible in DOM but invisible via opacity:0 so charts render). */}
+          <div
+            ref={homeCaptureRef}
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              width: "1200px",
+              opacity: 0,
+              pointerEvents: "none",
+              zIndex: -1,
+              background: "#1c2722",
+            }}
+          >
+            <div style={{ width: "1200px", minHeight: "900px", padding: "24px" }}>
               <HomeDashboardSection
                 derivedHomeStats={derivedHomeStats}
                 monthlyPerformance={monthlyPerformance}
