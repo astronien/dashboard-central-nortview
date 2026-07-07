@@ -1801,20 +1801,19 @@ function AppInternal({
   // a different branch appear immediately in the dropdown.
   const uploadedBranches = useMemo<string[]>(() => {
     const set = new Set<string>();
-    const branchCols = ["Branch (Name)", "BRANCH NAME", "branch", "Branch", "BRANCH"];
-    const rows = [
-      ...displayUploads.current,
-      ...displayUploads.target,
-      ...displayUploads.today,
-    ];
-    for (const row of rows) {
-      for (const col of branchCols) {
-        const val = String(row[col] ?? "").trim();
-        if (val) { set.add(val); break; }
+    const branchCols = ["Branch (Name)", "BRANCH NAME", "BRANCH NAME "];
+    const kinds = [uploadedFiles.current, uploadedFiles.target, uploadedFiles.today];
+    for (const rows of kinds) {
+      if (!Array.isArray(rows)) continue;
+      for (const row of rows) {
+        for (const col of branchCols) {
+          const val = String(row[col] ?? "").trim();
+          if (val) { set.add(val); break; }
+        }
       }
     }
     return Array.from(set).sort();
-  }, [displayUploads.current, displayUploads.target, displayUploads.today]);
+  }, [uploadedFiles.current, uploadedFiles.target, uploadedFiles.today]);
 
   // Combined branch list for the dropdown: uploaded first (primary),
   // then the Google-Sheet list (secondary) as a fallback for branches
