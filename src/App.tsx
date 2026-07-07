@@ -1796,24 +1796,25 @@ function AppInternal({
     categoryMaster: "Category Master",
   };
 
-  // Branches present in the uploaded data. This is the primary source
-  // for the branch dropdown — only branches the user has actually
-  // uploaded data for appear, so they can never select a branch with
-  // no rows behind it.
+  // Branches present in the uploaded data. Derived from raw uploaded
+  // rows (not filtered parsedReport) so that newly uploaded files for
+  // a different branch appear immediately in the dropdown.
   const uploadedBranches = useMemo<string[]>(() => {
     const set = new Set<string>();
-    for (const b of parsedReport.branches) {
-      const label = String(b?.label ?? "").trim();
-      if (label) set.add(label);
-    }
-    // Also fall back to Officer (Branch) values so PIA officers from
-    // branches not present in the target aggregate still show up.
-    for (const o of parsedReport.officers) {
-      const branch = String(o?.branch ?? "").trim();
-      if (branch) set.add(branch);
+    const branchCols = ["Branch (Name)", "BRANCH NAME", "branch", "Branch", "BRANCH"];
+    const rows = [
+      ...displayUploads.current,
+      ...displayUploads.target,
+      ...displayUploads.today,
+    ];
+    for (const row of rows) {
+      for (const col of branchCols) {
+        const val = String(row[col] ?? "").trim();
+        if (val) { set.add(val); break; }
+      }
     }
     return Array.from(set).sort();
-  }, [parsedReport.branches, parsedReport.officers]);
+  }, [displayUploads.current, displayUploads.target, displayUploads.today]);
 
   // Combined branch list for the dropdown: uploaded first (primary),
   // then the Google-Sheet list (secondary) as a fallback for branches
