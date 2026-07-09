@@ -592,7 +592,7 @@ export function StaffSection({
                     </motion.div>
 
                     {/* Top 3 Stats */}
-                    <div data-no-capture="stat-buttons" className="flex justify-center lg:justify-end gap-3 mb-3">
+                    <div className="flex justify-center lg:justify-end gap-3 mb-3">
                       <motion.button
                         onClick={() => onSetActiveStat("sales")}
                         initial={{ opacity: 0, y: 15 }}
