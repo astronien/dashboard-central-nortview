@@ -3250,15 +3250,17 @@ function AppInternal({
       : mainRef.current;
     if (!el) return;
     const w = Math.max((el as HTMLElement).scrollWidth, (el as HTMLElement).offsetWidth);
-    // Hide scrollbars + active "ring" + shadows during capture
-    const styleTag = document.createElement("style");
-    styleTag.textContent = `
-      * { scrollbar-width: none !important; }
+    // Inject a <style> element as a CHILD of the element so it travels
+    // with the clone into the SVG foreignObject. This hides scrollbars
+    // and box-shadows on all descendants during capture only.
+    const innerStyle = document.createElement("style");
+    innerStyle.textContent = `
       *::-webkit-scrollbar { display: none !important; }
+      * { scrollbar-width: none !important; }
       * { --tw-ring-shadow: 0 0 #0000 !important; --tw-ring-offset-shadow: 0 0 #0000 !important; }
-      * { box-shadow: none !important; }
+      * { --tw-shadow: 0 0 #0000 !important; }
     `;
-    document.head.appendChild(styleTag);
+    el.appendChild(innerStyle);
     try {
       const dataUrl = await toJpeg(el, {
         quality: 0.94,
@@ -3285,7 +3287,7 @@ function AppInternal({
     } catch (e) {
       console.error("[captureScreen] failed:", e);
     } finally {
-      styleTag.remove();
+      innerStyle.remove();
     }
   };
 
