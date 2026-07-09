@@ -3250,6 +3250,14 @@ function AppInternal({
       : mainRef.current;
     if (!el) return;
     const w = Math.max((el as HTMLElement).scrollWidth, (el as HTMLElement).offsetWidth);
+    // Hide scrollbars + active "ring" overlays during capture
+    const styleTag = document.createElement("style");
+    styleTag.textContent = `
+      * { scrollbar-width: none !important; }
+      *::-webkit-scrollbar { display: none !important; }
+      * { --tw-ring-shadow: 0 0 #0000 !important; --tw-ring-offset-shadow: 0 0 #0000 !important; }
+    `;
+    document.head.appendChild(styleTag);
     try {
       const dataUrl = await toJpeg(el, {
         quality: 0.94,
@@ -3275,6 +3283,8 @@ function AppInternal({
       document.body.removeChild(link);
     } catch (e) {
       console.error("[captureScreen] failed:", e);
+    } finally {
+      styleTag.remove();
     }
   };
 
