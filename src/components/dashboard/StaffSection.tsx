@@ -592,7 +592,7 @@ export function StaffSection({
                     </motion.div>
 
                     {/* Top 3 Stats */}
-                    <div className="flex justify-center lg:justify-end gap-3 mb-3">
+                    <div data-no-capture="stat-buttons" className="flex justify-center lg:justify-end gap-3 mb-3">
                       <motion.button
                         onClick={() => onSetActiveStat("sales")}
                         initial={{ opacity: 0, y: 15 }}
@@ -676,7 +676,7 @@ export function StaffSection({
                         className={`backdrop-blur-xl rounded-2xl px-2 py-4 w-28 sm:w-32 text-center border shadow-xl relative overflow-hidden transition-all duration-200 ${activeStat === "target" ? "bg-white/20 border-white/40 ring-1 ring-emerald-500/50" : "bg-white/5 border-white/10 hover:bg-white/10"}`}
                       >
                         {activeStat === "target" && (
-                          <div className="absolute inset-0 bg-emerald-400/20 mix-blend-overlay"></div>
+                          <div data-no-capture="card-overlay" className="absolute inset-0 bg-emerald-400/20 mix-blend-overlay"></div>
                         )}
                         <Star
                           className={`w-5 h-5 mx-auto mb-2 relative z-10 ${activeStat === "target" ? "text-emerald-200 fill-emerald-200" : "text-white/60"}`}
