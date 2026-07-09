@@ -674,7 +674,6 @@ export function StaffSection({
                         transition={{ type: "spring", stiffness: 120, damping: 14, delay: 0.2 }}
                         whileHover={{ scale: 1.05, y: -4, boxShadow: "0px 10px 25px rgba(16, 185, 129, 0.2)" }}
                         whileTap={{ scale: 0.95 }}
-                        data-no-capture="today-card"
                         className={`backdrop-blur-xl rounded-2xl px-2 py-4 w-28 sm:w-32 text-center border shadow-xl relative overflow-hidden transition-all duration-200 ${activeStat === "target" ? "bg-white/20 border-white/40 ring-1 ring-emerald-500/50" : "bg-white/5 border-white/10 hover:bg-white/10"}`}
                       >
                         {activeStat === "target" && (
