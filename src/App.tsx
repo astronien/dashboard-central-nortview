@@ -3241,16 +3241,24 @@ function AppInternal({
   }, []);
   const homeCaptureRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
+  const homeContentRef = useRef<HTMLDivElement>(null);
 
   const captureScreen = async () => {
-    const el = mainRef.current;
+    let el: HTMLElement | null = null;
+    if (currentView === "home") {
+      el = homeContentRef.current;
+    }
+    if (!el) el = mainRef.current;
     if (!el) return;
+    const w = el.offsetWidth || el.scrollWidth;
     try {
       const dataUrl = await toJpeg(el, {
         quality: 0.94,
         pixelRatio: 1.5,
         cacheBust: false,
         backgroundColor: "#1c2722",
+        width: w,
+        style: { padding: "24px", height: "auto", overflow: "hidden" },
         fetchRequestInit: { mode: "cors" },
       });
       const ts = new Date().toISOString().slice(0, 10);
@@ -3434,6 +3442,7 @@ function AppInternal({
           <AnimatePresence mode="wait">
             {currentView === "home" && (
               <motion.div
+                ref={homeContentRef}
                 key="home"
                 initial={{ opacity: 0, scale: 0.96, filter: "blur(8px)" }}
                 animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
