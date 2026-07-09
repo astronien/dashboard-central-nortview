@@ -717,7 +717,7 @@ export function StaffSection({
                     </div>
 
                     {/* Focus Device + Focus Wonder — 2 prominent pill cards */}
-                    <div className="flex flex-wrap justify-center lg:justify-end gap-3 mt-4 max-w-[420px] w-full mx-auto lg:mx-0 lg:ml-auto">
+                    <div data-no-capture="focus-cards" className="flex flex-wrap justify-center lg:justify-end gap-3 mt-4 max-w-[420px] w-full mx-auto lg:mx-0 lg:ml-auto">
                       <motion.div
                         initial={{ opacity: 0, y: 15 }}
                         animate={{ opacity: 1, y: 0 }}

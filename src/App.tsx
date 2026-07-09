@@ -3274,6 +3274,12 @@ function AppInternal({
           boxSizing: "border-box",
           overflow: "visible",
         },
+        filter: (node) => {
+          if (node instanceof HTMLElement && node.dataset?.noCapture !== undefined) {
+            return false;
+          }
+          return true;
+        },
         fetchRequestInit: { mode: "cors" },
       });
       const ts = new Date().toISOString().slice(0, 10);
