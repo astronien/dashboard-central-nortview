@@ -600,6 +600,7 @@ export function StaffSection({
                         transition={{ type: "spring", stiffness: 120, damping: 14, delay: 0.1 }}
                         whileHover={{ scale: 1.05, y: -4, boxShadow: "0px 10px 25px rgba(16, 185, 129, 0.2)" }}
                         whileTap={{ scale: 0.95 }}
+                        data-no-capture="monthly-sales"
                         className={`rounded-2xl px-2 py-3 w-28 sm:w-32 min-h-[104px] text-center border shadow-lg transition-all duration-200 overflow-visible ${activeStat === "sales" ? "bg-[#0c3123] border-white/30 ring-1 ring-emerald-500/50" : "bg-black/20 border-white/5 hover:bg-black/30"}`}
                       >
                         <ShoppingBag
