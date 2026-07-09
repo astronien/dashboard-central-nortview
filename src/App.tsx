@@ -3261,6 +3261,11 @@ function AppInternal({
       * { --tw-shadow: 0 0 #0000 !important; }
     `;
     el.appendChild(innerStyle);
+    // Hide mix-blend-overlay divs before capture. html-to-image renders
+    // them as a dark rectangle in SVG foreignObject. They're purely
+    // decorative overlays on the active stat card.
+    const overlays = el.querySelectorAll(".mix-blend-overlay");
+    overlays.forEach((n) => (n as HTMLElement).style.setProperty("display", "none", "important"));
     try {
       const dataUrl = await toJpeg(el, {
         quality: 0.94,
@@ -3273,12 +3278,6 @@ function AppInternal({
           height: "auto",
           boxSizing: "border-box",
           overflow: "visible",
-        },
-        filter: (node) => {
-          if (node instanceof HTMLElement && node.dataset?.noCapture !== undefined) {
-            return false;
-          }
-          return true;
         },
         fetchRequestInit: { mode: "cors" },
       });
@@ -3294,6 +3293,8 @@ function AppInternal({
       console.error("[captureScreen] failed:", e);
     } finally {
       innerStyle.remove();
+      // Restore mix-blend-overlay elements so subsequent captures work
+      overlays.forEach((n) => (n as HTMLElement).style.removeProperty("display"));
     }
   };
 
