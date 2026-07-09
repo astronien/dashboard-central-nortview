@@ -3,6 +3,7 @@ import {
   Building2,
   Building,
   Calendar,
+  Camera,
   ChevronDown,
   DollarSign,
   Home,
@@ -38,6 +39,7 @@ import CategoryTreePicker from "./components/CategoryTreePicker";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useState, useRef, type ChangeEvent } from "react";
 import { parseCategoryMasterFile } from "./lib/categoryMasterUpload";
+import { toJpeg } from "html-to-image";
 import { parseDocDate } from "./lib/dateParser";
 import { parseSalesExcelFile } from "./lib/salesUpload";
 import { parseTargetExcelFile } from "./lib/targetUpload";
@@ -3238,6 +3240,31 @@ function AppInternal({
     return acc;
   }, []);
   const homeCaptureRef = useRef<HTMLDivElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
+
+  const captureScreen = async () => {
+    const el = mainRef.current;
+    if (!el) return;
+    try {
+      const dataUrl = await toJpeg(el, {
+        quality: 0.94,
+        pixelRatio: 1.5,
+        cacheBust: false,
+        backgroundColor: "#1c2722",
+        fetchRequestInit: { mode: "cors" },
+      });
+      const ts = new Date().toISOString().slice(0, 10);
+      const label = currentView === "staff" ? "staff" : currentView;
+      const link = document.createElement("a");
+      link.download = `dashboard-${label}-${ts}.jpeg`;
+      link.href = dataUrl;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (e) {
+      console.error("[captureScreen] failed:", e);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#1c2722] p-4 font-sans text-white md:p-8 flex flex-col items-center">
@@ -3309,6 +3336,17 @@ function AppInternal({
                 </>
               )}
             </nav>
+
+            {/* Screenshot capture button */}
+            <div className="pointer-events-auto hidden md:flex items-center gap-2 pl-2 ml-2 border-l border-white/10">
+              <button
+                onClick={captureScreen}
+                title="บันทึกภาพหน้าจอ"
+                className="p-2 rounded-full transition-colors text-white/60 hover:text-white hover:bg-white/10"
+              >
+                <Camera className="w-5 h-5" />
+              </button>
+            </div>
 
             {/* User info + logout */}
             <div className="pointer-events-auto flex items-center gap-3 pl-2 ml-2 border-l border-white/10">
@@ -3390,6 +3428,7 @@ function AppInternal({
 
         {/* Main Content */}
         <main
+          ref={mainRef}
           className={`relative flex-1 flex flex-col px-4 md:px-8 pb-8 gap-6 z-20 overflow-x-hidden ${currentView === "home" ? "pt-28" : "pt-24"}`}
         >
           <AnimatePresence mode="wait">
@@ -3511,32 +3550,33 @@ function AppInternal({
               </motion.div>
             )}
           </AnimatePresence>
-
-          {/* Hidden home view for Telegram screenshot capture (always rendered,
-              visible in DOM but invisible via opacity:0 so charts render). */}
-          <div
-            ref={homeCaptureRef}
-            style={{
-              position: "fixed",
-              top: 0,
-              left: 0,
-              width: "1200px",
-              opacity: 0,
-              pointerEvents: "none",
-              zIndex: -1,
-              background: "#1c2722",
-            }}
-          >
-            <div style={{ width: "1200px", minHeight: "900px", padding: "24px" }}>
-              <HomeDashboardSection
-                derivedHomeStats={derivedHomeStats}
-                monthlyPerformance={monthlyPerformance}
-                categorySnapshots={categorySnapshotData}
-                branchOverviewKpiData={branchOverviewKpiData}
-              />
-            </div>
-          </div>
         </main>
+
+        {/* Hidden home view for Telegram screenshot capture (always rendered,
+            visible in DOM but invisible via opacity:0 so charts render).
+            Placed outside <main> so main content capture doesn't include it. */}
+        <div
+          ref={homeCaptureRef}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "1200px",
+            opacity: 0,
+            pointerEvents: "none",
+            zIndex: -1,
+            background: "#1c2722",
+          }}
+        >
+          <div style={{ width: "1200px", minHeight: "900px", padding: "24px" }}>
+            <HomeDashboardSection
+              derivedHomeStats={derivedHomeStats}
+              monthlyPerformance={monthlyPerformance}
+              categorySnapshots={categorySnapshotData}
+              branchOverviewKpiData={branchOverviewKpiData}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );
