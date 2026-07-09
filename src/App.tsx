@@ -3250,12 +3250,13 @@ function AppInternal({
       : mainRef.current;
     if (!el) return;
     const w = Math.max((el as HTMLElement).scrollWidth, (el as HTMLElement).offsetWidth);
-    // Hide scrollbars + active "ring" overlays during capture
+    // Hide scrollbars + active "ring" + shadows during capture
     const styleTag = document.createElement("style");
     styleTag.textContent = `
       * { scrollbar-width: none !important; }
       *::-webkit-scrollbar { display: none !important; }
       * { --tw-ring-shadow: 0 0 #0000 !important; --tw-ring-offset-shadow: 0 0 #0000 !important; }
+      * { box-shadow: none !important; }
     `;
     document.head.appendChild(styleTag);
     try {
