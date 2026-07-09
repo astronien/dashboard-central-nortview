@@ -3249,12 +3249,20 @@ function AppInternal({
       ? categorySnapshotRef.current
       : mainRef.current;
     if (!el) return;
+    const w = Math.max((el as HTMLElement).scrollWidth, (el as HTMLElement).offsetWidth);
     try {
       const dataUrl = await toJpeg(el, {
         quality: 0.94,
         pixelRatio: 1.5,
         cacheBust: false,
         backgroundColor: "#1c2722",
+        width: w,
+        style: {
+          width: `${w}px`,
+          height: "auto",
+          boxSizing: "border-box",
+          overflow: "visible",
+        },
         fetchRequestInit: { mode: "cors" },
       });
       const ts = new Date().toISOString().slice(0, 10);
