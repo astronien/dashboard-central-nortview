@@ -1,3 +1,4 @@
+import React from "react";
 import { TrendingUp, TrendingDown, Building2, User } from "lucide-react";
 import type { CategorySnapshotItem } from "../../lib/categorySnapshotBuilder";
 import type { DerivedHomeStat } from "./dashboardTypes";
@@ -37,11 +38,13 @@ export function HomeDashboardSection({
   monthlyPerformance,
   categorySnapshots,
   branchOverviewKpiData,
+  categorySnapshotRef,
 }: {
   derivedHomeStats: DerivedHomeStat[];
   monthlyPerformance: MonthlyPerformance;
   categorySnapshots?: CategorySnapshotItem[];
   branchOverviewKpiData?: BranchOverviewKpiData;
+  categorySnapshotRef?: React.RefObject<HTMLDivElement | null>;
 }) {
   return (
     <>
@@ -63,7 +66,7 @@ export function HomeDashboardSection({
       </div>
 
       {categorySnapshots && categorySnapshots.length > 0 ? (
-        <CategorySnapshotSection items={categorySnapshots} />
+        <CategorySnapshotSection ref={categorySnapshotRef} items={categorySnapshots} />
       ) : null}
 
       {branchOverviewKpiData && branchOverviewKpiData.presets.length > 0 ? (

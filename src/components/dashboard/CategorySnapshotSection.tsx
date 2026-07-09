@@ -1,3 +1,4 @@
+import React from "react";
 import type { LucideIcon } from "lucide-react";
 import { Building, Building2, CreditCard, DollarSign, Laptop, Smartphone, Tablet, Watch, ShieldCheck, ShieldPlus } from "lucide-react";
 import type { CategorySnapshotItem } from "../../lib/categorySnapshotBuilder";
@@ -42,12 +43,13 @@ function formatMetric(value: number, measureType: "revenue" | "quantity" | undef
   return Math.round(value).toLocaleString();
 }
 
-export function CategorySnapshotSection({ items }: { items: CategorySnapshotItem[] }) {
-  const visible = items.filter((item) => item.target > 0 || item.actual > 0);
-  if (!visible.length) return null;
+export const CategorySnapshotSection = React.forwardRef<HTMLDivElement, { items: CategorySnapshotItem[] }>(
+  ({ items }, ref) => {
+    const visible = items.filter((item) => item.target > 0 || item.actual > 0);
+    if (!visible.length) return null;
 
-  return (
-    <div className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+    return (
+      <div ref={ref} className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
       <div className="flex items-center justify-between mb-5">
         <div>
           <h3 className="text-lg font-bold tracking-tight text-white">Category KPI Snapshot</h3>
@@ -129,4 +131,4 @@ export function CategorySnapshotSection({ items }: { items: CategorySnapshotItem
       </div>
     </div>
   );
-}
+});
