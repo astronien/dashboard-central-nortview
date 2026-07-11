@@ -3192,7 +3192,7 @@ function AppInternal({
 
   useEffect(() => {
     if (!selectedBranchLoaded) return;
-    const branchCode = getBranchCodeFromTarget(uploadedFiles.target);
+    const branchCode = getBranchCodeFromTarget(displayUploads.target);
     if (!branchCode) {
       setTradeInData(undefined);
       return;
@@ -3207,7 +3207,7 @@ function AppInternal({
       }
     });
     return () => { cancelled = true; };
-  }, [selectedBranch, selectedBranchLoaded, uploadedFiles.target]);
+  }, [selectedBranch, selectedBranchLoaded, displayUploads.target]);
 
   // When the user uploads data for a branch that isn't currently
   // selected, auto-switch to the first uploaded branch so the rest of

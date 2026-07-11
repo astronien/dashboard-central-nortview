@@ -36,8 +36,10 @@ export async function fetchTradeInData(
     return { count: 0, todayCount: 0 };
   }
 
+  // status from the Trade API is a string (e.g. "4"). Status 4 means the
+  // customer agreed to the trade-in.
   const agreedTrades = json.data.filter(
-    (t: any) => t.status === 4,
+    (t: any) => String(t.status) === "4",
   );
   const count = agreedTrades.length;
 
@@ -55,9 +57,23 @@ export function getBranchCodeFromTarget(
   targetRows: Record<string, string | number | undefined>[],
 ): string {
   const row = targetRows.find(
-    (r) => r.emp_shop_code ?? r["emp_shop_code"],
+    (r) =>
+      r.emp_shop_code ??
+      r["emp_shop_code"] ??
+      r.branchId ??
+      r["Branch ID"] ??
+      r["BRANCH CODE"],
   );
-  return String(
-    row?.emp_shop_code ?? row?.["emp_shop_code"] ?? "",
+  const code = String(
+    row?.emp_shop_code ??
+      row?.["emp_shop_code"] ??
+      row?.branchId ??
+      row?.["Branch ID"] ??
+      row?.["BRANCH CODE"] ??
+      "",
   ).trim();
+  // The Trade API expects numeric real_branch_id. Accept pure numbers (with
+  // optional Excel ".0" suffix). Non-numeric codes like "B9" are ignored.
+  const numeric = code.replace(/\.0$/, "");
+  return /^\d+$/.test(numeric) ? numeric : "";
 }

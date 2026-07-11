@@ -52,8 +52,11 @@ function isQuantityItem(item: CategorySnapshotItem): boolean {
 
 export const CategorySnapshotSection = React.forwardRef<HTMLDivElement, { items: CategorySnapshotItem[] }>(
   ({ items }, ref) => {
-    const visible = items.filter((item) => item.target > 0 || item.actual > 0);
-    if (!visible.length) return null;
+  const visible = items.filter(
+    (item) =>
+      item.category === "Trade In" || item.target > 0 || item.actual > 0,
+  );
+  if (!visible.length) return null;
 
     return (
       <div ref={ref} className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
