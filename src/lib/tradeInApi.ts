@@ -72,8 +72,17 @@ export function getBranchCodeFromTarget(
       row?.["BRANCH CODE"] ??
       "",
   ).trim();
+  return normalizeBranchCode(code);
+}
+
+export function getBranchCodeFromString(value: string | undefined): string {
+  return normalizeBranchCode(String(value ?? ""));
+}
+
+function normalizeBranchCode(code: string): string {
+  const trimmed = code.trim();
   // The Trade API expects numeric real_branch_id. Accept pure numbers (with
   // optional Excel ".0" suffix). Non-numeric codes like "B9" are ignored.
-  const numeric = code.replace(/\.0$/, "");
+  const numeric = trimmed.replace(/\.0$/, "");
   return /^\d+$/.test(numeric) ? numeric : "";
 }

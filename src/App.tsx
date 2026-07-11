@@ -54,7 +54,12 @@ import {
 } from "./lib/uploadsApi";
 import { getItem as idbGet, setItem as idbSet, migrateFromLocalStorage } from "./lib/storage";
 import { buildCategorySnapshots } from "./lib/categorySnapshotBuilder";
-import { fetchTradeInData, getBranchCodeFromTarget } from "./lib/tradeInApi";
+import {
+  fetchTradeInData,
+  getBranchCodeFromString,
+  getBranchCodeFromTarget,
+} from "./lib/tradeInApi";
+import { getTradeBranchMapping } from "./lib/tradeInBranchStorage";
 import type { KpiCategoryKey } from "./lib/kpiCategoryAdapter";
 import {
   getOfficerCategoryKpi,
@@ -1413,7 +1418,12 @@ function AppInternal({
     }
   }, [selectedBranch]);
 
-  const [tradeInData, setTradeInData] = useState<{ actual: number; today: number } | undefined>(undefined);
+  const [tradeInData, setTradeInData] = useState<
+    { actual: number; today: number } | undefined
+  >(undefined);
+  const [tradeBranchMapping, setTradeBranchMapping] = useState<
+    Record<string, string>
+  >(() => getTradeBranchMapping());
 
   const [kpiPresets, setKpiPresets] = useState<KpiPreset[]>([]);
 
@@ -3192,22 +3202,41 @@ function AppInternal({
 
   useEffect(() => {
     if (!selectedBranchLoaded) return;
-    const branchCode = getBranchCodeFromTarget(displayUploads.target);
+    const branchCode =
+      tradeBranchMapping[selectedBranch] ||
+      getBranchCodeFromTarget(displayUploads.target) ||
+      getBranchCodeFromString(selectedBranch);
+    console.log(
+      "[TradeIn] selectedBranch:",
+      selectedBranch,
+      "branchCode:",
+      branchCode,
+    );
     if (!branchCode) {
       setTradeInData(undefined);
       return;
     }
     let cancelled = false;
-    fetchTradeInData(branchCode).then((result) => {
-      if (!cancelled) setTradeInData(result);
-    }).catch((e) => {
-      if (!cancelled) {
-        console.warn("[App] fetchTradeInData failed:", e);
-        setTradeInData(undefined);
-      }
-    });
-    return () => { cancelled = true; };
-  }, [selectedBranch, selectedBranchLoaded, displayUploads.target]);
+    fetchTradeInData(branchCode)
+      .then((result) => {
+        console.log("[TradeIn] API result for", branchCode, ":", result);
+        if (!cancelled) setTradeInData(result);
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          console.warn("[App] fetchTradeInData failed:", e);
+          setTradeInData(undefined);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    selectedBranch,
+    selectedBranchLoaded,
+    displayUploads.target,
+    tradeBranchMapping,
+  ]);
 
   // When the user uploads data for a branch that isn't currently
   // selected, auto-switch to the first uploaded branch so the rest of
@@ -3633,6 +3662,8 @@ function AppInternal({
                   onNavigateToReports={() => setCurrentView("reports")}
                   isAdmin={role === "admin"}
                   onCategoryTargetsChanged={loadCategoryTargetOverrides}
+                  tradeBranchMapping={tradeBranchMapping}
+                  onTradeBranchMappingChange={setTradeBranchMapping}
                 />
               </motion.div>
             )}
