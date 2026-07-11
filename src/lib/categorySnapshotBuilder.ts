@@ -42,6 +42,7 @@ const SNAPSHOT_CATEGORIES: Array<{ label: string; kpiKey?: KpiCategoryKey }> = [
   { label: "COVER+", kpiKey: "COVER+" },
   { label: "AC+", kpiKey: "AC+" },
   { label: "SIM", kpiKey: "SIM" },
+  { label: "Trade In" },
 ];
 
 function getMonthPeriod() {
@@ -140,8 +141,9 @@ export function buildCategorySnapshots(params: {
   lastMonthRows: RawRow[];
   lastYearRows: RawRow[];
   targetOverrides?: Record<string, number>;
+  tradeInData?: { actual: number; today: number };
 }): CategorySnapshotItem[] {
-  const { targetRows, currentRows, todayRows = [], lastMonthRows, lastYearRows, targetOverrides = {} } = params;
+  const { targetRows, currentRows, todayRows = [], lastMonthRows, lastYearRows, targetOverrides = {}, tradeInData } = params;
   const hasData = currentRows.length > 0;
   const { startDate, endDate, currentDay, totalDays } = getMonthPeriod();
   const targets: TargetRecord[] = rawTargetRowsToRecords(targetRows);
@@ -191,33 +193,46 @@ export function buildCategorySnapshots(params: {
         target = override;
       }
       actual = sumKpiActualFromRows(currentRows, kpiKey);
+    } else if (label === "Trade In" && tradeInData) {
+      measureType = "quantity";
+      actual = tradeInData.actual;
+      const override = targetOverrides?.[label];
+      if (typeof override === "number" && Number.isFinite(override)) {
+        target = override;
+      }
     }
 
     const lastMonthActual = kpiKey
       ? periodActual(lastMonthRows, kpiKey, measureType)
-      : periodActual(lastMonthRows);
+      : label === "Trade In"
+        ? 0
+        : periodActual(lastMonthRows);
     const lastYearActual = kpiKey
       ? periodActual(lastYearRows, kpiKey, measureType)
-      : periodActual(lastYearRows);
+      : label === "Trade In"
+        ? 0
+        : periodActual(lastYearRows);
 
     const forecast = calcForecastByDays(actual, currentDay, totalDays);
     const targetToToday = calcTargetToDate(target, currentDay, totalDays);
     const today =
-      todayRows.length > 0
-        ? kpiKey
-          ? sumKpiActualFromRows(todayRows, kpiKey)
-          : periodActual(todayRows)
-        : kpiKey
-          ? sumTodayActual(currentRows, kpiKey)
-          : sumTodayActual(currentRows);
+      label === "Trade In" && tradeInData
+        ? tradeInData.today
+        : todayRows.length > 0
+          ? kpiKey
+            ? sumKpiActualFromRows(todayRows, kpiKey)
+            : periodActual(todayRows)
+          : kpiKey
+            ? sumTodayActual(currentRows, kpiKey)
+            : sumTodayActual(currentRows);
 
     const mom =
       lastMonthActual > 0 ? ((actual - lastMonthActual) / lastMonthActual) * 100 : "New";
     const yoy =
       lastYearActual > 0 ? ((actual - lastYearActual) / lastYearActual) * 100 : "New";
 
-    const achieveRate = target === 0 && actual > 0 ? 100 : calcAchievementPct(actual, target);
-    const forecastRate = target === 0 ? 0 : calcAchievementPct(forecast, target);
+    const achieveRate = target > 0 ? calcAchievementPct(actual, target) : 0;
+    const forecastRate = target > 0 ? calcAchievementPct(forecast, target) : 0;
 
     return {
       category: label,

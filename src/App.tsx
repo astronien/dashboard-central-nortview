@@ -54,6 +54,7 @@ import {
 } from "./lib/uploadsApi";
 import { getItem as idbGet, setItem as idbSet, migrateFromLocalStorage } from "./lib/storage";
 import { buildCategorySnapshots } from "./lib/categorySnapshotBuilder";
+import { fetchTradeInData, getBranchCodeFromTarget } from "./lib/tradeInApi";
 import type { KpiCategoryKey } from "./lib/kpiCategoryAdapter";
 import {
   getOfficerCategoryKpi,
@@ -1411,6 +1412,9 @@ function AppInternal({
       console.warn("[App] loadCategoryTargetOverrides failed:", e);
     }
   }, [selectedBranch]);
+
+  const [tradeInData, setTradeInData] = useState<{ actual: number; today: number } | undefined>(undefined);
+
   const [kpiPresets, setKpiPresets] = useState<KpiPreset[]>([]);
 
   const handleBranchChange = (newBranch: string) => {
@@ -2730,6 +2734,7 @@ function AppInternal({
         lastMonthRows: displayUploads.lastMonth,
         lastYearRows: displayUploads.lastYear,
         targetOverrides: categoryTargetOverrides,
+        tradeInData,
       }),
     [
       displayUploads.target,
@@ -2738,6 +2743,7 @@ function AppInternal({
       displayUploads.lastMonth,
       displayUploads.lastYear,
       categoryTargetOverrides,
+      tradeInData,
     ],
   );
 
@@ -3183,6 +3189,25 @@ function AppInternal({
     if (!selectedBranchLoaded) return;
     void loadCategoryTargetOverrides();
   }, [selectedBranch, selectedBranchLoaded, loadCategoryTargetOverrides]);
+
+  useEffect(() => {
+    if (!selectedBranchLoaded) return;
+    const branchCode = getBranchCodeFromTarget(uploadedFiles.target);
+    if (!branchCode) {
+      setTradeInData(undefined);
+      return;
+    }
+    let cancelled = false;
+    fetchTradeInData(branchCode).then((result) => {
+      if (!cancelled) setTradeInData(result);
+    }).catch((e) => {
+      if (!cancelled) {
+        console.warn("[App] fetchTradeInData failed:", e);
+        setTradeInData(undefined);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [selectedBranch, selectedBranchLoaded, uploadedFiles.target]);
 
   // When the user uploads data for a branch that isn't currently
   // selected, auto-switch to the first uploaded branch so the rest of

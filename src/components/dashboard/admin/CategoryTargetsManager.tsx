@@ -11,6 +11,7 @@ const QUANTITY_CATEGORIES = [
   { key: "AC+", label: "AC+", desc: "Apple Care+ — จำนวนเครื่องที่ขาย Apple Care+" },
   { key: "COVER+", label: "COVER+", desc: "COVER+ — จำนวนเครื่องที่ขายประกัน COVER+" },
   { key: "SIM", label: "SIM", desc: "SIM — จำนวน SIM ที่ขาย" },
+  { key: "Trade In", label: "Trade In", desc: "Trade In — จำนวนเครื่องที่ลูกค้าตกลงเทรด" },
 ];
 
 export function CategoryTargetsManager({ selectedBranch, onChanged }: { selectedBranch: string; onChanged?: () => void }) {
@@ -119,7 +120,7 @@ export function CategoryTargetsManager({ selectedBranch, onChanged }: { selected
           <div>
             <h2 className="text-xl font-bold tracking-tight">ตั้งเป้าหมาย Category (ต่อชิ้น)</h2>
             <p className="text-sm text-white/60 mt-1">
-              กำหนด target เองสำหรับหมวด AC+ / COVER+ / SIM ที่ target Excel ไม่มี column เฉพาะ —
+              กำหนด target เองสำหรับหมวด AC+ / COVER+ / SIM / Trade In ที่ target Excel ไม่มี column เฉพาะ —
               ค่าที่ตั้งจะ override ค่า default ในหน้า Category KPI Snapshot
               {selectedBranch ? <span className="text-emerald-300"> · สาขา: {selectedBranch}</span> : null}
             </p>

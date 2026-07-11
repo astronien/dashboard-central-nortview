@@ -1,6 +1,6 @@
 import React from "react";
 import type { LucideIcon } from "lucide-react";
-import { Building, Building2, CreditCard, DollarSign, Laptop, Smartphone, Tablet, Watch, ShieldCheck, ShieldPlus } from "lucide-react";
+import { Building, Building2, CreditCard, DollarSign, Laptop, Smartphone, Tablet, Watch, ShieldCheck, ShieldPlus, RefreshCw } from "lucide-react";
 import type { CategorySnapshotItem } from "../../lib/categorySnapshotBuilder";
 
 const ICONS: Record<string, LucideIcon> = {
@@ -13,6 +13,7 @@ const ICONS: Record<string, LucideIcon> = {
   "COVER+": ShieldPlus,
   "AC+": ShieldCheck,
   SIM: CreditCard,
+  "Trade In": RefreshCw,
 };
 
 function formatValue(item: CategorySnapshotItem): string {
@@ -43,7 +44,7 @@ function formatMetric(value: number, measureType: "revenue" | "quantity" | undef
   return Math.round(value).toLocaleString();
 }
 
-const QUANTITY_CATEGORIES = new Set(["AC+", "SIM", "COVER+"]);
+const QUANTITY_CATEGORIES = new Set(["AC+", "SIM", "COVER+", "Trade In"]);
 
 function isQuantityItem(item: CategorySnapshotItem): boolean {
   return item.measureType === "quantity" || QUANTITY_CATEGORIES.has(item.category);
@@ -60,7 +61,7 @@ export const CategorySnapshotSection = React.forwardRef<HTMLDivElement, { items:
         <div>
           <h3 className="text-lg font-bold tracking-tight text-white">Category KPI Snapshot</h3>
           <p className="text-xs text-white/50 mt-1">
-            ยอดขายรายหมวด Mac / iPad / iPhone / Watch / BTB / COVER+ / AC+ / SIM — วันนี้ vs เป้ารายวัน vs Forecast
+            ยอดขายรายหมวด Mac / iPad / iPhone / Watch / BTB / COVER+ / AC+ / SIM / Trade In — วันนี้ vs เป้ารายวัน vs Forecast
           </p>
         </div>
       </div>
