@@ -37,7 +37,7 @@ import {
 import CategoryTreePicker from "./components/CategoryTreePicker";
 
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useMemo, useState, useRef, type ChangeEvent } from "react";
+import React, { useEffect, useMemo, useState, useRef, type ChangeEvent } from "react";
 import { parseCategoryMasterFile } from "./lib/categoryMasterUpload";
 import { toJpeg } from "html-to-image";
 import { parseDocDate } from "./lib/dateParser";
@@ -1391,6 +1391,26 @@ function AppInternal({
   const [uploadedFiles, setUploadedFiles] = useState<Record<UploadKind, RawRow[]>>({ target: [], current: [], today: [], lastMonth: [], lastYear: [], categoryMaster: [] });
   const [selectedBranch, setSelectedBranch] = useState<string>("Mega Bangna");
   const [selectedBranchLoaded, setSelectedBranchLoaded] = useState(false);
+  const [categoryTargetOverrides, setCategoryTargetOverrides] = useState<
+    Record<string, number>
+  >({});
+  const loadCategoryTargetOverrides = React.useCallback(async () => {
+    if (!selectedBranch) return;
+    try {
+      const res = await fetch(
+        `/api/category-target-overrides?branch=${encodeURIComponent(selectedBranch)}`,
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      const map: Record<string, number> = {};
+      for (const [cat, v] of Object.entries(data.overrides ?? {})) {
+        map[cat] = Number((v as any).target);
+      }
+      setCategoryTargetOverrides(map);
+    } catch (e) {
+      console.warn("[App] loadCategoryTargetOverrides failed:", e);
+    }
+  }, [selectedBranch]);
   const [kpiPresets, setKpiPresets] = useState<KpiPreset[]>([]);
 
   const handleBranchChange = (newBranch: string) => {
@@ -2709,6 +2729,7 @@ function AppInternal({
         todayRows: enrichedTodayRows,
         lastMonthRows: displayUploads.lastMonth,
         lastYearRows: displayUploads.lastYear,
+        targetOverrides: categoryTargetOverrides,
       }),
     [
       displayUploads.target,
@@ -2716,6 +2737,7 @@ function AppInternal({
       enrichedTodayRows,
       displayUploads.lastMonth,
       displayUploads.lastYear,
+      categoryTargetOverrides,
     ],
   );
 
@@ -3157,6 +3179,11 @@ function AppInternal({
     }
   }, [selectedBranch, selectedBranchLoaded]);
 
+  useEffect(() => {
+    if (!selectedBranchLoaded) return;
+    void loadCategoryTargetOverrides();
+  }, [selectedBranch, selectedBranchLoaded, loadCategoryTargetOverrides]);
+
   // When the user uploads data for a branch that isn't currently
   // selected, auto-switch to the first uploaded branch so the rest of
   // the dashboard immediately reflects the new data.
@@ -3580,6 +3607,7 @@ function AppInternal({
                   }}
                   onNavigateToReports={() => setCurrentView("reports")}
                   isAdmin={role === "admin"}
+                  onCategoryTargetsChanged={loadCategoryTargetOverrides}
                 />
               </motion.div>
             )}

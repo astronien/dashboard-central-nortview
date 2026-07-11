@@ -139,8 +139,9 @@ export function buildCategorySnapshots(params: {
   todayRows?: RawRow[];
   lastMonthRows: RawRow[];
   lastYearRows: RawRow[];
+  targetOverrides?: Record<string, number>;
 }): CategorySnapshotItem[] {
-  const { targetRows, currentRows, todayRows = [], lastMonthRows, lastYearRows } = params;
+  const { targetRows, currentRows, todayRows = [], lastMonthRows, lastYearRows, targetOverrides = {} } = params;
   const hasData = currentRows.length > 0;
   const { startDate, endDate, currentDay, totalDays } = getMonthPeriod();
   const targets: TargetRecord[] = rawTargetRowsToRecords(targetRows);
@@ -184,6 +185,11 @@ export function buildCategorySnapshots(params: {
         endDate,
       );
       target = result.target;
+      // Apply manual override from Settings (per-branch, per-category)
+      const override = targetOverrides?.[label];
+      if (typeof override === "number" && Number.isFinite(override)) {
+        target = override;
+      }
       actual = sumKpiActualFromRows(currentRows, kpiKey);
     }
 

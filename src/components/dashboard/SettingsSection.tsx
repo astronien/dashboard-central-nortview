@@ -1,4 +1,5 @@
 import { Building2, ImagePlus, Trash2, Users } from "lucide-react";
+import { CategoryTargetsManager } from "./admin/CategoryTargetsManager";
 
 export type StaffRosterEntry = {
   name: string;
@@ -20,6 +21,7 @@ export function SettingsSection({
   onPhotoRemove,
   onNavigateToReports,
   isAdmin,
+  onCategoryTargetsChanged,
 }: {
   selectedBranch: string;
   onBranchChange: (branch: string) => void;
@@ -33,6 +35,7 @@ export function SettingsSection({
   onPhotoRemove: (staffId: string) => void;
   onNavigateToReports: () => void;
   isAdmin: boolean;
+  onCategoryTargetsChanged?: () => void;
 }) {
   return (
     <>
@@ -77,6 +80,10 @@ export function SettingsSection({
         </div>
         {staffPhotoError && <p className="text-sm text-amber-300 lg:max-w-xs">{staffPhotoError}</p>}
       </div>
+
+      {isAdmin ? (
+        <CategoryTargetsManager selectedBranch={selectedBranch} onChanged={onCategoryTargetsChanged} />
+      ) : null}
 
       <div className="flex-1 bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)] relative z-10 w-full min-h-[400px] overflow-hidden flex flex-col">
         {staffRoster.length === 0 ? (

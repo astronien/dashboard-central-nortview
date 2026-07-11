@@ -26,7 +26,7 @@ function formatValue(item: CategorySnapshotItem): string {
 }
 
 function formatTarget(item: CategorySnapshotItem): string {
-  if (item.measureType === "quantity") {
+  if (isQuantityItem(item)) {
     return item.target.toLocaleString();
   }
   if (item.target >= 1_000_000) {
@@ -41,6 +41,12 @@ function formatMetric(value: number, measureType: "revenue" | "quantity" | undef
     return Math.round(value).toLocaleString();
   }
   return Math.round(value).toLocaleString();
+}
+
+const QUANTITY_CATEGORIES = new Set(["AC+", "SIM", "COVER+"]);
+
+function isQuantityItem(item: CategorySnapshotItem): boolean {
+  return item.measureType === "quantity" || QUANTITY_CATEGORIES.has(item.category);
 }
 
 export const CategorySnapshotSection = React.forwardRef<HTMLDivElement, { items: CategorySnapshotItem[] }>(
@@ -61,7 +67,7 @@ export const CategorySnapshotSection = React.forwardRef<HTMLDivElement, { items:
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         {visible.map((item) => {
           const Icon = ICONS[item.category] ?? DollarSign;
-          const isCurrency = item.measureType !== "quantity";
+          const isCurrency = !isQuantityItem(item);
           const achColor =
             item.achieveRate >= 100
               ? "text-emerald-400"

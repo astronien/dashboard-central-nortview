@@ -42,9 +42,28 @@ CREATE TABLE IF NOT EXISTS telegram_chats (
 );
 `;
 
+// Category target overrides: per-branch per-category custom targets.
+// Used to override the auto-derived target from the target Excel for
+// quantity categories (AC+, COVER+, SIM) which don't have specific
+// columns in the target Excel. Managed from the Settings page.
+const CATEGORY_TARGET_OVERRIDES_SQL = `
+CREATE TABLE IF NOT EXISTS category_target_overrides (
+  branch_id   TEXT NOT NULL,
+  category    TEXT NOT NULL,
+  target      REAL NOT NULL,
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_by  TEXT,
+  PRIMARY KEY (branch_id, category)
+);
+CREATE INDEX IF NOT EXISTS idx_cto_branch ON category_target_overrides(branch_id);
+`;
+
 async function initTelegramSchema() {
   const client = getTursoClient();
   for (const stmt of TELEGRAM_SCHEMA_SQL.split(";").map((s) => s.trim()).filter(Boolean)) {
+    await client.execute(stmt);
+  }
+  for (const stmt of CATEGORY_TARGET_OVERRIDES_SQL.split(";").map((s) => s.trim()).filter(Boolean)) {
     await client.execute(stmt);
   }
 }
@@ -55,6 +74,9 @@ module.exports = {
   initTelegramSchema,
   upsertTelegramChat,
   getMostRecentTelegramChatId,
+  upsertCategoryTargetOverride,
+  getCategoryTargetOverrides,
+  deleteCategoryTargetOverride,
 };
 
 /**
@@ -88,4 +110,56 @@ async function getMostRecentTelegramChatId() {
   } catch {
     return null;
   }
+}
+
+/**
+ * Upsert a per-branch per-category target override.
+ */
+async function upsertCategoryTargetOverride({ branchId, category, target, updatedBy }) {
+  const client = getTursoClient();
+  await client.execute({
+    sql: `INSERT INTO category_target_overrides (branch_id, category, target, updated_at, updated_by)
+          VALUES (?, ?, ?, datetime('now'), ?)
+          ON CONFLICT(branch_id, category) DO UPDATE SET
+            target = excluded.target,
+            updated_at = datetime('now'),
+            updated_by = excluded.updated_by`,
+    args: [String(branchId), String(category), Number(target), updatedBy ?? null],
+  });
+}
+
+/**
+ * Return all category target overrides for a branch.
+ * Shape: { "AC+": 150, "COVER+": 300, "SIM": 20, ... }
+ */
+async function getCategoryTargetOverrides(branchId) {
+  const client = getTursoClient();
+  try {
+    const result = await client.execute({
+      sql: `SELECT category, target, updated_at, updated_by
+            FROM category_target_overrides
+            WHERE branch_id = ?
+            ORDER BY category`,
+      args: [String(branchId)],
+    });
+    const map = {};
+    for (const row of result.rows) {
+      map[row.category] = {
+        target: Number(row.target),
+        updated_at: row.updated_at,
+        updated_by: row.updated_by,
+      };
+    }
+    return map;
+  } catch {
+    return {};
+  }
+}
+
+async function deleteCategoryTargetOverride({ branchId, category }) {
+  const client = getTursoClient();
+  await client.execute({
+    sql: `DELETE FROM category_target_overrides WHERE branch_id = ? AND category = ?`,
+    args: [String(branchId), String(category)],
+  });
 }
