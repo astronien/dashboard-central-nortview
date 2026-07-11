@@ -195,7 +195,7 @@ export function buildCategorySnapshots(params: {
       actual = sumKpiActualFromRows(currentRows, kpiKey);
     } else if (label === "Trade In" && tradeInData) {
       measureType = "quantity";
-      actual = tradeInData.actual;
+      actual = Number(tradeInData.actual ?? 0);
       const override = targetOverrides?.[label];
       if (typeof override === "number" && Number.isFinite(override)) {
         target = override;
@@ -217,7 +217,7 @@ export function buildCategorySnapshots(params: {
     const targetToToday = calcTargetToDate(target, currentDay, totalDays);
     const today =
       label === "Trade In" && tradeInData
-        ? tradeInData.today
+        ? Number(tradeInData.today ?? 0)
         : todayRows.length > 0
           ? kpiKey
             ? sumKpiActualFromRows(todayRows, kpiKey)

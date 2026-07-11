@@ -3220,7 +3220,9 @@ function AppInternal({
     fetchTradeInData(branchCode)
       .then((result) => {
         console.log("[TradeIn] API result for", branchCode, ":", result);
-        if (!cancelled) setTradeInData(result);
+        if (!cancelled) {
+          setTradeInData({ actual: result.count, today: result.todayCount });
+        }
       })
       .catch((e) => {
         if (!cancelled) {
