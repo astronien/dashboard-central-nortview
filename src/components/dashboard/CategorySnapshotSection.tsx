@@ -17,6 +17,12 @@ const ICONS: Record<string, LucideIcon> = {
 };
 
 function formatValue(item: CategorySnapshotItem): string {
+  if (item.category === "Trade In") {
+    if (item.target > 0) {
+      return `${item.actual.toLocaleString()}/${item.target.toLocaleString()}`;
+    }
+    return item.actual.toLocaleString();
+  }
   if (item.measureType === "quantity") {
     return item.actual.toLocaleString();
   }
@@ -64,7 +70,7 @@ export const CategorySnapshotSection = React.forwardRef<HTMLDivElement, { items:
         <div>
           <h3 className="text-lg font-bold tracking-tight text-white">Category KPI Snapshot</h3>
           <p className="text-xs text-white/50 mt-1">
-            ยอดขายรายหมวด Mac / iPad / iPhone / Watch / BTB / COVER+ / AC+ / SIM / Trade In — วันนี้ vs เป้ารายวัน vs Forecast
+            ยอดขายรายหมวด Mac / iPad / iPhone / Watch / BTB / COVER+ / AC+ / SIM / Trade In — วันนี้ vs เป้ารายวัน vs Forecast (Trade In = สิ้นสุดประมูล/ทั้งหมด)
           </p>
         </div>
       </div>
@@ -99,9 +105,15 @@ export const CategorySnapshotSection = React.forwardRef<HTMLDivElement, { items:
               <div className="text-2xl font-extrabold text-white leading-none">
                 {formatValue(item)}
               </div>
-              <div className="text-[10px] text-white/50 -mt-2">
-                Target {formatTarget(item)}
-              </div>
+              {item.category === "Trade In" ? (
+                <div className="text-[10px] text-white/50 -mt-2">
+                  สิ้นสุดประมูล / รายการเทรดทั้งหมด
+                </div>
+              ) : (
+                <div className="text-[10px] text-white/50 -mt-2">
+                  Target {formatTarget(item)}
+                </div>
+              )}
 
               <div className="flex-1 flex flex-col gap-1.5 text-[11px] border-t border-white/5 pt-2">
                 <div className="flex items-center justify-between">

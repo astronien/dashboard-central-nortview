@@ -11,7 +11,7 @@ const QUANTITY_CATEGORIES = [
   { key: "AC+", label: "AC+", desc: "Apple Care+ — จำนวนเครื่องที่ขาย Apple Care+" },
   { key: "COVER+", label: "COVER+", desc: "COVER+ — จำนวนเครื่องที่ขายประกัน COVER+" },
   { key: "SIM", label: "SIM", desc: "SIM — จำนวน SIM ที่ขาย" },
-  { key: "Trade In", label: "Trade In", desc: "Trade In — จำนวนเครื่องที่ลูกค้าตกลงเทรด" },
+  { key: "Trade In", label: "Trade In", desc: "Trade In — จำนวนรายการเทรดทั้งหมด (denominator) ถ้าไม่ตั้งจะใช้ค่าจาก API อัตโนมัติ" },
 ];
 
 export function CategoryTargetsManager({ selectedBranch, onChanged }: { selectedBranch: string; onChanged?: () => void }) {

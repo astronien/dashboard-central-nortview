@@ -2,15 +2,16 @@ const TRADE_API_BASE = "https://report-trade.vercel.app";
 const API_KEY = "techtrade_pro_secret_2026";
 
 export interface TradeInResult {
-  count: number;
-  todayCount: number;
+  actual: number; // status 3 (สิ้นสุดการประมูลราคา)
+  today: number; // status 3 วันนี้
+  target: number; // รายการเทรดทั้งหมด (ใช้แสดงเป็น denominator)
 }
 
 export async function fetchTradeInData(
   branchCode: string,
 ): Promise<TradeInResult> {
   if (!branchCode) {
-    return { count: 0, todayCount: 0 };
+    return { actual: 0, today: 0, target: 0 };
   }
 
   const now = new Date();
@@ -20,7 +21,7 @@ export async function fetchTradeInData(
   const startDate = `${year}-${month}-01`;
   const endDate = `${year}-${month}-${String(totalDays).padStart(2, "0")}`;
 
-  const url = `${TRADE_API_BASE}/api/v2/trades?branch=${encodeURIComponent(branchCode)}&start_date=${startDate}&end_date=${endDate}&limit=9999`;
+  const url = `${TRADE_API_BASE}/api/v2/trades?branch=${encodeURIComponent(branchCode)}&start_date=${startDate}&end_date=${endDate}&limit=99999`;
 
   const res = await fetch(url, {
     headers: { "X-API-Key": API_KEY },
@@ -28,29 +29,31 @@ export async function fetchTradeInData(
 
   if (!res.ok) {
     console.warn(`[TradeIn API] returned ${res.status}`);
-    return { count: 0, todayCount: 0 };
+    return { actual: 0, today: 0, target: 0 };
   }
 
   const json = await res.json();
   if (!json.success || !Array.isArray(json.data)) {
-    return { count: 0, todayCount: 0 };
+    return { actual: 0, today: 0, target: 0 };
   }
 
-  // status from the Trade API is a string (e.g. "4"). Status 4 means the
-  // customer agreed to the trade-in.
-  const agreedTrades = json.data.filter(
-    (t: any) => String(t.status) === "4",
+  const allTrades = json.data;
+  const target = allTrades.length;
+
+  // status 3 = สิ้นสุดการประมูลราคา (ยอดตกลง)
+  const agreedTrades = allTrades.filter(
+    (t: any) => String(t.status) === "3",
   );
-  const count = agreedTrades.length;
+  const actual = agreedTrades.length;
 
   const todayStr = `${year}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-  const todayCount = agreedTrades.filter(
+  const today = agreedTrades.filter(
     (t: any) =>
       t.document_date &&
       String(t.document_date).startsWith(todayStr),
   ).length;
 
-  return { count, todayCount };
+  return { actual, today, target };
 }
 
 export function getBranchCodeFromTarget(

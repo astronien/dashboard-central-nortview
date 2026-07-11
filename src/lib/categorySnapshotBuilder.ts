@@ -141,7 +141,7 @@ export function buildCategorySnapshots(params: {
   lastMonthRows: RawRow[];
   lastYearRows: RawRow[];
   targetOverrides?: Record<string, number>;
-  tradeInData?: { actual: number; today: number };
+  tradeInData?: { actual: number; today: number; target: number };
 }): CategorySnapshotItem[] {
   const { targetRows, currentRows, todayRows = [], lastMonthRows, lastYearRows, targetOverrides = {}, tradeInData } = params;
   const hasData = currentRows.length > 0;
@@ -196,6 +196,9 @@ export function buildCategorySnapshots(params: {
     } else if (label === "Trade In" && tradeInData) {
       measureType = "quantity";
       actual = Number(tradeInData.actual ?? 0);
+      // Default target = total trade-ins (denominator). Can be overridden in
+      // Settings if the user wants a different denominator.
+      target = Number(tradeInData.target ?? 0);
       const override = targetOverrides?.[label];
       if (typeof override === "number" && Number.isFinite(override)) {
         target = override;

@@ -1419,7 +1419,7 @@ function AppInternal({
   }, [selectedBranch]);
 
   const [tradeInData, setTradeInData] = useState<
-    { actual: number; today: number } | undefined
+    { actual: number; today: number; target: number } | undefined
   >(undefined);
   const [tradeBranchMapping, setTradeBranchMapping] = useState<
     Record<string, string>
@@ -3221,7 +3221,7 @@ function AppInternal({
       .then((result) => {
         console.log("[TradeIn] API result for", branchCode, ":", result);
         if (!cancelled) {
-          setTradeInData({ actual: result.count, today: result.todayCount });
+          setTradeInData(result);
         }
       })
       .catch((e) => {
