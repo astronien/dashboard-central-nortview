@@ -3210,6 +3210,7 @@ function AppInternal({
     styleTag.textContent = `* { scrollbar-width: none !important; } *::-webkit-scrollbar { display: none !important; }`;
     document.head.appendChild(styleTag);
 
+    const failed: string[] = [];
     try {
       for (let idx = 0; idx < officers.length; idx++) {
         setActiveStaffId(String(idx + 1));
@@ -3223,37 +3224,59 @@ function AppInternal({
           await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 3500)));
           const el = staffProfileCaptureRef.current;
           if (!el) continue;
-          const w = Math.max(el.scrollWidth, el.offsetWidth);
-          const dataUrl = await toJpeg(el, {
-            quality: 0.92,
-            pixelRatio: 1.5,
-            cacheBust: false,
-            backgroundColor: "#1c2722",
-            width: w,
-            style: {
-              padding: "32px",
-              width: `${w}px`,
-              height: "auto",
-              boxSizing: "border-box",
-              overflow: "visible",
-            },
-            fetchRequestInit: { mode: "cors" },
-          });
-          const link = document.createElement("a");
-          link.download = `staff-${String(idx + 1).padStart(2, "0")}-${officerName}-${view.label}-${ts}.jpeg`;
-          link.href = dataUrl;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
+          // One failed capture must not abort the rest of the roster
+          try {
+            const w = Math.max(el.scrollWidth, el.offsetWidth);
+            const pad = 32;
+            const dataUrl = await toJpeg(el, {
+              quality: 0.92,
+              pixelRatio: 1.5,
+              cacheBust: false,
+              backgroundColor: "#1c2722",
+              // Padding is added AROUND the card (w + pad*2) so the content
+              // stays centered instead of being squeezed to one side.
+              width: w + pad * 2,
+              style: {
+                padding: `${pad}px`,
+                width: `${w + pad * 2}px`,
+                height: "auto",
+                boxSizing: "border-box",
+                overflow: "visible",
+              },
+              // mix-blend-* layers (e.g. the emerald glow behind the photo)
+              // render as solid green blobs in the SVG clone — drop them.
+              filter: (node) =>
+                !(
+                  node instanceof HTMLElement &&
+                  String(node.className).includes("mix-blend-")
+                ),
+              fetchRequestInit: { mode: "cors" },
+            });
+            const link = document.createElement("a");
+            link.download = `staff-${String(idx + 1).padStart(2, "0")}-${officerName}-${view.label}-${ts}.jpeg`;
+            link.href = dataUrl;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          } catch (e) {
+            console.error(
+              `[captureAllStaffProfiles] ${officerName} ${view.label} failed:`,
+              e,
+            );
+            failed.push(`${officers[idx].name} (${view.label})`);
+          }
         }
       }
-    } catch (e) {
-      console.error("[captureAllStaffProfiles] failed:", e);
     } finally {
       styleTag.remove();
       setActiveStaffId(prevStaffId);
       setActiveStat(prevStat);
       setStaffCaptureProgress("");
+    }
+    if (failed.length) {
+      window.alert(
+        `แคปไม่สำเร็จ ${failed.length} รูป:\n${failed.join("\n")}\n\nหมายเหตุ: ถ้าไฟล์ไม่ถูกดาวน์โหลด กรุณาอนุญาต "ดาวน์โหลดหลายไฟล์" ในเบราว์เซอร์แล้วลองใหม่`,
+      );
     }
   };
 

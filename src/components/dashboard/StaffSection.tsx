@@ -144,19 +144,28 @@ function TelegramSendButton({
     styleTag.textContent = `* { scrollbar-width: none !important; } *::-webkit-scrollbar { display: none !important; }`;
     document.head.appendChild(styleTag);
     try {
+      const pad = 32;
       const dataUrl = await toJpeg(el, {
         quality: 0.92,
         pixelRatio: 1.5,
         cacheBust: false,
         backgroundColor: "#1c2722",
-        width: w,
+        // Padding is added AROUND the card so the content stays centered
+        width: w + pad * 2,
         style: {
-          padding: "32px",
-          width: `${w}px`,
+          padding: `${pad}px`,
+          width: `${w + pad * 2}px`,
           height: "auto",
           boxSizing: "border-box",
           overflow: "visible",
         },
+        // mix-blend-* layers (e.g. the emerald glow behind the photo)
+        // render as solid green blobs in the SVG clone — drop them.
+        filter: (node) =>
+          !(
+            node instanceof HTMLElement &&
+            String(node.className).includes("mix-blend-")
+          ),
         fetchRequestInit: { mode: "cors" },
       });
       return dataUrl.replace(/^data:image\/jpeg;base64,/, "");
