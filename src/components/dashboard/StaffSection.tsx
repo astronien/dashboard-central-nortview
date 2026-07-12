@@ -97,6 +97,24 @@ function TelegramSendButton({
   const [errorMsg, setErrorMsg] = React.useState("");
   const [menuOpen, setMenuOpen] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement>(null);
+  const resetTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Reset the status back to idle after a delay; cancel any pending reset
+  // (and on unmount) so we never setState on an unmounted component.
+  const scheduleReset = React.useCallback((delayMs: number) => {
+    if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+    resetTimerRef.current = setTimeout(() => {
+      setStatus("idle");
+      setProgress("");
+    }, delayMs);
+  }, []);
+
+  React.useEffect(
+    () => () => {
+      if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+    },
+    [],
+  );
 
   // Close menu on outside click
   React.useEffect(() => {
@@ -217,7 +235,7 @@ function TelegramSendButton({
 
     if (mode === "single") {
       const imgs = await captureOneStaff(staffId, 1, 1, true);
-      if (!imgs) { setTimeout(() => setStatus("idle"), 6000); return; }
+      if (!imgs) { scheduleReset(6000); return; }
       totalImages.push(...imgs);
     } else {
       for (let idx = 0; idx < piaIndices.length; idx++) {
@@ -225,7 +243,7 @@ function TelegramSendButton({
         setProgress(`คนที่ ${idx + 1}/${piaIndices.length}…`);
         onSetActiveStaffId(sid);
         const imgs = await captureOneStaff(sid, idx + 1, piaIndices.length, idx === 0);
-        if (!imgs) { setTimeout(() => setStatus("idle"), 6000); return; }
+        if (!imgs) { scheduleReset(6000); return; }
         totalImages.push(...imgs);
       }
     }
@@ -252,7 +270,7 @@ function TelegramSendButton({
       setStatus("error");
       setErrorMsg(allErrs[0] ?? "ส่งไม่สำเร็จ");
     }
-    setTimeout(() => { setStatus("idle"); setProgress(""); }, 8000);
+    scheduleReset(8000);
   };
 
   const baseClass =

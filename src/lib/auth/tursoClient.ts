@@ -47,6 +47,14 @@ CREATE TABLE IF NOT EXISTS upload_chunks (
 
 CREATE INDEX IF NOT EXISTS idx_upload_chunks_kind ON upload_chunks(kind);
 
+-- Small key/value store for app-wide settings that must follow the user
+-- across devices (e.g. the Trade In branch mapping).
+CREATE TABLE IF NOT EXISTS app_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 
 `;
 

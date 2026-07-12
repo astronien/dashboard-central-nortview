@@ -59,7 +59,10 @@ import {
   getBranchCodeFromString,
   getBranchCodeFromTarget,
 } from "./lib/tradeInApi";
-import { getTradeBranchMapping } from "./lib/tradeInBranchStorage";
+import {
+  fetchTradeBranchMappingFromCloud,
+  getTradeBranchMapping,
+} from "./lib/tradeInBranchStorage";
 import type { KpiCategoryKey } from "./lib/kpiCategoryAdapter";
 import {
   getOfficerCategoryKpi,
@@ -73,6 +76,7 @@ import {
   calcTodayAchievementPct,
   normalizeId,
   rawTargetRowsToRecords,
+  toNumber,
 } from "./lib/targetAggregations";
 import {
   buildStaffRoster,
@@ -130,101 +134,17 @@ import { parseBills, type BillSummary } from "./lib/presetBills";
 import { enrichSalesRowsWithCatDaily, buildCatDailyLookup } from "./lib/presetCatDaily";
 
 
-type Staff = {
-  id: string;
-  name: string;
-  store: string;
-  role: string;
-  experience: string;
-  expertise: string;
-  languages: string;
-  image: string;
-  radar: { subject: string; value: number; fullMark: number }[];
-  score: number;
+// Neutral placeholder shown before any data is uploaded — no demo profiles.
+const emptyStaff = {
+  id: "",
+  name: "-",
+  store: "-",
   stats: {
-    sales: string;
-    csat: string;
-    target: string;
-  };
+    sales: "0",
+    csat: "-",
+    target: "0",
+  },
 };
-
-const staffData: Staff[] = [
-  {
-    id: "1",
-    name: "Sarut Jitranon",
-    store: "iStudio Rama 9",
-    role: "Senior Sales Spec.",
-    experience: "5 Years",
-    expertise: "iPhone & Mac",
-    languages: "TH / EN",
-    image: "/staff1.png",
-    score: 97,
-    radar: [
-      { subject: "Trade In|48%", value: 96, fullMark: 100 },
-      { subject: "Cover Plus|26%", value: 100, fullMark: 100 },
-      { subject: "UFUND|5.7%", value: 95, fullMark: 100 },
-      { subject: "SIM|16%", value: 100, fullMark: 100 },
-      { subject: "Pencil|82%", value: 96, fullMark: 100 },
-      { subject: "Mac Att|14%", value: 93, fullMark: 100 },
-      { subject: "Case Att|48%", value: 96, fullMark: 100 },
-    ],
-    stats: {
-      sales: "142",
-      csat: "4.9/5",
-      target: "115%",
-    },
-  },
-  {
-    id: "2",
-    name: "Nadech Kugimiya",
-    store: "iStudio Central World",
-    role: "Store Manager",
-    experience: "8 Years",
-    expertise: "All Products",
-    languages: "TH / EN / JP",
-    image: "/staff2.png",
-    score: 100,
-    radar: [
-      { subject: "Trade In|52%", value: 100, fullMark: 100 },
-      { subject: "Cover Plus|28%", value: 100, fullMark: 100 },
-      { subject: "UFUND|6.3%", value: 100, fullMark: 100 },
-      { subject: "SIM|17%", value: 100, fullMark: 100 },
-      { subject: "Pencil|86%", value: 100, fullMark: 100 },
-      { subject: "Mac Att|16%", value: 100, fullMark: 100 },
-      { subject: "Case Att|53%", value: 100, fullMark: 100 },
-    ],
-    stats: {
-      sales: "256",
-      csat: "5.0/5",
-      target: "125%",
-    },
-  },
-  {
-    id: "3",
-    name: "Yaya Urassaya",
-    store: "iStudio Iconsiam",
-    role: "Sales Specialist",
-    experience: "3 Years",
-    expertise: "iPad & Watch",
-    languages: "TH / EN",
-    image: "/staff3.png",
-    score: 90,
-    radar: [
-      { subject: "Trade In|42%", value: 84, fullMark: 100 },
-      { subject: "Cover Plus|22%", value: 88, fullMark: 100 },
-      { subject: "UFUND|5.4%", value: 90, fullMark: 100 },
-      { subject: "SIM|13.5%", value: 90, fullMark: 100 },
-      { subject: "Pencil|80%", value: 94, fullMark: 100 },
-      { subject: "Mac Att|13.5%", value: 90, fullMark: 100 },
-      { subject: "Case Att|46%", value: 92, fullMark: 100 },
-    ],
-    stats: {
-      sales: "118",
-      csat: "4.8/5",
-      target: "105%",
-    },
-  },
-];
 
 type Interaction = {
   date: string;
@@ -235,85 +155,12 @@ type Interaction = {
   value: string;
 };
 
-const interactionsData: Record<string, Interaction[]> = {
-  sales: [
-    {
-      date: "04 Nov 2025",
-      type: "Corporate",
-      typeIcon: "building",
-      product: 'MacBook Pro 16"',
-      status: "Closed Won",
-      value: "189,000",
-    },
-    {
-      date: "02 Nov 2025",
-      type: "Walk-in",
-      typeIcon: "user",
-      product: "iPhone 15 Pro Max",
-      status: "Closed Won",
-      value: "48,900",
-    },
-    {
-      date: "01 Nov 2025",
-      type: "Call-in",
-      typeIcon: "phone",
-      product: "iPad Air M2",
-      status: "Follow-up",
-      value: "23,900",
-    },
-  ],
-  csat: [
-    {
-      date: "05 Nov 2025",
-      type: "Walk-in",
-      typeIcon: "user",
-      product: "AirPods Pro",
-      status: "5 Stars",
-      value: "8,990",
-    },
-    {
-      date: "04 Nov 2025",
-      type: "Corporate",
-      typeIcon: "building",
-      product: "MacBook Air M3",
-      status: "5 Stars",
-      value: "39,900",
-    },
-    {
-      date: "01 Nov 2025",
-      type: "Walk-in",
-      typeIcon: "user",
-      product: "Apple Watch S9",
-      status: "4.5 Stars",
-      value: "15,900",
-    },
-  ],
-  target: [
-    {
-      date: "04 Nov 2025",
-      type: "Corporate",
-      typeIcon: "building",
-      product: 'MacBook Pro 16"',
-      status: "Goal Met",
-      value: "189,000",
-    },
-    {
-      date: "03 Nov 2025",
-      type: "Call-in",
-      typeIcon: "phone",
-      product: "Mac Studio",
-      status: "Goal Met",
-      value: "74,900",
-    },
-    {
-      date: "30 Oct 2025",
-      type: "Walk-in",
-      typeIcon: "user",
-      product: "Accessories Bundle",
-      status: "Goal Met",
-      value: "12,500",
-    },
-  ],
+// No demo interactions — sections render their empty state until real
+// sales rows are uploaded.
+const emptyInteractions: Record<string, Interaction[]> = {
+  sales: [],
+  csat: [],
+  target: [],
 };
 
 const getIcon = (iconName: string) => {
@@ -511,7 +358,6 @@ const filterRowsByBranch = (rows: any[], branch: string) => {
     return normRow && normParam && (normRow.includes(normParam) || normParam.includes(normRow));
   });
 };
-const toNumber = (value: unknown) => Number(String(value ?? "").replace(/[^\d.-]/g, "")) || 0;
 const cleanOfficerName = (name: string) => {
   const aliases: Record<string, string> = { "แพวนภา": "แพรวนภา" };
   let cleaned = normalizeText(name).replace(/^(mr|mrs|ms|นาย|นางสาว|นาง|น\.ส\.|ด\.ช\.|ด\.ญ\.)\s*/i, "").replace(/\s+/g, "");
@@ -1425,6 +1271,18 @@ function AppInternal({
     Record<string, string>
   >(() => getTradeBranchMapping());
 
+  // Hydrate the Trade In branch mapping from Turso so it follows the user
+  // across devices (localStorage above is just the instant device cache).
+  useEffect(() => {
+    let cancelled = false;
+    void fetchTradeBranchMappingFromCloud().then((cloud) => {
+      if (!cancelled && cloud) setTradeBranchMapping(cloud);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const [kpiPresets, setKpiPresets] = useState<KpiPreset[]>([]);
 
   const handleBranchChange = (newBranch: string) => {
@@ -1868,8 +1726,7 @@ function AppInternal({
     return out;
   }, [uploadedBranches, sheetBranches]);
 
-  const currentStaff =
-    staffData.find((s) => s.id === activeStaffId) || staffData[0];
+  const currentStaff = emptyStaff;
   const currentOfficer = parsedReport.officers[Number(activeStaffId) - 1] ?? parsedReport.officers[0];
   const activeOfficerIndex = Math.max(Number(activeStaffId) - 1, 0);
   const activeOfficer = parsedReport.officers[activeOfficerIndex] ?? parsedReport.officers[0];
@@ -1894,42 +1751,33 @@ function AppInternal({
 
 
   const dynamicLanguages = useMemo(() => {
-    if (!displayUploads.current.length && Number(activeStaffId) <= 3) {
-      return currentStaff.languages;
-    }
-    const branch = activeOfficer?.branch ?? "";
+    if (!activeOfficer) return "-";
+    const branch = activeOfficer.branch ?? "";
     if (branch.includes("World") || branch.includes("Paragon") || branch.includes("Iconsiam")) {
       return (activeOfficerIndex % 2 === 0) ? "TH / EN / CN" : "TH / EN / JP";
     }
     return "TH / EN";
-  }, [displayUploads.current, activeOfficer, activeOfficerIndex, activeStaffId, currentStaff]);
+  }, [activeOfficer, activeOfficerIndex]);
 
   const dynamicExperience = useMemo(() => {
-    if (!displayUploads.current.length && Number(activeStaffId) <= 3) {
-      return currentStaff.experience;
-    }
-    const target = activeOfficer?.target ?? 0;
+    if (!activeOfficer) return "-";
+    const target = activeOfficer.target ?? 0;
     if (target > 1500000) return "5+ Years";
     if (target > 800000) return "3-5 Years";
     return "1-2 Years";
-  }, [displayUploads.current, activeOfficer, activeStaffId, currentStaff]);
+  }, [activeOfficer]);
 
   const dynamicRole = useMemo(() => {
-    if (!displayUploads.current.length && Number(activeStaffId) <= 3) {
-      return currentStaff.role;
-    }
-    const target = activeOfficer?.target ?? 0;
+    if (!activeOfficer) return "-";
+    const target = activeOfficer.target ?? 0;
     if (target > 1500000) return "Senior Sales Spec.";
     if (target > 800000) return "Sales Specialist";
     return "Sales Associate";
-  }, [displayUploads.current, activeOfficer, activeStaffId, currentStaff]);
+  }, [activeOfficer]);
 
   const dynamicExpertise = useMemo(() => {
-    if (!displayUploads.current.length && Number(activeStaffId) <= 3) {
-      return currentStaff.expertise;
-    }
     if (!displayUploads.current.length || !activeOfficer) {
-      return "All Products";
+      return "-";
     }
     const catSales = new Map<string, number>();
     displayUploads.current.forEach((row) => {
@@ -1962,7 +1810,7 @@ function AppInternal({
     if (lower.includes("sim")) return "SIM & Services Spec.";
     if (lower.includes("btb")) return "Corporate Sales Spec.";
     return `${maxCat} Specialist`;
-  }, [displayUploads.current, activeOfficer, activeStaffId, currentStaff]);
+  }, [displayUploads.current, activeOfficer]);
 
   const activeOfficerCategoryPerformance = useMemo<CategoryPerformanceRow[]>(() => {
     if (!activeOfficer) return [];
@@ -2249,9 +2097,6 @@ function AppInternal({
 
   const activeOfficer7WondersPerformance = useMemo<CategoryPerformanceRow[]>(() => {
     if (!activeOfficer) return [];
-    const officerName = activeOfficer?.name ?? currentStaff.name;
-    const officerIndex = activeOfficerIndex;
-    const hasData = displayUploads.current.length > 0;
     const hasPresetResults = activeOfficerPresetResults.length > 0;
 
     if (hasPresetResults) {
@@ -2305,50 +2150,10 @@ function AppInternal({
       return [...rows, totalRow];
     }
 
-    // Fallback: no preset marked — show mock data for first 3 staff
-    if (!hasData) {
-      const mockBase = [45, 22, 5.5, 13, 78, 12, 46, 35, 28, 42];
-      const mockOffset = [
-        (officerIndex % 3) * 3,
-        (officerIndex % 5) * 1.5,
-        (officerIndex % 4) * 0.3,
-        (officerIndex % 3) * 1.5,
-        (officerIndex % 3) * 4,
-        (officerIndex % 3) * 2,
-        (officerIndex % 5) * 2,
-        (officerIndex % 4) * 1.2,
-        (officerIndex % 3) * 2.5,
-        (officerIndex % 4) * 3,
-      ];
-      const rows: CategoryPerformanceRow[] = mockBase.map((base, idx) => {
-        const actualVal = base + (mockOffset[idx] ?? 0);
-        return {
-          category: `${idx + 1}. Wonder ${idx + 1}`,
-          target: 0,
-          actual: actualVal,
-          achPercent: 0,
-          forecast: actualVal,
-          forecastPercent: 0,
-          lastMonth: 0,
-          momPercent: "New",
-          lastYear: 0,
-          yoyPercent: "New",
-          targetDay: 0,
-          actualDay: actualVal,
-          diffDay: actualVal,
-          achDayPercent: 0,
-        };
-      });
-      return rows;
-    }
-
     return [];
-  }, [activeOfficer, displayUploads.current, activeOfficerIndex, currentStaff.name, activeOfficerPresetResults, kpiPresets]);
+  }, [activeOfficer, activeOfficerPresetResults, kpiPresets]);
 
   const sevenWondersScore = useMemo(() => {
-    if (!displayUploads.current.length && Number(activeStaffId) <= 3) {
-      return currentStaff.score;
-    }
     const wondersRows = activeOfficer7WondersPerformance.filter(r => r.category !== "Average" && r.category !== "Total");
     if (wondersRows.length === 0) return 0;
 
@@ -2368,7 +2173,7 @@ function AppInternal({
     }, 0);
     const avg = sum / wondersRows.length;
     return Math.min(100, Math.max(0, Math.round(avg)));
-  }, [activeOfficer7WondersPerformance, displayUploads.current, activeStaffId, currentStaff]);
+  }, [activeOfficer7WondersPerformance]);
 
   // Focus Device: the main device (iPhone / iPad / Mac / Apple Watch) the
   // officer is performing WORST at. Shown on the staff profile so they
@@ -2461,10 +2266,6 @@ function AppInternal({
   }, [kpiPresets, displayUploads.current, displayUploads.categoryMaster, parsedReport.officers]);
 
   const dynamicRadarData = useMemo(() => {
-    if (!displayUploads.current.length && Number(activeStaffId) <= 3 && activeStat === "csat") {
-      return currentStaff.radar;
-    }
-    
     if (activeStat === "csat") {
       const wondersRows = activeOfficer7WondersPerformance.filter(r => r.category !== "Average" && r.category !== "Total");
 
@@ -2523,19 +2324,13 @@ function AppInternal({
     activeStat,
     activeOfficerCategoryPerformance,
     activeOfficer7WondersPerformance,
-    displayUploads.current,
-    activeStaffId,
-    currentStaff
   ]);
 
   const dynamicScore = useMemo(() => {
-    if (!displayUploads.current.length && Number(activeStaffId) <= 3 && activeStat === "csat") {
-      return currentStaff.score;
-    }
     if (dynamicRadarData.length === 0) return 0;
     const sum = dynamicRadarData.reduce((acc, curr) => acc + curr.value, 0);
     return Math.round(sum / dynamicRadarData.length);
-  }, [dynamicRadarData, displayUploads.current, activeStaffId, currentStaff, activeStat]);
+  }, [dynamicRadarData]);
 
   const staffRoster = useMemo(
     () => buildStaffRoster(displayUploads.target, parsedReport.officers, cleanOfficerName),
@@ -2588,11 +2383,9 @@ function AppInternal({
 
   const monthlyPerformance = useMemo(() => {
     const hasData = displayUploads.current.length > 0;
-    
-    // Dynamic calculations or fallback mock values matching user's image exactly!
-    
+
     // Card 1: Overall Score
-    let avgScore = 70;
+    let avgScore = 0;
     let scoresList: number[] = [];
     if (parsedReport.officers.length > 0) {
       parsedReport.officers.forEach((officer, index) => {
@@ -2630,7 +2423,7 @@ function AppInternal({
     else if (avgScore >= 70) grade = "C";
     
     // Grade distribution
-    let gradeDist = { A: 0, B: 9, C: 3, D: 1 };
+    let gradeDist = { A: 0, B: 0, C: 0, D: 0 };
     if (scoresList.length > 0) {
       gradeDist = { A: 0, B: 0, C: 0, D: 0 };
       scoresList.forEach(s => {
@@ -2642,7 +2435,7 @@ function AppInternal({
     }
     
     // Low Forecast (<70% achievement rate)
-    let lowForecastCount = 2;
+    let lowForecastCount = 0;
     if (parsedReport.officers.length > 0) {
       lowForecastCount = parsedReport.officers.filter(o => o.rate < 70).length;
     }
@@ -2653,45 +2446,45 @@ function AppInternal({
     const salesAchRate = calcAchievementPct(totalSales, totalTarget);
     
     // Card 3: True Sim
-    const simCount = hasData ? countRows(displayUploads.current, (cat) => cat.includes("sim")) : 153;
-    const iphoneCount = hasData ? countRows(displayUploads.current, (cat) => cat.includes("iphone")) : 744;
-    const simRate = iphoneCount > 0 ? (simCount / iphoneCount) * 100 : 20.56;
+    const simCount = hasData ? countRows(displayUploads.current, (cat) => cat.includes("sim")) : 0;
+    const iphoneCount = hasData ? countRows(displayUploads.current, (cat) => cat.includes("iphone")) : 0;
+    const simRate = iphoneCount > 0 ? (simCount / iphoneCount) * 100 : 0;
     
     // Card 4: Case iPhone
-    const caseCount = hasData ? countRows(displayUploads.current, (cat, prod, sub) => cat.includes("case") || prod.includes("case") || sub.includes("case")) : 353;
-    const caseRate = iphoneCount > 0 ? (caseCount / iphoneCount) * 100 : 47.45;
+    const caseCount = hasData ? countRows(displayUploads.current, (cat, prod, sub) => cat.includes("case") || prod.includes("case") || sub.includes("case")) : 0;
+    const caseRate = iphoneCount > 0 ? (caseCount / iphoneCount) * 100 : 0;
     
     // Card 5: UFUND PERSONAL
-    const ufundCount = hasData ? countRows(displayUploads.current, (cat, prod, sub, row) => isUfundRow(row)) : 47;
-    const ufundBase = hasData ? countRows(displayUploads.current, (cat) => cat.includes("ufund") || cat.includes("personal")) : iphoneCount;
-    const ufundRate = ufundBase > 0 ? (ufundCount / ufundBase) * 100 : 6.32;
+    const ufundCount = hasData ? countRows(displayUploads.current, (cat, prod, sub, row) => isUfundRow(row)) : 0;
+    const ufundBase = hasData ? countRows(displayUploads.current, (cat) => cat.includes("ufund") || cat.includes("personal")) : 0;
+    const ufundRate = ufundBase > 0 ? (ufundCount / ufundBase) * 100 : 0;
     
     // Card 6: COVER + (solid card)
-    const coverCount = hasData ? countRows(displayUploads.current, (cat, prod) => cat.includes("cover") || cat.includes("care") || prod.includes("cover") || prod.includes("care")) : 104;
-    const coverRate = iphoneCount > 0 ? (coverCount / iphoneCount) * 100 : 13.98;
+    const coverCount = hasData ? countRows(displayUploads.current, (cat, prod) => cat.includes("cover") || cat.includes("care") || prod.includes("cover") || prod.includes("care")) : 0;
+    const coverRate = iphoneCount > 0 ? (coverCount / iphoneCount) * 100 : 0;
     
     // Card 7: KPIs Pencil 85%
-    const pencilCount = hasData ? countRows(displayUploads.current, (cat, prod) => prod.includes("pencil") || prod.includes("pen")) : 325;
-    const ipadCount = hasData ? countRows(displayUploads.current, (cat) => cat.includes("ipad")) : 471;
-    const pencilRate = ipadCount > 0 ? (pencilCount / ipadCount) * 100 : 69.00;
+    const pencilCount = hasData ? countRows(displayUploads.current, (cat, prod) => prod.includes("pencil") || prod.includes("pen")) : 0;
+    const ipadCount = hasData ? countRows(displayUploads.current, (cat) => cat.includes("ipad")) : 0;
+    const pencilRate = ipadCount > 0 ? (pencilCount / ipadCount) * 100 : 0;
     
     // Card 8: KPIs Mac 10%
-    const macCount = hasData ? countRows(displayUploads.current, (cat) => cat.includes("mac")) : 119;
-    const macRate = iphoneCount > 0 ? (macCount / iphoneCount) * 100 : 15.99;
+    const macCount = hasData ? countRows(displayUploads.current, (cat) => cat.includes("mac")) : 0;
+    const macRate = iphoneCount > 0 ? (macCount / iphoneCount) * 100 : 0;
     
     // Card 9: KPIs iPad 30%
-    const ipadAttachCount = hasData ? countRows(displayUploads.current, (cat) => cat.includes("ipad")) : 471;
-    const ipadRate = iphoneCount > 0 ? (ipadAttachCount / iphoneCount) * 100 : 63.31;
+    const ipadAttachCount = hasData ? countRows(displayUploads.current, (cat) => cat.includes("ipad")) : 0;
+    const ipadRate = iphoneCount > 0 ? (ipadAttachCount / iphoneCount) * 100 : 0;
     
     // Card 10: KPIs BTB Mix 10%
-    const btbSales = hasData ? sumSales(displayUploads.current, (cat) => cat.includes("btb")) : 6850000;
-    const btbTotalSales = totalSales || 54300000;
-    const btbRate = btbTotalSales > 0 ? (btbSales / btbTotalSales) * 100 : 12.61;
+    const btbSales = hasData ? sumSales(displayUploads.current, (cat) => cat.includes("btb")) : 0;
+    const btbTotalSales = totalSales;
+    const btbRate = btbTotalSales > 0 ? (btbSales / btbTotalSales) * 100 : 0;
     
     // Card 11: Mac Growth YoY
     const currentMacSales = hasData
       ? parsedReport.categories.find((c) => c.category.toLowerCase() === "mac")?.actual ?? sumSales(displayUploads.current, (cat) => cat.includes("mac"))
-      : 5160000;
+      : 0;
     const lastYearMacSales = hasData ? sumSales(displayUploads.lastYear, (cat) => cat.includes("mac")) : 0;
     const macYoYRate = lastYearMacSales > 0 ? ((currentMacSales - lastYearMacSales) / lastYearMacSales) * 100 : 0.00;
     
@@ -2704,7 +2497,7 @@ function AppInternal({
 
     return {
       overallScore: { score: avgScore, grade },
-      actualSales: { actual: totalSales || 54810000, target: totalTarget || 86220000, rate: salesAchRate || 63.57 },
+      actualSales: { actual: totalSales, target: totalTarget, rate: salesAchRate },
       trueSim: { count: simCount, base: iphoneCount, rate: simRate, target: 15 },
       caseIphone: { count: caseCount, base: iphoneCount, rate: caseRate, target: 60 },
       ufundPersonal: { count: ufundCount, base: ufundBase, rate: ufundRate, target: 7 },
@@ -2713,8 +2506,8 @@ function AppInternal({
       kpisMac: { count: macCount, base: iphoneCount, rate: macRate, target: 10 },
       kpisIpad: { count: ipadAttachCount, base: iphoneCount, rate: ipadRate, target: 30 },
       btbMix: { btbSales, totalSales: btbTotalSales, rate: btbRate, target: 10 },
-      macYoY: { actual: currentMacSales, target: lastYearMacSales || 7270000, rate: macYoYRate, targetRate: 10 },
-      totalYoY: { actual: currentTotalSales, target: lastYearTotalSales || 77240000, rate: totalSalesYoYRate, targetRate: 10 },
+      macYoY: { actual: currentMacSales, target: lastYearMacSales, rate: macYoYRate, targetRate: 10 },
+      totalYoY: { actual: currentTotalSales, target: lastYearTotalSales, rate: totalSalesYoYRate, targetRate: 10 },
       gradeDist,
       lowForecast: lowForecastCount,
     };
@@ -2790,7 +2583,7 @@ function AppInternal({
       sales: Math.round((dailySales.get(date) ?? 0) / 1000),
       index,
     }));
-  }, [displayUploads.current, parsedReport.branches]);
+  }, [displayUploads.current]);
 
   const topPerformingProducts = useMemo(() => {
     if (!displayUploads.current.length) {
@@ -2822,7 +2615,9 @@ function AppInternal({
   const attachCategoryOptions = useMemo(() => getAttachCategoryOptions(displayUploads.categoryMaster), [displayUploads.categoryMaster]);
 
   const displayStaffAvatar = useMemo(() => {
-    if (!activeOfficer) return currentStaff.image;
+    if (!activeOfficer) {
+      return getStaffAvatar(staffPhotos, { officerKey: "", fallbackIndex: 0 });
+    }
     const attachRow = attachOfficerRows.find((row) =>
       attachMatchesOfficer(row.name, activeOfficer.name),
     );
@@ -2831,13 +2626,7 @@ function AppInternal({
       officerKey: cleanOfficerName(activeOfficer.name),
       fallbackIndex: activeOfficerIndex,
     });
-  }, [
-    activeOfficer,
-    attachOfficerRows,
-    staffPhotos,
-    activeOfficerIndex,
-    currentStaff.image,
-  ]);
+  }, [activeOfficer, attachOfficerRows, staffPhotos, activeOfficerIndex]);
 
   const parsedStoreHeader = useMemo(() => {
     const matchedBranch = parsedReport.branches.find(b => {
@@ -2887,8 +2676,8 @@ function AppInternal({
   }, [attachOfficerRows, parsedReport.officers]);
 
   const activeOfficerInteractions = useMemo(() => {
-    const officerName = activeOfficer?.name ?? currentStaff.name;
-    if (!displayUploads.current.length) return interactionsData;
+    const officerName = activeOfficer?.name ?? "";
+    if (!displayUploads.current.length || !officerName) return emptyInteractions;
 
     const formatDocDate = (raw: unknown) => {
       const parsed = parseDocDate(raw);
@@ -2941,13 +2730,13 @@ function AppInternal({
         };
       });
 
-    if (!rows.length) return interactionsData;
+    if (!rows.length) return emptyInteractions;
     return {
       sales: rows,
       csat: rows,
       target: rows,
     };
-  }, [displayUploads.current, activeOfficer?.name, currentStaff.name]);
+  }, [displayUploads.current, activeOfficer?.name]);
 
   /**
    * Persist the upload state to IndexedDB (replaces the old
@@ -3200,26 +2989,26 @@ function AppInternal({
     void loadCategoryTargetOverrides();
   }, [selectedBranch, selectedBranchLoaded, loadCategoryTargetOverrides]);
 
-  useEffect(() => {
-    if (!selectedBranchLoaded) return;
-    const branchCode =
+  // Resolve to a stable string first so the fetch effect below only
+  // refires when the effective branch code actually changes (not on every
+  // uploads-array identity change).
+  const tradeInBranchCode = useMemo(
+    () =>
       tradeBranchMapping[selectedBranch] ||
       getBranchCodeFromTarget(displayUploads.target) ||
-      getBranchCodeFromString(selectedBranch);
-    console.log(
-      "[TradeIn] selectedBranch:",
-      selectedBranch,
-      "branchCode:",
-      branchCode,
-    );
-    if (!branchCode) {
+      getBranchCodeFromString(selectedBranch),
+    [selectedBranch, displayUploads.target, tradeBranchMapping],
+  );
+
+  useEffect(() => {
+    if (!selectedBranchLoaded) return;
+    if (!tradeInBranchCode) {
       setTradeInData(undefined);
       return;
     }
     let cancelled = false;
-    fetchTradeInData(branchCode)
+    fetchTradeInData(tradeInBranchCode)
       .then((result) => {
-        console.log("[TradeIn] API result for", branchCode, ":", result);
         if (!cancelled) {
           setTradeInData(result);
         }
@@ -3233,12 +3022,7 @@ function AppInternal({
     return () => {
       cancelled = true;
     };
-  }, [
-    selectedBranch,
-    selectedBranchLoaded,
-    displayUploads.target,
-    tradeBranchMapping,
-  ]);
+  }, [tradeInBranchCode, selectedBranchLoaded]);
 
   // When the user uploads data for a branch that isn't currently
   // selected, auto-switch to the first uploaded branch so the rest of
@@ -3492,7 +3276,7 @@ function AppInternal({
                   >
                     <img
                       src={displayStaffAvatar}
-                      alt={currentStaff.name}
+                      alt={activeOfficer?.name ?? "Staff"}
                       className="w-full h-full object-cover object-top"
                     />
                   </div>
@@ -3504,10 +3288,7 @@ function AppInternal({
                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
                         className="absolute right-0 top-12 w-48 bg-[#0c3123]/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 flex flex-col"
                       >
-                        {(parsedReport.officers.length > 0
-                          ? parsedReport.officers
-                          : staffData.map((s) => ({ name: s.name, branch: s.store }))
-                        ).map((officer, idx) => (
+                        {parsedReport.officers.map((officer, idx) => (
                           <button
                             key={`${officer.name}-${idx}`}
                             className={`flex items-center gap-3 w-full text-left px-4 py-3 hover:bg-white/10 transition-colors ${idx === activeOfficerIndex ? "bg-white/5" : ""}`}

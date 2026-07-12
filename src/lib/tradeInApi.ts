@@ -14,12 +14,16 @@ export async function fetchTradeInData(
     return { actual: 0, today: 0, target: 0 };
   }
 
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const totalDays = new Date(year, now.getMonth() + 1, 0).getDate();
-  const startDate = `${year}-${month}-01`;
-  const endDate = `${year}-${month}-${String(totalDays).padStart(2, "0")}`;
+  // Trade data is keyed to Thailand business days — compute "today" and the
+  // month window in Asia/Bangkok regardless of where this code runs
+  // (user browser or the bot's headless browser on a UTC server).
+  const todayStr = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Bangkok",
+  }).format(new Date()); // YYYY-MM-DD
+  const [yearStr, monthStr] = todayStr.split("-");
+  const totalDays = new Date(Number(yearStr), Number(monthStr), 0).getDate();
+  const startDate = `${yearStr}-${monthStr}-01`;
+  const endDate = `${yearStr}-${monthStr}-${String(totalDays).padStart(2, "0")}`;
 
   const url = `${TRADE_API_BASE}/api/v2/trades?branch=${encodeURIComponent(branchCode)}&start_date=${startDate}&end_date=${endDate}&limit=99999`;
 
@@ -46,7 +50,6 @@ export async function fetchTradeInData(
   );
   const actual = agreedTrades.length;
 
-  const todayStr = `${year}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   const today = agreedTrades.filter(
     (t: any) =>
       t.document_date &&
@@ -56,26 +59,20 @@ export async function fetchTradeInData(
   return { actual, today, target };
 }
 
+const BRANCH_CODE_KEYS = ["emp_shop_code", "branchId", "Branch ID", "BRANCH CODE"];
+
 export function getBranchCodeFromTarget(
   targetRows: Record<string, string | number | undefined>[],
 ): string {
-  const row = targetRows.find(
-    (r) =>
-      r.emp_shop_code ??
-      r["emp_shop_code"] ??
-      r.branchId ??
-      r["Branch ID"] ??
-      r["BRANCH CODE"],
-  );
-  const code = String(
-    row?.emp_shop_code ??
-      row?.["emp_shop_code"] ??
-      row?.branchId ??
-      row?.["Branch ID"] ??
-      row?.["BRANCH CODE"] ??
-      "",
-  ).trim();
-  return normalizeBranchCode(code);
+  // Scan every row/key until we hit the first usable (numeric) code —
+  // rows often carry present-but-empty cells, which must not stop the search.
+  for (const row of targetRows) {
+    for (const key of BRANCH_CODE_KEYS) {
+      const code = normalizeBranchCode(String(row[key] ?? ""));
+      if (code) return code;
+    }
+  }
+  return "";
 }
 
 export function getBranchCodeFromString(value: string | undefined): string {

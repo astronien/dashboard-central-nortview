@@ -46,7 +46,7 @@ export function calcTodayAchievementPct(actualToday: number, targetToDate: numbe
   return calcAchievementPct(actualToday, targetToDate);
 }
 
-const toNumber = (value: unknown) =>
+export const toNumber = (value: unknown) =>
   Number(String(value ?? "").replace(/[^\d.-]/g, "")) || 0;
 
 export function parseTargetNumber(val: unknown): number {

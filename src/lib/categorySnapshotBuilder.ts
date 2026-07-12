@@ -5,8 +5,8 @@ import {
   calcForecastByDays,
   calcTargetToDate,
   calcTodayAchievementPct,
-  getTargetForPeriod,
   normalizeId,
+  toNumber,
   rawTargetRowsToRecords,
   type TargetRecord,
 } from "./targetAggregations";
@@ -61,14 +61,13 @@ function getMonthPeriod() {
 }
 
 function resolveBranchId(targetRows: RawRow[], currentRows: RawRow[]): string {
-  const fromTarget = targetRows.find((r) => r.emp_shop_code ?? r["emp_shop_code"] ?? r["BRANCH NAME"]);
-  if (fromTarget) {
-    return normalizeId(
-      fromTarget.emp_shop_code ??
-        fromTarget["emp_shop_code"] ??
-        fromTarget["BRANCH NAME"] ??
-        "",
-    );
+  // Scan target rows key-by-key so a present-but-empty cell doesn't stop the
+  // search before a later key/row that holds the real value.
+  for (const row of targetRows) {
+    for (const key of ["emp_shop_code", "BRANCH NAME"] as const) {
+      const id = normalizeId(row[key] ?? "");
+      if (id) return id;
+    }
   }
 
   const fromCurrent = currentRows[0];
@@ -103,33 +102,20 @@ function sumTodayActual(rows: RawRow[], category?: string): number {
   );
   if (!category) {
     return todayRows.reduce(
-      (sum, row) =>
-        sum +
-        (Number(String(row["ราคาจำหน่าย"] ?? row["ราคาขายตามบิล"] ?? row["Total Price"] ?? "0").replace(/[^\d.-]/g, "")) ||
-          0),
+      (sum, row) => sum + toNumber(row["ราคาจำหน่าย"] ?? row["ราคาขายตามบิล"] ?? row["Total Price"]),
       0,
     );
   }
   return sumKpiActualFromRows(todayRows, category);
 }
 
-function periodActual(
-  rows: RawRow[],
-  category?: string,
-  measureType?: "revenue" | "quantity",
-): number {
+function periodActual(rows: RawRow[], category?: string): number {
   if (!rows.length) return 0;
   if (!category) {
     return rows.reduce(
-      (sum, row) =>
-        sum +
-        (Number(String(row["ราคาจำหน่าย"] ?? row["ราคาขายตามบิล"] ?? row["Total Price"] ?? "0").replace(/[^\d.-]/g, "")) ||
-          0),
+      (sum, row) => sum + toNumber(row["ราคาจำหน่าย"] ?? row["ราคาขายตามบิล"] ?? row["Total Price"]),
       0,
     );
-  }
-  if (measureType === "quantity") {
-    return sumKpiActualFromRows(rows, category);
   }
   return sumKpiActualFromRows(rows, category);
 }
@@ -170,11 +156,7 @@ export function buildCategorySnapshots(params: {
     let actual = 0;
     let measureType: "revenue" | "quantity" | undefined = "revenue";
 
-    if (label === "Total Sales") {
-      target = getTargetForPeriod(targets, branchId, "branch", startDate, endDate);
-      actual = periodActual(currentRows);
-      measureType = "revenue";
-    } else if (kpiKey) {
+    if (kpiKey) {
       const cfg = getKpiCategoryConfig(kpiKey);
       measureType = cfg?.measureType ?? "revenue";
       const result = getKpiTargetResult(
@@ -206,12 +188,12 @@ export function buildCategorySnapshots(params: {
     }
 
     const lastMonthActual = kpiKey
-      ? periodActual(lastMonthRows, kpiKey, measureType)
+      ? periodActual(lastMonthRows, kpiKey)
       : label === "Trade In"
         ? 0
         : periodActual(lastMonthRows);
     const lastYearActual = kpiKey
-      ? periodActual(lastYearRows, kpiKey, measureType)
+      ? periodActual(lastYearRows, kpiKey)
       : label === "Trade In"
         ? 0
         : periodActual(lastYearRows);
