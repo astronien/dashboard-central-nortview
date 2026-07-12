@@ -39,35 +39,40 @@ export function HomeDashboardSection({
   categorySnapshots,
   branchOverviewKpiData,
   categorySnapshotRef,
+  captureRef,
 }: {
   derivedHomeStats: DerivedHomeStat[];
   monthlyPerformance: MonthlyPerformance;
   categorySnapshots?: CategorySnapshotItem[];
   branchOverviewKpiData?: BranchOverviewKpiData;
   categorySnapshotRef?: React.RefObject<HTMLDivElement | null>;
+  /** Wraps the stat cards + Category KPI Snapshot for screenshot capture */
+  captureRef?: React.RefObject<HTMLDivElement | null>;
 }) {
   return (
     <>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {derivedHomeStats.map((stat, idx) => (
-          <div key={idx} className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 p-5 shadow-[0_8px_32px_rgba(0,0,0,0.12)] flex flex-col justify-between hover:bg-white/[0.15] transition-colors cursor-pointer">
-            <div className="flex justify-between items-start mb-2">
-              <div className="p-2.5 bg-white/5 rounded-xl border border-white/5"><stat.icon className="w-5 h-5 text-emerald-400" /></div>
-              <div className={`text-xs font-semibold px-2 py-1 rounded-lg ${stat.isUp ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"} flex items-center gap-1`}>
-                {stat.isUp ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />} {stat.trend}
+      <div ref={captureRef} className="flex flex-col gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {derivedHomeStats.map((stat, idx) => (
+            <div key={idx} className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 p-5 shadow-[0_8px_32px_rgba(0,0,0,0.12)] flex flex-col justify-between hover:bg-white/[0.15] transition-colors cursor-pointer">
+              <div className="flex justify-between items-start mb-2">
+                <div className="p-2.5 bg-white/5 rounded-xl border border-white/5"><stat.icon className="w-5 h-5 text-emerald-400" /></div>
+                <div className={`text-xs font-semibold px-2 py-1 rounded-lg ${stat.isUp ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"} flex items-center gap-1`}>
+                  {stat.isUp ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />} {stat.trend}
+                </div>
+              </div>
+              <div>
+                <div className="text-sm text-white/60 mb-1">{stat.label}</div>
+                <div className="text-3xl font-bold tracking-tight">{stat.value}</div>
               </div>
             </div>
-            <div>
-              <div className="text-sm text-white/60 mb-1">{stat.label}</div>
-              <div className="text-3xl font-bold tracking-tight">{stat.value}</div>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
 
-      {categorySnapshots && categorySnapshots.length > 0 ? (
-        <CategorySnapshotSection ref={categorySnapshotRef} items={categorySnapshots} />
-      ) : null}
+        {categorySnapshots && categorySnapshots.length > 0 ? (
+          <CategorySnapshotSection ref={categorySnapshotRef} items={categorySnapshots} />
+        ) : null}
+      </div>
 
       {branchOverviewKpiData && branchOverviewKpiData.presets.length > 0 ? (
         <BranchOverviewKpiTable data={branchOverviewKpiData} />

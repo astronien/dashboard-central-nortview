@@ -3109,14 +3109,20 @@ function AppInternal({
   const homeCaptureRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   const categorySnapshotRef = useRef<HTMLDivElement>(null);
+  // Stat cards + Category KPI Snapshot inside the always-rendered hidden
+  // home view — captured at a stable 1200px width regardless of viewport.
+  const homeStatsCaptureRef = useRef<HTMLDivElement>(null);
 
   const captureScreen = async () => {
-    // On home view, capture only the Category KPI Snapshot section
-    const el = currentView === "home" && categorySnapshotRef.current
-      ? categorySnapshotRef.current
-      : mainRef.current;
+    // On home view, capture the 4 stat cards + Category KPI Snapshot
+    const isHome = currentView === "home" && !!homeStatsCaptureRef.current;
+    const el = isHome ? homeStatsCaptureRef.current : mainRef.current;
     if (!el) return;
     const w = Math.max((el as HTMLElement).scrollWidth, (el as HTMLElement).offsetWidth);
+    const h = Math.max((el as HTMLElement).scrollHeight, (el as HTMLElement).offsetHeight);
+    // Home capture gets padding + the app's green gradient behind the
+    // cards so the image matches the on-screen look.
+    const pad = isHome ? 28 : 0;
     // Inject a <style> element as a CHILD of the element so it travels
     // with the clone into the SVG foreignObject. This hides scrollbars
     // and box-shadows on all descendants during capture only.
@@ -3134,12 +3140,19 @@ function AppInternal({
         pixelRatio: 1.5,
         cacheBust: false,
         backgroundColor: "#1c2722",
-        width: w,
+        width: w + pad * 2,
+        ...(isHome ? { height: h + pad * 2 } : {}),
         style: {
-          width: `${w}px`,
-          height: "auto",
+          width: `${w + pad * 2}px`,
+          height: isHome ? `${h + pad * 2}px` : "auto",
           boxSizing: "border-box",
           overflow: "visible",
+          ...(isHome
+            ? {
+                padding: `${pad}px`,
+                background: "linear-gradient(to bottom right, #1b5d44, #123627)",
+              }
+            : {}),
         },
         // Drop mix-blend-overlay nodes from the clone — they render as a
         // dark rectangle when html-to-image uses SVG foreignObject.
@@ -3476,6 +3489,7 @@ function AppInternal({
               categorySnapshots={categorySnapshotData}
               branchOverviewKpiData={branchOverviewKpiData}
               categorySnapshotRef={categorySnapshotRef}
+              captureRef={homeStatsCaptureRef}
             />
           </div>
         </div>
