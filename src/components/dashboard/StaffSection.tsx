@@ -150,17 +150,21 @@ function TelegramSendButton({
     document.head.appendChild(styleTag);
     try {
       const pad = 32;
+      const h = Math.max(sizeEl.scrollHeight, sizeEl.offsetHeight);
       const dataUrl = await toJpeg(el, {
         quality: 0.92,
         pixelRatio: 1.5,
         cacheBust: false,
         backgroundColor: "#1c2722",
         // Padding is added AROUND the card so the content stays centered
+        // with even margins on every side (width AND height must grow,
+        // otherwise the bottom padding gets clipped).
         width: w + pad * 2,
+        height: h + pad * 2,
         style: {
           padding: `${pad}px`,
           width: `${w + pad * 2}px`,
-          height: "auto",
+          height: `${h + pad * 2}px`,
           boxSizing: "border-box",
           overflow: "visible",
         },

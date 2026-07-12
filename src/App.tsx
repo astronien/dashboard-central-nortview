@@ -3234,19 +3234,21 @@ function AppInternal({
           // One failed capture must not abort the rest of the roster
           try {
             const w = Math.max(el.scrollWidth, el.offsetWidth);
+            const h = Math.max(el.scrollHeight, el.offsetHeight);
             const pad = 32;
             const dataUrl = await toJpeg(el, {
               quality: 0.92,
               pixelRatio: 1.5,
               cacheBust: false,
               backgroundColor: "#1c2722",
-              // Padding is added AROUND the card (w + pad*2) so the content
-              // stays centered instead of being squeezed to one side.
+              // Padding is added AROUND the card (w/h + pad*2) so the content
+              // stays centered with even margins on every side.
               width: w + pad * 2,
+              height: h + pad * 2,
               style: {
                 padding: `${pad}px`,
                 width: `${w + pad * 2}px`,
-                height: "auto",
+                height: `${h + pad * 2}px`,
                 boxSizing: "border-box",
                 overflow: "visible",
               },
