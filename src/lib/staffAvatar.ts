@@ -9,7 +9,20 @@ export type StaffPhotoRecord = {
 
 export type StaffPhotosMap = Record<string, StaffPhotoRecord>;
 
-const DEFAULT_AVATARS = ["/staff2.png", "/staff3.png", "/staff2.png"];
+// Generic person silhouette as an inline SVG data URI — always decodable,
+// so screenshot capture (html-to-image) never trips on a missing/broken
+// avatar file for staff without an uploaded photo.
+const GENERIC_AVATAR =
+  "data:image/svg+xml," +
+  encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">` +
+      `<rect width="96" height="96" fill="#0c3123"/>` +
+      `<circle cx="48" cy="38" r="16" fill="#34d399" opacity="0.45"/>` +
+      `<path d="M16 88c4-18 17-26 32-26s28 8 32 26z" fill="#34d399" opacity="0.45"/>` +
+      `</svg>`,
+  );
+
+const DEFAULT_AVATARS = [GENERIC_AVATAR];
 
 export type StaffRosterEntry = {
   staffId: string;
