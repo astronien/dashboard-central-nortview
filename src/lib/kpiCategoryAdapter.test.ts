@@ -82,15 +82,34 @@ describe("kpiCategoryAdapter", () => {
     assert.equal(rowMatchesKpiCategory(accRow, "AC+"), false);
   });
 
-  it("catDaily is authoritative when present (row belongs to one group only)", () => {
-    // Master says this AppleCare-looking row is grouped under Mac —
-    // it must not also count toward AC+.
-    const row: RawRow = { "Product (Name)": "AppleCare+ for Mac", catDaily: "Mac", Number: "1" };
-    assert.equal(rowMatchesKpiCategory(row, "AC+"), false);
-    assert.equal(rowMatchesKpiCategory(row, "Mac"), true);
-    // Same for SIM: a "sim"-substring product assigned elsewhere doesn't count
+  it("catDaily is authoritative for grouped categories", () => {
+    // A "sim"-substring product the master assigns to another group
+    // does not count toward SIM.
     const otherRow: RawRow = { "Product (Name)": "SIM tray tool", catDaily: "Other", Number: "1" };
     assert.equal(rowMatchesKpiCategory(otherRow, "SIM"), false);
+    // ...but rows assigned to the group do.
+    const simCard: RawRow = { "Product (Name)": "TRUE 5G", catDaily: "SIM", Number: "1" };
+    assert.equal(rowMatchesKpiCategory(simCard, "SIM"), true);
+  });
+
+  it("7CARE+/COVER+ bundle items count as COVER+ only, never AC+", () => {
+    const bundleRow: RawRow = {
+      "Category (Name)": "Smile",
+      "Product (Name)": "7CARE+ Free for COVER+ with AppleCare Service",
+      Number: "1",
+    };
+    assert.equal(rowMatchesKpiCategory(bundleRow, "COVER+"), true);
+    assert.equal(rowMatchesKpiCategory(bundleRow, "AC+"), false);
+  });
+
+  it("AC+/COVER+ match on product text regardless of catDaily group", () => {
+    // The Category Master has no AC+/COVER+ group — an AppleCare row is
+    // assigned to a device group (e.g. Mac) but still counts toward AC+.
+    const row: RawRow = { "Product (Name)": "AppleCare+ for Mac", catDaily: "Mac", Number: "1" };
+    assert.equal(rowMatchesKpiCategory(row, "AC+"), true);
+    assert.equal(rowMatchesKpiCategory(row, "Mac"), true);
+    const coverRow: RawRow = { "Product (Name)": "COVER+ 1 Year", catDaily: "Other", Number: "1" };
+    assert.equal(rowMatchesKpiCategory(coverRow, "COVER+"), true);
   });
 
   it("BTB and BTB(Apple) are mutually exclusive on raw text", () => {

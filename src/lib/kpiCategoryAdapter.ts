@@ -90,20 +90,39 @@ export function rowMatchesKpiCategory(row: RawRow, category: string): boolean {
   // then fell through to a `includes("ac")` match that counted every
   // Mac/Accessories row).
   const catKey = category.trim().toLowerCase();
+  const raw = rowRawText(row);
+
+  // COVER+/AC+ have no CAT Daily group in the Category Master — they are
+  // attach-style KPIs detected from product text only, independent of
+  // which device group the master assigns the row to.
+  if (catKey === "cover+" || catKey === "cover plus") {
+    return raw.includes("cover+") || raw.includes("cover plus");
+  }
+  if (catKey === "ac+" || catKey === "apple care") {
+    // "7CARE+ Free for COVER+ with AppleCare Service" is a COVER+ bundle
+    // item (sold paired with COVER+), not an AppleCare sale — anything
+    // COVER+-flavored never counts toward AC+.
+    if (raw.includes("cover+") || raw.includes("cover plus") || raw.includes("7care")) {
+      return false;
+    }
+    return raw.includes("apple care") || raw.includes("applecare") || raw.includes("ac+");
+  }
 
   // If the row was enriched with `catDaily` by the Category Master
-  // (see enrichSalesRowsWithCatDaily), that is the source of truth —
-  // the row belongs to exactly the group the master assigns it to.
+  // (see enrichSalesRowsWithCatDaily), that is the source of truth for
+  // the grouped categories — the row counts only toward its assigned
+  // group (mirrors studio7-sales-dashboard-main's
+  // `li.catDaily === targetCatDaily` matching).
   const catDaily = String((row as any).catDaily ?? "").trim();
   if (catDaily) {
     if (catDaily === category) return true;
-    // BTB(Apple) ↔ "BTB Apple" / "btb apple" / "btb(apple)" — strip all
+    // BTB(Apple) ↔ "BTB Apple" / "btb apple" / "BTB(APPLE)" — strip all
     // whitespace and punctuation before comparing
     const strip = (s: string) => s.toLowerCase().replace(/[\s()]+/g, "");
     return strip(catDaily) === strip(category);
   }
 
-  const raw = rowRawText(row);
+  // Heuristics for rows the master doesn't cover:
 
   if (catKey === "sim" || catKey === "smile") {
     const cat = String(row["Category (Name)"] ?? "").trim();
@@ -117,14 +136,6 @@ export function rowMatchesKpiCategory(row: RawRow, category: string): boolean {
 
   if (catKey === "btb(apple)" || catKey === "btb apple") {
     return raw.includes("btb apple") || raw.includes("btb(apple)");
-  }
-
-  if (catKey === "cover+" || catKey === "cover plus") {
-    return raw.includes("cover+") || raw.includes("cover plus");
-  }
-
-  if (catKey === "ac+" || catKey === "apple care") {
-    return raw.includes("apple care") || raw.includes("applecare") || raw.includes("ac+");
   }
 
   const cfg = getKpiCategoryConfig(category);
