@@ -173,7 +173,7 @@ async function handleReportMenu(chatId) {
   }
   if (piaList.length > 1) {
     buttons.push([{
-      text: `📊 ส่งทุกคน (${piaList.length} PIAs, ~${Math.ceil(piaList.length * DELAY_BETWEEN_PIAS_SEC / 60)} นาที)`,
+      text: `📊 ส่งทุกคน (${piaList.length} PIAs)`,
       callback_data: "report_all",
     }]);
   }

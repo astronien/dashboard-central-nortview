@@ -130,19 +130,35 @@ const tursoPipeline = async (requests) => {
   return payload;
 };
 
+const toPipelineArgs = (args) =>
+  args.map((value) => {
+    if (typeof value === "number" && Number.isInteger(value)) {
+      return { type: "integer", value: String(value) };
+    }
+    return { type: "text", value: String(value) };
+  });
+
 const tursoExecute = async (sql, args = []) => {
   const stmt = { sql };
   if (args.length) {
-    stmt.args = args.map((value) => {
-      if (typeof value === "number" && Number.isInteger(value)) {
-        return { type: "integer", value: String(value) };
-      }
-      return { type: "text", value: String(value) };
-    });
+    stmt.args = toPipelineArgs(args);
   }
 
   const payload = await tursoPipeline([{ type: "execute", stmt }]);
   return getExecuteResult(payload, 0);
+};
+
+/** Run several statements atomically in one BEGIN/COMMIT pipeline. */
+const tursoTransaction = async (statements) => {
+  const requests = [
+    { type: "execute", stmt: { sql: "BEGIN TRANSACTION" } },
+    ...statements.map(({ sql, args = [] }) => ({
+      type: "execute",
+      stmt: args.length ? { sql, args: toPipelineArgs(args) } : { sql },
+    })),
+    { type: "execute", stmt: { sql: "COMMIT" } },
+  ];
+  return tursoPipeline(requests);
 };
 
 const isMissingTableError = (error) => {
@@ -244,11 +260,18 @@ const clearUploadKind = async (kind) => {
 };
 
 const clearAllUploads = async () => {
-  await tursoExecute("DELETE FROM data_sales");
-  await tursoExecute("DELETE FROM data_targets");
-  await tursoExecute("DELETE FROM data_categories");
-  await tursoExecute("DELETE FROM upload_meta");
+  // Clear the core tables atomically so a mid-way failure can't leave a
+  // partially-wiped state.
+  await tursoTransaction([
+    { sql: "DELETE FROM data_sales" },
+    { sql: "DELETE FROM data_targets" },
+    { sql: "DELETE FROM data_categories" },
+    { sql: "DELETE FROM upload_meta" },
+  ]);
 
+  // Best-effort cleanup of legacy tables (and the web dashboard's
+  // upload_chunks table) that may not exist on every database.
+  await tursoExecuteOptional("DELETE FROM upload_chunks");
   for (const kind of UPLOAD_KINDS) {
     await tursoExecuteOptional(`DELETE FROM ${chunkTable(kind)}`);
     await tursoExecuteOptional(`DELETE FROM ${KIND_TABLE[kind]}`);
@@ -374,12 +397,14 @@ const loadWonderConfigsDb = async (execute = tursoExecute) => {
 
 const saveWonderConfigsDb = async (execute, configs) => {
   await ensureRelationalSchema(execute);
-  await execute("DELETE FROM wonder_configs");
-  for (const w of configs) {
-    await execute(
-      `INSERT INTO wonder_configs (id, name, target_percent, base_categories, divisor_categories, divisor_column, divisor_value)
+  // DELETE + INSERTs run in one transaction so a mid-way failure can't
+  // leave the configs wiped (and one pipeline beats N+1 round-trips).
+  await tursoTransaction([
+    { sql: "DELETE FROM wonder_configs" },
+    ...configs.map((w) => ({
+      sql: `INSERT INTO wonder_configs (id, name, target_percent, base_categories, divisor_categories, divisor_column, divisor_value)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [
+      args: [
         w.id,
         w.name,
         w.targetPercent,
@@ -388,8 +413,8 @@ const saveWonderConfigsDb = async (execute, configs) => {
         w.divisorColumn ?? "",
         w.divisorValue ?? "",
       ],
-    );
-  }
+    })),
+  ]);
 };
 
 const initDatabase = async () => {

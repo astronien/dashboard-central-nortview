@@ -438,6 +438,7 @@ const insertBatch = async (tursoExecute, tursoPipeline, getExecuteResult, table,
   if (!presentColumns.size) {
     throw new Error(`Table ${table} has no matching columns for INSERT.`);
   }
+  const cols = Array.from(presentColumns);
 
   // Split into sub-pipelines of max ~500 rows to avoid Turso HTTP body size limits
   const MAX_ROWS_PER_PIPELINE = 500;
@@ -449,14 +450,14 @@ const insertBatch = async (tursoExecute, tursoPipeline, getExecuteResult, table,
 
     for (let offset = 0; offset < pipeSlice.length; offset += batchSize) {
       const slice = pipeSlice.slice(offset, offset + batchSize);
-      const placeholders = `(${presentColumns.map(() => "?").join(", ")})`;
-      const sql = `INSERT INTO ${table} (${Array.from(presentColumns).join(", ")}) VALUES ${slice
+      const placeholders = `(${cols.map(() => "?").join(", ")})`;
+      const sql = `INSERT INTO ${table} (${cols.join(", ")}) VALUES ${slice
         .map(() => placeholders)
         .join(", ")}`;
 
       const args = [];
       for (const row of slice) {
-        for (const col of presentColumns) {
+        for (const col of cols) {
           args.push(textArg(row[col]));
         }
       }

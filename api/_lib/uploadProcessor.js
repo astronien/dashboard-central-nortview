@@ -269,7 +269,12 @@ async function getTargetTotalForBranch(branchId) {
     });
     let total = 0;
     for (const row of res.rows) {
-      const data = JSON.parse(String(row.data));
+      let data;
+      try {
+        data = JSON.parse(String(row.data));
+      } catch {
+        continue; // skip malformed chunk instead of failing the whole lookup
+      }
       for (const t of data) {
         const tBranch = String(t["emp_shop_code"] ?? t["BRANCH NAME"] ?? "").trim();
         if (tBranch === branchId) {
@@ -283,15 +288,52 @@ async function getTargetTotalForBranch(branchId) {
   }
 }
 
+// --- Schema ---
+
+// upload_chunks must stay identical to the web dashboard's schema
+// (src/lib/auth/tursoClient.ts SCHEMA_SQL) — both sides read and write
+// the same table.
+async function ensureSchema() {
+  const client = getTursoClient();
+  await client.batch(
+    [
+      `CREATE TABLE IF NOT EXISTS upload_chunks (
+        kind TEXT NOT NULL,
+        chunk_index INTEGER NOT NULL,
+        row_count INTEGER NOT NULL,
+        data TEXT NOT NULL,
+        file_name TEXT,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        PRIMARY KEY (kind, chunk_index)
+      )`,
+      `CREATE TABLE IF NOT EXISTS upload_audit_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        branch_id TEXT,
+        kind TEXT,
+        file_name TEXT,
+        file_size INTEGER,
+        row_count INTEGER,
+        target_total REAL,
+        actual_total REAL,
+        status TEXT,
+        error_message TEXT,
+        created_at TEXT
+      )`,
+    ],
+    "write",
+  );
+}
+
 // --- Audit log ---
 
 async function logAudit(params) {
   try {
     const client = getTursoClient();
+    await ensureSchema();
     const res = await client.execute({
       sql: `INSERT INTO upload_audit_log
         (branch_id, kind, file_name, file_size, row_count, target_total, actual_total, status, error_message, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
       args: [
         params.branchId,
         params.kind,
@@ -366,33 +408,24 @@ export async function processUpload(params) {
   // 6. Compute actual
   const actualTotal = kind === "categoryMaster" || kind === "target" ? 0 : sumActualAmount(rows);
 
-  // 7. Transaction: DELETE existing + INSERT new chunks (Q-G: replace เสมอ)
+  // 7. Replace this kind's chunks in upload_chunks — the same table/schema
+  //    the web dashboard reads and writes (src/lib/cloudStorage.ts)
   await ensureSchema();
   const client = getTursoClient();
   const chunks = [];
   for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
-    chunks.push(JSON.stringify(rows.slice(i, i + CHUNK_SIZE)));
+    chunks.push(rows.slice(i, i + CHUNK_SIZE));
   }
 
   try {
     const statements = [
       // DELETE existing chunks for this kind (replace เสมอ)
-      ...(kind !== "categoryMaster"
-        ? [{ sql: "DELETE FROM upload_chunks WHERE kind = ?", args: [kind] }]
-        : []),
+      { sql: "DELETE FROM upload_chunks WHERE kind = ?", args: [kind] },
       // INSERT new chunks
-      ...chunks.map((data, i) => ({
+      ...chunks.map((chunkRows, i) => ({
         sql:
-          "INSERT INTO upload_chunks (kind, chunk_index, row_count, data, file_name, branch_id, line_user_id, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))",
-        args: [
-          kind,
-          i,
-          Math.min(CHUNK_SIZE, rows.length - i * CHUNK_SIZE),
-          data,
-          fileName,
-          branchId ?? null,
-          lineUserId ?? null,
-        ],
+          "INSERT INTO upload_chunks (kind, chunk_index, row_count, data, file_name, updated_at) VALUES (?, ?, ?, ?, ?, datetime('now'))",
+        args: [kind, i, chunkRows.length, JSON.stringify(chunkRows), fileName ?? null],
       })),
     ];
     await client.batch(statements, "write");
