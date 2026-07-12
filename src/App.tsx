@@ -33,6 +33,7 @@ import {
   Watch,
   CreditCard,
   LogOut,
+  Loader2,
 } from "lucide-react";
 import CategoryTreePicker from "./components/CategoryTreePicker";
 
@@ -3112,6 +3113,9 @@ function AppInternal({
   // Stat cards + Category KPI Snapshot inside the always-rendered hidden
   // home view — captured at a stable 1200px width regardless of viewport.
   const homeStatsCaptureRef = useRef<HTMLDivElement>(null);
+  // Staff profile card element (set by StaffSection) for the camera button.
+  const staffProfileCaptureRef = useRef<HTMLDivElement>(null);
+  const [staffCaptureProgress, setStaffCaptureProgress] = useState("");
 
   const captureScreen = async () => {
     // On home view, capture the 4 stat cards + Category KPI Snapshot
@@ -3176,6 +3180,80 @@ function AppInternal({
       console.error("[captureScreen] failed:", e);
     } finally {
       innerStyle.remove();
+    }
+  };
+
+  /**
+   * Camera button on the staff view: walk through EVERY officer and
+   * download 2 images per person — the KPI (sales) view and the
+   * 7 Wonders (csat) view of the profile card — same framing as the
+   * "ส่งไป Telegram" captures.
+   */
+  const captureAllStaffProfiles = async () => {
+    if (staffCaptureProgress) return; // already running
+    const officers = parsedReport.officers;
+    if (!officers.length || !staffProfileCaptureRef.current) {
+      // No roster yet — fall back to a plain full-page capture
+      await captureScreen();
+      return;
+    }
+
+    const views: Array<{ stat: "sales" | "csat"; label: string }> = [
+      { stat: "sales", label: "KPI" },
+      { stat: "csat", label: "7Wonders" },
+    ];
+    const prevStaffId = activeStaffId;
+    const prevStat = activeStat;
+    const ts = new Date().toISOString().slice(0, 10);
+
+    const styleTag = document.createElement("style");
+    styleTag.textContent = `* { scrollbar-width: none !important; } *::-webkit-scrollbar { display: none !important; }`;
+    document.head.appendChild(styleTag);
+
+    try {
+      for (let idx = 0; idx < officers.length; idx++) {
+        setActiveStaffId(String(idx + 1));
+        const officerName = officers[idx].name.trim().replace(/\s+/g, "-");
+        for (const view of views) {
+          setActiveStat(view.stat);
+          setStaffCaptureProgress(
+            `คนที่ ${idx + 1}/${officers.length} — ${view.label}`,
+          );
+          // Wait for the profile card + charts to finish animating
+          await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 3500)));
+          const el = staffProfileCaptureRef.current;
+          if (!el) continue;
+          const w = Math.max(el.scrollWidth, el.offsetWidth);
+          const dataUrl = await toJpeg(el, {
+            quality: 0.92,
+            pixelRatio: 1.5,
+            cacheBust: false,
+            backgroundColor: "#1c2722",
+            width: w,
+            style: {
+              padding: "32px",
+              width: `${w}px`,
+              height: "auto",
+              boxSizing: "border-box",
+              overflow: "visible",
+            },
+            fetchRequestInit: { mode: "cors" },
+          });
+          const link = document.createElement("a");
+          link.download = `staff-${String(idx + 1).padStart(2, "0")}-${officerName}-${view.label}-${ts}.jpeg`;
+          link.href = dataUrl;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+      }
+    } catch (e) {
+      console.error("[captureAllStaffProfiles] failed:", e);
+    } finally {
+      styleTag.remove();
+      setActiveStaffId(prevStaffId);
+      setActiveStat(prevStat);
+      setStaffCaptureProgress("");
     }
   };
 
@@ -3253,11 +3331,31 @@ function AppInternal({
             {/* Screenshot capture button */}
             <div className="pointer-events-auto hidden md:flex items-center gap-2 pl-2 ml-2 border-l border-white/10">
               <button
-                onClick={captureScreen}
-                title="บันทึกภาพหน้าจอ"
-                className="p-2 rounded-full transition-colors text-white/60 hover:text-white hover:bg-white/10"
+                onClick={() => {
+                  if (currentView === "staff") {
+                    void captureAllStaffProfiles();
+                  } else {
+                    void captureScreen();
+                  }
+                }}
+                disabled={!!staffCaptureProgress}
+                title={
+                  currentView === "staff"
+                    ? "บันทึกภาพ KPI + 7 Wonders ของพนักงานทุกคน"
+                    : "บันทึกภาพหน้าจอ"
+                }
+                className="p-2 rounded-full transition-colors text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-60 flex items-center gap-1.5"
               >
-                <Camera className="w-5 h-5" />
+                {staffCaptureProgress ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin text-emerald-300" />
+                    <span className="text-xs text-emerald-200 whitespace-nowrap">
+                      {staffCaptureProgress}
+                    </span>
+                  </>
+                ) : (
+                  <Camera className="w-5 h-5" />
+                )}
               </button>
             </div>
 
@@ -3385,6 +3483,7 @@ function AppInternal({
                  onSetActiveStaffId={setActiveStaffId}
                  piaIndices={piaIndices}
                  homeCaptureRef={homeCaptureRef}
+                 profileCaptureRef={staffProfileCaptureRef}
               />
             )}
             {!isPia && currentView === "reports" && (

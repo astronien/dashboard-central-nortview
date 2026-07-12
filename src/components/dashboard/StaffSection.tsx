@@ -355,6 +355,7 @@ export function StaffSection({
   onSetActiveStaffId,
   piaIndices,
   homeCaptureRef,
+  profileCaptureRef,
 }: {
   displayStaffAvatar: string;
   activeOfficer?: OfficerData;
@@ -384,6 +385,8 @@ export function StaffSection({
   onSetActiveStaffId: (id: string) => void;
   piaIndices: string[];
   homeCaptureRef: React.RefObject<HTMLDivElement | null>;
+  /** Exposes the profile card element to App for screenshot capture */
+  profileCaptureRef?: React.RefObject<HTMLDivElement | null>;
 }) {
   const monthlySalesActual = activeOfficer
     ? Math.round(activeOfficer.actual)
@@ -451,7 +454,10 @@ export function StaffSection({
   return (
               <motion.div
                 key="staff"
-                ref={staffSectionRef}
+                ref={(el: HTMLDivElement | null) => {
+                  staffSectionRef.current = el;
+                  if (profileCaptureRef) profileCaptureRef.current = el;
+                }}
                 initial={{ opacity: 0, scale: 0.96, filter: "blur(8px)" }}
                 animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
                 exit={{ opacity: 0, scale: 1.04, filter: "blur(8px)" }}
