@@ -139,9 +139,14 @@ function TelegramSendButton({
     const sizeEl = refForSize.current || el;
     const w = Math.max(sizeEl.scrollWidth, sizeEl.offsetWidth);
     await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 3500)));
-    // Hide scrollbars during capture
+    // Hide scrollbars and backdrop-filter during capture (backdrop-filter
+    // renders as a misplaced light patch in html-to-image clones)
     const styleTag = document.createElement("style");
-    styleTag.textContent = `* { scrollbar-width: none !important; } *::-webkit-scrollbar { display: none !important; }`;
+    styleTag.textContent = `
+      * { scrollbar-width: none !important; }
+      *::-webkit-scrollbar { display: none !important; }
+      * { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+    `;
     document.head.appendChild(styleTag);
     try {
       const pad = 32;
@@ -490,20 +495,22 @@ export function StaffSection({
                       className="absolute bottom-[8%] left-1/2 -translate-x-1/2 w-[85%] max-w-[360px] h-[60%] bg-emerald-500/15 blur-[60px] lg:blur-[85px] rounded-full pointer-events-none -z-10 mix-blend-screen"
                     />
                     <AnimatePresence mode="wait">
-                      <motion.img
-                        key={displayStaffAvatar}
-                        initial={{ opacity: 0, y: 16, scale: 0.97 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 6, scale: 0.97, filter: "blur(6px)" }}
-                        transition={{ duration: 0.45, type: "spring", bounce: 0.3 }}
-                        src={displayStaffAvatar}
-                        alt={activeOfficer?.name ?? currentStaff.name}
-                        className="relative z-20 mx-auto w-auto h-[105%] max-h-[480px] sm:max-h-[520px] lg:h-[125%] lg:max-h-[640px] xl:h-[130%] lg:scale-105 xl:scale-110 object-contain object-bottom drop-shadow-[0_25px_35px_rgba(0,0,0,0.6)] pointer-events-none"
-                        style={{
-                          WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,1) 60%, rgba(0,0,0,0) 95%)",
-                          maskImage: "linear-gradient(to bottom, rgba(0,0,0,1) 60%, rgba(0,0,0,0) 95%)",
-                        }}
-                      />
+                      {displayStaffAvatar ? (
+                        <motion.img
+                          key={displayStaffAvatar}
+                          initial={{ opacity: 0, y: 16, scale: 0.97 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 6, scale: 0.97, filter: "blur(6px)" }}
+                          transition={{ duration: 0.45, type: "spring", bounce: 0.3 }}
+                          src={displayStaffAvatar}
+                          alt={activeOfficer?.name ?? currentStaff.name}
+                          className="relative z-20 mx-auto w-auto h-[105%] max-h-[480px] sm:max-h-[520px] lg:h-[125%] lg:max-h-[640px] xl:h-[130%] lg:scale-105 xl:scale-110 object-contain object-bottom drop-shadow-[0_25px_35px_rgba(0,0,0,0.6)] pointer-events-none"
+                          style={{
+                            WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,1) 60%, rgba(0,0,0,0) 95%)",
+                            maskImage: "linear-gradient(to bottom, rgba(0,0,0,1) 60%, rgba(0,0,0,0) 95%)",
+                          }}
+                        />
+                      ) : null}
                     </AnimatePresence>
                   </div>
 

@@ -82,6 +82,7 @@ import {
 import {
   buildStaffRoster,
   getStaffAvatar,
+  getStaffPhotoUrl,
   resizeImageFile,
   type StaffPhotosMap,
 } from "./lib/staffAvatar";
@@ -2615,19 +2616,18 @@ function AppInternal({
 
   const attachCategoryOptions = useMemo(() => getAttachCategoryOptions(displayUploads.categoryMaster), [displayUploads.categoryMaster]);
 
+  // Uploaded photo of the active officer — empty string when there is no
+  // real photo (the profile view then renders no image at all).
   const displayStaffAvatar = useMemo(() => {
-    if (!activeOfficer) {
-      return getStaffAvatar(staffPhotos, { officerKey: "", fallbackIndex: 0 });
-    }
+    if (!activeOfficer) return "";
     const attachRow = attachOfficerRows.find((row) =>
       attachMatchesOfficer(row.name, activeOfficer.name),
     );
-    return getStaffAvatar(staffPhotos, {
+    return getStaffPhotoUrl(staffPhotos, {
       staffId: attachRow?.staffId,
       officerKey: cleanOfficerName(activeOfficer.name),
-      fallbackIndex: activeOfficerIndex,
     });
-  }, [activeOfficer, attachOfficerRows, staffPhotos, activeOfficerIndex]);
+  }, [activeOfficer, attachOfficerRows, staffPhotos]);
 
   const parsedStoreHeader = useMemo(() => {
     const matchedBranch = parsedReport.branches.find(b => {
@@ -3136,6 +3136,7 @@ function AppInternal({
       * { scrollbar-width: none !important; }
       * { --tw-ring-shadow: 0 0 #0000 !important; --tw-ring-offset-shadow: 0 0 #0000 !important; }
       * { --tw-shadow: 0 0 #0000 !important; }
+      * { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
     `;
     el.appendChild(innerStyle);
     try {
@@ -3207,7 +3208,13 @@ function AppInternal({
     const ts = new Date().toISOString().slice(0, 10);
 
     const styleTag = document.createElement("style");
-    styleTag.textContent = `* { scrollbar-width: none !important; } *::-webkit-scrollbar { display: none !important; }`;
+    // backdrop-filter renders as a misplaced light patch in html-to-image
+    // clones — disable it (and scrollbars) during capture.
+    styleTag.textContent = `
+      * { scrollbar-width: none !important; }
+      *::-webkit-scrollbar { display: none !important; }
+      * { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+    `;
     document.head.appendChild(styleTag);
 
     const failed: string[] = [];
@@ -3408,11 +3415,17 @@ function AppInternal({
                     className={`w-10 h-10 border-2 border-white/20 rounded-full overflow-hidden shrink-0 ${isPia ? "cursor-default" : "cursor-pointer hover:border-white/40"} transition-colors bg-emerald-500/20`}
                     onClick={() => { if (!isPia) setShowDropdown(!showDropdown); }}
                   >
-                    <img
-                      src={displayStaffAvatar}
-                      alt={activeOfficer?.name ?? "Staff"}
-                      className="w-full h-full object-cover object-top"
-                    />
+                    {displayStaffAvatar ? (
+                      <img
+                        src={displayStaffAvatar}
+                        alt={activeOfficer?.name ?? "Staff"}
+                        className="w-full h-full object-cover object-top"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <User className="w-5 h-5 text-emerald-300/80" />
+                      </div>
+                    )}
                   </div>
                   <AnimatePresence>
                     {showDropdown && !isPia && (

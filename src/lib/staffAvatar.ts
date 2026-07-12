@@ -74,12 +74,15 @@ export const buildStaffRoster = (
   return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, "th"));
 };
 
-export const getStaffAvatar = (
+/**
+ * Uploaded photo URL for a staff member, or "" when none exists.
+ * Use this where "no photo" should hide the image entirely.
+ */
+export const getStaffPhotoUrl = (
   photos: StaffPhotosMap,
   opts: {
     staffId?: string | number;
     officerKey?: string;
-    fallbackIndex?: number;
   },
 ): string => {
   const staffId = opts.staffId != null ? String(opts.staffId) : "";
@@ -93,6 +96,19 @@ export const getStaffAvatar = (
     if (match?.photoUrl) return match.photoUrl;
   }
 
+  return "";
+};
+
+export const getStaffAvatar = (
+  photos: StaffPhotosMap,
+  opts: {
+    staffId?: string | number;
+    officerKey?: string;
+    fallbackIndex?: number;
+  },
+): string => {
+  const photo = getStaffPhotoUrl(photos, opts);
+  if (photo) return photo;
   const idx = opts.fallbackIndex ?? 0;
   return DEFAULT_AVATARS[idx % DEFAULT_AVATARS.length];
 };
