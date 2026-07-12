@@ -72,6 +72,33 @@ describe("kpiCategoryAdapter", () => {
     assert.equal(rowMatchesKpiCategory(simRow, "COVER+"), false);
     assert.equal(rowMatchesKpiCategory(simRow, "AC+"), false);
   });
+
+  it("AC+ does NOT match rows merely containing the letters 'ac' (Mac/Accessories)", () => {
+    // Regression: normalizeText strips "+", so the old AC+ branch fell
+    // through to `includes("ac")` and counted every Mac/Accessories row.
+    const macRow: RawRow = { "Category (Name)": "Mac", "Product (Name)": "MacBook Air M3", Number: "1" };
+    const accRow: RawRow = { "Category (Name)": "Accessories", "Product (Name)": "20W Adapter", Number: "1" };
+    assert.equal(rowMatchesKpiCategory(macRow, "AC+"), false);
+    assert.equal(rowMatchesKpiCategory(accRow, "AC+"), false);
+  });
+
+  it("catDaily is authoritative when present (row belongs to one group only)", () => {
+    // Master says this AppleCare-looking row is grouped under Mac —
+    // it must not also count toward AC+.
+    const row: RawRow = { "Product (Name)": "AppleCare+ for Mac", catDaily: "Mac", Number: "1" };
+    assert.equal(rowMatchesKpiCategory(row, "AC+"), false);
+    assert.equal(rowMatchesKpiCategory(row, "Mac"), true);
+    // Same for SIM: a "sim"-substring product assigned elsewhere doesn't count
+    const otherRow: RawRow = { "Product (Name)": "SIM tray tool", catDaily: "Other", Number: "1" };
+    assert.equal(rowMatchesKpiCategory(otherRow, "SIM"), false);
+  });
+
+  it("BTB and BTB(Apple) are mutually exclusive on raw text", () => {
+    const btbAppleRow: RawRow = { "Category (Name)": "BTB Apple", "Product (Name)": "Case", Number: "1" };
+    assert.equal(rowMatchesKpiCategory(btbAppleRow, "BTB(Apple)"), true);
+    assert.equal(rowMatchesKpiCategory(btbAppleRow, "BTB"), false);
+    assert.equal(rowMatchesKpiCategory(btbRow, "BTB"), true);
+  });
 });
 
 describe("rowMatchesKpiCategory — data integrity fixes", () => {

@@ -25,7 +25,9 @@ export type KpiCategoryKey =
 export type KpiMeasureType = "revenue" | "quantity";
 
 export interface KpiCategoryConfig {
-  targetField: TargetRecordField;
+  /** Target Excel column; omitted when no column exists for the category
+   *  (COVER+ / AC+) — target then defaults to 0 unless overridden. */
+  targetField?: TargetRecordField;
   measureType: KpiMeasureType;
   /** Aliases used when matching sales rows */
   matchNames: string[];
@@ -40,8 +42,10 @@ const KPI_CONFIG: Record<KpiCategoryKey, KpiCategoryConfig> = {
   Smile: { targetField: "simTarget", measureType: "quantity", matchNames: ["Smile", "SIM"] },
   BTB: { targetField: "btbTarget", measureType: "revenue", matchNames: ["BTB"] },
   "BTB(Apple)": { targetField: "btbAppleTarget", measureType: "revenue", matchNames: ["BTB(Apple)", "BTB Apple"] },
-  "COVER+": { targetField: "totalTarget", measureType: "quantity", matchNames: ["COVER+", "Cover+", "cover+"] },
-  "AC+": { targetField: "totalTarget", measureType: "quantity", matchNames: ["Apple Care", "AppleCare", "AC+"] },
+  // No COVER+/AC+ column exists in the target Excel — using totalTarget
+  // here made the achieve % nonsense (count actual vs branch-total baht).
+  "COVER+": { measureType: "quantity", matchNames: ["COVER+", "Cover+", "cover+"] },
+  "AC+": { measureType: "quantity", matchNames: ["Apple Care", "AppleCare", "AC+"] },
 };
 
 export function getKpiCategoryConfig(category: string): KpiCategoryConfig | undefined {
@@ -69,46 +73,58 @@ function rowCategoryText(row: RawRow): string {
   return normalizeText(`${cat} ${sub} ${prod}`);
 }
 
+/** Raw (lowercased, punctuation preserved) row text — needed for names
+ *  like "AC+"/"COVER+" whose "+" is stripped by normalizeText. */
+function rowRawText(row: RawRow): string {
+  const cat = String(row["Category (Name)"] ?? row.category ?? "").trim();
+  const sub = String(row["Sub Category"] ?? row.sub_category ?? "").trim();
+  const prod = String(row["Product (Name)"] ?? row.product_name ?? "").trim();
+  return `${cat} ${sub} ${prod}`.toLowerCase();
+}
+
 /** Whether a sales row counts toward a KPI category (inventory-style rules from source). */
 export function rowMatchesKpiCategory(row: RawRow, category: string): boolean {
   const text = rowCategoryText(row);
-  const catNorm = normalizeText(category);
+  // Compare the raw category name — normalizeText strips "+" and "()",
+  // which used to break the AC+/COVER+/BTB(Apple) branches below (AC+
+  // then fell through to a `includes("ac")` match that counted every
+  // Mac/Accessories row).
+  const catKey = category.trim().toLowerCase();
 
-  // Fast-path: if the row was enriched with `catDaily` by the Category
-  // Master (see enrichSalesRowsWithCatDaily), use that as the most
-  // reliable signal. The source repo uses this as the source of truth.
+  // If the row was enriched with `catDaily` by the Category Master
+  // (see enrichSalesRowsWithCatDaily), that is the source of truth —
+  // the row belongs to exactly the group the master assigns it to.
   const catDaily = String((row as any).catDaily ?? "").trim();
   if (catDaily) {
     if (catDaily === category) return true;
     // BTB(Apple) ↔ "BTB Apple" / "btb apple" / "btb(apple)" — strip all
     // whitespace and punctuation before comparing
     const strip = (s: string) => s.toLowerCase().replace(/[\s()]+/g, "");
-    if (strip(catDaily) === strip(category)) return true;
+    return strip(catDaily) === strip(category);
   }
 
-  if (catNorm === "sim" || catNorm === "smile") {
+  const raw = rowRawText(row);
+
+  if (catKey === "sim" || catKey === "smile") {
     const cat = String(row["Category (Name)"] ?? "").trim();
     const prod = String(row["Product (Name)"] ?? "").toLowerCase();
     return cat === "Smile" || prod.includes("sim");
   }
 
-  if (catNorm === "btb") {
-    const cat = String(row["Category (Name)"] ?? "").toLowerCase();
-    const sub = String(row["Sub Category"] ?? "").toLowerCase();
-    const prod = String(row["Product (Name)"] ?? "").toLowerCase();
-    return cat.includes("btb") || sub.includes("btb") || prod.includes("btb");
+  if (catKey === "btb") {
+    return raw.includes("btb") && !raw.includes("btb apple") && !raw.includes("btb(apple)");
   }
 
-  if (catNorm === "btb(apple)" || catNorm === "btb apple") {
-    return text.includes("btb apple") || text.includes("btb(apple)");
+  if (catKey === "btb(apple)" || catKey === "btb apple") {
+    return raw.includes("btb apple") || raw.includes("btb(apple)");
   }
 
-  if (catNorm === "cover+" || catNorm === "cover plus") {
-    return text.includes("cover+") || text.includes("cover plus");
+  if (catKey === "cover+" || catKey === "cover plus") {
+    return raw.includes("cover+") || raw.includes("cover plus");
   }
 
-  if (catNorm === "ac+" || catNorm === "apple care") {
-    return text.includes("apple care") || text.includes("applecare") || text.includes("ac+");
+  if (catKey === "ac+" || catKey === "apple care") {
+    return raw.includes("apple care") || raw.includes("applecare") || raw.includes("ac+");
   }
 
   const cfg = getKpiCategoryConfig(category);
@@ -161,17 +177,21 @@ export function getKpiTargetResult(
   endDate: string,
 ): KPITargetResult {
   const cfg = getKpiCategoryConfig(category);
-  const targetField = cfg?.targetField ?? "totalTarget";
   const measureType = cfg?.measureType ?? "revenue";
 
-  const target = getTargetForPeriodByField(
-    targets,
-    entityId,
-    mode,
-    targetField,
-    startDate,
-    endDate,
-  );
+  // Categories without a target column (COVER+/AC+) have no default
+  // target — 0 unless a manual override supplies one downstream.
+  const targetField = cfg ? cfg.targetField : "totalTarget";
+  const target = targetField
+    ? getTargetForPeriodByField(
+        targets,
+        entityId,
+        mode,
+        targetField,
+        startDate,
+        endDate,
+      )
+    : 0;
 
   const filter = mode === "branch" ? { branchId: entityId } : { officerId: entityId };
 
