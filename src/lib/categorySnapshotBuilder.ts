@@ -13,6 +13,7 @@ import {
 import {
   getKpiCategoryConfig,
   getKpiTargetResult,
+  rowMatchesKpiCategory,
   sumKpiActualFromRows,
   type KpiCategoryKey,
 } from "./kpiCategoryAdapter";
@@ -30,6 +31,10 @@ export type CategorySnapshotItem = {
   mom: number | string;
   yoy: number | string;
   measureType?: "revenue" | "quantity";
+  /** Trade In only: สิ้นสุดประมูล ÷ iPhone units sold × 100 (เป้า 20%) */
+  tradeInPerIphonePct?: number;
+  /** Trade In only: รายการเทรดทั้งหมด ÷ iPhone units sold × 100 (เป้า 50%) */
+  tradeInAppraisalPct?: number;
 };
 
 const SNAPSHOT_CATEGORIES: Array<{ label: string; kpiKey?: KpiCategoryKey }> = [
@@ -155,6 +160,8 @@ export function buildCategorySnapshots(params: {
     let target = 0;
     let actual = 0;
     let measureType: "revenue" | "quantity" | undefined = "revenue";
+    let tradeInPerIphonePct: number | undefined;
+    let tradeInAppraisalPct: number | undefined;
 
     if (kpiKey) {
       const cfg = getKpiCategoryConfig(kpiKey);
@@ -185,6 +192,21 @@ export function buildCategorySnapshots(params: {
       if (typeof override === "number" && Number.isFinite(override)) {
         target = override;
       }
+
+      // Extra Trade In rates (computed from the RAW totals, not the
+      // overridden target). Both use iPhone units sold as denominator:
+      const totalTrades = Number(tradeInData.target ?? 0);
+      const iphoneUnits = currentRows.reduce(
+        (sum, row) =>
+          rowMatchesKpiCategory(row, "iPhone")
+            ? sum + toNumber(row["Number"] ?? row.number ?? row.qty)
+            : sum,
+        0,
+      );
+      // Trade In/iPhone — สิ้นสุดประมูล ÷ iPhone ที่ขาย (เป้า 20%)
+      tradeInPerIphonePct = iphoneUnits > 0 ? (actual / iphoneUnits) * 100 : 0;
+      // ยอดประเมิน — รายการเทรดทั้งหมด ÷ iPhone ที่ขาย (เป้า 50%)
+      tradeInAppraisalPct = iphoneUnits > 0 ? (totalTrades / iphoneUnits) * 100 : 0;
     }
 
     const lastMonthActual = kpiKey
@@ -232,6 +254,8 @@ export function buildCategorySnapshots(params: {
       mom,
       yoy,
       measureType,
+      tradeInPerIphonePct,
+      tradeInAppraisalPct,
     };
   });
 }

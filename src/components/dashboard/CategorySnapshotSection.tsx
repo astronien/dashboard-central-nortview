@@ -146,6 +146,26 @@ export const CategorySnapshotSection = React.forwardRef<HTMLDivElement, { items:
                     {item.forecastRate.toFixed(2)}%
                   </span>
                 </div>
+                {item.tradeInPerIphonePct != null ? (
+                  <div className="flex items-center justify-between">
+                    <span className="text-white/50">Trade In/iPhone (เป้า 20%)</span>
+                    <span
+                      className={`font-bold ${item.tradeInPerIphonePct >= 20 ? "text-emerald-400" : "text-rose-400"}`}
+                    >
+                      {item.tradeInPerIphonePct.toFixed(2)}%
+                    </span>
+                  </div>
+                ) : null}
+                {item.tradeInAppraisalPct != null ? (
+                  <div className="flex items-center justify-between">
+                    <span className="text-white/50">ยอดประเมิน (เป้า 50%)</span>
+                    <span
+                      className={`font-bold ${item.tradeInAppraisalPct >= 50 ? "text-emerald-400" : "text-rose-400"}`}
+                    >
+                      {item.tradeInAppraisalPct.toFixed(2)}%
+                    </span>
+                  </div>
+                ) : null}
               </div>
             </div>
           );
