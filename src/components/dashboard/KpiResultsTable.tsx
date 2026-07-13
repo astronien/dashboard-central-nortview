@@ -189,21 +189,21 @@ export default function KpiResultsTable({
           คลิกหัวคอลัมน์เพื่อเรียงลำดับ
         </span>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
+      <div>
+        <table className="w-full table-fixed text-left text-sm">
           <thead>
-            <tr className="bg-white/5 text-white/60 text-xs uppercase tracking-wider">
-              <th className="py-3 px-4 font-bold">
+            <tr className="bg-white/5 text-white/60 text-[11px] uppercase">
+              <th className="py-2 px-2 font-bold align-bottom">
                 <button
                   type="button"
                   onClick={() => handleSort("name")}
-                  className="hover:text-white"
+                  className="hover:text-white break-words"
                 >
                   {mode === "branch" ? "สาขา" : "พนักงาน"}
                   <SortIcon field="name" />
                 </button>
               </th>
-              <th className="py-3 px-4 font-bold text-center">
+              <th className="py-2 px-1 font-bold text-center align-bottom w-12">
                 <button
                   type="button"
                   onClick={() => handleSort("billCount")}
@@ -216,33 +216,33 @@ export default function KpiResultsTable({
               {activePresets.map((preset) => (
                 <th
                   key={preset.id}
-                  className="py-3 px-4 font-bold text-center whitespace-nowrap"
+                  className="py-2 px-1 font-bold text-center align-bottom"
                 >
                   <button
                     type="button"
                     onClick={() => handleSort(preset.id)}
-                    className="hover:text-white"
+                    className="hover:text-white break-words"
                   >
                     {preset.name}
                     <SortIcon field={preset.id} />
                   </button>
                 </th>
               ))}
-              <th className="py-3 px-4 font-bold text-right">
+              <th className="py-2 px-1 font-bold text-right align-bottom">
                 <button
                   type="button"
                   onClick={() => handleSort("totalBaht")}
-                  className="hover:text-white"
+                  className="hover:text-white break-words"
                 >
                   รวมยอด
                   <SortIcon field="totalBaht" />
                 </button>
               </th>
-              <th className="py-3 px-4 font-bold text-center">
+              <th className="py-2 px-1 font-bold text-center align-bottom">
                 <button
                   type="button"
                   onClick={() => handleSort("totalAchRate")}
-                  className="hover:text-white"
+                  className="hover:text-white break-words"
                 >
                   Avg Ach%
                   <SortIcon field="totalAchRate" />
@@ -258,15 +258,15 @@ export default function KpiResultsTable({
                   idx % 2 === 0 ? "bg-transparent" : "bg-white/[0.02]"
                 } hover:bg-white/5`}
               >
-                <td className="py-3 px-4 text-white/90 font-medium">{row.name}</td>
-                <td className="py-3 px-4 text-center text-white/70">
+                <td className="py-2 px-2 text-white/90 font-medium break-words">{row.name}</td>
+                <td className="py-2 px-1 text-center text-white/70">
                   {row.billCount.toLocaleString()}
                 </td>
                 {activePresets.map((preset) => {
                   const r = row.presetResults[preset.id];
                   if (!r) {
                     return (
-                      <td key={preset.id} className="py-3 px-4 text-center text-white/30">
+                      <td key={preset.id} className="py-2 px-1 text-center text-white/30">
                         -
                       </td>
                     );
@@ -275,14 +275,14 @@ export default function KpiResultsTable({
                   const ct = preset.calcType;
                   if (ct === "bahtRate" || ct === "attach" || ct === "catAttach") {
                     return (
-                      <td key={preset.id} className="py-3 px-4 text-center">
+                      <td key={preset.id} className="py-2 px-1 text-center">
                         <span
-                          className={`px-2 py-0.5 rounded font-bold text-xs border ${achBg(r.attachRate)}`}
+                          className={`px-1.5 py-0.5 rounded font-bold text-xs border ${achBg(r.attachRate)}`}
                         >
                           {v.text}
                         </span>
                         {v.suffix && (
-                          <div className="text-[10px] text-white/40 mt-0.5">
+                          <div className="text-[10px] text-white/40 mt-0.5 break-words">
                             {v.suffix.trim()}
                           </div>
                         )}
@@ -292,23 +292,23 @@ export default function KpiResultsTable({
                   return (
                     <td
                       key={preset.id}
-                      className={`py-3 px-4 text-center font-semibold ${
+                      className={`py-2 px-1 text-center font-semibold ${
                         isCurrencyCalc(ct) ? "text-emerald-300" : "text-white/80"
                       }`}
                     >
                       {v.text}
                       {v.suffix && (
-                        <div className="text-[10px] text-white/40 mt-0.5">{v.suffix.trim()}</div>
+                        <div className="text-[10px] text-white/40 mt-0.5 break-words">{v.suffix.trim()}</div>
                       )}
                     </td>
                   );
                 })}
-                <td className="py-3 px-4 text-right text-emerald-300 font-semibold">
+                <td className="py-2 px-1 text-right text-emerald-300 font-semibold">
                   ฿{formatNumber(row.totalBaht, true)}
                 </td>
-                <td className="py-3 px-4 text-center">
+                <td className="py-2 px-1 text-center">
                   <span
-                    className={`px-2 py-0.5 rounded font-bold text-xs border ${achBg(row.totalAchRate)}`}
+                    className={`px-1.5 py-0.5 rounded font-bold text-xs border ${achBg(row.totalAchRate)}`}
                   >
                     {row.totalAchRate.toFixed(1)}%
                   </span>
