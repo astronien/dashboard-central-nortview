@@ -122,30 +122,34 @@ export const CategorySnapshotSection = React.forwardRef<HTMLDivElement, { items:
                     {formatMetric(item.today, item.measureType, isCurrency)}
                   </span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-white/50">Target per Day</span>
-                  <span className="text-white/90 font-semibold">
-                    {formatMetric(item.targetDay, item.measureType, isCurrency)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-white/50">Forecast</span>
-                  <span className="text-white/90 font-semibold">
-                    {formatMetric(item.forecast, item.measureType, isCurrency)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-white/50">Achieve %</span>
-                  <span className={`font-bold ${achColor}`}>
-                    {item.achieveRate.toFixed(2)}%
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-white/50">Forecast %</span>
-                  <span className={`font-bold ${forecastColor}`}>
-                    {item.forecastRate.toFixed(2)}%
-                  </span>
-                </div>
+                {item.category !== "Trade In" ? (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="text-white/50">Target per Day</span>
+                      <span className="text-white/90 font-semibold">
+                        {formatMetric(item.targetDay, item.measureType, isCurrency)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-white/50">Forecast</span>
+                      <span className="text-white/90 font-semibold">
+                        {formatMetric(item.forecast, item.measureType, isCurrency)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-white/50">Achieve %</span>
+                      <span className={`font-bold ${achColor}`}>
+                        {item.achieveRate.toFixed(2)}%
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-white/50">Forecast %</span>
+                      <span className={`font-bold ${forecastColor}`}>
+                        {item.forecastRate.toFixed(2)}%
+                      </span>
+                    </div>
+                  </>
+                ) : null}
                 {item.tradeInPerIphonePct != null ? (
                   <div className="flex items-center justify-between">
                     <span className="text-white/50">Trade In/iPhone (เป้า 20%)</span>
