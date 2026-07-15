@@ -99,6 +99,7 @@ const formatKpiCell = (val: number, calcType: PresetCalcType | undefined): strin
     case "attach":
     case "bahtRate":
     case "catAttach":
+    case "tradeIn":
       return `${val.toFixed(1)}%`;
     case "baht":
     case "catBaht":
@@ -127,6 +128,8 @@ const calcTypeLabel = (calcType: PresetCalcType | undefined): string => {
       return "Qty CatMaster";
     case "catAttach":
       return "ATT % CatMaster";
+    case "tradeIn":
+      return "Trade In %";
     default:
       return "—";
   }

@@ -121,6 +121,24 @@ export default function KpiPresetBuilder({
       return;
     }
     const isCatMode = calcType === "catBaht" || calcType === "catQty" || calcType === "catAttach";
+    const isTradeIn = calcType === "tradeIn";
+    // tradeIn needs no line-item filters — the value comes from the branch
+    // trade-in count and iPhone units.
+    if (isTradeIn) {
+      onSave({
+        name: name.trim(),
+        calcType,
+        labelA: "จำนวนที่ตก (Trade In)",
+        labelB: "iPhone ที่ขายได้",
+        filtersA: [],
+        filtersB: [],
+        color,
+        targetPercent: targetPercent > 0 ? targetPercent : undefined,
+        showInStaffProfile,
+        showInBranchOverview,
+      });
+      return;
+    }
     onSave({
       name: name.trim(),
       calcType,
@@ -179,10 +197,11 @@ export default function KpiPresetBuilder({
               ["catBaht", "ยอดบาท (CatMaster)"],
               ["catQty", "ยอดจำนวน (CatMaster)"],
               ["catAttach", "ATT CatMaster (จำนวน A ÷ จำนวน B)"],
+              ["tradeIn", "Trade In / iPhone (%)"],
             ] as [PresetCalcType, string][]
           ).map(([key, label], idx) => {
             const isCat = key.startsWith("cat");
-            const span = key === "catAttach" ? "col-span-2" : "";
+            const span = key === "catAttach" || key === "tradeIn" ? "col-span-2" : "";
             return (
               <button
                 key={key}
@@ -299,7 +318,19 @@ export default function KpiPresetBuilder({
         </div>
       )}
 
-      {!(calcType === "catBaht" || calcType === "catQty" || calcType === "catAttach") && (
+      {calcType === "tradeIn" && (
+        <div className="border border-sky-500/30 rounded-lg p-3 bg-sky-500/5 space-y-1">
+          <h4 className="text-sm font-semibold text-sky-200">Trade In / iPhone</h4>
+          <p className="text-xs text-sky-200/80">
+            คำนวณ = จำนวนที่ตก (สิ้นสุดประมูล) ÷ iPhone ที่ขายได้ (ชิ้น) × 100
+            <br />
+            ดึงจำนวนเทรดจาก Trade API ของสาขาโดยอัตโนมัติ — ไม่ต้องตั้งเงื่อนไขสินค้า
+            ตั้งเป้าหมาย (%) ด้านล่างเพื่อวัด Ach%
+          </p>
+        </div>
+      )}
+
+      {!(calcType === "catBaht" || calcType === "catQty" || calcType === "catAttach" || calcType === "tradeIn") && (
         <div className="border border-emerald-500/30 rounded-lg p-3 bg-emerald-500/5">
           <h4 className="text-sm font-semibold text-emerald-200 mb-2">
             {calcType === "attach"
@@ -491,6 +522,17 @@ export default function KpiPresetBuilder({
             </p>
             <p className="text-xs text-amber-200/80 font-bold mt-2">
               คำนวณ Attach Rate โดยใช้ catDaily จาก CatMaster แทนการเลือก filter แบบปกติ
+            </p>
+          </>
+        ) : calcType === "tradeIn" ? (
+          <>
+            <p className="text-sm text-white/80">
+              Trade In = <strong className="text-sky-300">จำนวนที่ตก</strong>
+              {" ÷ "}
+              <strong className="text-purple-300">iPhone ที่ขายได้</strong> × 100%
+            </p>
+            <p className="text-xs text-sky-200/80 font-bold mt-2">
+              ตัวอย่าง: เทรดที่ตก 21 ÷ iPhone 100 ชิ้น = 21% (เป้า {targetPercent || 20}%)
             </p>
           </>
         ) : (

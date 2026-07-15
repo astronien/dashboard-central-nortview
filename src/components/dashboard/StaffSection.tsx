@@ -939,7 +939,8 @@ export function StaffSection({
                                 const isPercentPreset =
                                   r.calcType === "attach" ||
                                   r.calcType === "bahtRate" ||
-                                  r.calcType === "catAttach";
+                                  r.calcType === "catAttach" ||
+                                  r.calcType === "tradeIn";
                                 if (isPercentPreset && r.target > 0) {
                                   return (r.actual / r.target) * 100;
                                 }

@@ -210,10 +210,47 @@ export function sumItemRevenueAnyFilter(bill: BillSummary, filters: ItemFilter[]
 }
 
 /**
+ * Extra branch-level context for calcTypes that draw on data outside the
+ * bills (currently only "tradeIn", whose trade count comes from the Trade
+ * API and iPhone units from the whole branch).
+ */
+export interface PresetCalcContext {
+  /** Completed trade-ins for the branch (สิ้นสุดประมูล / จำนวนที่ตก) */
+  tradeInCount?: number;
+  /** iPhone units sold in the branch (the trade-in denominator) */
+  iphoneUnits?: number;
+}
+
+/**
  * Calculate attach rate for a single preset.
  */
-export function calcPreset(bills: BillSummary[], preset: Preset): PresetResult {
+export function calcPreset(
+  bills: BillSummary[],
+  preset: Preset,
+  ctx?: PresetCalcContext,
+): PresetResult {
   const calcType = preset.calcType || "attach";
+
+  if (calcType === "tradeIn") {
+    // Trade In / iPhone: branch trade count ÷ iPhone units sold. Both
+    // values are branch-level (passed via ctx), so the rate is identical
+    // wherever the preset is shown; bills are ignored.
+    const trades = ctx?.tradeInCount ?? 0;
+    const iphone = ctx?.iphoneUnits ?? 0;
+    const rate = iphone > 0 ? (trades / iphone) * 100 : 0;
+    return {
+      presetId: preset.id,
+      presetName: preset.name,
+      calcType,
+      color: preset.color,
+      billsWithB: iphone,
+      billsWithAandB: trades,
+      attachRate: rate,
+      totalBaht: 0,
+      totalBahtB: 0,
+      bahtRate: 0,
+    };
+  }
 
   if (calcType === "catBaht" || calcType === "catQty" || calcType === "catAttach") {
     const catA = preset.catDailyFilter ?? "";
@@ -288,8 +325,12 @@ export function calcPreset(bills: BillSummary[], preset: Preset): PresetResult {
   };
 }
 
-export function calcAllPresets(bills: BillSummary[], presets: Preset[]): PresetResult[] {
-  return presets.map((preset) => calcPreset(bills, preset));
+export function calcAllPresets(
+  bills: BillSummary[],
+  presets: Preset[],
+  ctx?: PresetCalcContext,
+): PresetResult[] {
+  return presets.map((preset) => calcPreset(bills, preset, ctx));
 }
 
 export function presetDisplayValue(result: PresetResult): number {
@@ -303,6 +344,7 @@ export function presetDisplayValue(result: PresetResult): number {
     case "catQty":
       return result.billsWithAandB;
     case "catAttach":
+    case "tradeIn":
       return result.attachRate;
     default:
       return result.attachRate;
@@ -321,7 +363,7 @@ export function computePresetAchPercent(result: PresetResult, target: number): n
   if (calcType === "bahtRate") {
     return result.bahtRate;
   }
-  if (calcType === "attach" || calcType === "catAttach") {
+  if (calcType === "attach" || calcType === "catAttach" || calcType === "tradeIn") {
     return result.attachRate;
   }
   if (target <= 0) return 0;
@@ -336,6 +378,7 @@ export function formatPresetValue(result: PresetResult): string {
   switch (result.calcType) {
     case "bahtRate":
     case "catAttach":
+    case "tradeIn":
       return `${result.attachRate.toFixed(1)}%`;
     case "baht":
     case "catBaht":

@@ -257,6 +257,40 @@ describe("presetEngine", () => {
     assert.equal(result.attachRate, 0);
   });
 
+  it("calcPreset tradeIn = trade count / iPhone units * 100 from context", () => {
+    const preset: Preset = {
+      id: "t1",
+      name: "Trade In / iPhone",
+      calcType: "tradeIn",
+      labelA: "จำนวนที่ตก",
+      labelB: "iPhone",
+      color: "blue",
+      filtersA: [],
+      filtersB: [],
+      targetPercent: 20,
+    };
+    // bills are ignored — value comes from ctx
+    const result = calcPreset([bill1], preset, { tradeInCount: 21, iphoneUnits: 100 });
+    assert.equal(result.billsWithAandB, 21);
+    assert.equal(result.billsWithB, 100);
+    assert.equal(result.attachRate, 21);
+  });
+
+  it("calcPreset tradeIn returns 0 when iPhone units is 0", () => {
+    const preset: Preset = {
+      id: "t2",
+      name: "Trade In / iPhone",
+      calcType: "tradeIn",
+      labelA: "a",
+      labelB: "b",
+      color: "blue",
+      filtersA: [],
+      filtersB: [],
+    };
+    const result = calcPreset([bill1], preset, { tradeInCount: 21, iphoneUnits: 0 });
+    assert.equal(result.attachRate, 0);
+  });
+
   it("calcAllPresets processes array of presets", () => {
     const p1: Preset = {
       id: "1",

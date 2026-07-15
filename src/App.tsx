@@ -64,7 +64,7 @@ import {
   fetchTradeBranchMappingFromCloud,
   getTradeBranchMapping,
 } from "./lib/tradeInBranchStorage";
-import type { KpiCategoryKey } from "./lib/kpiCategoryAdapter";
+import { rowMatchesKpiCategory, type KpiCategoryKey } from "./lib/kpiCategoryAdapter";
 import {
   getOfficerCategoryKpi,
   resolveOfficerId,
@@ -2089,13 +2089,30 @@ function AppInternal({
     return parseBills(enriched);
   }, [activeOfficer, displayUploads.current, displayUploads.categoryMaster]);
 
+  // Branch-level context for the "tradeIn" preset calcType: completed
+  // trades ÷ iPhone units sold (both branch totals, so the rate is the
+  // same wherever the preset is shown).
+  const presetCalcContext = useMemo(
+    () => ({
+      tradeInCount: tradeInData?.actual ?? 0,
+      iphoneUnits: displayUploads.current.reduce(
+        (sum, row) =>
+          rowMatchesKpiCategory(row, "iPhone")
+            ? sum + toNumber(row["Number"] ?? row.number ?? row.qty)
+            : sum,
+        0,
+      ),
+    }),
+    [tradeInData, displayUploads.current],
+  );
+
   // Compute KPI results for presets marked showInStaffProfile
   const activeOfficerPresetResults = useMemo<PresetResult[]>(() => {
     if (activeOfficerBills.length === 0) return [];
     const staffPresets = kpiPresets.filter((p) => p.showInStaffProfile);
     if (staffPresets.length === 0) return [];
-    return staffPresets.map((p) => calcPreset(activeOfficerBills, p));
-  }, [activeOfficerBills, kpiPresets]);
+    return staffPresets.map((p) => calcPreset(activeOfficerBills, p, presetCalcContext));
+  }, [activeOfficerBills, kpiPresets, presetCalcContext]);
 
   const activeOfficer7WondersPerformance = useMemo<CategoryPerformanceRow[]>(() => {
     if (!activeOfficer) return [];
@@ -2167,7 +2184,8 @@ function AppInternal({
       const isPercentPreset =
         row.calcType === "attach" ||
         row.calcType === "bahtRate" ||
-        row.calcType === "catAttach";
+        row.calcType === "catAttach" ||
+        row.calcType === "tradeIn";
       const v = isPercentPreset && row.target > 0
         ? (row.actual / row.target) * 100
         : row.achPercent;
@@ -2208,7 +2226,8 @@ function AppInternal({
       const isPercentPreset =
         row.calcType === "attach" ||
         row.calcType === "bahtRate" ||
-        row.calcType === "catAttach";
+        row.calcType === "catAttach" ||
+        row.calcType === "tradeIn";
       const rate = isPercentPreset && row.target > 0
         ? (row.actual / row.target) * 100
         : row.achPercent;
@@ -2252,7 +2271,7 @@ function AppInternal({
           if (officerBills.length === 0) return null;
           const results: Record<string, number> = {};
           branchPresets.forEach((p) => {
-            const r = calcPreset(officerBills, p);
+            const r = calcPreset(officerBills, p, presetCalcContext);
             results[p.id] = presetDisplayValue(r);
           });
           return { officer, results };
@@ -2265,7 +2284,7 @@ function AppInternal({
         });
 
     return { presets: branchPresets, rows };
-  }, [kpiPresets, displayUploads.current, displayUploads.categoryMaster, parsedReport.officers]);
+  }, [kpiPresets, displayUploads.current, displayUploads.categoryMaster, parsedReport.officers, presetCalcContext]);
 
   const dynamicRadarData = useMemo(() => {
     if (activeStat === "csat") {
@@ -2283,7 +2302,8 @@ function AppInternal({
         const isPercentPreset =
           row.calcType === "attach" ||
           row.calcType === "bahtRate" ||
-          row.calcType === "catAttach";
+          row.calcType === "catAttach" ||
+          row.calcType === "tradeIn";
         const scaled = isPercentPreset && row.target > 0
           ? (row.actual / row.target) * 100
           : row.achPercent;

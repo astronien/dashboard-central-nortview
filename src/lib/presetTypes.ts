@@ -13,7 +13,8 @@ export type PresetCalcType =
   | "bahtRate"
   | "catBaht"
   | "catQty"
-  | "catAttach";
+  | "catAttach"
+  | "tradeIn";
 
 export type PresetColor = "green" | "amber" | "blue" | "teal" | "purple" | "coral";
 
