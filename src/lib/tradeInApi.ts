@@ -1,17 +1,26 @@
 const TRADE_API_BASE = "https://report-trade.vercel.app";
 const API_KEY = "techtrade_pro_secret_2026";
 
-export interface TradeInResult {
+export interface TradeInStaffRate {
+  code: string; // SALE_CODE (= STAFF ID)
+  name: string; // SALE_NAME
   actual: number; // status 3 (สิ้นสุดการประมูลราคา)
-  today: number; // status 3 วันนี้
-  target: number; // รายการเทรดทั้งหมด (ใช้แสดงเป็น denominator)
+  today: number;
+  target: number; // รายการเทรดทั้งหมดของพนักงานคนนี้
+}
+
+export interface TradeInResult {
+  actual: number; // status 3 (สิ้นสุดการประมูลราคา) — ทั้งสาขา
+  today: number; // status 3 วันนี้ — ทั้งสาขา
+  target: number; // รายการเทรดทั้งหมด (ใช้แสดงเป็น denominator) — ทั้งสาขา
+  perStaff: TradeInStaffRate[]; // แยกตามพนักงาน (SALE_CODE / SALE_NAME)
 }
 
 export async function fetchTradeInData(
   branchCode: string,
 ): Promise<TradeInResult> {
   if (!branchCode) {
-    return { actual: 0, today: 0, target: 0 };
+    return { actual: 0, today: 0, target: 0, perStaff: [] };
   }
 
   // Trade data is keyed to Thailand business days — compute "today" and the
@@ -33,12 +42,12 @@ export async function fetchTradeInData(
 
   if (!res.ok) {
     console.warn(`[TradeIn API] returned ${res.status}`);
-    return { actual: 0, today: 0, target: 0 };
+    return { actual: 0, today: 0, target: 0, perStaff: [] };
   }
 
   const json = await res.json();
   if (!json.success || !Array.isArray(json.data)) {
-    return { actual: 0, today: 0, target: 0 };
+    return { actual: 0, today: 0, target: 0, perStaff: [] };
   }
 
   const allTrades = json.data;
@@ -50,13 +59,31 @@ export async function fetchTradeInData(
   );
   const actual = agreedTrades.length;
 
-  const today = agreedTrades.filter(
-    (t: any) =>
-      t.document_date &&
-      String(t.document_date).startsWith(todayStr),
-  ).length;
+  const isToday = (t: any) =>
+    t.document_date && String(t.document_date).startsWith(todayStr);
+  const today = agreedTrades.filter(isToday).length;
 
-  return { actual, today, target };
+  // Per-staff breakdown keyed by SALE_CODE (= STAFF ID); every trade is
+  // counted toward `target`, only status-3 toward `actual`/`today`.
+  const staffMap = new Map<string, TradeInStaffRate>();
+  for (const t of allTrades) {
+    const code = String(t.SALE_CODE ?? "").trim();
+    const name = String(t.SALE_NAME ?? "").trim();
+    const key = code || name;
+    if (!key) continue;
+    let entry = staffMap.get(key);
+    if (!entry) {
+      entry = { code, name, actual: 0, today: 0, target: 0 };
+      staffMap.set(key, entry);
+    }
+    entry.target += 1;
+    if (String(t.status) === "3") {
+      entry.actual += 1;
+      if (isToday(t)) entry.today += 1;
+    }
+  }
+
+  return { actual, today, target, perStaff: Array.from(staffMap.values()) };
 }
 
 const BRANCH_CODE_KEYS = ["emp_shop_code", "branchId", "Branch ID", "BRANCH CODE"];

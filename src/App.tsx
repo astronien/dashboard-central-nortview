@@ -59,6 +59,7 @@ import {
   fetchTradeInData,
   getBranchCodeFromString,
   getBranchCodeFromTarget,
+  type TradeInResult,
 } from "./lib/tradeInApi";
 import {
   fetchTradeBranchMappingFromCloud,
@@ -1266,9 +1267,9 @@ function AppInternal({
     }
   }, [selectedBranch]);
 
-  const [tradeInData, setTradeInData] = useState<
-    { actual: number; today: number; target: number } | undefined
-  >(undefined);
+  const [tradeInData, setTradeInData] = useState<TradeInResult | undefined>(
+    undefined,
+  );
   const [tradeBranchMapping, setTradeBranchMapping] = useState<
     Record<string, string>
   >(() => getTradeBranchMapping());
@@ -2089,21 +2090,48 @@ function AppInternal({
     return parseBills(enriched);
   }, [activeOfficer, displayUploads.current, displayUploads.categoryMaster]);
 
-  // Branch-level context for the "tradeIn" preset calcType: completed
-  // trades ÷ iPhone units sold (both branch totals, so the rate is the
-  // same wherever the preset is shown).
-  const presetCalcContext = useMemo(
-    () => ({
-      tradeInCount: tradeInData?.actual ?? 0,
-      iphoneUnits: displayUploads.current.reduce(
-        (sum, row) =>
-          rowMatchesKpiCategory(row, "iPhone")
-            ? sum + toNumber(row["Number"] ?? row.number ?? row.qty)
-            : sum,
+  // Per-officer Trade In lookup for the "tradeIn" preset calcType.
+  // The Trade API tags each record with SALE_CODE (= STAFF ID) and
+  // SALE_NAME, so completed trades can be attributed to each officer.
+  const tradeInByOfficer = useMemo(() => {
+    const byCode = new Map<string, number>();
+    const byName = new Map<string, number>();
+    for (const s of tradeInData?.perStaff ?? []) {
+      const code = String(s.code ?? "").replace(/[^0-9]/g, "");
+      if (code) byCode.set(code, s.actual);
+      const name = cleanOfficerName(s.name ?? "");
+      if (name) byName.set(name, s.actual);
+    }
+    return { byCode, byName };
+  }, [tradeInData]);
+
+  const tradeCountForOfficer = React.useCallback(
+    (staffId?: string, name?: string): number => {
+      const code = String(staffId ?? "").replace(/[^0-9]/g, "");
+      if (code && tradeInByOfficer.byCode.has(code)) {
+        return tradeInByOfficer.byCode.get(code) ?? 0;
+      }
+      const nm = cleanOfficerName(name ?? "");
+      return tradeInByOfficer.byName.get(nm) ?? 0;
+    },
+    [tradeInByOfficer],
+  );
+
+  const iphoneUnitsFromBills = React.useCallback(
+    (bills: BillSummary[]): number =>
+      bills.reduce(
+        (sum, bill) =>
+          sum +
+          bill.lineItems.reduce(
+            (s, li) =>
+              rowMatchesKpiCategory(li, "iPhone")
+                ? s + toNumber(li["Number"] ?? li.number ?? li.qty)
+                : s,
+            0,
+          ),
         0,
       ),
-    }),
-    [tradeInData, displayUploads.current],
+    [],
   );
 
   // Compute KPI results for presets marked showInStaffProfile
@@ -2111,8 +2139,12 @@ function AppInternal({
     if (activeOfficerBills.length === 0) return [];
     const staffPresets = kpiPresets.filter((p) => p.showInStaffProfile);
     if (staffPresets.length === 0) return [];
-    return staffPresets.map((p) => calcPreset(activeOfficerBills, p, presetCalcContext));
-  }, [activeOfficerBills, kpiPresets, presetCalcContext]);
+    const ctx = {
+      tradeInCount: tradeCountForOfficer(activeOfficer?.staffId, activeOfficer?.name),
+      iphoneUnits: iphoneUnitsFromBills(activeOfficerBills),
+    };
+    return staffPresets.map((p) => calcPreset(activeOfficerBills, p, ctx));
+  }, [activeOfficerBills, kpiPresets, activeOfficer, tradeCountForOfficer, iphoneUnitsFromBills]);
 
   const activeOfficer7WondersPerformance = useMemo<CategoryPerformanceRow[]>(() => {
     if (!activeOfficer) return [];
@@ -2269,9 +2301,16 @@ function AppInternal({
             matchesOfficer(b.officerName, officer.name),
           );
           if (officerBills.length === 0) return null;
+          const ctx = {
+            tradeInCount: tradeCountForOfficer(
+              (officer as { staffId?: string }).staffId,
+              officer.name,
+            ),
+            iphoneUnits: iphoneUnitsFromBills(officerBills),
+          };
           const results: Record<string, number> = {};
           branchPresets.forEach((p) => {
-            const r = calcPreset(officerBills, p, presetCalcContext);
+            const r = calcPreset(officerBills, p, ctx);
             results[p.id] = presetDisplayValue(r);
           });
           return { officer, results };
@@ -2284,7 +2323,7 @@ function AppInternal({
         });
 
     return { presets: branchPresets, rows };
-  }, [kpiPresets, displayUploads.current, displayUploads.categoryMaster, parsedReport.officers, presetCalcContext]);
+  }, [kpiPresets, displayUploads.current, displayUploads.categoryMaster, parsedReport.officers, tradeCountForOfficer, iphoneUnitsFromBills]);
 
   const dynamicRadarData = useMemo(() => {
     if (activeStat === "csat") {
