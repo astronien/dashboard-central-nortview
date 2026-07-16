@@ -31,6 +31,8 @@ export type CategorySnapshotItem = {
   mom: number | string;
   yoy: number | string;
   measureType?: "revenue" | "quantity";
+  /** AC+/COVER+ only: target expressed as % of iPhone units sold */
+  targetPctOfIphone?: number;
   /** Trade In only: สิ้นสุดประมูล ÷ iPhone units sold × 100 (เป้า 20%) */
   tradeInPerIphonePct?: number;
   /** Trade In only: รายการเทรดทั้งหมด ÷ iPhone units sold × 100 (เป้า 50%) */
@@ -140,6 +142,13 @@ export function buildCategorySnapshots(params: {
   const targets: TargetRecord[] = rawTargetRowsToRecords(targetRows);
   const branchId = resolveBranchId(targetRows, currentRows);
 
+  // iPhone units sold this period — the denominator for AC+/COVER+ targets,
+  // which are configured as a % of iPhone sold (no target Excel column).
+  const iphoneUnits = currentRows.reduce(
+    (sum, row) => (rowMatchesKpiCategory(row, "iPhone") ? sum + toNumber(row["Number"]) : sum),
+    0,
+  );
+
   return SNAPSHOT_CATEGORIES.map(({ label, kpiKey }) => {
     if (!hasData || !branchId) {
       return {
@@ -160,6 +169,7 @@ export function buildCategorySnapshots(params: {
     let target = 0;
     let actual = 0;
     let measureType: "revenue" | "quantity" | undefined = "revenue";
+    let targetPctOfIphone: number | undefined;
     let tradeInPerIphonePct: number | undefined;
     let tradeInAppraisalPct: number | undefined;
 
@@ -176,9 +186,18 @@ export function buildCategorySnapshots(params: {
         endDate,
       );
       target = result.target;
-      // Apply manual override from Settings (per-branch, per-category)
       const override = targetOverrides?.[label];
-      if (typeof override === "number" && Number.isFinite(override)) {
+      if (label === "AC+" || label === "COVER+") {
+        // Target is a % of iPhone units sold (there is no target column
+        // for these in the Excel). Derive the piece target from iPhone.
+        if (typeof override === "number" && Number.isFinite(override)) {
+          targetPctOfIphone = override;
+          target = Math.round((iphoneUnits * override) / 100);
+        } else {
+          target = 0;
+        }
+      } else if (typeof override === "number" && Number.isFinite(override)) {
+        // SIM etc. — override is an absolute piece count
         target = override;
       }
       actual = sumKpiActualFromRows(currentRows, kpiKey);
@@ -254,6 +273,7 @@ export function buildCategorySnapshots(params: {
       mom,
       yoy,
       measureType,
+      targetPctOfIphone,
       tradeInPerIphonePct,
       tradeInAppraisalPct,
     };

@@ -109,6 +109,10 @@ export const CategorySnapshotSection = React.forwardRef<HTMLDivElement, { items:
                 <div className="text-[10px] text-white/50 -mt-2">
                   สิ้นสุดประมูล / รายการเทรดทั้งหมด
                 </div>
+              ) : item.targetPctOfIphone != null ? (
+                <div className="text-[10px] text-white/50 -mt-2">
+                  Target {item.targetPctOfIphone}% ของ iPhone ({formatTarget(item)})
+                </div>
               ) : (
                 <div className="text-[10px] text-white/50 -mt-2">
                   Target {formatTarget(item)}

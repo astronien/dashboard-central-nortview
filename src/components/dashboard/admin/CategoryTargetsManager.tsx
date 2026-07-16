@@ -8,10 +8,10 @@ import { useAuth } from "../../../lib/auth/authContext";
  * target Excel. Settings page, admin only.
  */
 const QUANTITY_CATEGORIES = [
-  { key: "AC+", label: "AC+", desc: "Apple Care+ — จำนวนเครื่องที่ขาย Apple Care+" },
-  { key: "COVER+", label: "COVER+", desc: "COVER+ — จำนวนเครื่องที่ขายประกัน COVER+" },
-  { key: "SIM", label: "SIM", desc: "SIM — จำนวน SIM ที่ขาย" },
-  { key: "Trade In", label: "Trade In", desc: "Trade In — จำนวนรายการเทรดทั้งหมด (denominator) ถ้าไม่ตั้งจะใช้ค่าจาก API อัตโนมัติ" },
+  { key: "AC+", label: "AC+", unit: "%", desc: "Apple Care+ — เป้าเป็น % ของ iPhone ที่ขายได้ (ระบบคำนวณจำนวนชิ้นให้อัตโนมัติ)" },
+  { key: "COVER+", label: "COVER+", unit: "%", desc: "COVER+ — เป้าเป็น % ของ iPhone ที่ขายได้ (ระบบคำนวณจำนวนชิ้นให้อัตโนมัติ)" },
+  { key: "SIM", label: "SIM", unit: "ชิ้น", desc: "SIM — จำนวน SIM ที่ขาย" },
+  { key: "Trade In", label: "Trade In", unit: "ชิ้น", desc: "Trade In — จำนวนรายการเทรดทั้งหมด (denominator) ถ้าไม่ตั้งจะใช้ค่าจาก API อัตโนมัติ" },
 ];
 
 export function CategoryTargetsManager({ selectedBranch, onChanged }: { selectedBranch: string; onChanged?: () => void }) {
@@ -73,7 +73,9 @@ export function CategoryTargetsManager({ selectedBranch, onChanged }: { selected
       });
       const data = await res.json();
       if (res.ok) {
-        setSuccess(`บันทึก target ${category} = ${value.toLocaleString()} แล้ว`);
+        const unit = QUANTITY_CATEGORIES.find((c) => c.key === category)?.unit ?? "";
+        const shown = unit === "%" ? `${value}%` : `${value.toLocaleString()} ${unit}`.trim();
+        setSuccess(`บันทึก target ${category} = ${shown} แล้ว`);
         setDraft((d) => ({ ...d, [category]: "" }));
         await load();
         onChanged?.();
@@ -118,9 +120,10 @@ export function CategoryTargetsManager({ selectedBranch, onChanged }: { selected
             <Target className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-xl font-bold tracking-tight">ตั้งเป้าหมาย Category (ต่อชิ้น)</h2>
+            <h2 className="text-xl font-bold tracking-tight">ตั้งเป้าหมาย Category</h2>
             <p className="text-sm text-white/60 mt-1">
-              กำหนด target เองสำหรับหมวด AC+ / COVER+ / SIM / Trade In ที่ target Excel ไม่มี column เฉพาะ —
+              กำหนด target เองสำหรับหมวดที่ target Excel ไม่มี column เฉพาะ — AC+ / COVER+ ตั้งเป็น{" "}
+              <span className="text-emerald-300">% ของ iPhone</span> · SIM / Trade In ตั้งเป็นจำนวนชิ้น —
               ค่าที่ตั้งจะ override ค่า default ในหน้า Category KPI Snapshot
               {selectedBranch ? <span className="text-emerald-300"> · สาขา: {selectedBranch}</span> : null}
             </p>
@@ -149,7 +152,7 @@ export function CategoryTargetsManager({ selectedBranch, onChanged }: { selected
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {QUANTITY_CATEGORIES.map(({ key, label, desc }) => {
+        {QUANTITY_CATEGORIES.map(({ key, label, desc, unit }) => {
           const ov = overrides[key];
           const currentValue = draft[key] !== undefined ? draft[key] : (ov ? String(ov.target) : "");
           return (
@@ -168,8 +171,10 @@ export function CategoryTargetsManager({ selectedBranch, onChanged }: { selected
               {ov ? (
                 <div className="flex items-center gap-2 text-sm">
                   <span className="text-white/60">ปัจจุบัน:</span>
-                  <span className="font-bold text-emerald-300 tabular-nums">{ov.target.toLocaleString()}</span>
-                  <span className="text-white/40 text-xs">ชิ้น</span>
+                  <span className="font-bold text-emerald-300 tabular-nums">
+                    {unit === "%" ? `${ov.target}%` : ov.target.toLocaleString()}
+                  </span>
+                  {unit !== "%" ? <span className="text-white/40 text-xs">{unit}</span> : null}
                 </div>
               ) : null}
               <div className="flex gap-2 mt-1">
