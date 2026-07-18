@@ -2,9 +2,11 @@
 //
 // Turns the per-officer numbers already computed for the Home combined
 // table into human-readable Thai insights: where each person is weak,
-// concrete coaching tips, and — when things are critical — a prioritised
-// action plan. Pure functions with a normalised input so the same engine
-// can later feed an AI layer or a server-side Telegram job.
+// concrete coaching tips grounded in their own figures (gap to target,
+// how they compare to the team), a per-person pattern read, and — when
+// things are critical — a prioritised action plan. Pure functions with a
+// normalised input so the same engine can later feed an AI layer or a
+// server-side Telegram job.
 
 import type {
   CombinedOfficerKpiData,
@@ -21,8 +23,20 @@ export interface AnalysisMetric {
   achievePct: number;
   severity: Severity;
   kind: "category" | "wonder" | "csat";
+  actual?: number;
+  target?: number;
+  /** 7-Wonder attach: bills with A / base bills */
+  actualA?: number;
+  actualB?: number;
+  calcType?: PresetCalcType;
   /** e.g. "฿55,000 / ฿110,000" or "2/13 บิล" */
   detail?: string;
+  /** e.g. "ขาด ฿445,800" or "เหลืออีก ~3 บิลถึงเป้า" */
+  gapText?: string;
+  /** team average achievement for this metric */
+  peerAvg?: number;
+  /** how many units/bills short of target (for prioritising) */
+  opportunity?: number;
 }
 
 export interface OfficerAnalysis {
@@ -32,6 +46,8 @@ export interface OfficerAnalysis {
   /** Headline: month-to-date total sales achievement % */
   overallPct: number;
   grade: "A" | "B" | "C" | "D";
+  /** One-line pattern read of this person specifically */
+  insight: string;
   strengths: AnalysisMetric[];
   weaknesses: AnalysisMetric[];
   recommendations: string[];
@@ -44,16 +60,16 @@ export interface StoreAnalysis {
   dateLabel: string;
   officers: OfficerAnalysis[];
   criticalCount: number;
-  /** Weakest areas store-wide (avg achievement across staff) */
   topWeakAreas: { area: string; avgPct: number }[];
   summary: string[];
 }
 
 // ── thresholds ─────────────────────────────────────────────────────────
-const WEAK = 80; // below target but recoverable
-const CRIT = 50; // critical
-const CSAT_TARGET = 20; // store response-rate target (%)
+const WEAK = 80;
+const CRIT = 50;
+const CSAT_TARGET = 20;
 const CSAT_CRIT = 10;
+const DEVICE_CATS = ["Mac", "iPad", "iPhone", "Apple Watch"];
 
 const severityFor = (pct: number, weak = WEAK, crit = CRIT): Severity => {
   if (pct >= 100) return "good";
@@ -62,92 +78,162 @@ const severityFor = (pct: number, weak = WEAK, crit = CRIT): Severity => {
   return "critical";
 };
 
-const gradeFor = (pct: number): OfficerAnalysis["grade"] => {
-  if (pct >= 100) return "A";
-  if (pct >= 80) return "B";
-  if (pct >= 60) return "C";
-  return "D";
-};
+const gradeFor = (pct: number): OfficerAnalysis["grade"] =>
+  pct >= 100 ? "A" : pct >= 80 ? "B" : pct >= 60 ? "C" : "D";
 
 const fmtBaht = (n: number) => `฿${Math.round(n).toLocaleString()}`;
-
-// ── recommendation mapping (keyword → Thai coaching tip) ───────────────
-function recommendationFor(m: AnalysisMetric): string {
-  const l = m.label.toLowerCase();
-  const gap = m.achievePct < CRIT ? "ต่ำมาก" : "ต่ำกว่าเป้า";
-
-  if (m.kind === "csat") {
-    return `อัตราการตอบแบบสอบถาม ${gap} (${m.achievePct.toFixed(0)}%) — ชวนลูกค้าสแกน QR ประเมินก่อนออกจากร้านทุกบิล และแจ้งว่าใช้เวลาแค่ 10 วินาที`;
-  }
-
-  if (l.includes("cover") || l.includes("ac+") || l.includes("ufund") || l.includes("ประกัน"))
-    return `${m.label} ${gap} — เสนอประกัน/บริการทุกบิล iPhone·iPad ด้วยสคริปต์ "ปกป้องเครื่องคุ้มกว่าซ่อม" และเน้นตอนปิดการขาย`;
-  if (l.includes("film") || l.includes("ฟิล์ม") || l.includes("case") || l.includes("เคส") || l.includes("pvl"))
-    return `${m.label} ${gap} — bundle ฟิล์ม+เคสตอนปิดการขาย เสนอเป็นเซ็ตพร้อมติดตั้งให้ฟรี`;
-  if (l.includes("pencil"))
-    return `${m.label} ${gap} — เสนอ Pencil/Keyboard คู่กับ iPad ทุกครั้ง โดยสาธิตการใช้งานจริง`;
-  if (l.includes("sim"))
-    return `${m.label} ${gap} — เสนอแพ็กเกจ SIM/เน็ตคู่กับเครื่องใหม่ ชูโปรค่าบริการรายเดือน`;
-  if (l.includes("trade"))
-    return `${m.label} ${gap} — ชวนลูกค้าเทิร์นเครื่องเก่าเพิ่มมูลค่า เช็คราคาเทิร์นให้ดูทันทีหน้าเครื่อง`;
-  if (l.includes("iphone"))
-    return `ยอด iPhone ${gap} — เน้นรุ่นใหม่ + เทิร์นเครื่องเก่า และผูกกับประกัน/อุปกรณ์เสริม`;
-  if (l.includes("ipad"))
-    return `ยอด iPad ${gap} — เจาะกลุ่มนักเรียน/ทำงาน เสนอ iPad + Pencil + เคสเป็นเซ็ต`;
-  if (l.includes("mac"))
-    return `ยอด Mac ${gap} — ชูจุดเด่นด้านงาน/เรียน เสนอผ่อน 0% และเทิร์นโน้ตบุ๊กเก่า`;
-  if (l.includes("watch"))
-    return `ยอด Apple Watch ${gap} — เสนอคู่กับ iPhone ชูฟีเจอร์สุขภาพ และสาย/เคสเสริม`;
-  if (l.includes("btb"))
-    return `ยอด ${m.label} ${gap} — ติดตามดีลองค์กร/ลูกค้าธุรกิจที่ค้างอยู่ และเสนอใบเสนอราคาเชิงรุก`;
-  return `${m.label} ${gap} (${m.achievePct.toFixed(0)}%) — วางแผนเจาะเป้าหมวดนี้เพิ่ม`;
-}
-
 const isPercentPreset = (c: PresetCalcType | undefined): boolean =>
   c === "attach" || c === "bahtRate" || c === "catAttach" || c === "tradeIn";
 
-// ── per-officer ────────────────────────────────────────────────────────
-export function analyzeOfficer(
+// The coaching action for a given metric label (what to DO).
+function tipFor(label: string): string {
+  const l = label.toLowerCase();
+  if (l.includes("ufund"))
+    return "เสนอผ่อนผ่าน UFUND (สินเชื่อบุคคล) กับลูกค้าที่ไม่มีบัตรเครดิตแต่สนใจ iPhone/Mac/iPad — เป็นตัวปิดการขายเครื่องราคาสูงที่คนมักพลาด";
+  if (l.includes("cover") || l.includes("ac+") || l.includes("ประกัน"))
+    return 'เสนอประกัน/บริการทุกบิล iPhone·iPad ด้วยสคริปต์ "ปกป้องเครื่องคุ้มกว่าซ่อม" ปิดตอนจบการขาย';
+  if (l.includes("film") || l.includes("ฟิล์ม"))
+    return "เสนอฟิล์มพร้อมติดตั้งให้ฟรีทุกเครื่อง ทำเป็นขั้นตอนมาตรฐานก่อนส่งมอบ";
+  if (l.includes("case") || l.includes("เคส") || l.includes("pvl"))
+    return "bundle เคสตอนปิดการขาย เสนอเป็นเซ็ตกับฟิล์ม";
+  if (l.includes("pencil"))
+    return "เสนอ Pencil/Keyboard คู่กับ iPad ทุกครั้ง โดยสาธิตการใช้งานจริง";
+  if (l.includes("sim"))
+    return "เสนอแพ็กเกจ SIM/เน็ตคู่กับเครื่องใหม่ ชูโปรค่าบริการรายเดือน";
+  if (l.includes("trade"))
+    return "เช็คราคาเทิร์นให้ลูกค้าดูทันทีหน้าเครื่อง ชวนเทิร์นเพื่อลดราคาเครื่องใหม่";
+  if (l.includes("csat"))
+    return "ชวนลูกค้าสแกน QR ประเมินก่อนออกจากร้านทุกบิล บอกว่าใช้เวลาแค่ 10 วินาที";
+  if (l.includes("iphone"))
+    return "เน้นรุ่นใหม่ + เทิร์นเครื่องเก่า และผูกกับประกัน/อุปกรณ์เสริมทุกเครื่อง";
+  if (l.includes("ipad"))
+    return "เจาะกลุ่มนักเรียน/ทำงาน เสนอ iPad + Pencil + เคสเป็นเซ็ต";
+  if (l.includes("mac"))
+    return "ชูจุดเด่นด้านงาน/เรียน เสนอผ่อน 0% และเทิร์นโน้ตบุ๊กเก่า";
+  if (l.includes("watch"))
+    return "เสนอคู่กับ iPhone ชูฟีเจอร์สุขภาพ และสาย/เคสเสริม";
+  if (l.includes("btb"))
+    return "ติดตามดีลองค์กร/ลูกค้าธุรกิจที่ค้างอยู่ และเสนอใบเสนอราคาเชิงรุก";
+  return "วางแผนเจาะเป้าหมวดนี้เพิ่ม";
+}
+
+// Compose a specific recommendation from the metric's own numbers.
+function recommendationFor(m: AnalysisMetric): string {
+  const head = `${m.label} ${m.achievePct.toFixed(0)}%`;
+  const detail = m.detail ? ` (${m.detail})` : "";
+  const gap = m.gapText ? ` ${m.gapText}` : "";
+  const peer =
+    m.peerAvg !== undefined && m.achievePct < m.peerAvg - 8
+      ? ` · ต่ำกว่าค่าเฉลี่ยทีม ${(m.peerAvg - m.achievePct).toFixed(0)}pp`
+      : m.peerAvg !== undefined && m.achievePct > m.peerAvg + 12
+        ? ` · สูงกว่าทีม แต่ยังไม่ถึงเป้า`
+        : "";
+  return `${head}${detail}${gap} — ${tipFor(m.label)}${peer}`;
+}
+
+// Per-person pattern read (device vs attach vs CSAT).
+function computeInsight(
+  metrics: AnalysisMetric[],
+  overallPct: number,
+): string {
+  const avg = (arr: AnalysisMetric[]) =>
+    arr.length ? arr.reduce((s, m) => s + m.achievePct, 0) / arr.length : NaN;
+  const device = avg(
+    metrics.filter((m) => m.kind === "category" && DEVICE_CATS.includes(m.label)),
+  );
+  const attach = avg(metrics.filter((m) => m.kind === "wonder"));
+  const csat = metrics.find((m) => m.kind === "csat");
+
+  const parts: string[] = [];
+  if (!isNaN(device) && !isNaN(attach)) {
+    if (device >= 80 && attach < 70)
+      parts.push(
+        `ปิดการขายเครื่องได้ดี (หมวดหลักเฉลี่ย ${device.toFixed(0)}%) แต่แนบบริการเสริมน้อย (7 Wonders เฉลี่ย ${attach.toFixed(0)}%) — ทุกเครื่องที่ขายคือโอกาสแนบที่หลุดไป โฟกัส attach จะเพิ่มมาร์จิ้นทันที`,
+      );
+    else if (attach >= 80 && device < 70)
+      parts.push(
+        `แนบอุปกรณ์เสริมเก่ง (${attach.toFixed(0)}%) แต่ยอดเครื่องหลักยังต่ำ (${device.toFixed(0)}%) — เพิ่มการปิดการขายเครื่องหลัก โดยเฉพาะรุ่นราคาสูง`,
+      );
+    else if (device < 60 && attach < 60)
+      parts.push(
+        `อ่อนทั้งยอดเครื่องและ attach — ต้องเร่งพื้นฐานการขาย เข้าโค้ชแบบตัวต่อตัว`,
+      );
+    else if (device >= 90 && attach >= 90)
+      parts.push(`ทำได้สมดุลทั้งยอดเครื่องและ attach — รักษาระดับและช่วยโค้ชเพื่อน`);
+  }
+  if (csat && csat.achievePct < CSAT_TARGET)
+    parts.push(
+      `อัตราการตอบ CSAT ต่ำ (${csat.achievePct.toFixed(0)}%) — เก็บ feedback ลูกค้าได้น้อย ควรชวนสแกน QR ทุกบิล`,
+    );
+
+  if (parts.length === 0)
+    parts.push(
+      overallPct >= 100
+        ? "ทำได้ตามเป้าโดยรวม — โฟกัสรักษาระดับและดันหมวดที่ยังพอมีช่องว่าง"
+        : `ยอดรวม ${overallPct.toFixed(0)}% ของเป้า — ไล่ดูจุดอ่อนด้านล่างเป็นรายหมวด`,
+    );
+  return parts.join(" ");
+}
+
+// ── build metrics for one officer ──────────────────────────────────────
+function buildMetrics(
   row: CombinedOfficerRow,
   categories: string[],
   presets: { id: string; name: string; calcType?: PresetCalcType }[],
-): OfficerAnalysis {
+  peerAvg: Map<string, number>,
+): AnalysisMetric[] {
   const metrics: AnalysisMetric[] = [];
 
-  // Category sales (skip categories with no target)
   for (const cat of categories) {
     const c = row.cats[cat];
     if (!c || c.target <= 0) continue;
+    const gap = c.target - c.actual;
     metrics.push({
       label: cat,
       achievePct: c.achPercent,
       severity: severityFor(c.achPercent),
       kind: "category",
+      actual: c.actual,
+      target: c.target,
       detail: `${fmtBaht(c.actual)} / ${fmtBaht(c.target)}`,
+      gapText: gap > 0 ? `ขาดอีก ${fmtBaht(gap)}` : undefined,
+      peerAvg: peerAvg.get(cat),
+      opportunity: gap > 0 ? gap : 0,
     });
   }
 
-  // 7 Wonders (scale percent-presets vs their target)
   for (const p of presets) {
     const w = row.wonders[p.id];
     if (!w || w.target <= 0) continue;
-    const pct = isPercentPreset(p.calcType)
-      ? (w.actual / w.target) * 100
-      : w.achPercent;
-    const detail =
-      w.actualA !== undefined && w.actualB !== undefined
-        ? `${Math.round(w.actualA)}/${Math.round(w.actualB)} บิล`
-        : undefined;
+    const percent = isPercentPreset(p.calcType);
+    const pct = percent ? (w.actual / w.target) * 100 : w.achPercent;
+    let detail: string | undefined;
+    let gapText: string | undefined;
+    let opportunity = 0;
+    if (w.actualA !== undefined && w.actualB !== undefined) {
+      detail = `แนบ ${Math.round(w.actualA)}/${Math.round(w.actualB)} บิล`;
+      if (percent && w.actualB > 0) {
+        const need = Math.ceil((w.target / 100) * w.actualB);
+        opportunity = Math.max(0, need - Math.round(w.actualA));
+        if (opportunity > 0)
+          gapText = `เหลืออีก ~${opportunity} บิลถึงเป้า`;
+      }
+    }
     metrics.push({
       label: p.name,
       achievePct: pct,
       severity: severityFor(pct),
       kind: "wonder",
+      actualA: w.actualA,
+      actualB: w.actualB,
+      calcType: p.calcType,
       detail,
+      gapText,
+      peerAvg: peerAvg.get(p.name),
+      opportunity,
     });
   }
 
-  // CSAT response rate
   if (row.csat && row.csat.billCount > 0) {
     const rate = (row.csat.responseCount / row.csat.billCount) * 100;
     metrics.push({
@@ -155,10 +241,22 @@ export function analyzeOfficer(
       achievePct: rate,
       severity: severityFor(rate, CSAT_TARGET, CSAT_CRIT),
       kind: "csat",
-      detail: `${row.csat.responseCount}/${row.csat.billCount} บิล`,
+      detail: `ตอบ ${row.csat.responseCount}/${row.csat.billCount} บิล`,
+      peerAvg: peerAvg.get("CSAT (อัตราการตอบ)"),
     });
   }
 
+  return metrics;
+}
+
+// ── per-officer ────────────────────────────────────────────────────────
+export function analyzeOfficer(
+  row: CombinedOfficerRow,
+  categories: string[],
+  presets: { id: string; name: string; calcType?: PresetCalcType }[],
+  peerAvg: Map<string, number> = new Map(),
+): OfficerAnalysis {
+  const metrics = buildMetrics(row, categories, presets, peerAvg);
   const overallPct = row.catTotal.target > 0 ? row.catTotal.achPercent : 0;
 
   const strengths = metrics
@@ -166,11 +264,21 @@ export function analyzeOfficer(
     .sort((a, b) => b.achievePct - a.achievePct)
     .slice(0, 3);
 
+  // Rank weaknesses: critical first, then by how far below the team,
+  // then by raw achievement — so the list is specific to this person.
   const weaknesses = metrics
     .filter((m) => m.severity === "weak" || m.severity === "critical")
-    .sort((a, b) => a.achievePct - b.achievePct);
+    .sort((a, b) => {
+      if (a.severity !== b.severity)
+        return a.severity === "critical" ? -1 : 1;
+      const aPeer = a.peerAvg !== undefined ? a.peerAvg - a.achievePct : 0;
+      const bPeer = b.peerAvg !== undefined ? b.peerAvg - b.achievePct : 0;
+      if (Math.abs(bPeer - aPeer) > 3) return bPeer - aPeer;
+      return a.achievePct - b.achievePct;
+    });
 
   const recommendations = weaknesses.slice(0, 4).map(recommendationFor);
+  const insight = computeInsight(metrics, overallPct);
 
   const criticalMetrics = metrics.filter((m) => m.severity === "critical");
   const critical = overallPct < CRIT || criticalMetrics.length >= 2;
@@ -180,14 +288,13 @@ export function analyzeOfficer(
     const focus = (criticalMetrics.length ? criticalMetrics : weaknesses)
       .sort((a, b) => a.achievePct - b.achievePct)
       .slice(0, 3);
-    focus.forEach((m, i) => {
-      actionPlan.push(`ลำดับ ${i + 1}: ${recommendationFor(m)}`);
-    });
-    if (overallPct < CRIT) {
+    focus.forEach((m, i) =>
+      actionPlan.push(`ลำดับ ${i + 1}: ${recommendationFor(m)}`),
+    );
+    if (overallPct < CRIT)
       actionPlan.push(
-        `ยอดรวมทำได้เพียง ${overallPct.toFixed(0)}% ของเป้า — จับคู่โค้ชกับหัวหน้า/พนักงานท็อป และตั้งเป้าย่อยรายวันเพื่อไล่ตามให้ทัน`,
+        `ยอดรวมทำได้เพียง ${overallPct.toFixed(0)}% ของเป้า — จับคู่โค้ชกับหัวหน้า/พนักงานท็อป ตั้งเป้าย่อยรายวันเพื่อไล่ให้ทัน`,
       );
-    }
   }
 
   return {
@@ -196,6 +303,7 @@ export function analyzeOfficer(
     staffId: row.officer.staffId,
     overallPct,
     grade: gradeFor(overallPct),
+    insight,
     strengths,
     weaknesses,
     recommendations,
@@ -205,29 +313,53 @@ export function analyzeOfficer(
 }
 
 // ── store-wide ─────────────────────────────────────────────────────────
+function computePeerAverages(
+  data: CombinedOfficerKpiData,
+): Map<string, number> {
+  const agg = new Map<string, { sum: number; n: number }>();
+  const add = (label: string, pct: number) => {
+    const cur = agg.get(label) ?? { sum: 0, n: 0 };
+    cur.sum += pct;
+    cur.n += 1;
+    agg.set(label, cur);
+  };
+  for (const r of data.rows) {
+    for (const cat of data.categories) {
+      const c = r.cats[cat];
+      if (c && c.target > 0) add(cat, c.achPercent);
+    }
+    for (const p of data.presets) {
+      const w = r.wonders[p.id];
+      if (w && w.target > 0)
+        add(
+          p.name,
+          isPercentPreset(p.calcType) ? (w.actual / w.target) * 100 : w.achPercent,
+        );
+    }
+    if (r.csat && r.csat.billCount > 0)
+      add(
+        "CSAT (อัตราการตอบ)",
+        (r.csat.responseCount / r.csat.billCount) * 100,
+      );
+  }
+  const out = new Map<string, number>();
+  agg.forEach((v, k) => out.set(k, v.n ? v.sum / v.n : 0));
+  return out;
+}
+
 export function analyzeStore(
   data: CombinedOfficerKpiData,
   dateLabel: string,
 ): StoreAnalysis {
+  const peerAvg = computePeerAverages(data);
   const officers = data.rows.map((r) =>
-    analyzeOfficer(r, data.categories, data.presets),
+    analyzeOfficer(r, data.categories, data.presets, peerAvg),
   );
 
   const criticalCount = officers.filter((o) => o.critical).length;
 
-  // Weakest areas store-wide: average achievement per metric label
-  const agg = new Map<string, { sum: number; n: number }>();
-  for (const r of data.rows) {
-    const a = analyzeOfficer(r, data.categories, data.presets);
-    for (const m of [...a.weaknesses, ...a.strengths]) {
-      const cur = agg.get(m.label) ?? { sum: 0, n: 0 };
-      cur.sum += m.achievePct;
-      cur.n += 1;
-      agg.set(m.label, cur);
-    }
-  }
-  const topWeakAreas = Array.from(agg.entries())
-    .map(([area, v]) => ({ area, avgPct: v.n ? v.sum / v.n : 0 }))
+  const topWeakAreas = Array.from(peerAvg.entries())
+    .map(([area, avgPct]) => ({ area, avgPct }))
     .filter((x) => x.avgPct < WEAK)
     .sort((a, b) => a.avgPct - b.avgPct)
     .slice(0, 5);
@@ -275,14 +407,7 @@ export function analysisToText(store: StoreAnalysis): string {
     lines.push(
       `${o.critical ? "🔴" : o.grade === "A" ? "🟢" : "🟡"} ${o.name} — ยอดรวม ${o.overallPct.toFixed(0)}% (เกรด ${o.grade})`,
     );
-    if (o.weaknesses.length) {
-      lines.push(
-        `  จุดอ่อน: ${o.weaknesses
-          .slice(0, 4)
-          .map((w) => `${w.label} ${w.achievePct.toFixed(0)}%`)
-          .join(", ")}`,
-      );
-    }
+    lines.push(`  💡 ${o.insight}`);
     o.recommendations.forEach((r) => lines.push(`  • ${r}`));
     if (o.critical && o.actionPlan.length) {
       lines.push("  🚨 แผนแก้ไขด่วน:");

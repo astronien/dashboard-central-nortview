@@ -69,6 +69,11 @@ function OfficerCard({ o }: { o: OfficerAnalysis }) {
         </div>
       </div>
 
+      <p className="mb-3 text-[12px] leading-snug text-white/85 bg-black/20 border border-white/10 rounded-lg px-3 py-2">
+        <span className="text-amber-400">💡 </span>
+        {o.insight}
+      </p>
+
       {o.strengths.length > 0 ? (
         <div className="mb-2 flex flex-wrap items-center gap-1.5">
           <CheckCircle2 className="w-3.5 h-3.5 text-green-400 shrink-0" />
