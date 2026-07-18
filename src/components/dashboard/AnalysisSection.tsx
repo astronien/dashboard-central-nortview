@@ -7,6 +7,7 @@ import {
   Lightbulb,
   Send,
   Loader2,
+  Sparkles,
 } from "lucide-react";
 import type { CombinedOfficerKpiData } from "./HomeDashboardSection";
 import {
@@ -159,6 +160,11 @@ export function AnalysisSection({
     "idle" | "sending" | "sent" | "error"
   >("idle");
   const [sendMsg, setSendMsg] = React.useState("");
+  const [aiText, setAiText] = React.useState<string | null>(null);
+  const [aiState, setAiState] = React.useState<
+    "idle" | "loading" | "done" | "error"
+  >("idle");
+  const [aiMsg, setAiMsg] = React.useState("");
 
   const store = React.useMemo(() => {
     if (!combinedOfficerKpiData || combinedOfficerKpiData.rows.length === 0)
@@ -169,11 +175,45 @@ export function AnalysisSection({
     );
   }, [combinedOfficerKpiData, dateLabel]);
 
+  // Regenerating cards should invalidate a stale AI narrative
+  React.useEffect(() => {
+    setAiText(null);
+    setAiState("idle");
+  }, [store]);
+
+  const generateAi = async () => {
+    if (!store) return;
+    setAiState("loading");
+    setAiMsg("");
+    try {
+      const res = await fetch("/api/ai-analysis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: analysisToText(store),
+          dateLabel: store.dateLabel,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok && data.text) {
+        setAiText(data.text);
+        setAiState("done");
+      } else {
+        setAiState("error");
+        setAiMsg(data.error ?? "สร้างด้วย AI ไม่สำเร็จ");
+      }
+    } catch (e) {
+      setAiState("error");
+      setAiMsg(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   const handleSend = async () => {
     if (!store || !onSendTelegram) return;
     setSendState("sending");
     setSendMsg("");
-    const res = await onSendTelegram(analysisToText(store));
+    // Prefer the AI narrative if it's been generated
+    const res = await onSendTelegram(aiText || analysisToText(store));
     if (res.ok) {
       setSendState("sent");
     } else {
@@ -217,6 +257,28 @@ export function AnalysisSection({
               </p>
             </div>
           </div>
+          <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => void generateAi()}
+            disabled={aiState === "loading"}
+            title={aiMsg}
+            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-colors ${
+              aiState === "error"
+                ? "bg-rose-500/15 border border-rose-400/30 text-rose-200"
+                : "bg-purple-500/15 border border-purple-400/30 text-purple-200 hover:bg-purple-500/25"
+            }`}
+          >
+            {aiState === "loading" ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Sparkles className="w-4 h-4" />
+            )}
+            {aiState === "loading"
+              ? "กำลังเขียน…"
+              : aiText
+                ? "เขียนใหม่ด้วย AI"
+                : "เขียนด้วย AI"}
+          </button>
           {onSendTelegram ? (
             <button
               onClick={() => void handleSend()}
@@ -246,7 +308,12 @@ export function AnalysisSection({
                     : "ส่งไป Telegram"}
             </button>
           ) : null}
+          </div>
         </div>
+
+        {aiState === "error" ? (
+          <p className="mb-3 text-[12px] text-rose-300">{aiMsg}</p>
+        ) : null}
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {store.summary.map((s, i) => (
@@ -263,6 +330,28 @@ export function AnalysisSection({
           ))}
         </div>
       </div>
+
+      {/* AI narrative (natural language) */}
+      {aiText ? (
+        <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-purple-400/20 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="p-2 bg-purple-500/20 rounded-xl border border-purple-500/20">
+              <Sparkles className="w-5 h-5 text-purple-300" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold tracking-tight text-white">
+                บทวิเคราะห์ (เรียบเรียงด้วย AI)
+              </h2>
+              <p className="text-[11px] text-white/50">
+                เขียนจากตัวเลขจริงในบทวิเคราะห์ด้านล่าง — ตรวจทานก่อนใช้งานจริง
+              </p>
+            </div>
+          </div>
+          <div className="text-[13px] leading-relaxed text-white/90 whitespace-pre-wrap">
+            {aiText}
+          </div>
+        </div>
+      ) : null}
 
       {/* Per-officer cards (critical first) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
