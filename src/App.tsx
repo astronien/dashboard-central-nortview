@@ -2481,6 +2481,9 @@ function AppInternal({
                 score: csatUser.avgScore,
                 maxScore: csatUser.maxScore,
                 responseCount: csatUser.responseCount,
+                // ตัวหาร = จำนวนบิลของพนักงานคนนั้นจากข้อมูลขาย (Current)
+                // เพราะ CSAT ไม่ได้แยกจำนวนบิลทั้งหมดรายคนมาให้
+                billCount: officerBills.length,
               }
             : undefined,
         };
@@ -3796,6 +3799,7 @@ function AppInternal({
                 focusDevice={focusDevice}
                 focusWonder={focusWonder}
                 csatUser={csatForOfficer(activeOfficer?.staffId, activeOfficer?.name)}
+                csatBillCount={activeOfficerBills.length}
                 activeOfficer7WondersPerformance={activeOfficer7WondersPerformance}
                 activeOfficerCategoryPerformance={activeOfficerCategoryPerformance}
                 todaySalesTotal={activeOfficerTodaySales}

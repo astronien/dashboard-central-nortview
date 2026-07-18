@@ -54,7 +54,12 @@ export type CombinedOfficerRow = {
   cats: Record<string, CombinedCatCell>;
   catTotal: CombinedCatCell;
   wonders: Record<string, CombinedWonderCell>;
-  csat?: { score: number | null; maxScore: number; responseCount: number };
+  csat?: {
+    score: number | null;
+    maxScore: number;
+    responseCount: number;
+    billCount: number;
+  };
 };
 
 export type CombinedOfficerKpiData = {
@@ -415,7 +420,7 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                   <th className="py-2 px-2 font-bold uppercase tracking-wide text-right min-w-[64px] text-sky-300 border-l border-white/10">
                     <div>คะแนน</div>
                     <div className="text-[8px] text-white/40 font-normal normal-case">
-                      (จำนวนตอบ)
+                      (ตอบ/บิล)
                     </div>
                   </th>
                 ) : null}
@@ -467,7 +472,8 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                             <span className="text-white/30 font-normal">/{row.csat.maxScore}</span>
                           </span>
                           <span className="text-[8px] text-white/40 tabular-nums">
-                            {row.csat.responseCount} ตอบ
+                            ตอบ {row.csat.responseCount}
+                            {row.csat.billCount > 0 ? `/${row.csat.billCount}` : ""}
                           </span>
                         </div>
                       ) : (

@@ -367,6 +367,7 @@ export function StaffSection({
   focusDevice,
   focusWonder,
   csatUser,
+  csatBillCount,
   activeOfficer7WondersPerformance,
   activeOfficerCategoryPerformance,
   todaySalesTotal,
@@ -398,6 +399,7 @@ export function StaffSection({
   focusDevice: { label: string; rate: number } | null;
   focusWonder: { label: string; rate: number } | null;
   csatUser?: CsatUser;
+  csatBillCount?: number;
   activeOfficer7WondersPerformance: PerformanceRow[];
   activeOfficerCategoryPerformance: PerformanceRow[];
   todaySalesTotal: number;
@@ -845,7 +847,8 @@ export function StaffSection({
                             );
                           })()}
                           <div className="text-[10px] text-sky-300/80 mt-0.5 tabular-nums">
-                            ตอบ {csatUser.responseCount} ครั้ง
+                            ตอบ {csatUser.responseCount}
+                            {csatBillCount ? `/${csatBillCount}` : ""} บิล
                           </div>
                         </motion.div>
                       ) : null}
