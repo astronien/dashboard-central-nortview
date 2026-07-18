@@ -30,11 +30,31 @@ export interface CsatUser {
   maxScore: number;
 }
 
+export interface CsatLowScoreQuestion {
+  title: string;
+  score: number | null;
+  answer: string;
+}
+
+export interface CsatLowScore {
+  billId: string;
+  submittedAt: string;
+  staffName: string;
+  empCode: string;
+  score: number;
+  maxScore: number;
+  skus: string[];
+  questions: CsatLowScoreQuestion[];
+  /** the question title(s) that scored lowest on this bill */
+  weakAspects: string[];
+}
+
 export interface CsatResult {
   branch: { id: number; refId: string; name: string };
   period: { start: string; end: string };
   overview: CsatOverview;
   users: CsatUser[];
+  lowScores: CsatLowScore[];
 }
 
 /** "auth" = token expired/revoked, "no_token" = none set, "error" = other */

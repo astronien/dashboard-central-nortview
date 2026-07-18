@@ -95,6 +95,7 @@ async function csatGet(path, params, token) {
 // the only source of true per-person scores + response counts.
 async function aggregatePerStaff(branchId, params, token) {
   const perStaff = new Map(); // emp_code -> { name, position, count, sum, maxScore }
+  const lowScores = []; // surveys that scored below max (drill-down)
   const pageSize = 500;
   let page = 1;
   let pageCount = 1;
@@ -109,33 +110,59 @@ async function aggregatePerStaff(branchId, params, token) {
     for (const s of rows) {
       const st = s.staff || {};
       const code = String(st.emp_code ?? "").trim();
-      if (!code) continue;
+      const maxScore = Number(s.max_score ?? 5);
       // One question per survey → avg_score == that answer's score.
       const score =
         s.avg_score != null
           ? Number(s.avg_score)
           : Number(s.answers?.[0]?.score ?? NaN);
-      if (!Number.isFinite(score)) continue;
-      const cur =
-        perStaff.get(code) ||
-        {
-          name: String(st.name ?? ""),
-          position: String(st.position ?? ""),
-          count: 0,
-          sum: 0,
-          maxScore: Number(s.max_score ?? 5),
-        };
-      cur.count += 1;
-      cur.sum += score;
-      if (s.max_score) cur.maxScore = Number(s.max_score);
-      perStaff.set(code, cur);
+      if (code && Number.isFinite(score)) {
+        const cur =
+          perStaff.get(code) ||
+          { name: String(st.name ?? ""), position: String(st.position ?? ""), count: 0, sum: 0, maxScore };
+        cur.count += 1;
+        cur.sum += score;
+        if (s.max_score) cur.maxScore = maxScore;
+        perStaff.set(code, cur);
+      }
+
+      // Collect surveys that didn't score full marks so a manager can
+      // drill into who/when/which service aspect dragged the score down.
+      if (Number.isFinite(score) && score < maxScore) {
+        const questions = (Array.isArray(s.answers) ? s.answers : []).map((a) => ({
+          title: String(a?.question?.title_th ?? a?.question?.title ?? "").trim(),
+          score: a?.score == null ? null : Number(a.score),
+          answer: String(a?.answer?.title_th ?? a?.answer?.title ?? "").trim(),
+        }));
+        // The weakest aspect(s) on this bill
+        const scored = questions.filter((q) => q.score != null);
+        const minQ = scored.length ? Math.min(...scored.map((q) => q.score)) : score;
+        lowScores.push({
+          billId: String(s.bill_id ?? ""),
+          submittedAt: String(s.submit_at ?? s.bought_at ?? ""),
+          staffName: String(st.name ?? ""),
+          empCode: code,
+          score,
+          maxScore,
+          skus: Array.isArray(s.skus) ? s.skus.map(String) : [],
+          questions,
+          weakAspects: scored
+            .filter((q) => q.score === minQ)
+            .map((q) => q.title)
+            .filter(Boolean),
+        });
+      }
     }
     page += 1;
-    // Safety cap: a single branch/month never has thousands of responses.
     if (page > 20) break;
   } while (page <= pageCount);
 
-  return Array.from(perStaff.entries()).map(([empCode, v]) => ({
+  lowScores.sort((a, b) => {
+    if (a.score !== b.score) return a.score - b.score; // worst first
+    return b.submittedAt.localeCompare(a.submittedAt); // then newest
+  });
+
+  const users = Array.from(perStaff.entries()).map(([empCode, v]) => ({
     empCode,
     name: v.name,
     position: v.position,
@@ -143,6 +170,8 @@ async function aggregatePerStaff(branchId, params, token) {
     responseCount: v.count,
     maxScore: v.maxScore || 5,
   }));
+
+  return { users, lowScores: lowScores.slice(0, 80) };
 }
 
 // ── Token management sub-handler (resource=token) ──────────────────────
@@ -246,7 +275,7 @@ module.exports = async function handler(req, res) {
       branches[0];
 
     // 2. Store-level overview + real per-staff aggregation (in parallel)
-    const [overviewJson, users] = await Promise.all([
+    const [overviewJson, surveyData] = await Promise.all([
       csatGet(
         "/overviews",
         { start_date: startDate, end_date: endDate, branch_id: wanted.id },
@@ -258,6 +287,7 @@ module.exports = async function handler(req, res) {
         token,
       ),
     ]);
+    const { users, lowScores } = surveyData;
 
     const o = overviewJson?.data ?? {};
     const npsBuckets = Array.isArray(o.nps_scores) ? o.nps_scores : [];
@@ -286,6 +316,7 @@ module.exports = async function handler(req, res) {
         detractors: bucket("detractor"),
       },
       users,
+      lowScores,
     });
   } catch (e) {
     console.error("[api/csat] failed:", e);

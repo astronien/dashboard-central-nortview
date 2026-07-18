@@ -3818,6 +3818,7 @@ function AppInternal({
                   branchOverviewKpiData={branchOverviewKpiData}
                   combinedOfficerKpiData={combinedOfficerKpiData}
                   csatOverview={csatData?.overview}
+                  csatLowScores={csatData?.lowScores}
                   categorySnapshotRef={categorySnapshotRef}
                 />
               </motion.div>
@@ -3986,6 +3987,7 @@ function AppInternal({
               branchOverviewKpiData={branchOverviewKpiData}
               combinedOfficerKpiData={combinedOfficerKpiData}
               csatOverview={csatData?.overview}
+              csatLowScores={csatData?.lowScores}
               categorySnapshotRef={categorySnapshotRef}
               captureRef={homeStatsCaptureRef}
             />

@@ -1,6 +1,6 @@
 import React from "react";
 import { TrendingUp, TrendingDown, Building2, User, Smile } from "lucide-react";
-import type { CsatOverview } from "../../lib/csatApi";
+import type { CsatOverview, CsatLowScore } from "../../lib/csatApi";
 import type { CategorySnapshotItem } from "../../lib/categorySnapshotBuilder";
 import type { DerivedHomeStat } from "./dashboardTypes";
 import { CategorySnapshotSection } from "./CategorySnapshotSection";
@@ -75,6 +75,7 @@ export function HomeDashboardSection({
   branchOverviewKpiData,
   combinedOfficerKpiData,
   csatOverview,
+  csatLowScores,
   categorySnapshotRef,
   captureRef,
 }: {
@@ -84,6 +85,7 @@ export function HomeDashboardSection({
   branchOverviewKpiData?: BranchOverviewKpiData;
   combinedOfficerKpiData?: CombinedOfficerKpiData;
   csatOverview?: CsatOverview;
+  csatLowScores?: CsatLowScore[];
   categorySnapshotRef?: React.RefObject<HTMLDivElement | null>;
   /** Wraps the stat cards + Category KPI Snapshot for screenshot capture */
   captureRef?: React.RefObject<HTMLDivElement | null>;
@@ -113,6 +115,10 @@ export function HomeDashboardSection({
         ) : null}
 
         {csatOverview ? <CsatStoreCard overview={csatOverview} /> : null}
+
+        {csatLowScores && csatLowScores.length > 0 ? (
+          <CsatLowScoresCard items={csatLowScores} />
+        ) : null}
       </div>
 
       {branchOverviewKpiData && branchOverviewKpiData.presets.length > 0 ? (
@@ -560,6 +566,83 @@ function CsatStoreCard({ overview }: { overview: CsatOverview }) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * CSAT drill-down: บิลที่ได้คะแนนไม่เต็ม — เห็นว่าใคร/เมื่อไหร่/จุดบริการไหน
+ * ที่ลูกค้าให้คะแนนต่ำ เพื่อตามโค้ชได้ตรงจุด
+ */
+function CsatLowScoresCard({ items }: { items: CsatLowScore[] }) {
+  const [expanded, setExpanded] = React.useState(false);
+  const shown = expanded ? items : items.slice(0, 6);
+
+  const fmtDate = (iso: string) => {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso.slice(0, 10);
+    return d.toLocaleDateString("th-TH", {
+      day: "2-digit",
+      month: "short",
+    }) + " " + d.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+  };
+
+  return (
+    <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-amber-400/20 p-4 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+      <div className="flex items-center gap-3 mb-3">
+        <div className="p-2 bg-amber-500/20 rounded-xl border border-amber-500/20">
+          <TrendingDown className="w-5 h-5 text-amber-400" />
+        </div>
+        <div>
+          <h2 className="text-base font-bold tracking-tight text-white">
+            CSAT คะแนนไม่เต็ม ({items.length})
+          </h2>
+          <p className="text-[10px] text-white/45">
+            บิลที่ลูกค้าให้คะแนนต่ำกว่าเต็ม — ดูจุดบริการที่ควรปรับ เพื่อโค้ชรายคน
+          </p>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto rounded-xl border border-white/10">
+        <table className="w-full text-left border-collapse text-[11px]">
+          <thead>
+            <tr className="bg-[#0c3123] border-b border-emerald-500/20 text-white/80">
+              <th className="py-2 px-3 font-bold uppercase tracking-wide min-w-[120px]">วันที่</th>
+              <th className="py-2 px-3 font-bold uppercase tracking-wide min-w-[130px]">พนักงาน</th>
+              <th className="py-2 px-3 font-bold uppercase tracking-wide text-center">คะแนน</th>
+              <th className="py-2 px-3 font-bold uppercase tracking-wide min-w-[200px]">จุดที่ควรปรับ</th>
+              <th className="py-2 px-3 font-bold uppercase tracking-wide min-w-[90px]">บิล</th>
+            </tr>
+          </thead>
+          <tbody>
+            {shown.map((s, i) => (
+              <tr key={`${s.billId}-${i}`} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                <td className="py-2 px-3 text-white/70 whitespace-nowrap">{fmtDate(s.submittedAt)}</td>
+                <td className="py-2 px-3 font-medium text-white">{s.staffName || "-"}</td>
+                <td className="py-2 px-3 text-center">
+                  <span className="font-mono font-bold text-amber-300">
+                    {s.score}
+                    <span className="text-white/30 font-normal">/{s.maxScore}</span>
+                  </span>
+                </td>
+                <td className="py-2 px-3 text-white/80">
+                  {s.weakAspects.length > 0 ? s.weakAspects.join(", ") : "—"}
+                </td>
+                <td className="py-2 px-3 text-white/40 font-mono text-[10px]">{s.billId}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {items.length > 6 ? (
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-3 text-[11px] text-amber-300 hover:text-amber-200 font-medium"
+        >
+          {expanded ? "ย่อลง" : `ดูทั้งหมด (${items.length})`}
+        </button>
+      ) : null}
     </div>
   );
 }
