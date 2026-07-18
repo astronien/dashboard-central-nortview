@@ -23,9 +23,10 @@ export interface CsatUser {
   empCode: string;
   name: string;
   position: string;
-  staffScore: number | null;
-  branchScore: number | null;
+  /** True per-person average (from the individual survey feed) */
   avgScore: number | null;
+  /** Number of survey responses this person received in the period */
+  responseCount: number;
   maxScore: number;
 }
 

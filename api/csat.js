@@ -89,6 +89,62 @@ async function csatGet(path, params, token) {
   return json;
 }
 
+// Aggregate real per-staff CSAT from the raw survey records. The
+// per-staff /user-metrics endpoint returns the branch average for every
+// person (so everyone looks identical); the individual survey feed is
+// the only source of true per-person scores + response counts.
+async function aggregatePerStaff(branchId, params, token) {
+  const perStaff = new Map(); // emp_code -> { name, position, count, sum, maxScore }
+  const pageSize = 500;
+  let page = 1;
+  let pageCount = 1;
+  do {
+    const json = await csatGet(
+      `/branches/${branchId}/surveys`,
+      { ...params, branch_id: branchId, page, page_size: pageSize },
+      token,
+    );
+    const rows = Array.isArray(json?.data) ? json.data : [];
+    pageCount = Number(json?.meta?.page_count ?? 1) || 1;
+    for (const s of rows) {
+      const st = s.staff || {};
+      const code = String(st.emp_code ?? "").trim();
+      if (!code) continue;
+      // One question per survey → avg_score == that answer's score.
+      const score =
+        s.avg_score != null
+          ? Number(s.avg_score)
+          : Number(s.answers?.[0]?.score ?? NaN);
+      if (!Number.isFinite(score)) continue;
+      const cur =
+        perStaff.get(code) ||
+        {
+          name: String(st.name ?? ""),
+          position: String(st.position ?? ""),
+          count: 0,
+          sum: 0,
+          maxScore: Number(s.max_score ?? 5),
+        };
+      cur.count += 1;
+      cur.sum += score;
+      if (s.max_score) cur.maxScore = Number(s.max_score);
+      perStaff.set(code, cur);
+    }
+    page += 1;
+    // Safety cap: a single branch/month never has thousands of responses.
+    if (page > 20) break;
+  } while (page <= pageCount);
+
+  return Array.from(perStaff.entries()).map(([empCode, v]) => ({
+    empCode,
+    name: v.name,
+    position: v.position,
+    avgScore: v.count > 0 ? v.sum / v.count : null,
+    responseCount: v.count,
+    maxScore: v.maxScore || 5,
+  }));
+}
+
 // ── Token management sub-handler (resource=token) ──────────────────────
 async function handleTokenResource(req, res) {
   try {
@@ -189,16 +245,16 @@ module.exports = async function handler(req, res) {
         )) ||
       branches[0];
 
-    // 2. Store-level overview + per-staff metrics (in parallel)
-    const [overviewJson, usersJson] = await Promise.all([
+    // 2. Store-level overview + real per-staff aggregation (in parallel)
+    const [overviewJson, users] = await Promise.all([
       csatGet(
         "/overviews",
         { start_date: startDate, end_date: endDate, branch_id: wanted.id },
         token,
       ),
-      csatGet(
-        `/branches/${wanted.id}/user-metrics`,
-        { start_date: startDate, end_date: endDate, page: 1, page_size: 200 },
+      aggregatePerStaff(
+        wanted.id,
+        { start_date: startDate, end_date: endDate },
         token,
       ),
     ]);
@@ -229,17 +285,7 @@ module.exports = async function handler(req, res) {
         passives: bucket("passive"),
         detractors: bucket("detractor"),
       },
-      users: (Array.isArray(usersJson?.data) ? usersJson.data : []).map(
-        (u) => ({
-          empCode: String(u.emp_code ?? ""),
-          name: String(u.name ?? ""),
-          position: String(u.position ?? ""),
-          staffScore: u.staff_score === null ? null : Number(u.staff_score),
-          branchScore: u.branch_score === null ? null : Number(u.branch_score),
-          avgScore: u.avg_score === null ? null : Number(u.avg_score),
-          maxScore: Number(u.max_score ?? 5),
-        }),
-      ),
+      users,
     });
   } catch (e) {
     console.error("[api/csat] failed:", e);

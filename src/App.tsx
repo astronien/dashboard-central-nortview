@@ -2478,11 +2478,9 @@ function AppInternal({
           wonders,
           csat: csatUser
             ? {
-                score:
-                  csatUser.avgScore ??
-                  csatUser.branchScore ??
-                  csatUser.staffScore,
+                score: csatUser.avgScore,
                 maxScore: csatUser.maxScore,
+                responseCount: csatUser.responseCount,
               }
             : undefined,
         };

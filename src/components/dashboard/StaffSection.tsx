@@ -819,7 +819,7 @@ export function StaffSection({
                           </div>
                         ) : null}
                       </motion.div>
-                      {csatUser && (csatUser.avgScore ?? csatUser.branchScore ?? csatUser.staffScore) !== null ? (
+                      {csatUser && csatUser.avgScore !== null ? (
                         <motion.div
                           initial={{ opacity: 0, y: 15 }}
                           animate={{ opacity: 1, y: 0 }}
@@ -830,8 +830,7 @@ export function StaffSection({
                             CSAT
                           </div>
                           {(() => {
-                            const score =
-                              csatUser.avgScore ?? csatUser.branchScore ?? csatUser.staffScore ?? 0;
+                            const score = csatUser.avgScore ?? 0;
                             const cls =
                               score >= 4.5
                                 ? "text-green-400"
@@ -840,13 +839,13 @@ export function StaffSection({
                                   : "text-rose-400";
                             return (
                               <div className={`text-sm lg:text-base font-bold w-full truncate tabular-nums ${cls}`}>
-                                {score.toFixed(1)}
+                                {score.toFixed(2)}
                                 <span className="text-white/40 font-normal">/{csatUser.maxScore}</span>
                               </div>
                             );
                           })()}
-                          <div className="text-[10px] text-sky-300/80 mt-0.5">
-                            ความพึงพอใจลูกค้า
+                          <div className="text-[10px] text-sky-300/80 mt-0.5 tabular-nums">
+                            ตอบ {csatUser.responseCount} ครั้ง
                           </div>
                         </motion.div>
                       ) : null}

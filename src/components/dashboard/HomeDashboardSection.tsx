@@ -54,7 +54,7 @@ export type CombinedOfficerRow = {
   cats: Record<string, CombinedCatCell>;
   catTotal: CombinedCatCell;
   wonders: Record<string, CombinedWonderCell>;
-  csat?: { score: number | null; maxScore: number };
+  csat?: { score: number | null; maxScore: number; responseCount: number };
 };
 
 export type CombinedOfficerKpiData = {
@@ -412,8 +412,11 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                   </th>
                 ))}
                 {hasCsat ? (
-                  <th className="py-2 px-2 font-bold uppercase tracking-wide text-right min-w-[56px] text-sky-300 border-l border-white/10">
-                    คะแนน
+                  <th className="py-2 px-2 font-bold uppercase tracking-wide text-right min-w-[64px] text-sky-300 border-l border-white/10">
+                    <div>คะแนน</div>
+                    <div className="text-[8px] text-white/40 font-normal normal-case">
+                      (จำนวนตอบ)
+                    </div>
                   </th>
                 ) : null}
               </tr>
@@ -450,18 +453,23 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                   {hasCsat ? (
                     <td className="py-1.5 px-2 text-right align-top border-l border-white/5">
                       {row.csat && row.csat.score !== null ? (
-                        <span
-                          className={`font-mono font-semibold tabular-nums ${
-                            row.csat.score >= 4.5
-                              ? "text-green-400"
-                              : row.csat.score >= 4
-                                ? "text-amber-400"
-                                : "text-rose-400"
-                          }`}
-                        >
-                          {row.csat.score.toFixed(1)}
-                          <span className="text-white/30 font-normal">/{row.csat.maxScore}</span>
-                        </span>
+                        <div className="flex flex-col items-end gap-0.5 leading-none">
+                          <span
+                            className={`font-mono font-semibold tabular-nums ${
+                              row.csat.score >= 4.5
+                                ? "text-green-400"
+                                : row.csat.score >= 4
+                                  ? "text-amber-400"
+                                  : "text-rose-400"
+                            }`}
+                          >
+                            {row.csat.score.toFixed(2)}
+                            <span className="text-white/30 font-normal">/{row.csat.maxScore}</span>
+                          </span>
+                          <span className="text-[8px] text-white/40 tabular-nums">
+                            {row.csat.responseCount} ตอบ
+                          </span>
+                        </div>
                       ) : (
                         <span className="text-white/25">—</span>
                       )}
@@ -532,7 +540,9 @@ function CsatStoreCard({ overview }: { overview: CsatOverview }) {
           </div>
         </div>
         <div className="bg-black/20 rounded-xl border border-white/5 p-3 text-center">
-          <div className="text-[10px] text-white/50 mb-1">ตอบ/บิลทั้งหมด</div>
+          <div className="text-[10px] text-white/50 mb-1">
+            จำนวนตอบ / บิลทั้งหมด
+          </div>
           <div className="text-2xl font-bold tabular-nums text-white">
             {overview.submitBill}
             <span className="text-sm text-white/40">/{overview.totalBill}</span>
