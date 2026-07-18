@@ -30,6 +30,9 @@ const DEFAULT_MODEL = {
   gemini: "gemini-1.5-flash",
   openai: "gpt-4o-mini",
 };
+// Thai is token-heavy and a full multi-staff report is long — give the
+// model plenty of room so it doesn't get cut off mid-report.
+const MAX_TOKENS = 8000;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -44,6 +47,7 @@ const SYSTEM = `คุณเป็นหัวหน้าทีมขายร�
 - ห้ามแต่งตัวเลข ชื่อ หรือข้อเท็จจริงใหม่ ใช้เฉพาะข้อมูลที่ได้รับเท่านั้น
 - เขียนให้อ่านลื่น เป็นย่อหน้า/หัวข้อสั้น ๆ ไม่ใช่แค่ bullet ดิบ ๆ
 - โครงสร้าง: (1) ภาพรวมทีมสั้น ๆ (2) รายคน — จุดเด่น, จุดที่ต้องพัฒนา, สิ่งที่ควรทำพรุ่งนี้ (3) คนที่วิกฤติ เน้นแผนแก้ไขที่ทำได้จริง
+- สำคัญ: ต้องเขียนถึงพนักงานทุกคนที่อยู่ในข้อมูล ห้ามข้ามหรือสรุปรวบคน
 - คำศัพท์: UFUND = สินเชื่อบุคคลสำหรับลูกค้าที่ไม่มีบัตรเครดิต; COVER+/AC+ = ประกันเครื่อง; CSAT = ความพึงพอใจลูกค้า
 - กระชับ ไม่เยิ่นเย้อ`;
 
@@ -103,7 +107,7 @@ async function callAnthropic(apiKey, model, userMsg) {
     },
     body: JSON.stringify({
       model,
-      max_tokens: 2000,
+      max_tokens: MAX_TOKENS,
       system: SYSTEM,
       messages: [{ role: "user", content: userMsg }],
     }),
@@ -127,12 +131,17 @@ async function callGemini(apiKey, model, userMsg) {
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: SYSTEM }] },
       contents: [{ role: "user", parts: [{ text: userMsg }] }],
-      generationConfig: { maxOutputTokens: 2048, temperature: 0.7 },
+      generationConfig: { maxOutputTokens: MAX_TOKENS, temperature: 0.7 },
     }),
   });
   const json = await r.json().catch(() => null);
   if (!r.ok) throw new Error(json?.error?.message || `Gemini ${r.status}`);
-  const parts = json?.candidates?.[0]?.content?.parts || [];
+  const cand = json?.candidates?.[0];
+  // Prompt/response blocked → surface a clear reason instead of empty text
+  if (!cand || (cand.finishReason && cand.finishReason === "SAFETY")) {
+    throw new Error("Gemini ปฏิเสธคำขอ (SAFETY) — ลองใหม่หรือเปลี่ยนโมเดล");
+  }
+  const parts = cand?.content?.parts || [];
   return parts
     .map((p) => p.text || "")
     .join("\n")
@@ -148,7 +157,7 @@ async function callOpenAI(apiKey, model, userMsg) {
     },
     body: JSON.stringify({
       model,
-      max_tokens: 2000,
+      max_tokens: MAX_TOKENS,
       messages: [
         { role: "system", content: SYSTEM },
         { role: "user", content: userMsg },
