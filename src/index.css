@@ -1,1 +1,103 @@
 @import "tailwindcss";
+
+/* ============================================================
+   LIGHT MODE
+   The app is dark-first (hard-coded white/opacity utilities and a
+   handful of dark-green hex backgrounds). Rather than rewriting every
+   className, `theme-light` on <html> re-maps that palette to a light
+   one. Selectors use two classes (`.theme-light .x`) so they outrank
+   Tailwind's single-class utilities regardless of source order.
+   ============================================================ */
+
+:root {
+  --capture-bg: #1c2722;
+}
+html.theme-light {
+  --capture-bg: #eaf1ed;
+}
+
+/* Structural backgrounds (marker classes added in JSX) */
+html.theme-light .app-root {
+  background-color: #e7edea !important;
+}
+html.theme-light .app-panel {
+  background: linear-gradient(to bottom right, #ffffff, #e8f1ec) !important;
+}
+html.theme-light .staff-hero {
+  background: linear-gradient(to bottom right, #ffffff, #eef4f0) !important;
+}
+
+/* Text: white → dark green-gray, preserving the muted alpha steps */
+html.theme-light .text-white { color: #14261e; }
+html.theme-light .text-white\/95 { color: rgb(20 38 30 / 0.95); }
+html.theme-light .text-white\/90 { color: rgb(20 38 30 / 0.92); }
+html.theme-light .text-white\/85 { color: rgb(20 38 30 / 0.86); }
+html.theme-light .text-white\/80 { color: rgb(20 38 30 / 0.80); }
+html.theme-light .text-white\/70 { color: rgb(20 38 30 / 0.70); }
+html.theme-light .text-white\/60 { color: rgb(20 38 30 / 0.62); }
+html.theme-light .text-white\/55 { color: rgb(20 38 30 / 0.58); }
+html.theme-light .text-white\/50 { color: rgb(20 38 30 / 0.52); }
+html.theme-light .text-white\/45 { color: rgb(20 38 30 / 0.48); }
+html.theme-light .text-white\/40 { color: rgb(20 38 30 / 0.44); }
+html.theme-light .text-white\/35 { color: rgb(20 38 30 / 0.40); }
+html.theme-light .text-white\/30 { color: rgb(20 38 30 / 0.36); }
+html.theme-light .text-white\/25 { color: rgb(20 38 30 / 0.32); }
+html.theme-light .text-white\/20 { color: rgb(20 38 30 / 0.28); }
+
+/* Surfaces: translucent white overlays → raised white cards on the
+   light panel */
+html.theme-light .bg-white\/5 { background-color: rgb(255 255 255 / 0.55); }
+html.theme-light .bg-white\/10 { background-color: rgb(255 255 255 / 0.72); }
+html.theme-light .bg-white\/15 { background-color: rgb(255 255 255 / 0.85); }
+html.theme-light .bg-white\/20 { background-color: rgb(255 255 255 / 0.95); }
+html.theme-light .bg-white\/40 { background-color: rgb(255 255 255 / 0.98); }
+html.theme-light .bg-white\/\[0\.15\] { background-color: rgb(255 255 255 / 0.85); }
+html.theme-light .hover\:bg-white\/\[0\.07\]:hover { background-color: rgb(255 255 255 / 0.65); }
+html.theme-light .hover\:bg-white\/10:hover { background-color: rgb(255 255 255 / 0.85); }
+html.theme-light .hover\:bg-white\/\[0\.15\]:hover { background-color: rgb(255 255 255 / 0.9); }
+html.theme-light .hover\:bg-white\/20:hover { background-color: rgb(255 255 255 / 0.98); }
+
+/* Borders: white → dark translucent */
+html.theme-light .border-white\/5 { border-color: rgb(15 45 32 / 0.07); }
+html.theme-light .border-white\/10 { border-color: rgb(15 45 32 / 0.12); }
+html.theme-light .border-white\/15 { border-color: rgb(15 45 32 / 0.16); }
+html.theme-light .border-white\/20 { border-color: rgb(15 45 32 / 0.20); }
+html.theme-light .border-white\/25 { border-color: rgb(15 45 32 / 0.24); }
+html.theme-light .border-white\/30 { border-color: rgb(15 45 32 / 0.28); }
+html.theme-light .border-white\/40 { border-color: rgb(15 45 32 / 0.34); }
+html.theme-light .hover\:border-white\/25:hover { border-color: rgb(15 45 32 / 0.24); }
+html.theme-light .hover\:border-white\/40:hover { border-color: rgb(15 45 32 / 0.34); }
+
+/* Dark-green hex backgrounds → light greens */
+html.theme-light .bg-\[\#1c2722\] { background-color: #e7edea; }
+html.theme-light .bg-\[\#0c3123\] { background-color: #dde9e2; }
+html.theme-light .bg-\[\#051710\] { background-color: #ffffff; }
+html.theme-light .bg-\[\#0a1f17\] { background-color: #f1f6f3; }
+html.theme-light .bg-\[\#052b20\] { background-color: #eef4f0; }
+html.theme-light .bg-\[\#032e1f\] { background-color: #eef4f0; }
+html.theme-light .bg-\[\#043d29\] { background-color: #e6f0ea; }
+html.theme-light .bg-\[\#0c291d\] { background-color: #eaf2ee; }
+html.theme-light .bg-\[\#0f4430\] { background-color: #d6e9df; }
+html.theme-light .bg-\[\#1b3a2c\] { background-color: #e6f0ea; }
+html.theme-light .bg-\[\#052b20\]\/60 { background-color: rgb(238 244 240 / 0.6); }
+html.theme-light .bg-\[\#0c3123\]\/90 { background-color: rgb(221 233 226 / 0.95); }
+
+/* Accent text: brighten-on-dark shades are too pale on white → deepen */
+html.theme-light .text-emerald-200,
+html.theme-light .text-emerald-300,
+html.theme-light .text-emerald-400 { color: #047857; }
+html.theme-light .text-green-400 { color: #15803d; }
+html.theme-light .text-teal-400 { color: #0f766e; }
+html.theme-light .text-sky-200,
+html.theme-light .text-sky-300,
+html.theme-light .text-sky-400 { color: #0369a1; }
+html.theme-light .text-amber-200,
+html.theme-light .text-amber-300,
+html.theme-light .text-amber-400 { color: #b45309; }
+html.theme-light .text-rose-300,
+html.theme-light .text-rose-400,
+html.theme-light .text-red-400 { color: #be123c; }
+html.theme-light .text-\[\#34d399\] { color: #047857; }
+
+/* Drop-shadowed header text sat on a dark panel; flatten on light */
+html.theme-light .drop-shadow-md { filter: none; }

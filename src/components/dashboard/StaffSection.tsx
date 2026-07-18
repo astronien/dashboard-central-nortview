@@ -156,7 +156,10 @@ function TelegramSendButton({
         quality: 0.92,
         pixelRatio: 1.5,
         cacheBust: false,
-        backgroundColor: "#1c2722",
+        backgroundColor:
+          getComputedStyle(document.documentElement)
+            .getPropertyValue("--capture-bg")
+            .trim() || "#1c2722",
         // Padding is added AROUND the card so the content stays centered
         // with even margins on every side (width AND height must grow,
         // otherwise the bottom padding gets clipped).
@@ -488,7 +491,7 @@ export function StaffSection({
                 className="flex flex-col w-full h-full gap-6 relative"
               >
                 {/* TOP HALF: Person | Radar | Stats */}
-                <div className="flex-1 bg-gradient-to-br from-[#113a29]/80 via-[#0c291d]/85 to-[#051710]/95 backdrop-blur-xl border border-white/10 shadow-[0_16px_48px_rgba(0,0,0,0.35)] rounded-[2.5rem] p-6 lg:p-8 lg:pb-6 flex flex-col lg:flex-row min-h-[360px] lg:min-h-[460px] shrink-0 relative overflow-visible gap-6 lg:gap-0">
+                <div className="staff-hero flex-1 bg-gradient-to-br from-[#113a29]/80 via-[#0c291d]/85 to-[#051710]/95 backdrop-blur-xl border border-white/10 shadow-[0_16px_48px_rgba(0,0,0,0.35)] rounded-[2.5rem] p-6 lg:p-8 lg:pb-6 flex flex-col lg:flex-row min-h-[360px] lg:min-h-[460px] shrink-0 relative overflow-visible gap-6 lg:gap-0">
                   {/* Left Column - Image */}
                   <div className="lg:w-[38%] relative self-stretch flex items-end justify-center z-30 min-h-[320px] sm:min-h-[360px] lg:min-h-0 pointer-events-none -mb-6 lg:-ml-8 lg:-mt-20 xl:-mt-28">
                     <motion.div

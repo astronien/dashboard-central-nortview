@@ -34,6 +34,8 @@ import {
   CreditCard,
   LogOut,
   Loader2,
+  Sun,
+  Moon,
 } from "lucide-react";
 import CategoryTreePicker from "./components/CategoryTreePicker";
 
@@ -1243,6 +1245,24 @@ function AppInternal({
   const [currentView, setCurrentView] = useState<
     "home" | "staff" | "settings" | "reports" | "kpi_preset"
   >("home");
+
+  // Light / dark theme. Applied as a `theme-light` class on <html> so a
+  // small set of CSS overrides (index.css) can re-map the dark palette.
+  const [theme, setTheme] = useState<"dark" | "light">(() => {
+    try {
+      return localStorage.getItem("theme") === "light" ? "light" : "dark";
+    } catch {
+      return "dark";
+    }
+  });
+  useEffect(() => {
+    document.documentElement.classList.toggle("theme-light", theme === "light");
+    try {
+      localStorage.setItem("theme", theme);
+    } catch {
+      /* ignore */
+    }
+  }, [theme]);
   const [parsedReport, setParsedReport] = useState<ParsedReport>(fallbackReport);
   const [uploadedFiles, setUploadedFiles] = useState<Record<UploadKind, RawRow[]>>({ target: [], current: [], today: [], lastMonth: [], lastYear: [], categoryMaster: [] });
   const [selectedBranch, setSelectedBranch] = useState<string>("Mega Bangna");
@@ -3415,7 +3435,10 @@ function AppInternal({
         quality: 0.94,
         pixelRatio: 1.5,
         cacheBust: false,
-        backgroundColor: "#1c2722",
+        backgroundColor:
+          getComputedStyle(document.documentElement)
+            .getPropertyValue("--capture-bg")
+            .trim() || "#1c2722",
         width: w + pad * 2,
         ...(isHome ? { height: h + pad * 2 } : {}),
         style: {
@@ -3511,7 +3534,10 @@ function AppInternal({
               quality: 0.92,
               pixelRatio: 1.5,
               cacheBust: false,
-              backgroundColor: "#1c2722",
+              backgroundColor:
+          getComputedStyle(document.documentElement)
+            .getPropertyValue("--capture-bg")
+            .trim() || "#1c2722",
               // Padding is added AROUND the card (w/h + pad*2) so the content
               // stays centered with even margins on every side.
               width: w + pad * 2,
@@ -3561,7 +3587,7 @@ function AppInternal({
   };
 
   return (
-    <div className="min-h-screen bg-[#1c2722] p-4 font-sans text-white md:p-8 flex flex-col items-center">
+    <div className="app-root min-h-screen bg-[#1c2722] p-4 font-sans text-white md:p-8 flex flex-col items-center">
       {isInitialLoading && (
         <div className="fixed inset-0 z-[999] bg-[#1c2722] flex items-center justify-center">
           <div className="flex flex-col items-center gap-4">
@@ -3570,7 +3596,7 @@ function AppInternal({
           </div>
         </div>
       )}
-      <div className="w-full max-w-[1440px] h-auto min-h-[90vh] bg-gradient-to-br from-[#1b5d44] to-[#123627] rounded-[2rem] border border-white/10 shadow-2xl flex flex-col relative overflow-x-hidden">
+      <div className="app-panel w-full max-w-[1440px] h-auto min-h-[90vh] bg-gradient-to-br from-[#1b5d44] to-[#123627] rounded-[2rem] border border-white/10 shadow-2xl flex flex-col relative overflow-x-hidden">
         {/* Logo (Absolute Left) */}
         <div className="absolute top-6 left-8 z-50 flex items-center gap-4 pointer-events-auto">
           <img src="/site-logo.09b5daa.svg" alt="Logo" className="h-8" />
@@ -3633,6 +3659,13 @@ function AppInternal({
 
             {/* Screenshot capture button */}
             <div className="pointer-events-auto hidden md:flex items-center gap-2 pl-2 ml-2 border-l border-white/10">
+              <button
+                onClick={() => setTheme((t) => (t === "light" ? "dark" : "light"))}
+                title={theme === "light" ? "สลับเป็นโหมดมืด" : "สลับเป็นโหมดสว่าง"}
+                className="p-2 rounded-full transition-colors text-white/60 hover:text-white hover:bg-white/10"
+              >
+                {theme === "light" ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+              </button>
               <button
                 onClick={() => {
                   if (currentView === "staff") {
@@ -3904,7 +3937,7 @@ function AppInternal({
             opacity: 0,
             pointerEvents: "none",
             zIndex: -1,
-            background: "#1c2722",
+            background: "var(--capture-bg, #1c2722)",
           }}
         >
           <div style={{ width: "1200px", minHeight: "900px", padding: "24px" }}>
