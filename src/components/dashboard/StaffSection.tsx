@@ -12,6 +12,7 @@ import React from "react";
 import { toJpeg } from "html-to-image";
 import { calcTargetToDate, calcTodayAchievementPct } from "../../lib/targetAggregations";
 import type { PresetCalcType } from "../../lib/presetTypes";
+import type { CsatUser } from "../../lib/csatApi";
 
 export type StaffLeaderboardItem = {
   id: string;
@@ -365,6 +366,7 @@ export function StaffSection({
   dynamicLanguages,
   focusDevice,
   focusWonder,
+  csatUser,
   activeOfficer7WondersPerformance,
   activeOfficerCategoryPerformance,
   todaySalesTotal,
@@ -395,6 +397,7 @@ export function StaffSection({
   dynamicLanguages: string;
   focusDevice: { label: string; rate: number } | null;
   focusWonder: { label: string; rate: number } | null;
+  csatUser?: CsatUser;
   activeOfficer7WondersPerformance: PerformanceRow[];
   activeOfficerCategoryPerformance: PerformanceRow[];
   todaySalesTotal: number;
@@ -816,6 +819,37 @@ export function StaffSection({
                           </div>
                         ) : null}
                       </motion.div>
+                      {csatUser && (csatUser.avgScore ?? csatUser.branchScore ?? csatUser.staffScore) !== null ? (
+                        <motion.div
+                          initial={{ opacity: 0, y: 15 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ type: "spring", stiffness: 100, delay: 0.35 }}
+                          className="flex-1 min-w-[140px] max-w-[200px] bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl px-3 lg:px-4 py-3 text-center overflow-hidden flex flex-col items-center justify-center min-h-[88px] transition-all duration-200 hover:bg-white/[0.15] hover:border-white/25 hover:shadow-[0_8px_20px_rgba(56,189,248,0.15)]"
+                        >
+                          <div className="text-[10px] uppercase tracking-wider text-white/60 mb-1.5 w-full truncate font-medium">
+                            CSAT
+                          </div>
+                          {(() => {
+                            const score =
+                              csatUser.avgScore ?? csatUser.branchScore ?? csatUser.staffScore ?? 0;
+                            const cls =
+                              score >= 4.5
+                                ? "text-green-400"
+                                : score >= 4
+                                  ? "text-amber-300"
+                                  : "text-rose-400";
+                            return (
+                              <div className={`text-sm lg:text-base font-bold w-full truncate tabular-nums ${cls}`}>
+                                {score.toFixed(1)}
+                                <span className="text-white/40 font-normal">/{csatUser.maxScore}</span>
+                              </div>
+                            );
+                          })()}
+                          <div className="text-[10px] text-sky-300/80 mt-0.5">
+                            ความพึงพอใจลูกค้า
+                          </div>
+                        </motion.div>
+                      ) : null}
                     </div>
                   </div>
                 </div>

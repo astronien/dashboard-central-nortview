@@ -1,5 +1,6 @@
 import React from "react";
-import { TrendingUp, TrendingDown, Building2, User } from "lucide-react";
+import { TrendingUp, TrendingDown, Building2, User, Smile } from "lucide-react";
+import type { CsatOverview } from "../../lib/csatApi";
 import type { CategorySnapshotItem } from "../../lib/categorySnapshotBuilder";
 import type { DerivedHomeStat } from "./dashboardTypes";
 import { CategorySnapshotSection } from "./CategorySnapshotSection";
@@ -53,6 +54,7 @@ export type CombinedOfficerRow = {
   cats: Record<string, CombinedCatCell>;
   catTotal: CombinedCatCell;
   wonders: Record<string, CombinedWonderCell>;
+  csat?: { score: number | null; maxScore: number };
 };
 
 export type CombinedOfficerKpiData = {
@@ -67,6 +69,7 @@ export function HomeDashboardSection({
   categorySnapshots,
   branchOverviewKpiData,
   combinedOfficerKpiData,
+  csatOverview,
   categorySnapshotRef,
   captureRef,
 }: {
@@ -75,6 +78,7 @@ export function HomeDashboardSection({
   categorySnapshots?: CategorySnapshotItem[];
   branchOverviewKpiData?: BranchOverviewKpiData;
   combinedOfficerKpiData?: CombinedOfficerKpiData;
+  csatOverview?: CsatOverview;
   categorySnapshotRef?: React.RefObject<HTMLDivElement | null>;
   /** Wraps the stat cards + Category KPI Snapshot for screenshot capture */
   captureRef?: React.RefObject<HTMLDivElement | null>;
@@ -102,6 +106,8 @@ export function HomeDashboardSection({
         {categorySnapshots && categorySnapshots.length > 0 ? (
           <CategorySnapshotSection ref={categorySnapshotRef} items={categorySnapshots} />
         ) : null}
+
+        {csatOverview ? <CsatStoreCard overview={csatOverview} /> : null}
       </div>
 
       {branchOverviewKpiData && branchOverviewKpiData.presets.length > 0 ? (
@@ -278,6 +284,7 @@ const isPercentCalc = (calcType: PresetCalcType | undefined): boolean =>
 
 function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
   const { categories, presets, rows } = data;
+  const hasCsat = rows.some((r) => r.csat && r.csat.score !== null);
 
   // ช่องยอดขายตามหมวด: เป้า / ยอดจริง / %ถึงเป้า (3 บรรทัดกะทัดรัด)
   const renderCatCell = (cell: CombinedCatCell | undefined, isTotal = false) => {
@@ -371,6 +378,11 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                     7 Wonders
                   </th>
                 ) : null}
+                {hasCsat ? (
+                  <th className="py-1.5 px-2 text-center text-[9px] font-bold uppercase tracking-widest text-sky-300/80 border-l border-white/10">
+                    CSAT
+                  </th>
+                ) : null}
               </tr>
               <tr className="bg-[#0c3123] border-b border-emerald-500/20 text-white/90">
                 <th className="py-2 px-2 font-bold uppercase tracking-wider sticky left-0 bg-[#0c3123] z-10 min-w-[120px]">
@@ -399,6 +411,11 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                     </div>
                   </th>
                 ))}
+                {hasCsat ? (
+                  <th className="py-2 px-2 font-bold uppercase tracking-wide text-right min-w-[56px] text-sky-300 border-l border-white/10">
+                    คะแนน
+                  </th>
+                ) : null}
               </tr>
             </thead>
             <tbody>
@@ -430,12 +447,101 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                       {renderWonderCell(row.wonders[p.id])}
                     </td>
                   ))}
+                  {hasCsat ? (
+                    <td className="py-1.5 px-2 text-right align-top border-l border-white/5">
+                      {row.csat && row.csat.score !== null ? (
+                        <span
+                          className={`font-mono font-semibold tabular-nums ${
+                            row.csat.score >= 4.5
+                              ? "text-green-400"
+                              : row.csat.score >= 4
+                                ? "text-amber-400"
+                                : "text-rose-400"
+                          }`}
+                        >
+                          {row.csat.score.toFixed(1)}
+                          <span className="text-white/30 font-normal">/{row.csat.maxScore}</span>
+                        </span>
+                      ) : (
+                        <span className="text-white/25">—</span>
+                      )}
+                    </td>
+                  ) : null}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+/** การ์ด CSAT ทั้งร้าน (NPS / คะแนนเฉลี่ย / อัตราการตอบแบบสอบถาม) */
+function CsatStoreCard({ overview }: { overview: CsatOverview }) {
+  const npsClass =
+    overview.npsScore >= 70
+      ? "text-green-400"
+      : overview.npsScore >= 30
+        ? "text-amber-400"
+        : "text-rose-400";
+  const respClass =
+    overview.submitBillPercent >= overview.targetBillPercent
+      ? "text-green-400"
+      : "text-amber-400";
+  return (
+    <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-4 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+      <div className="flex items-center gap-3 mb-3">
+        <div className="p-2 bg-sky-500/20 rounded-xl border border-sky-500/20">
+          <Smile className="w-5 h-5 text-sky-400" />
+        </div>
+        <div>
+          <h2 className="text-base font-bold tracking-tight text-white">
+            CSAT ทั้งร้าน
+          </h2>
+          <p className="text-[10px] text-white/45">
+            ผลสำรวจความพึงพอใจของลูกค้า (COM7 CSAT) — เดือนปัจจุบัน
+          </p>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-black/20 rounded-xl border border-white/5 p-3 text-center">
+          <div className="text-[10px] text-white/50 mb-1">NPS</div>
+          <div className={`text-2xl font-bold tabular-nums ${npsClass}`}>
+            {overview.npsScore.toFixed(2)}
+          </div>
+          <div className="text-[9px] text-white/40 mt-1">
+            P {overview.promoters.count} · Pa {overview.passives.count} · D{" "}
+            {overview.detractors.count}
+          </div>
+        </div>
+        <div className="bg-black/20 rounded-xl border border-white/5 p-3 text-center">
+          <div className="text-[10px] text-white/50 mb-1">คะแนนเฉลี่ย</div>
+          <div className="text-2xl font-bold tabular-nums text-white">
+            {overview.avgScore.toFixed(1)}
+            <span className="text-sm text-white/40">/{overview.maxScore}</span>
+          </div>
+        </div>
+        <div className="bg-black/20 rounded-xl border border-white/5 p-3 text-center">
+          <div className="text-[10px] text-white/50 mb-1">อัตราการตอบ</div>
+          <div className={`text-2xl font-bold tabular-nums ${respClass}`}>
+            {overview.submitBillPercent.toFixed(1)}%
+          </div>
+          <div className="text-[9px] text-white/40 mt-1">
+            เป้า {overview.targetBillPercent}%
+          </div>
+        </div>
+        <div className="bg-black/20 rounded-xl border border-white/5 p-3 text-center">
+          <div className="text-[10px] text-white/50 mb-1">ตอบ/บิลทั้งหมด</div>
+          <div className="text-2xl font-bold tabular-nums text-white">
+            {overview.submitBill}
+            <span className="text-sm text-white/40">/{overview.totalBill}</span>
+          </div>
+          <div className="text-[9px] text-white/40 mt-1">
+            เป้า {overview.targetBill} ครั้ง
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

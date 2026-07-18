@@ -61,6 +61,7 @@ import {
   getBranchCodeFromTarget,
   type TradeInResult,
 } from "./lib/tradeInApi";
+import { fetchCsatData, type CsatResult, type CsatUser } from "./lib/csatApi";
 import {
   fetchTradeBranchMappingFromCloud,
   getTradeBranchMapping,
@@ -1270,6 +1271,7 @@ function AppInternal({
   const [tradeInData, setTradeInData] = useState<TradeInResult | undefined>(
     undefined,
   );
+  const [csatData, setCsatData] = useState<CsatResult | undefined>(undefined);
   const [tradeBranchMapping, setTradeBranchMapping] = useState<
     Record<string, string>
   >(() => getTradeBranchMapping());
@@ -2117,6 +2119,31 @@ function AppInternal({
     [tradeInByOfficer],
   );
 
+  // Per-officer CSAT lookup (emp_code = STAFF ID, fallback = name match)
+  const csatByOfficer = useMemo(() => {
+    const byCode = new Map<string, CsatUser>();
+    const byName = new Map<string, CsatUser>();
+    for (const u of csatData?.users ?? []) {
+      const code = normalizeId(u.empCode);
+      if (code) byCode.set(code, u);
+      const nm = cleanOfficerName(u.name);
+      if (nm) byName.set(nm, u);
+    }
+    return { byCode, byName };
+  }, [csatData]);
+
+  const csatForOfficer = React.useCallback(
+    (staffId?: string, name?: string): CsatUser | undefined => {
+      const code = normalizeId(staffId ?? "");
+      if (code && csatByOfficer.byCode.has(code)) {
+        return csatByOfficer.byCode.get(code);
+      }
+      const nm = cleanOfficerName(name ?? "");
+      return csatByOfficer.byName.get(nm);
+    },
+    [csatByOfficer],
+  );
+
   const iphoneUnitsFromBills = React.useCallback(
     (bills: BillSummary[]): number =>
       bills.reduce(
@@ -2435,6 +2462,8 @@ function AppInternal({
           };
         });
 
+        const csatUser = csatForOfficer(officer.staffId, officer.name);
+
         return {
           officer,
           cats,
@@ -2444,6 +2473,15 @@ function AppInternal({
             achPercent: catTargetSum > 0 ? (catActualSum / catTargetSum) * 100 : 0,
           },
           wonders,
+          csat: csatUser
+            ? {
+                score:
+                  csatUser.avgScore ??
+                  csatUser.branchScore ??
+                  csatUser.staffScore,
+                maxScore: csatUser.maxScore,
+              }
+            : undefined,
         };
       })
       .filter(
@@ -2463,6 +2501,7 @@ function AppInternal({
     getCategory,
     tradeCountForOfficer,
     iphoneUnitsFromBills,
+    csatForOfficer,
   ]);
 
   const dynamicRadarData = useMemo(() => {
@@ -3224,6 +3263,27 @@ function AppInternal({
     };
   }, [tradeInBranchCode, selectedBranchLoaded]);
 
+  // CSAT (COM7 backoffice) — store + per-staff satisfaction. Uses the same
+  // branch code as Trade In; the API falls back to the first branch the
+  // token can see when the code doesn't match.
+  useEffect(() => {
+    if (!selectedBranchLoaded) return;
+    let cancelled = false;
+    fetchCsatData(tradeInBranchCode || undefined)
+      .then((result) => {
+        if (!cancelled) setCsatData(result);
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          console.warn("[App] fetchCsatData failed:", e);
+          setCsatData(undefined);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tradeInBranchCode, selectedBranchLoaded]);
+
   // When the user uploads data for a branch that isn't currently
   // selected, auto-switch to the first uploaded branch so the rest of
   // the dashboard immediately reflects the new data.
@@ -3692,6 +3752,7 @@ function AppInternal({
                   categorySnapshots={categorySnapshotData}
                   branchOverviewKpiData={branchOverviewKpiData}
                   combinedOfficerKpiData={combinedOfficerKpiData}
+                  csatOverview={csatData?.overview}
                   categorySnapshotRef={categorySnapshotRef}
                 />
               </motion.div>
@@ -3713,6 +3774,7 @@ function AppInternal({
                 dynamicLanguages={dynamicLanguages}
                 focusDevice={focusDevice}
                 focusWonder={focusWonder}
+                csatUser={csatForOfficer(activeOfficer?.staffId, activeOfficer?.name)}
                 activeOfficer7WondersPerformance={activeOfficer7WondersPerformance}
                 activeOfficerCategoryPerformance={activeOfficerCategoryPerformance}
                 todaySalesTotal={activeOfficerTodaySales}
@@ -3826,6 +3888,7 @@ function AppInternal({
               categorySnapshots={categorySnapshotData}
               branchOverviewKpiData={branchOverviewKpiData}
               combinedOfficerKpiData={combinedOfficerKpiData}
+              csatOverview={csatData?.overview}
               categorySnapshotRef={categorySnapshotRef}
               captureRef={homeStatsCaptureRef}
             />
