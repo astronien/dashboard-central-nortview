@@ -88,7 +88,7 @@ export interface CsatTokenStatus {
 /** Read whether a CSAT token is configured (never returns the token itself). */
 export async function getCsatTokenStatus(): Promise<CsatTokenStatus | undefined> {
   try {
-    const res = await fetch("/api/csat-token");
+    const res = await fetch("/api/csat?resource=token");
     if (!res.ok) return undefined;
     return (await res.json()) as CsatTokenStatus;
   } catch {
@@ -102,7 +102,7 @@ export async function saveCsatToken(
   updatedBy?: string,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    const res = await fetch("/api/csat-token", {
+    const res = await fetch("/api/csat?resource=token", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token, updatedBy }),

@@ -19,18 +19,49 @@ import {
   answerCallbackQuery,
   getFile,
   downloadFile,
+  setWebhook,
 } from "./_lib/telegramBot.js";
 import {
   getPiaListForBranch,
 } from "./_lib/piaReportBuilder.js";
 import { processUpload } from "./_lib/uploadProcessor.js";
 import { detectBranchFromRows } from "./_lib/branchDetector.js";
-import { upsertTelegramChat, initTelegramSchema } from "./_lib/tursoClient.js";
+import {
+  upsertTelegramChat,
+  initTelegramSchema,
+  getMostRecentTelegramChatId,
+} from "./_lib/tursoClient.js";
 
 const BRANCH_ID = process.env.TELEGRAM_BRANCH_ID ?? "645";
 const BRANCH_DISPLAY = process.env.TELEGRAM_BRANCH_DISPLAY ?? "ID645 : Studio 7-Central-Westgate";
+const WEBHOOK_URL = "https://dashboard-central-nortview.vercel.app/api/telegram";
+
+/**
+ * GET /api/telegram — webhook setup/status helper (was /api/telegram-setup,
+ * merged here to stay under the Hobby-plan 12-function limit).
+ *   ?set=1     → set webhook to production URL
+ *   ?delete=1  → delete webhook (switch to polling)
+ */
+async function handleSetup(req, res) {
+  res.setHeader("Content-Type", "text/plain; charset=utf-8");
+  const lines = [];
+  if (req.query.delete === "1") {
+    const r = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/deleteWebhook`);
+    lines.push(`deleteWebhook: ${JSON.stringify(await r.json())}`);
+  }
+  if (req.query.set === "1") {
+    const r = await setWebhook(WEBHOOK_URL);
+    lines.push(`setWebhook → ${WEBHOOK_URL}: ${JSON.stringify(r)}`);
+  }
+  const info = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/getWebhookInfo`);
+  lines.push(`\ngetWebhookInfo:\n${JSON.stringify(await info.json(), null, 2)}`);
+  const chatId = await getMostRecentTelegramChatId();
+  lines.push(`\ntelegram_chats most recent: ${chatId ?? "NONE — no chat stored"}`);
+  return res.status(200).send(lines.join("\n") + "\n");
+}
 
 export default async function handler(req, res) {
+  if (req.method === "GET") return handleSetup(req, res);
   if (req.method !== "POST") return res.status(200).end();
 
   const update = req.body;

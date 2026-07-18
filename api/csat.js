@@ -10,11 +10,20 @@
 //   end_date   : YYYY-MM-DD. Optional — defaults to today (Asia/Bangkok).
 //
 // Response: { ok, branch, overview, users }
+//
+// Token management (merged here to stay under the Hobby-plan 12-function
+// limit — was /api/csat-token):
+//   GET  /api/csat?resource=token   → { hasToken, source, updatedAt, updatedBy }
+//                                      (never returns the token value)
+//   POST /api/csat?resource=token   → save a new token  body: { token, updatedBy? }
 
-const { getAppConfig, initTelegramSchema } = require("./_lib/tursoClient");
+const { getAppConfig, setAppConfig, initTelegramSchema } = require("./_lib/tursoClient");
 
 const CSAT_API_BASE = "https://api-csat.com7.in/v1/backoffice";
 const CSAT_TOKEN_KEY = "csat_token";
+
+// CSAT personal access tokens look like "12345|alphanumericstring"
+const looksLikeToken = (t) => /^\d+\|[A-Za-z0-9]{20,}$/.test(String(t || "").trim());
 
 // Token resolution order:
 //   1. token saved by an admin in the Settings page (Turso app_config) —
@@ -36,7 +45,7 @@ async function resolveToken() {
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
@@ -80,12 +89,56 @@ async function csatGet(path, params, token) {
   return json;
 }
 
+// ── Token management sub-handler (resource=token) ──────────────────────
+async function handleTokenResource(req, res) {
+  try {
+    await initTelegramSchema();
+  } catch (e) {
+    console.warn("[api/csat] schema init failed:", e.message);
+  }
+
+  if (req.method === "GET") {
+    const cfg = await getAppConfig(CSAT_TOKEN_KEY);
+    const hasDbToken = Boolean(cfg && cfg.value && cfg.value.trim());
+    return res.status(200).json({
+      hasToken: hasDbToken || Boolean((process.env.CSAT_TOKEN || "").trim()),
+      source: hasDbToken ? "settings" : process.env.CSAT_TOKEN ? "env" : "none",
+      updatedAt: cfg?.updatedAt ?? null,
+      updatedBy: cfg?.updatedBy ?? null,
+    });
+  }
+
+  if (req.method === "POST") {
+    const token = String(req.body?.token ?? "").trim();
+    const updatedBy = req.body?.updatedBy ? String(req.body.updatedBy) : null;
+    if (!token) {
+      return res.status(400).json({ ok: false, error: "กรุณากรอก token" });
+    }
+    if (!looksLikeToken(token)) {
+      return res.status(400).json({
+        ok: false,
+        error: 'รูปแบบ token ไม่ถูกต้อง — ต้องเป็นรูปแบบ "เลข|ตัวอักษร" เช่น 21573|abcd...',
+      });
+    }
+    await setAppConfig(CSAT_TOKEN_KEY, token, updatedBy);
+    return res.status(200).json({ ok: true });
+  }
+
+  return res.status(405).json({ ok: false, error: "Method not allowed" });
+}
+
 module.exports = async function handler(req, res) {
   applyCors(res);
 
   if (req.method === "OPTIONS") {
     return res.status(204).end();
   }
+
+  // Token management path
+  if (req.query.resource === "token") {
+    return handleTokenResource(req, res);
+  }
+
   if (req.method !== "GET") {
     return res.status(405).json({ ok: false, error: "Method not allowed" });
   }
