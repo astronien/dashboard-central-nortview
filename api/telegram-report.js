@@ -19,13 +19,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { staffId, images } = req.body ?? {};
-  if (!staffId) {
-    return res.status(400).json({ error: "Missing staffId" });
-  }
-  if (!Array.isArray(images) || images.length === 0) {
-    return res.status(400).json({ error: "Missing images" });
-  }
+  const { staffId, images, text } = req.body ?? {};
 
   // Ensure telegram_chats table exists
   try { await initTelegramSchema(); } catch (e) {
@@ -38,6 +32,35 @@ export default async function handler(req, res) {
     return res.status(404).json({
       error: "ยังไม่มี Telegram chat ในระบบ — ส่ง /start ไปที่บอทก่อน",
     });
+  }
+
+  // Text mode: send the daily analysis as chunked messages (Telegram caps
+  // a message at 4096 chars).
+  if (typeof text === "string" && text.trim()) {
+    try {
+      const chunks = [];
+      let rest = text.trim();
+      while (rest.length > 3800) {
+        let cut = rest.lastIndexOf("\n", 3800);
+        if (cut < 1000) cut = 3800;
+        chunks.push(rest.slice(0, cut));
+        rest = rest.slice(cut);
+      }
+      chunks.push(rest);
+      for (const c of chunks) await sendMessage(chatId, c);
+      return res.status(200).json({ ok: true, sent: chunks.length });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("[telegram-report] sendMessage failed:", msg);
+      return res.status(500).json({ ok: false, error: msg });
+    }
+  }
+
+  if (!staffId) {
+    return res.status(400).json({ error: "Missing staffId" });
+  }
+  if (!Array.isArray(images) || images.length === 0) {
+    return res.status(400).json({ error: "Missing images" });
   }
 
   // Send each image as an uncompressed document (Telegram renders PNG inline)
