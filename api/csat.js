@@ -19,6 +19,48 @@ const CSAT_TOKEN =
   process.env.CSAT_TOKEN ||
   "21573|VEXLZqufxp33nqSX5UnYTpJhcrEajoW5odlzTJrbabb23a9d";
 
+// Auto-login: when CSAT_USERNAME + CSAT_PASSWORD are set in the Vercel
+// env, the proxy logs itself in whenever the token is missing/expired,
+// so nobody has to keep a browser session alive. The fresh token is
+// cached in module scope (survives across warm lambda invocations).
+const CSAT_USERNAME = process.env.CSAT_USERNAME || "";
+const CSAT_PASSWORD = process.env.CSAT_PASSWORD || "";
+let cachedToken = "";
+
+async function loginForToken() {
+  if (!CSAT_USERNAME || !CSAT_PASSWORD) return "";
+  const res = await fetch(`${CSAT_API_BASE}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ username: CSAT_USERNAME, password: CSAT_PASSWORD }),
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok) {
+    console.error(
+      "[api/csat] auto-login failed:",
+      res.status,
+      json && json.message,
+    );
+    return "";
+  }
+  const token =
+    json?.data?.token ??
+    json?.token ??
+    json?.data?.access_token ??
+    json?.access_token ??
+    "";
+  if (token) {
+    cachedToken = String(token);
+    console.log("[api/csat] auto-login OK, new token cached");
+  } else {
+    console.error(
+      "[api/csat] auto-login: token not found in response keys:",
+      json ? Object.keys(json) : null,
+    );
+  }
+  return cachedToken;
+}
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
@@ -31,8 +73,8 @@ const applyCors = (res) => {
   });
 };
 
-const authHeaders = () => ({
-  Authorization: `Bearer ${CSAT_TOKEN}`,
+const authHeaders = (token) => ({
+  Authorization: `Bearer ${token}`,
   Accept: "application/json",
 });
 
@@ -44,13 +86,28 @@ const bangkokToday = () =>
 
 const isYmd = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
 
-async function csatGet(path, params) {
+async function csatGetRaw(path, params, token) {
   const url = new URL(`${CSAT_API_BASE}${path}`);
   Object.entries(params || {}).forEach(([k, v]) => {
     if (v !== undefined && v !== null && v !== "") url.searchParams.set(k, String(v));
   });
-  const res = await fetch(url.toString(), { headers: authHeaders() });
+  const res = await fetch(url.toString(), { headers: authHeaders(token) });
   const json = await res.json().catch(() => null);
+  return { res, json };
+}
+
+async function csatGet(path, params) {
+  let token = cachedToken || CSAT_TOKEN;
+  let { res, json } = await csatGetRaw(path, params, token);
+
+  // Token expired/revoked → try a fresh login once, then retry
+  if (res.status === 401) {
+    const fresh = await loginForToken();
+    if (fresh) {
+      ({ res, json } = await csatGetRaw(path, params, fresh));
+    }
+  }
+
   if (!res.ok) {
     const msg = json && json.message ? json.message : `CSAT API ${res.status}`;
     const err = new Error(msg);
