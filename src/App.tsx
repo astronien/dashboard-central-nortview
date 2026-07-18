@@ -117,7 +117,7 @@ import {
   Bar,
   Legend,
 } from "recharts";
-import { HomeDashboardSection } from "./components/dashboard/HomeDashboardSection";
+import { HomeDashboardSection, type CombinedOfficerKpiData, type CombinedOfficerCell } from "./components/dashboard/HomeDashboardSection";
 
 import { StaffSection } from "./components/dashboard/StaffSection";
 import { ReportsSection } from "./components/dashboard/ReportsSection";
@@ -2325,6 +2325,141 @@ function AppInternal({
     return { presets: branchPresets, rows };
   }, [kpiPresets, displayUploads.current, displayUploads.categoryMaster, parsedReport.officers, tradeCountForOfficer, iphoneUnitsFromBills]);
 
+  // Home: ตารางรวมยอดขายแยกตามหมวด (เหมือน staff profile) + 7 Wonders
+  // ในตารางเดียว ลิสต์เป็นรายเจ้าหน้าที่
+  const combinedOfficerKpiData = useMemo<CombinedOfficerKpiData>(() => {
+    const categoriesList: KpiCategoryKey[] = ["Mac", "iPad", "iPhone", "Apple Watch", "BTB", "BTB(Apple)"];
+    const wonderPresets = kpiPresets.filter((p) => p.showInStaffProfile);
+    if (displayUploads.current.length === 0) {
+      return { categories: categoriesList, presets: wonderPresets, rows: [] };
+    }
+
+    const targetRecords = rawTargetRowsToRecords(displayUploads.target);
+
+    // หา period จากวันที่ล่าสุดในข้อมูล (fallback = วันนี้) — ตรรกะเดียวกับ
+    // activeOfficerCategoryPerformance เพื่อให้เป้าตรงกับ staff profile
+    let periodYear = new Date().getFullYear();
+    let periodMonth = new Date().getMonth();
+    let bestTime = 0;
+    for (const row of displayUploads.current) {
+      const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
+      if (!rawDate) continue;
+      const parsed = parseDocDate(rawDate);
+      if (parsed && parsed.getTime() > bestTime) {
+        bestTime = parsed.getTime();
+        periodYear = parsed.getFullYear();
+        periodMonth = parsed.getMonth();
+      }
+    }
+    const periodTotalDays = new Date(periodYear, periodMonth + 1, 0).getDate();
+    const periodMonthStr = String(periodMonth + 1).padStart(2, "0");
+    const periodStart = `${periodYear}-${periodMonthStr}-01`;
+    const periodEnd = `${periodYear}-${periodMonthStr}-${String(periodTotalDays).padStart(2, "0")}`;
+
+    const lookup = buildCatDailyLookup(displayUploads.categoryMaster);
+    const enriched = enrichSalesRowsWithCatDaily(displayUploads.current, lookup);
+    const allBills = parseBills(enriched);
+
+    const officerList: Array<{ name: string; branch: string; staffId?: string }> =
+      parsedReport.officers.length > 0
+        ? parsedReport.officers.map((o) => ({ name: o.name, branch: o.branch, staffId: o.staffId }))
+        : Array.from(
+            new Map(
+              allBills
+                .filter((b) => b.officerName)
+                .map((b) => [b.officerName, { name: b.officerName, branch: b.branchName }]),
+            ).values(),
+          );
+
+    const rows = officerList
+      .map((officer) => {
+        const officerTargetRow = displayUploads.target.find((row) => {
+          const name = `${row.NAME ?? ""} ${row.SURNAME ?? ""}`.trim();
+          return matchesOfficer(name, officer.name);
+        });
+        const officerId =
+          officer.staffId ||
+          resolveOfficerId(
+            officer.name,
+            displayUploads.target,
+            targetRecords,
+            displayUploads.current,
+            matchesOfficer,
+          );
+
+        const cats: Record<string, CombinedOfficerCell> = {};
+        let catActualSum = 0;
+        let catTargetSum = 0;
+        categoriesList.forEach((catName) => {
+          const kpi = getOfficerCategoryKpi({
+            category: catName,
+            officerName: officer.name,
+            officerId,
+            officerTargetRow,
+            targetRecords,
+            currentRows: displayUploads.current,
+            lastMonthRows: [],
+            lastYearRows: [],
+            periodStart,
+            periodEnd,
+            getCategory,
+            matchesOfficer,
+          });
+          cats[catName] = {
+            actual: kpi.actual,
+            target: kpi.target,
+            achPercent: calcAchievementPct(kpi.actual, kpi.target),
+          };
+          catActualSum += kpi.actual;
+          catTargetSum += kpi.target;
+        });
+
+        const officerBills = allBills.filter((b) => matchesOfficer(b.officerName, officer.name));
+        const ctx = {
+          tradeInCount: tradeCountForOfficer(officer.staffId, officer.name),
+          iphoneUnits: iphoneUnitsFromBills(officerBills),
+        };
+        const wonders: Record<string, CombinedOfficerCell> = {};
+        wonderPresets.forEach((p) => {
+          const r = calcPreset(officerBills, p, ctx);
+          const target = p.targetPercent ?? 0;
+          wonders[p.id] = {
+            actual: presetDisplayValue(r),
+            target,
+            achPercent: computePresetAchPercent(r, target),
+          };
+        });
+
+        return {
+          officer,
+          cats,
+          catTotal: {
+            actual: catActualSum,
+            target: catTargetSum,
+            achPercent: catTargetSum > 0 ? (catActualSum / catTargetSum) * 100 : 0,
+          },
+          wonders,
+        };
+      })
+      .filter(
+        (r) =>
+          r.catTotal.actual > 0 ||
+          Object.values(r.wonders).some((w) => w.actual > 0),
+      )
+      .sort((a, b) => b.catTotal.actual - a.catTotal.actual);
+
+    return { categories: categoriesList, presets: wonderPresets, rows };
+  }, [
+    kpiPresets,
+    displayUploads.current,
+    displayUploads.target,
+    displayUploads.categoryMaster,
+    parsedReport.officers,
+    getCategory,
+    tradeCountForOfficer,
+    iphoneUnitsFromBills,
+  ]);
+
   const dynamicRadarData = useMemo(() => {
     if (activeStat === "csat") {
       const wondersRows = activeOfficer7WondersPerformance.filter(r => r.category !== "Average" && r.category !== "Total");
@@ -3551,6 +3686,7 @@ function AppInternal({
                   monthlyPerformance={monthlyPerformance}
                   categorySnapshots={categorySnapshotData}
                   branchOverviewKpiData={branchOverviewKpiData}
+                  combinedOfficerKpiData={combinedOfficerKpiData}
                   categorySnapshotRef={categorySnapshotRef}
                 />
               </motion.div>
@@ -3684,6 +3820,7 @@ function AppInternal({
               monthlyPerformance={monthlyPerformance}
               categorySnapshots={categorySnapshotData}
               branchOverviewKpiData={branchOverviewKpiData}
+              combinedOfficerKpiData={combinedOfficerKpiData}
               categorySnapshotRef={categorySnapshotRef}
               captureRef={homeStatsCaptureRef}
             />
