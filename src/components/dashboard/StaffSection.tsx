@@ -821,7 +821,7 @@ export function StaffSection({
                           </div>
                         ) : null}
                       </motion.div>
-                      {csatUser && csatUser.avgScore !== null ? (
+                      {csatUser && csatBillCount && csatBillCount > 0 ? (
                         <motion.div
                           initial={{ opacity: 0, y: 15 }}
                           animate={{ opacity: 1, y: 0 }}
@@ -829,26 +829,25 @@ export function StaffSection({
                           className="flex-1 min-w-[140px] max-w-[200px] bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl px-3 lg:px-4 py-3 text-center overflow-hidden flex flex-col items-center justify-center min-h-[88px] transition-all duration-200 hover:bg-white/[0.15] hover:border-white/25 hover:shadow-[0_8px_20px_rgba(56,189,248,0.15)]"
                         >
                           <div className="text-[10px] uppercase tracking-wider text-white/60 mb-1.5 w-full truncate font-medium">
-                            CSAT
+                            อัตราการตอบ CSAT
                           </div>
                           {(() => {
-                            const score = csatUser.avgScore ?? 0;
+                            const rate =
+                              (csatUser.responseCount / csatBillCount) * 100;
                             const cls =
-                              score >= 4.5
+                              rate >= 20
                                 ? "text-green-400"
-                                : score >= 4
+                                : rate >= 10
                                   ? "text-amber-300"
                                   : "text-rose-400";
                             return (
                               <div className={`text-sm lg:text-base font-bold w-full truncate tabular-nums ${cls}`}>
-                                {score.toFixed(2)}
-                                <span className="text-white/40 font-normal">/{csatUser.maxScore}</span>
+                                {rate.toFixed(1)}%
                               </div>
                             );
                           })()}
                           <div className="text-[10px] text-sky-300/80 mt-0.5 tabular-nums">
-                            ตอบ {csatUser.responseCount}
-                            {csatBillCount ? `/${csatBillCount}` : ""} บิล
+                            ตอบ {csatUser.responseCount}/{csatBillCount} บิล
                           </div>
                         </motion.div>
                       ) : null}
