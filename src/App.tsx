@@ -2377,15 +2377,17 @@ function AppInternal({
           const name = `${row.NAME ?? ""} ${row.SURNAME ?? ""}`.trim();
           return matchesOfficer(name, officer.name);
         });
-        const officerId =
-          officer.staffId ||
-          resolveOfficerId(
-            officer.name,
-            displayUploads.target,
-            targetRecords,
-            displayUploads.current,
-            matchesOfficer,
-          );
+        // ใช้ resolveOfficerId แบบเดียวกับ staff profile — ห้ามใช้ staffId จาก
+        // parsedReport ตรงๆ เพราะถ้า id นั้นไม่ตรงกับคอลัมน์ STAFF ID ในไฟล์ขาย
+        // (หรือไฟล์ขายไม่มีคอลัมน์นี้) ตัวกรองรายคนจะไม่ทำงาน และยอดของทุกคน
+        // จะกลายเป็นยอดรวมทั้งสาขา (เท่ากันหมด)
+        const officerId = resolveOfficerId(
+          officer.name,
+          displayUploads.target,
+          targetRecords,
+          displayUploads.current,
+          matchesOfficer,
+        );
 
         const cats: Record<string, CombinedCatCell> = {};
         let catActualSum = 0;
