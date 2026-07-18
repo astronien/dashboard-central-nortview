@@ -117,7 +117,7 @@ import {
   Bar,
   Legend,
 } from "recharts";
-import { HomeDashboardSection, type CombinedOfficerKpiData, type CombinedOfficerCell } from "./components/dashboard/HomeDashboardSection";
+import { HomeDashboardSection, type CombinedOfficerKpiData, type CombinedCatCell, type CombinedWonderCell } from "./components/dashboard/HomeDashboardSection";
 
 import { StaffSection } from "./components/dashboard/StaffSection";
 import { ReportsSection } from "./components/dashboard/ReportsSection";
@@ -2387,7 +2387,7 @@ function AppInternal({
             matchesOfficer,
           );
 
-        const cats: Record<string, CombinedOfficerCell> = {};
+        const cats: Record<string, CombinedCatCell> = {};
         let catActualSum = 0;
         let catTargetSum = 0;
         categoriesList.forEach((catName) => {
@@ -2419,7 +2419,7 @@ function AppInternal({
           tradeInCount: tradeCountForOfficer(officer.staffId, officer.name),
           iphoneUnits: iphoneUnitsFromBills(officerBills),
         };
-        const wonders: Record<string, CombinedOfficerCell> = {};
+        const wonders: Record<string, CombinedWonderCell> = {};
         wonderPresets.forEach((p) => {
           const r = calcPreset(officerBills, p, ctx);
           const target = p.targetPercent ?? 0;
@@ -2427,6 +2427,9 @@ function AppInternal({
             actual: presetDisplayValue(r),
             target,
             achPercent: computePresetAchPercent(r, target),
+            actualA: r.billsWithAandB,
+            actualB: r.billsWithB,
+            calcType: p.calcType,
           };
         });
 
