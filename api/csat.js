@@ -11,54 +11,27 @@
 //
 // Response: { ok, branch, overview, users }
 
+const { getAppConfig, initTelegramSchema } = require("./_lib/tursoClient");
+
 const CSAT_API_BASE = "https://api-csat.com7.in/v1/backoffice";
-// Personal access token of the CSAT backoffice account. Prefer setting
-// CSAT_TOKEN in Vercel env — the constant is a fallback so the feature
-// works out of the box (server-side only; never sent to browsers).
-const CSAT_TOKEN =
-  process.env.CSAT_TOKEN ||
-  "21573|VEXLZqufxp33nqSX5UnYTpJhcrEajoW5odlzTJrbabb23a9d";
+const CSAT_TOKEN_KEY = "csat_token";
 
-// Auto-login: when CSAT_USERNAME + CSAT_PASSWORD are set in the Vercel
-// env, the proxy logs itself in whenever the token is missing/expired,
-// so nobody has to keep a browser session alive. The fresh token is
-// cached in module scope (survives across warm lambda invocations).
-const CSAT_USERNAME = process.env.CSAT_USERNAME || "";
-const CSAT_PASSWORD = process.env.CSAT_PASSWORD || "";
-let cachedToken = "";
-
-async function loginForToken() {
-  if (!CSAT_USERNAME || !CSAT_PASSWORD) return "";
-  const res = await fetch(`${CSAT_API_BASE}/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ username: CSAT_USERNAME, password: CSAT_PASSWORD }),
-  });
-  const json = await res.json().catch(() => null);
-  if (!res.ok) {
-    console.error(
-      "[api/csat] auto-login failed:",
-      res.status,
-      json && json.message,
-    );
-    return "";
+// Token resolution order:
+//   1. token saved by an admin in the Settings page (Turso app_config) —
+//      this is the easy self-serve refresh path when the token expires.
+//   2. CSAT_TOKEN env var on Vercel.
+// The token is a Laravel Sanctum personal access token that does not
+// expire unless the account logs out / revokes it. Because the account
+// has 2FA, it can only be minted by a human logging in once; after that
+// it can be pasted into Settings whenever it needs refreshing.
+async function resolveToken() {
+  try {
+    const cfg = await getAppConfig(CSAT_TOKEN_KEY);
+    if (cfg && cfg.value && cfg.value.trim()) return cfg.value.trim();
+  } catch (e) {
+    console.warn("[api/csat] could not read token from DB:", e.message);
   }
-  const token =
-    json?.data?.token ??
-    json?.token ??
-    json?.data?.access_token ??
-    json?.access_token ??
-    "";
-  if (token) {
-    cachedToken = String(token);
-    console.log("[api/csat] auto-login OK, new token cached");
-  } else {
-    console.error(
-      "[api/csat] auto-login: token not found in response keys:",
-      json ? Object.keys(json) : null,
-    );
-  }
-  return cachedToken;
+  return (process.env.CSAT_TOKEN || "").trim();
 }
 
 const corsHeaders = {
@@ -96,18 +69,8 @@ async function csatGetRaw(path, params, token) {
   return { res, json };
 }
 
-async function csatGet(path, params) {
-  let token = cachedToken || CSAT_TOKEN;
-  let { res, json } = await csatGetRaw(path, params, token);
-
-  // Token expired/revoked → try a fresh login once, then retry
-  if (res.status === 401) {
-    const fresh = await loginForToken();
-    if (fresh) {
-      ({ res, json } = await csatGetRaw(path, params, fresh));
-    }
-  }
-
+async function csatGet(path, params, token) {
+  const { res, json } = await csatGetRaw(path, params, token);
   if (!res.ok) {
     const msg = json && json.message ? json.message : `CSAT API ${res.status}`;
     const err = new Error(msg);
@@ -128,6 +91,19 @@ module.exports = async function handler(req, res) {
   }
 
   try {
+    try { await initTelegramSchema(); } catch (e) {
+      console.warn("[api/csat] schema init failed:", e.message);
+    }
+
+    const token = await resolveToken();
+    if (!token) {
+      return res.status(200).json({
+        ok: false,
+        code: "no_token",
+        error: "ยังไม่ได้ตั้งค่า CSAT token — ไปที่หน้า Settings เพื่อวาง token",
+      });
+    }
+
     const today = bangkokToday();
     const [y, m] = today.split("-");
     const startYmd = isYmd(req.query.start_date)
@@ -139,12 +115,11 @@ module.exports = async function handler(req, res) {
     const branchRef = String(req.query.branch || "").trim();
 
     // 1. Resolve the CSAT internal branch id from the branch ref code
-    const branchesJson = await csatGet("/overviews/branches", {
-      start_date: startDate,
-      end_date: endDate,
-      page: 1,
-      page_size: 100,
-    });
+    const branchesJson = await csatGet(
+      "/overviews/branches",
+      { start_date: startDate, end_date: endDate, page: 1, page_size: 100 },
+      token,
+    );
     const branches = Array.isArray(branchesJson?.data) ? branchesJson.data : [];
     if (branches.length === 0) {
       return res
@@ -163,17 +138,16 @@ module.exports = async function handler(req, res) {
 
     // 2. Store-level overview + per-staff metrics (in parallel)
     const [overviewJson, usersJson] = await Promise.all([
-      csatGet("/overviews", {
-        start_date: startDate,
-        end_date: endDate,
-        branch_id: wanted.id,
-      }),
-      csatGet(`/branches/${wanted.id}/user-metrics`, {
-        start_date: startDate,
-        end_date: endDate,
-        page: 1,
-        page_size: 200,
-      }),
+      csatGet(
+        "/overviews",
+        { start_date: startDate, end_date: endDate, branch_id: wanted.id },
+        token,
+      ),
+      csatGet(
+        `/branches/${wanted.id}/user-metrics`,
+        { start_date: startDate, end_date: endDate, page: 1, page_size: 200 },
+        token,
+      ),
     ]);
 
     const o = overviewJson?.data ?? {};
@@ -216,8 +190,17 @@ module.exports = async function handler(req, res) {
     });
   } catch (e) {
     console.error("[api/csat] failed:", e);
-    return res
-      .status(200)
-      .json({ ok: false, error: e instanceof Error ? e.message : String(e) });
+    // 401 = token expired/revoked → tell the client so it can prompt an
+    // admin to paste a fresh token in Settings.
+    const isAuth = e && e.status === 401;
+    return res.status(200).json({
+      ok: false,
+      code: isAuth ? "auth" : "error",
+      error: isAuth
+        ? "CSAT token หมดอายุหรือถูกเพิกถอน — ไปที่หน้า Settings เพื่อวาง token ใหม่"
+        : e instanceof Error
+          ? e.message
+          : String(e),
+    });
   }
 };

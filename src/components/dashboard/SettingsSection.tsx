@@ -1,6 +1,7 @@
 import { Building2, ImagePlus, Trash2, Users } from "lucide-react";
 import { CategoryTargetsManager } from "./admin/CategoryTargetsManager";
 import { TradeInBranchMapping } from "./admin/TradeInBranchMapping";
+import { CsatTokenManager } from "./admin/CsatTokenManager";
 
 export type StaffRosterEntry = {
   name: string;
@@ -22,6 +23,7 @@ export function SettingsSection({
   onPhotoRemove,
   onNavigateToReports,
   isAdmin,
+  adminName,
   onCategoryTargetsChanged,
   tradeBranchMapping,
   onTradeBranchMappingChange,
@@ -38,6 +40,7 @@ export function SettingsSection({
   onPhotoRemove: (staffId: string) => void;
   onNavigateToReports: () => void;
   isAdmin: boolean;
+  adminName?: string;
   onCategoryTargetsChanged?: () => void;
   tradeBranchMapping?: Record<string, string>;
   onTradeBranchMappingChange?: (mapping: Record<string, string>) => void;
@@ -97,6 +100,8 @@ export function SettingsSection({
           onChange={onTradeBranchMappingChange}
         />
       ) : null}
+
+      {isAdmin ? <CsatTokenManager updatedBy={adminName} /> : null}
 
       <div className="flex-1 bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)] relative z-10 w-full min-h-[400px] overflow-hidden flex flex-col">
         {staffRoster.length === 0 ? (

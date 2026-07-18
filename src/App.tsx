@@ -1272,6 +1272,9 @@ function AppInternal({
     undefined,
   );
   const [csatData, setCsatData] = useState<CsatResult | undefined>(undefined);
+  const [csatError, setCsatError] = useState<
+    { code: "auth" | "no_token" | "error"; message: string } | undefined
+  >(undefined);
   const [tradeBranchMapping, setTradeBranchMapping] = useState<
     Record<string, string>
   >(() => getTradeBranchMapping());
@@ -3271,12 +3274,20 @@ function AppInternal({
     let cancelled = false;
     fetchCsatData(tradeInBranchCode || undefined)
       .then((result) => {
-        if (!cancelled) setCsatData(result);
+        if (cancelled) return;
+        if (result.ok) {
+          setCsatData(result.data);
+          setCsatError(undefined);
+        } else {
+          setCsatData(undefined);
+          setCsatError({ code: result.code, message: result.error });
+        }
       })
       .catch((e) => {
         if (!cancelled) {
           console.warn("[App] fetchCsatData failed:", e);
           setCsatData(undefined);
+          setCsatError({ code: "error", message: String(e) });
         }
       });
     return () => {
@@ -3746,6 +3757,18 @@ function AppInternal({
                 transition={{ duration: 0.4, ease: "easeOut" }}
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
+                {role === "admin" && csatError && (csatError.code === "auth" || csatError.code === "no_token") ? (
+                  <button
+                    onClick={() => setCurrentView("settings")}
+                    className="flex items-center gap-3 text-left rounded-2xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 hover:bg-amber-500/15 transition-colors"
+                  >
+                    <span className="text-amber-300 text-lg shrink-0">⚠️</span>
+                    <span className="text-sm text-amber-100/90">
+                      {csatError.message}{" "}
+                      <span className="underline font-semibold">ไปที่ Settings →</span>
+                    </span>
+                  </button>
+                ) : null}
                 <HomeDashboardSection
                   derivedHomeStats={derivedHomeStats}
                   monthlyPerformance={monthlyPerformance}
@@ -3856,6 +3879,7 @@ function AppInternal({
                   }}
                   onNavigateToReports={() => setCurrentView("reports")}
                   isAdmin={role === "admin"}
+                  adminName={user?.name ?? user?.username}
                   onCategoryTargetsChanged={loadCategoryTargetOverrides}
                   tradeBranchMapping={tradeBranchMapping}
                   onTradeBranchMappingChange={setTradeBranchMapping}
