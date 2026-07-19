@@ -305,7 +305,7 @@ const shortWonderName = (name: string): string =>
 
 function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
   const { categories, presets, rows } = data;
-  const hasCsat = rows.some((r) => r.csat && r.csat.billCount > 0);
+  const hasCsat = rows.some((r) => r.csat && r.csat.score !== null);
 
   // ช่องยอดขายตามหมวด: เป้า / ยอดจริง / %ถึงเป้า (3 บรรทัดกะทัดรัด)
   const renderCatCell = (cell: CombinedCatCell | undefined, isTotal = false) => {
@@ -434,9 +434,9 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                 ))}
                 {hasCsat ? (
                   <th className="py-2 px-2 font-bold uppercase tracking-wide text-right min-w-[64px] text-sky-300 border-l border-white/10">
-                    <div>อัตราการตอบ</div>
+                    <div>CSAT</div>
                     <div className="text-[8px] text-white/40 font-normal normal-case">
-                      (ตอบ/บิล)
+                      (คะแนน · ตอบ)
                     </div>
                   </th>
                 ) : null}
@@ -473,27 +473,24 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                   ))}
                   {hasCsat ? (
                     <td className="py-1.5 px-2 text-right align-top border-l border-white/5">
-                      {row.csat && row.csat.billCount > 0 ? (
-                        (() => {
-                          const rate =
-                            (row.csat.responseCount / row.csat.billCount) * 100;
-                          const cls =
-                            rate >= 20
-                              ? "text-green-400"
-                              : rate >= 10
-                                ? "text-amber-400"
-                                : "text-rose-400";
-                          return (
-                            <div className="flex flex-col items-end gap-0.5 leading-none">
-                              <span className={`font-mono font-semibold tabular-nums ${cls}`}>
-                                {rate.toFixed(1)}%
-                              </span>
-                              <span className="text-[8px] text-white/40 tabular-nums">
-                                {row.csat.responseCount}/{row.csat.billCount}
-                              </span>
-                            </div>
-                          );
-                        })()
+                      {row.csat && row.csat.score !== null ? (
+                        <div className="flex flex-col items-end gap-0.5 leading-none">
+                          <span
+                            className={`font-mono font-semibold tabular-nums ${
+                              row.csat.score >= 4.5
+                                ? "text-green-400"
+                                : row.csat.score >= 4
+                                  ? "text-amber-400"
+                                  : "text-rose-400"
+                            }`}
+                          >
+                            {row.csat.score.toFixed(2)}
+                            <span className="text-white/30 font-normal">/{row.csat.maxScore}</span>
+                          </span>
+                          <span className="text-[8px] text-white/40 tabular-nums">
+                            ตอบ {row.csat.responseCount}
+                          </span>
+                        </div>
                       ) : (
                         <span className="text-white/25">—</span>
                       )}
