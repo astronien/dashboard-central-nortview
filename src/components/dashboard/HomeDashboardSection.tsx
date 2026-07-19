@@ -1,5 +1,5 @@
 import React from "react";
-import { TrendingUp, TrendingDown, Building2, User, Smile } from "lucide-react";
+import { TrendingUp, TrendingDown, Building2, User, Smile, Gauge } from "lucide-react";
 import type { CsatOverview, CsatLowScore } from "../../lib/csatApi";
 import type { CategorySnapshotItem } from "../../lib/categorySnapshotBuilder";
 import type { DerivedHomeStat } from "./dashboardTypes";
@@ -76,11 +76,13 @@ export function HomeDashboardSection({
   combinedOfficerKpiData,
   csatOverview,
   csatLowScores,
+  pace,
   categorySnapshotRef,
   captureRef,
 }: {
   derivedHomeStats: DerivedHomeStat[];
   monthlyPerformance: MonthlyPerformance;
+  pace?: { actual: number; target: number; currentDay: number; totalDays: number };
   categorySnapshots?: CategorySnapshotItem[];
   branchOverviewKpiData?: BranchOverviewKpiData;
   combinedOfficerKpiData?: CombinedOfficerKpiData;
@@ -93,6 +95,9 @@ export function HomeDashboardSection({
   return (
     <>
       <div ref={captureRef} className="flex flex-col gap-6">
+        {pace && pace.target > 0 && pace.totalDays > 0 ? (
+          <PaceBanner {...pace} />
+        ) : null}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {derivedHomeStats.map((stat, idx) => (
             <div key={idx} className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 p-5 shadow-[0_8px_32px_rgba(0,0,0,0.12)] flex flex-col justify-between hover:bg-white/[0.15] transition-colors cursor-pointer">
@@ -643,6 +648,87 @@ function CsatLowScoresCard({ items }: { items: CsatLowScore[] }) {
           {expanded ? "ย่อลง" : `ดูทั้งหมด (${items.length})`}
         </button>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * Pace-to-target banner: compares month-to-date sales against the linear
+ * pace needed to hit the monthly target, and shows how much per day is
+ * needed for the rest of the month + a simple end-of-month projection.
+ */
+function PaceBanner({
+  actual,
+  target,
+  currentDay,
+  totalDays,
+}: {
+  actual: number;
+  target: number;
+  currentDay: number;
+  totalDays: number;
+}) {
+  const day = Math.max(1, Math.min(currentDay, totalDays));
+  const expectedByNow = target * (day / totalDays);
+  const diffPct = expectedByNow > 0 ? (actual / expectedByNow) * 100 - 100 : 0;
+  const onTrack = actual >= expectedByNow;
+  const remainingDays = Math.max(0, totalDays - day);
+  const remainingAmount = Math.max(0, target - actual);
+  const neededPerDay = remainingDays > 0 ? remainingAmount / remainingDays : remainingAmount;
+  const projected = day > 0 ? (actual / day) * totalDays : 0;
+  const projectedPct = target > 0 ? (projected / target) * 100 : 0;
+
+  const fmt = (n: number) => `฿${Math.round(n).toLocaleString()}`;
+
+  const tone = onTrack
+    ? { bar: "border-emerald-400/30 bg-emerald-500/10", head: "text-emerald-300", icon: "text-emerald-400" }
+    : diffPct > -10
+      ? { bar: "border-amber-400/30 bg-amber-500/10", head: "text-amber-300", icon: "text-amber-400" }
+      : { bar: "border-rose-400/30 bg-rose-500/10", head: "text-rose-300", icon: "text-rose-400" };
+
+  return (
+    <div className={`rounded-2xl border p-4 shadow-[0_8px_32px_rgba(0,0,0,0.12)] ${tone.bar}`}>
+      <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+        <div className="flex items-center gap-3 lg:min-w-[280px]">
+          <div className="p-2.5 bg-white/10 rounded-xl border border-white/10">
+            <Gauge className={`w-6 h-6 ${tone.icon}`} />
+          </div>
+          <div>
+            <div className={`text-lg font-bold tracking-tight ${tone.head}`}>
+              {onTrack
+                ? `ตามเป้าอยู่ (+${Math.abs(diffPct).toFixed(0)}%)`
+                : `ช้ากว่าเป้า ${Math.abs(diffPct).toFixed(0)}%`}
+            </div>
+            <div className="text-[11px] text-white/50">
+              วันที่ {day}/{totalDays} ของเดือน · ควรทำได้ถึง {fmt(expectedByNow)} แล้ว
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 flex-1">
+          <div className="bg-black/20 rounded-xl border border-white/5 px-3 py-2">
+            <div className="text-[10px] text-white/50">ยอดสะสม / เป้า</div>
+            <div className="text-sm font-bold text-white tabular-nums">
+              {fmt(actual)}<span className="text-white/40 font-normal"> / {fmt(target)}</span>
+            </div>
+          </div>
+          <div className="bg-black/20 rounded-xl border border-white/5 px-3 py-2">
+            <div className="text-[10px] text-white/50">
+              ต้องทำอีกวันละ {remainingDays > 0 ? `(เหลือ ${remainingDays} วัน)` : "(วันสุดท้าย)"}
+            </div>
+            <div className={`text-sm font-bold tabular-nums ${tone.head}`}>
+              {remainingAmount > 0 ? fmt(neededPerDay) : "ถึงเป้าแล้ว 🎉"}
+            </div>
+          </div>
+          <div className="bg-black/20 rounded-xl border border-white/5 px-3 py-2 col-span-2 sm:col-span-1">
+            <div className="text-[10px] text-white/50">คาดว่าจะจบเดือนที่</div>
+            <div className="text-sm font-bold text-white tabular-nums">
+              {projectedPct.toFixed(0)}%
+              <span className="text-white/40 font-normal"> ({fmt(projected)})</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

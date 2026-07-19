@@ -2860,6 +2860,28 @@ function AppInternal({
     csatData,
   ]);
 
+  // Day-of-month for the pace banner — from the latest data date in the
+  // current upload (so pace reflects the data we actually have), else today.
+  const paceInfo = useMemo(() => {
+    let year = new Date().getFullYear();
+    let month = new Date().getMonth();
+    let day = new Date().getDate();
+    let best = 0;
+    for (const row of displayUploads.current) {
+      const raw = String(row["Doc Date"] ?? row["doc date"] ?? "");
+      if (!raw) continue;
+      const p = parseDocDate(raw);
+      if (p && p.getTime() > best) {
+        best = p.getTime();
+        year = p.getFullYear();
+        month = p.getMonth();
+        day = p.getDate();
+      }
+    }
+    const totalDays = new Date(year, month + 1, 0).getDate();
+    return { currentDay: Math.min(day, totalDays), totalDays };
+  }, [displayUploads.current]);
+
   const salesTrendData = useMemo(() => {
     if (!displayUploads.current.length) {
       return [];
@@ -3871,6 +3893,12 @@ function AppInternal({
                   combinedOfficerKpiData={combinedOfficerKpiData}
                   csatOverview={csatData?.overview}
                   csatLowScores={csatData?.lowScores}
+                  pace={{
+                    actual: monthlyPerformance.actualSales.actual,
+                    target: monthlyPerformance.actualSales.target,
+                    currentDay: paceInfo.currentDay,
+                    totalDays: paceInfo.totalDays,
+                  }}
                   categorySnapshotRef={categorySnapshotRef}
                 />
               </motion.div>
@@ -4052,6 +4080,12 @@ function AppInternal({
               combinedOfficerKpiData={combinedOfficerKpiData}
               csatOverview={csatData?.overview}
               csatLowScores={csatData?.lowScores}
+              pace={{
+                actual: monthlyPerformance.actualSales.actual,
+                target: monthlyPerformance.actualSales.target,
+                currentDay: paceInfo.currentDay,
+                totalDays: paceInfo.totalDays,
+              }}
               categorySnapshotRef={categorySnapshotRef}
               captureRef={homeStatsCaptureRef}
             />
