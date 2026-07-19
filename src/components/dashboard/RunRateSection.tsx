@@ -217,12 +217,38 @@ export function RunRateSection({
   }
 
   const hasStock = data.products.some((p) => p.stock != null);
-  const fast = data.products.slice(0, 12);
-  const slow = [...data.products]
+
+  const productCats = React.useMemo(
+    () => Array.from(new Set(data.products.map((p) => p.sub).filter(Boolean))) as string[],
+    [data.products],
+  );
+  const [catFilter, setCatFilter] = React.useState<string>("all");
+  const filteredProducts =
+    catFilter === "all"
+      ? data.products
+      : data.products.filter((p) => p.sub === catFilter);
+
+  const fast = filteredProducts.slice(0, 12);
+  const slow = [...filteredProducts]
     .filter((p) => p.units > 0)
     .sort((a, b) => a.unitsPerDay - b.unitsPerDay)
     .slice(0, 10);
-  const products = showAllProducts ? data.products : fast;
+  const products = showAllProducts ? filteredProducts : fast;
+
+  const CatFilter = (
+    <select
+      value={catFilter}
+      onChange={(e) => setCatFilter(e.target.value)}
+      className="bg-[#051710] border border-white/15 rounded-lg px-2 py-1.5 text-white text-[11px] focus:outline-none focus:border-amber-400"
+    >
+      <option value="all">ทุกหมวด</option>
+      {productCats.map((c) => (
+        <option key={c} value={c}>
+          {c}
+        </option>
+      ))}
+    </select>
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -280,14 +306,17 @@ export function RunRateSection({
               สินค้าขายเร็ว (Top {products.length})
             </h2>
           </div>
-          {data.products.length > 12 ? (
-            <button
-              onClick={() => setShowAllProducts((v) => !v)}
-              className="text-[11px] text-amber-300 hover:text-amber-200 font-medium"
-            >
-              {showAllProducts ? "แสดงเฉพาะ Top 12" : `ดูทั้งหมด (${data.products.length})`}
-            </button>
-          ) : null}
+          <div className="flex items-center gap-3">
+            {CatFilter}
+            {filteredProducts.length > 12 ? (
+              <button
+                onClick={() => setShowAllProducts((v) => !v)}
+                className="text-[11px] text-amber-300 hover:text-amber-200 font-medium"
+              >
+                {showAllProducts ? "แสดงเฉพาะ Top 12" : `ดูทั้งหมด (${filteredProducts.length})`}
+              </button>
+            ) : null}
+          </div>
         </div>
         <RunRateTable rows={products} hasStock={hasStock} showSub />
       </div>
@@ -295,14 +324,19 @@ export function RunRateSection({
       {/* Slow movers */}
       {slow.length > 0 ? (
         <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-white/10 rounded-xl border border-white/10">
-              <Snail className="w-5 h-5 text-white/60" />
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white/10 rounded-xl border border-white/10">
+                <Snail className="w-5 h-5 text-white/60" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold tracking-tight text-white">
+                  สินค้าขายช้า{catFilter !== "all" ? ` · ${catFilter}` : ""}
+                </h2>
+                <p className="text-[11px] text-white/50">ขายได้น้อยที่สุดต่อวัน — เสี่ยงเงินจม/ค้างสต็อก</p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-base font-bold tracking-tight text-white">สินค้าขายช้า</h2>
-              <p className="text-[11px] text-white/50">ขายได้น้อยที่สุดต่อวัน — เสี่ยงเงินจม/ค้างสต็อก</p>
-            </div>
+            {CatFilter}
           </div>
           <RunRateTable rows={slow} hasStock={hasStock} showSub />
         </div>
