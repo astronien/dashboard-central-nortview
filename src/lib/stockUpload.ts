@@ -38,6 +38,16 @@ const QTY_KEYS = [
   "สต็อก",
   "ยอดคงเหลือ",
 ];
+const COST_KEYS = [
+  "cost",
+  "unit cost",
+  "avg cost",
+  "average cost",
+  "ต้นทุน",
+  "ทุน",
+  "ต้นทุนต่อหน่วย",
+  "cost price",
+];
 
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
 
@@ -64,6 +74,9 @@ export interface StockParseResult {
   itemCount: number;
   /** productName/code (raw string) → qty on hand */
   stockMap: Record<string, number>;
+  /** productName/code → unit cost (empty if no cost column) */
+  costMap: Record<string, number>;
+  hasCost: boolean;
   sample: { key: string; qty: number }[];
 }
 
@@ -80,13 +93,14 @@ export async function parseStockExcelFile(file: File): Promise<StockParseResult>
       raw: false,
     });
     if (rows.length === 0) {
-      return { ok: false, error: "ไฟล์ว่างเปล่า", itemCount: 0, stockMap: {}, sample: [] };
+      return { ok: false, error: "ไฟล์ว่างเปล่า", itemCount: 0, stockMap: {}, costMap: {}, hasCost: false, sample: [] };
     }
 
     const headers = Object.keys(rows[0]);
     const nameH = findHeader(headers, NAME_KEYS);
     const codeH = findHeader(headers, CODE_KEYS);
     const qtyH = findHeader(headers, QTY_KEYS);
+    const costH = findHeader(headers, COST_KEYS);
 
     if (!qtyH || (!nameH && !codeH)) {
       return {
@@ -94,20 +108,28 @@ export async function parseStockExcelFile(file: File): Promise<StockParseResult>
         error: `หาคอลัมน์ไม่เจอ — ต้องมีคอลัมน์จำนวนคงเหลือ และชื่อ/รหัสสินค้า (คอลัมน์ที่พบ: ${headers.join(", ")})`,
         itemCount: 0,
         stockMap: {},
+        costMap: {},
+        hasCost: false,
         sample: [],
       };
     }
 
     const stockMap: Record<string, number> = {};
+    const costMap: Record<string, number> = {};
     let count = 0;
     for (const r of rows) {
       const qty = toQty(qtyH ? r[qtyH] : 0);
+      const cost = costH ? toQty(r[costH]) : 0;
       const name = nameH ? String(r[nameH] ?? "").trim() : "";
       const code = codeH ? String(r[codeH] ?? "").trim() : "";
       if (!name && !code) continue;
       // sum in case the same product appears in multiple rows
       if (name) stockMap[name] = (stockMap[name] ?? 0) + qty;
       if (code) stockMap[code] = (stockMap[code] ?? 0) + qty;
+      if (costH && cost > 0) {
+        if (name) costMap[name] = cost;
+        if (code) costMap[code] = cost;
+      }
       count += 1;
     }
 
@@ -115,13 +137,22 @@ export async function parseStockExcelFile(file: File): Promise<StockParseResult>
       .slice(0, 5)
       .map(([key, qty]) => ({ key, qty }));
 
-    return { ok: true, itemCount: count, stockMap, sample };
+    return {
+      ok: true,
+      itemCount: count,
+      stockMap,
+      costMap,
+      hasCost: Boolean(costH) && Object.keys(costMap).length > 0,
+      sample,
+    };
   } catch (e) {
     return {
       ok: false,
       error: e instanceof Error ? e.message : String(e),
       itemCount: 0,
       stockMap: {},
+      costMap: {},
+      hasCost: false,
       sample: [],
     };
   }

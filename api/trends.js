@@ -54,11 +54,17 @@ module.exports = async function handler(req, res) {
     if (req.method === "GET") {
       const cfg = await getAppConfig(stockKey(branchId));
       let map = {};
-      let itemCount = 0;
+      let cost = {};
       if (cfg && cfg.value) {
         try {
-          map = JSON.parse(cfg.value);
-          itemCount = Object.keys(map).length;
+          const parsed = JSON.parse(cfg.value);
+          // New format { qty, cost }; old format was a flat qty map.
+          if (parsed && parsed.qty && typeof parsed.qty === "object") {
+            map = parsed.qty;
+            cost = parsed.cost && typeof parsed.cost === "object" ? parsed.cost : {};
+          } else {
+            map = parsed;
+          }
         } catch {
           /* ignore */
         }
@@ -66,19 +72,22 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({
         ok: true,
         map,
-        itemCount,
+        cost,
+        itemCount: Object.keys(map).length,
+        hasCost: Object.keys(cost).length > 0,
         updatedAt: cfg?.updatedAt ?? null,
         updatedBy: cfg?.updatedBy ?? null,
       });
     }
     if (req.method === "POST") {
-      const map = req.body?.map;
+      const map = req.body?.qty ?? req.body?.map;
+      const cost = req.body?.cost ?? {};
       if (!map || typeof map !== "object") {
         return res.status(400).json({ ok: false, error: "Missing stock map" });
       }
       await setAppConfig(
         stockKey(branchId),
-        JSON.stringify(map),
+        JSON.stringify({ qty: map, cost }),
         req.body?.updatedBy ? String(req.body.updatedBy) : null,
       );
       return res.status(200).json({ ok: true, itemCount: Object.keys(map).length });

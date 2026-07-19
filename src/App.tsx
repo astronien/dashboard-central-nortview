@@ -2922,14 +2922,17 @@ function AppInternal({
     loadStock();
   }, [loadStock]);
 
+  const [runRateWindow, setRunRateWindow] = useState<number>(0); // 0 = MTD, 7 = last 7 days
   const runRateData = useMemo(
     () =>
       computeRunRate(displayUploads.current, getCategory, {
         daysElapsed: paceInfo.currentDay,
         totalDays: paceInfo.totalDays,
         stockByProduct: stockStatus?.map,
+        costByProduct: stockStatus?.cost,
+        windowDays: runRateWindow || undefined,
       }),
-    [displayUploads.current, getCategory, paceInfo, stockStatus],
+    [displayUploads.current, getCategory, paceInfo, stockStatus, runRateWindow],
   );
 
   const salesTrendData = useMemo(() => {
@@ -4041,6 +4044,8 @@ function AppInternal({
                   stockStatus={stockStatus}
                   updatedBy={user?.name ?? user?.username}
                   onStockSaved={loadStock}
+                  windowDays={runRateWindow}
+                  onWindowChange={setRunRateWindow}
                 />
               </motion.div>
             )}

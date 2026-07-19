@@ -2,6 +2,8 @@
 
 export interface StockStatus {
   map: Record<string, number>;
+  cost: Record<string, number>;
+  hasCost: boolean;
   itemCount: number;
   updatedAt: string | null;
   updatedBy: string | null;
@@ -18,6 +20,8 @@ export async function fetchStock(branch: string): Promise<StockStatus | undefine
     if (!json?.ok) return undefined;
     return {
       map: json.map ?? {},
+      cost: json.cost ?? {},
+      hasCost: Boolean(json.hasCost),
       itemCount: json.itemCount ?? 0,
       updatedAt: json.updatedAt ?? null,
       updatedBy: json.updatedBy ?? null,
@@ -30,6 +34,7 @@ export async function fetchStock(branch: string): Promise<StockStatus | undefine
 export async function saveStock(
   branch: string,
   map: Record<string, number>,
+  costMap?: Record<string, number>,
   updatedBy?: string,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
@@ -38,7 +43,7 @@ export async function saveStock(
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ branchId: branch, map, updatedBy }),
+        body: JSON.stringify({ branchId: branch, qty: map, cost: costMap ?? {}, updatedBy }),
       },
     );
     const json = await res.json().catch(() => null);
