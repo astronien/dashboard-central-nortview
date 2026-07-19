@@ -71,6 +71,20 @@ CREATE TABLE IF NOT EXISTS app_config (
 );
 `;
 
+// Daily trend snapshots: one compact JSON row per branch per day, so the
+// dashboard can chart sales pace / CSAT over time. Upserted from the
+// client when the Home view has fresh data (keyed by branch + date).
+const DAILY_SNAPSHOTS_SQL = `
+CREATE TABLE IF NOT EXISTS daily_snapshots (
+  branch_id   TEXT NOT NULL,
+  snap_date   TEXT NOT NULL,
+  payload     TEXT NOT NULL,
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (branch_id, snap_date)
+);
+CREATE INDEX IF NOT EXISTS idx_snap_branch ON daily_snapshots(branch_id);
+`;
+
 async function initTelegramSchema() {
   const client = getTursoClient();
   for (const stmt of TELEGRAM_SCHEMA_SQL.split(";").map((s) => s.trim()).filter(Boolean)) {
@@ -81,6 +95,41 @@ async function initTelegramSchema() {
   }
   for (const stmt of APP_CONFIG_SQL.split(";").map((s) => s.trim()).filter(Boolean)) {
     await client.execute(stmt);
+  }
+  for (const stmt of DAILY_SNAPSHOTS_SQL.split(";").map((s) => s.trim()).filter(Boolean)) {
+    await client.execute(stmt);
+  }
+}
+
+/** Upsert one branch/day snapshot (payload = JSON string). */
+async function upsertDailySnapshot({ branchId, date, payload }) {
+  const client = getTursoClient();
+  await client.execute({
+    sql: `INSERT INTO daily_snapshots (branch_id, snap_date, payload, updated_at)
+          VALUES (?, ?, ?, datetime('now'))
+          ON CONFLICT(branch_id, snap_date) DO UPDATE SET
+            payload = excluded.payload,
+            updated_at = datetime('now')`,
+    args: [String(branchId), String(date), String(payload)],
+  });
+}
+
+/** Most recent `limit` snapshots for a branch, oldest → newest. */
+async function getDailySnapshots(branchId, limit = 90) {
+  const client = getTursoClient();
+  try {
+    const result = await client.execute({
+      sql: `SELECT snap_date, payload FROM daily_snapshots
+            WHERE branch_id = ?
+            ORDER BY snap_date DESC LIMIT ?`,
+      args: [String(branchId), Number(limit) || 90],
+    });
+    return result.rows
+      .map((r) => ({ date: String(r.snap_date), payload: String(r.payload) }))
+      .reverse();
+  } catch (e) {
+    console.error("[tursoClient] getDailySnapshots failed:", e);
+    return [];
   }
 }
 
@@ -130,6 +179,8 @@ module.exports = {
   deleteCategoryTargetOverride,
   getAppConfig,
   setAppConfig,
+  upsertDailySnapshot,
+  getDailySnapshots,
 };
 
 /**

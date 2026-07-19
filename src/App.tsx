@@ -122,6 +122,8 @@ import {
 } from "recharts";
 import { HomeDashboardSection, type CombinedOfficerKpiData, type CombinedCatCell, type CombinedWonderCell } from "./components/dashboard/HomeDashboardSection";
 import { AnalysisSection } from "./components/dashboard/AnalysisSection";
+import { TrendsSection } from "./components/dashboard/TrendsSection";
+import { saveTrendSnapshot } from "./lib/trendsApi";
 
 import { StaffSection } from "./components/dashboard/StaffSection";
 import { ReportsSection } from "./components/dashboard/ReportsSection";
@@ -1244,7 +1246,7 @@ function AppInternal({
 }) {
   const { user, logout, isPia } = useAuth();
   const [currentView, setCurrentView] = useState<
-    "home" | "staff" | "settings" | "reports" | "kpi_preset" | "analysis"
+    "home" | "staff" | "settings" | "reports" | "kpi_preset" | "analysis" | "trends"
   >("home");
 
   // Light / dark theme. Applied as a `theme-light` class on <html> so a
@@ -2815,6 +2817,49 @@ function AppInternal({
     ],
   );
 
+  // Auto-capture a compact daily snapshot for the trends charts. Keyed by
+  // branch + Bangkok date and upserted once per session/day, so simply
+  // opening the dashboard each day builds the history.
+  const snapshotWrittenRef = useRef<string>("");
+  useEffect(() => {
+    const branchKey = selectedBranch;
+    if (!branchKey) return;
+    if (!combinedOfficerKpiData.rows.length) return;
+    if (!(monthlyPerformance.actualSales.target > 0)) return;
+    const dayKey = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Bangkok",
+    }).format(new Date());
+    const guard = `${branchKey}|${dayKey}`;
+    if (snapshotWrittenRef.current === guard) return;
+    snapshotWrittenRef.current = guard;
+    const payload = {
+      totalActual: monthlyPerformance.actualSales.actual,
+      totalTarget: monthlyPerformance.actualSales.target,
+      achPct: monthlyPerformance.actualSales.rate,
+      categories: categorySnapshotData.map((c) => ({
+        name: c.category,
+        actual: c.actual,
+        target: c.target,
+      })),
+      csat: csatData
+        ? {
+            nps: csatData.overview.npsScore,
+            avgScore: csatData.overview.avgScore,
+            responseRate: csatData.overview.submitBillPercent,
+            submitBill: csatData.overview.submitBill,
+            totalBill: csatData.overview.totalBill,
+          }
+        : null,
+    };
+    void saveTrendSnapshot(branchKey, payload, dayKey);
+  }, [
+    selectedBranch,
+    combinedOfficerKpiData,
+    monthlyPerformance,
+    categorySnapshotData,
+    csatData,
+  ]);
+
   const salesTrendData = useMemo(() => {
     if (!displayUploads.current.length) {
       return [];
@@ -3655,6 +3700,13 @@ function AppInternal({
                     <Activity className="w-5 h-5" />
                   </button>
                   <button
+                    onClick={() => setCurrentView("trends")}
+                    className={`p-2 rounded-full transition-colors ${currentView === "trends" ? "bg-[#0f4430] shadow-inner text-white" : "text-white/60 hover:text-white"}`}
+                    title="แนวโน้มย้อนหลัง"
+                  >
+                    <TrendingUp className="w-5 h-5" />
+                  </button>
+                  <button
                     onClick={() => setCurrentView("settings")}
                     className={`p-2 rounded-full transition-colors ${currentView === "settings" ? "bg-[#0f4430] shadow-inner text-white" : "text-white/60 hover:text-white"}`}
                     title="Settings"
@@ -3875,6 +3927,18 @@ function AppInternal({
                   onUploadFile={handleUploadFile}
                   parsedReport={parsedReport}
                 />
+              </motion.div>
+            )}
+            {!isPia && currentView === "trends" && (
+              <motion.div
+                key="trends"
+                initial={{ opacity: 0, scale: 0.96, filter: "blur(8px)" }}
+                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+                exit={{ opacity: 0, scale: 1.04, filter: "blur(8px)" }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+                className="flex flex-col gap-6 w-full h-full relative z-20"
+              >
+                <TrendsSection branch={selectedBranch} />
               </motion.div>
             )}
             {!isPia && currentView === "analysis" && (
