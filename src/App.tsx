@@ -36,6 +36,7 @@ import {
   Loader2,
   Sun,
   Moon,
+  Gauge,
 } from "lucide-react";
 import CategoryTreePicker from "./components/CategoryTreePicker";
 
@@ -124,6 +125,8 @@ import { HomeDashboardSection, type CombinedOfficerKpiData, type CombinedCatCell
 import { AnalysisSection } from "./components/dashboard/AnalysisSection";
 import { TrendsSection } from "./components/dashboard/TrendsSection";
 import { saveTrendSnapshot } from "./lib/trendsApi";
+import { RunRateSection } from "./components/dashboard/RunRateSection";
+import { computeRunRate } from "./lib/runRate";
 
 import { StaffSection } from "./components/dashboard/StaffSection";
 import { ReportsSection } from "./components/dashboard/ReportsSection";
@@ -1246,7 +1249,7 @@ function AppInternal({
 }) {
   const { user, logout, isPia } = useAuth();
   const [currentView, setCurrentView] = useState<
-    "home" | "staff" | "settings" | "reports" | "kpi_preset" | "analysis" | "trends"
+    "home" | "staff" | "settings" | "reports" | "kpi_preset" | "analysis" | "trends" | "runrate"
   >("home");
 
   // Light / dark theme. Applied as a `theme-light` class on <html> so a
@@ -2909,6 +2912,15 @@ function AppInternal({
     return { currentDay: Math.min(day, totalDays), totalDays };
   }, [displayUploads.current]);
 
+  const runRateData = useMemo(
+    () =>
+      computeRunRate(displayUploads.current, getCategory, {
+        daysElapsed: paceInfo.currentDay,
+        totalDays: paceInfo.totalDays,
+      }),
+    [displayUploads.current, getCategory, paceInfo],
+  );
+
   const salesTrendData = useMemo(() => {
     if (!displayUploads.current.length) {
       return [];
@@ -3756,6 +3768,13 @@ function AppInternal({
                     <TrendingUp className="w-5 h-5" />
                   </button>
                   <button
+                    onClick={() => setCurrentView("runrate")}
+                    className={`p-2 rounded-full transition-colors ${currentView === "runrate" ? "bg-[#0f4430] shadow-inner text-white" : "text-white/60 hover:text-white"}`}
+                    title="Run Rate อัตราการขาย"
+                  >
+                    <Gauge className="w-5 h-5" />
+                  </button>
+                  <button
                     onClick={() => setCurrentView("settings")}
                     className={`p-2 rounded-full transition-colors ${currentView === "settings" ? "bg-[#0f4430] shadow-inner text-white" : "text-white/60 hover:text-white"}`}
                     title="Settings"
@@ -3994,6 +4013,18 @@ function AppInternal({
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
                 <TrendsSection branch={selectedBranch} />
+              </motion.div>
+            )}
+            {!isPia && currentView === "runrate" && (
+              <motion.div
+                key="runrate"
+                initial={{ opacity: 0, scale: 0.96, filter: "blur(8px)" }}
+                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+                exit={{ opacity: 0, scale: 1.04, filter: "blur(8px)" }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+                className="flex flex-col gap-6 w-full h-full relative z-20"
+              >
+                <RunRateSection data={runRateData} />
               </motion.div>
             )}
             {!isPia && currentView === "analysis" && (
