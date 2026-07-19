@@ -2832,6 +2832,32 @@ function AppInternal({
     const guard = `${branchKey}|${dayKey}`;
     if (snapshotWrittenRef.current === guard) return;
     snapshotWrittenRef.current = guard;
+    // Per-officer metric snapshot (for the day-over-day progress tracker):
+    // overall achievement + each category/7-Wonder/CSAT achievement %.
+    const isPct = (c?: string) =>
+      c === "attach" || c === "bahtRate" || c === "catAttach" || c === "tradeIn";
+    const staff = combinedOfficerKpiData.rows.map((r) => {
+      const m: Record<string, number> = {};
+      for (const cat of combinedOfficerKpiData.categories) {
+        const c = r.cats[cat];
+        if (c && c.target > 0) m[cat] = Math.round(c.achPercent);
+      }
+      for (const p of combinedOfficerKpiData.presets) {
+        const w = r.wonders[p.id];
+        if (w && w.target > 0) {
+          const pct = isPct(p.calcType) ? (w.actual / w.target) * 100 : w.achPercent;
+          m[p.name] = Math.round(pct);
+        }
+      }
+      if (r.csat && r.csat.billCount > 0)
+        m["CSAT"] = Math.round((r.csat.responseCount / r.csat.billCount) * 100);
+      return {
+        name: r.officer.name,
+        overallPct: Math.round(r.catTotal.achPercent),
+        m,
+      };
+    });
+
     const payload = {
       totalActual: monthlyPerformance.actualSales.actual,
       totalTarget: monthlyPerformance.actualSales.target,
@@ -2850,6 +2876,7 @@ function AppInternal({
             totalBill: csatData.overview.totalBill,
           }
         : null,
+      staff,
     };
     void saveTrendSnapshot(branchKey, payload, dayKey);
   }, [

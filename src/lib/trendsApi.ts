@@ -14,12 +14,20 @@ export interface TrendCsat {
   totalBill: number;
 }
 
+export interface TrendStaff {
+  name: string;
+  overallPct: number;
+  /** metric label → achievement % (categories, 7-wonders, CSAT) */
+  m: Record<string, number>;
+}
+
 export interface TrendSnapshotPayload {
   totalActual: number;
   totalTarget: number;
   achPct: number;
   categories?: TrendCategory[];
   csat?: TrendCsat | null;
+  staff?: TrendStaff[];
 }
 
 export interface TrendSnapshot extends TrendSnapshotPayload {
