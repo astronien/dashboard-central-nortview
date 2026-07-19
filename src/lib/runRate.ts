@@ -56,7 +56,7 @@ export function computeRunRate(
   const stock = opts.stockByProduct;
 
   const catAgg = new Map<string, number>();
-  const prodAgg = new Map<string, { units: number; category: string }>();
+  const prodAgg = new Map<string, { units: number; category: string; code: string }>();
 
   for (const row of rows) {
     const units = toUnits(row["Number"] ?? row.number ?? row.qty);
@@ -67,19 +67,36 @@ export function computeRunRate(
     const name = String(
       row["Product (Name)"] ?? row.product_name ?? row.Product ?? "",
     ).trim();
+    const code = String(row["Product (Code)"] ?? row.product_code ?? "").trim();
     if (name) {
-      const cur = prodAgg.get(name) ?? { units: 0, category: cat };
+      const cur = prodAgg.get(name) ?? { units: 0, category: cat, code };
       cur.units += units;
+      if (!cur.code && code) cur.code = code;
       prodAgg.set(name, cur);
     }
   }
 
   const totalUnits = Array.from(catAgg.values()).reduce((s, v) => s + v, 0) || 1;
 
+  // Match a stock entry by any candidate key (product name or code).
+  const applyStock = (row: RunRateRow, candidates: string[]) => {
+    if (!stock) return;
+    for (const c of candidates) {
+      if (c && c in stock) {
+        const onHand = Number(stock[c]) || 0;
+        row.stock = onHand;
+        row.coverDays = row.unitsPerDay > 0 ? onHand / row.unitsPerDay : null;
+        row.reorderFlag = row.coverDays != null && row.coverDays <= reorderDays;
+        return;
+      }
+    }
+  };
+
   const mkRow = (
     key: string,
     label: string,
     units: number,
+    candidates: string[],
     sub?: string,
   ): RunRateRow => {
     const unitsPerDay = units / days;
@@ -92,21 +109,16 @@ export function computeRunRate(
       projectedUnits: Math.round(unitsPerDay * totalDays),
       sharePct: (units / totalUnits) * 100,
     };
-    if (stock && key in stock) {
-      const onHand = Number(stock[key]) || 0;
-      row.stock = onHand;
-      row.coverDays = unitsPerDay > 0 ? onHand / unitsPerDay : null;
-      row.reorderFlag = row.coverDays != null && row.coverDays <= reorderDays;
-    }
+    applyStock(row, candidates);
     return row;
   };
 
   const categories = Array.from(catAgg.entries())
-    .map(([cat, units]) => mkRow(cat, cat, units))
+    .map(([cat, units]) => mkRow(cat, cat, units, [cat]))
     .sort((a, b) => b.unitsPerDay - a.unitsPerDay);
 
   const products = Array.from(prodAgg.entries())
-    .map(([name, v]) => mkRow(name, name, v.units, v.category))
+    .map(([name, v]) => mkRow(name, name, v.units, [name, v.code], v.category))
     .sort((a, b) => b.unitsPerDay - a.unitsPerDay);
 
   return { daysElapsed: days, totalDays, totalUnits, categories, products };

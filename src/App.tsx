@@ -127,6 +127,7 @@ import { TrendsSection } from "./components/dashboard/TrendsSection";
 import { saveTrendSnapshot } from "./lib/trendsApi";
 import { RunRateSection } from "./components/dashboard/RunRateSection";
 import { computeRunRate } from "./lib/runRate";
+import { fetchStock, type StockStatus } from "./lib/stockApi";
 
 import { StaffSection } from "./components/dashboard/StaffSection";
 import { ReportsSection } from "./components/dashboard/ReportsSection";
@@ -2912,13 +2913,23 @@ function AppInternal({
     return { currentDay: Math.min(day, totalDays), totalDays };
   }, [displayUploads.current]);
 
+  const [stockStatus, setStockStatus] = useState<StockStatus | undefined>(undefined);
+  const loadStock = React.useCallback(() => {
+    if (!selectedBranch) return;
+    void fetchStock(selectedBranch).then(setStockStatus);
+  }, [selectedBranch]);
+  useEffect(() => {
+    loadStock();
+  }, [loadStock]);
+
   const runRateData = useMemo(
     () =>
       computeRunRate(displayUploads.current, getCategory, {
         daysElapsed: paceInfo.currentDay,
         totalDays: paceInfo.totalDays,
+        stockByProduct: stockStatus?.map,
       }),
-    [displayUploads.current, getCategory, paceInfo],
+    [displayUploads.current, getCategory, paceInfo, stockStatus],
   );
 
   const salesTrendData = useMemo(() => {
@@ -4024,7 +4035,13 @@ function AppInternal({
                 transition={{ duration: 0.4, ease: "easeOut" }}
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
-                <RunRateSection data={runRateData} />
+                <RunRateSection
+                  data={runRateData}
+                  branch={selectedBranch}
+                  stockStatus={stockStatus}
+                  updatedBy={user?.name ?? user?.username}
+                  onStockSaved={loadStock}
+                />
               </motion.div>
             )}
             {!isPia && currentView === "analysis" && (

@@ -13,7 +13,11 @@ const {
   upsertDailySnapshot,
   getDailySnapshots,
   initTelegramSchema,
+  getAppConfig,
+  setAppConfig,
 } = require("./_lib/tursoClient");
+
+const stockKey = (branchId) => `stock:${branchId}`;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -36,6 +40,50 @@ module.exports = async function handler(req, res) {
     await initTelegramSchema();
   } catch (e) {
     console.warn("[api/trends] schema init failed:", e.message);
+  }
+
+  // Stock-on-hand map (for Run Rate stock cover). Stored per branch in
+  // app_config; folded here to avoid adding a serverless function.
+  if (req.query.resource === "stock") {
+    const branchId = String(
+      req.query.branch ?? req.body?.branchId ?? "",
+    ).trim();
+    if (!branchId) {
+      return res.status(400).json({ ok: false, error: "Missing branch" });
+    }
+    if (req.method === "GET") {
+      const cfg = await getAppConfig(stockKey(branchId));
+      let map = {};
+      let itemCount = 0;
+      if (cfg && cfg.value) {
+        try {
+          map = JSON.parse(cfg.value);
+          itemCount = Object.keys(map).length;
+        } catch {
+          /* ignore */
+        }
+      }
+      return res.status(200).json({
+        ok: true,
+        map,
+        itemCount,
+        updatedAt: cfg?.updatedAt ?? null,
+        updatedBy: cfg?.updatedBy ?? null,
+      });
+    }
+    if (req.method === "POST") {
+      const map = req.body?.map;
+      if (!map || typeof map !== "object") {
+        return res.status(400).json({ ok: false, error: "Missing stock map" });
+      }
+      await setAppConfig(
+        stockKey(branchId),
+        JSON.stringify(map),
+        req.body?.updatedBy ? String(req.body.updatedBy) : null,
+      );
+      return res.status(200).json({ ok: true, itemCount: Object.keys(map).length });
+    }
+    return res.status(405).json({ ok: false, error: "Method not allowed" });
   }
 
   if (req.method === "GET") {
