@@ -850,7 +850,10 @@ export function StaffSection({
                             );
                           })()}
                           <div className="text-[10px] text-sky-300/80 mt-0.5 tabular-nums">
-                            ตอบ {csatUser.responseCount} ครั้ง
+                            ตอบ {csatUser.responseCount}
+                            {csatBillCount && csatBillCount > 0
+                              ? `/${csatBillCount} บิล (${((csatUser.responseCount / csatBillCount) * 100).toFixed(0)}%)`
+                              : " ครั้ง"}
                           </div>
                         </motion.div>
                       ) : null}
