@@ -298,6 +298,11 @@ const isPercentCalc = (calcType: PresetCalcType | undefined): boolean =>
   calcType === "catAttach" ||
   calcType === "tradeIn";
 
+// Shorten a 7-Wonder preset name for the header — drop the word "Attach"
+// (it makes the columns needlessly wide, e.g. "ATTACH COVERPLUS" → "COVERPLUS")
+const shortWonderName = (name: string): string =>
+  name.replace(/attach/gi, "").replace(/\s+/g, " ").trim() || name;
+
 function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
   const { categories, presets, rows } = data;
   const hasCsat = rows.some((r) => r.csat && r.csat.billCount > 0);
@@ -423,7 +428,7 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                   >
                     <div className="flex items-center justify-end gap-1">
                       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${colorDotClass(p.color)}`} />
-                      <span className="truncate max-w-[70px]">{p.name}</span>
+                      <span className="truncate max-w-[70px]">{shortWonderName(p.name)}</span>
                     </div>
                   </th>
                 ))}
