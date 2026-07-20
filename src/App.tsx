@@ -73,6 +73,7 @@ import { rowMatchesKpiCategory, type KpiCategoryKey } from "./lib/kpiCategoryAda
 import {
   getOfficerCategoryKpi,
   resolveOfficerId,
+  sumOfficerCategoryActual,
 } from "./lib/officerCategoryKpi";
 import {
   calcAchievementPct,
@@ -123,6 +124,12 @@ import {
 } from "recharts";
 import { HomeDashboardSection, type CombinedOfficerKpiData, type CombinedCatCell, type CombinedWonderCell } from "./components/dashboard/HomeDashboardSection";
 import { AnalysisSection } from "./components/dashboard/AnalysisSection";
+import {
+  DailyKpiTable,
+  type DailyKpiData,
+  type DailyCatCell,
+  type DailyWonderCell,
+} from "./components/dashboard/DailyKpiTable";
 import { TrendsSection } from "./components/dashboard/TrendsSection";
 import { saveTrendSnapshot } from "./lib/trendsApi";
 import { RunRateSection } from "./components/dashboard/RunRateSection";
@@ -2535,6 +2542,126 @@ function AppInternal({
     csatForOfficer,
   ]);
 
+  // Home: ตารางรายวัน — ยอดขายตามหมวด + 7 Wonders ต่อคน เทียบ "วันล่าสุด"
+  // กับ "วันก่อนหน้า" (2 วันที่มีข้อมูลล่าสุด)
+  const dailyKpiData = useMemo<DailyKpiData>(() => {
+    const categoriesList: KpiCategoryKey[] = ["Mac", "iPad", "iPhone", "Apple Watch", "BTB", "BTB(Apple)"];
+    const wonderPresets = kpiPresets.filter((p) => p.showInStaffProfile);
+    const empty: DailyKpiData = {
+      categories: categoriesList,
+      presets: wonderPresets,
+      rows: [],
+      latestDate: "",
+      prevDate: "",
+    };
+    if (displayUploads.current.length === 0) return empty;
+
+    // Two most recent distinct data dates
+    const dayKey = (row: RawRow) => {
+      const p = parseDocDate(String(row["Doc Date"] ?? row["doc date"] ?? ""));
+      return p ? `${p.getFullYear()}-${String(p.getMonth() + 1).padStart(2, "0")}-${String(p.getDate()).padStart(2, "0")}` : "";
+    };
+    const daySet = new Set<string>();
+    displayUploads.current.forEach((r) => {
+      const k = dayKey(r);
+      if (k) daySet.add(k);
+    });
+    const days = Array.from(daySet).sort().reverse();
+    if (days.length === 0) return empty;
+    const latestDay = days[0];
+    const prevDay = days[1] ?? null;
+
+    const latestRows = displayUploads.current.filter((r) => dayKey(r) === latestDay);
+    const prevRows = prevDay
+      ? displayUploads.current.filter((r) => dayKey(r) === prevDay)
+      : [];
+
+    const targetRecords = rawTargetRowsToRecords(displayUploads.target);
+    const lookup = buildCatDailyLookup(displayUploads.categoryMaster);
+    const latestBills = parseBills(enrichSalesRowsWithCatDaily(latestRows, lookup));
+    const prevBills = parseBills(enrichSalesRowsWithCatDaily(prevRows, lookup));
+
+    const officerList: Array<{ name: string; branch: string; staffId?: string }> =
+      parsedReport.officers.length > 0
+        ? parsedReport.officers.map((o) => ({ name: o.name, branch: o.branch, staffId: o.staffId }))
+        : Array.from(
+            new Map(
+              latestBills
+                .filter((b) => b.officerName)
+                .map((b) => [b.officerName, { name: b.officerName, branch: b.branchName }]),
+            ).values(),
+          );
+
+    const rows = officerList
+      .map((officer) => {
+        const officerId = resolveOfficerId(
+          officer.name,
+          displayUploads.target,
+          targetRecords,
+          displayUploads.current,
+          matchesOfficer,
+        );
+        const cats: Record<string, DailyCatCell> = {};
+        let latestTot = 0;
+        let prevTot = 0;
+        categoriesList.forEach((cat) => {
+          const latest = sumOfficerCategoryActual(latestRows, cat, officer.name, officerId, getCategory, matchesOfficer);
+          const prev = sumOfficerCategoryActual(prevRows, cat, officer.name, officerId, getCategory, matchesOfficer);
+          cats[cat] = { latest, prev };
+          latestTot += latest;
+          prevTot += prev;
+        });
+
+        const latestOfficerBills = latestBills.filter((b) => matchesOfficer(b.officerName, officer.name));
+        const prevOfficerBills = prevBills.filter((b) => matchesOfficer(b.officerName, officer.name));
+        const wonders: Record<string, DailyWonderCell> = {};
+        wonderPresets.forEach((p) => {
+          const ctxL = { tradeInCount: 0, iphoneUnits: iphoneUnitsFromBills(latestOfficerBills) };
+          const ctxP = { tradeInCount: 0, iphoneUnits: iphoneUnitsFromBills(prevOfficerBills) };
+          const rL = calcPreset(latestOfficerBills, p, ctxL);
+          const rP = calcPreset(prevOfficerBills, p, ctxP);
+          wonders[p.id] = {
+            latest: presetDisplayValue(rL),
+            prev: presetDisplayValue(rP),
+            latestA: rL.billsWithAandB,
+            latestB: rL.billsWithB,
+            prevA: rP.billsWithAandB,
+            calcType: p.calcType,
+          };
+        });
+
+        return {
+          officer,
+          cats,
+          catTotal: { latest: latestTot, prev: prevTot },
+          wonders,
+        };
+      })
+      .filter(
+        (r) =>
+          r.catTotal.latest > 0 ||
+          r.catTotal.prev > 0 ||
+          Object.values(r.wonders).some((w) => w.latest > 0 || w.prev > 0),
+      )
+      .sort((a, b) => b.catTotal.latest - a.catTotal.latest);
+
+    return {
+      categories: categoriesList,
+      presets: wonderPresets,
+      rows,
+      latestDate: latestDay,
+      prevDate: prevDay ?? "",
+    };
+  }, [
+    kpiPresets,
+    displayUploads.current,
+    displayUploads.target,
+    displayUploads.categoryMaster,
+    parsedReport.officers,
+    getCategory,
+    iphoneUnitsFromBills,
+  ]);
+
   const dynamicRadarData = useMemo(() => {
     if (activeStat === "csat") {
       const wondersRows = activeOfficer7WondersPerformance.filter(r => r.category !== "Average" && r.category !== "Total");
@@ -3962,6 +4089,7 @@ function AppInternal({
                   }}
                   categorySnapshotRef={categorySnapshotRef}
                 />
+                <DailyKpiTable data={dailyKpiData} />
               </motion.div>
             )}
             {currentView === "staff" && (
