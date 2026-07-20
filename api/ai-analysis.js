@@ -47,6 +47,16 @@ async function fetchWithTimeout(url, init) {
   }
 }
 
+function apiError(status, msg) {
+  const e = new Error(msg || `HTTP ${status}`);
+  e.status = status;
+  // Overloaded / rate-limited / transient upstream errors are retryable
+  e.retryable = [429, 500, 502, 503, 529].includes(Number(status));
+  return e;
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -125,7 +135,7 @@ async function callAnthropic(apiKey, model, userMsg) {
     }),
   });
   const json = await r.json().catch(() => null);
-  if (!r.ok) throw new Error(json?.error?.message || `Anthropic ${r.status}`);
+  if (!r.ok) throw apiError(r.status, json?.error?.message || `Anthropic ${r.status}`);
   return (json?.content || [])
     .filter((b) => b.type === "text")
     .map((b) => b.text)
@@ -147,7 +157,7 @@ async function callGemini(apiKey, model, userMsg) {
     }),
   });
   const json = await r.json().catch(() => null);
-  if (!r.ok) throw new Error(json?.error?.message || `Gemini ${r.status}`);
+  if (!r.ok) throw apiError(r.status, json?.error?.message || `Gemini ${r.status}`);
   const cand = json?.candidates?.[0];
   // Prompt/response blocked → surface a clear reason instead of empty text
   if (!cand || (cand.finishReason && cand.finishReason === "SAFETY")) {
@@ -177,11 +187,11 @@ async function callOpenAI(apiKey, model, userMsg) {
     }),
   });
   const json = await r.json().catch(() => null);
-  if (!r.ok) throw new Error(json?.error?.message || `OpenAI ${r.status}`);
+  if (!r.ok) throw apiError(r.status, json?.error?.message || `OpenAI ${r.status}`);
   return (json?.choices?.[0]?.message?.content || "").trim();
 }
 
-async function generate(cfg, userMsg) {
+async function generateOnce(cfg, userMsg) {
   switch (cfg.provider) {
     case "gemini":
       return callGemini(cfg.apiKey, cfg.model, userMsg);
@@ -190,6 +200,23 @@ async function generate(cfg, userMsg) {
     case "anthropic":
     default:
       return callAnthropic(cfg.apiKey, cfg.model, userMsg);
+  }
+}
+
+// Overload (529) / rate-limit (429) errors are transient — retry a couple
+// of times with short backoff before giving up.
+async function generate(cfg, userMsg) {
+  const delays = [1500, 3500];
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await generateOnce(cfg, userMsg);
+    } catch (e) {
+      if (e && e.retryable && attempt < delays.length) {
+        await sleep(delays[attempt]);
+        continue;
+      }
+      throw e;
+    }
   }
 }
 
@@ -282,6 +309,18 @@ module.exports = async function handler(req, res) {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[ai-analysis] failed:", msg);
-    return res.status(200).json({ ok: false, code: "api_error", error: msg });
+    const overloaded =
+      (e && (e.status === 529 || e.status === 429)) ||
+      /overload|high demand|rate limit|try again/i.test(msg);
+    const aborted = e && e.name === "AbortError";
+    return res.status(200).json({
+      ok: false,
+      code: overloaded ? "overloaded" : aborted ? "timeout" : "api_error",
+      error: overloaded
+        ? "โมเดล AI กำลังมีผู้ใช้งานเยอะ (overloaded) — ลองใหม่อีกครั้งในสักครู่ หรือสลับไปใช้ค่าย/โมเดลอื่นในหน้า Settings"
+        : aborted
+          ? "AI ใช้เวลานานเกินไป (timeout) — ลองใหม่ หรือใช้โมเดลที่เร็วขึ้น"
+          : msg,
+    });
   }
 };
