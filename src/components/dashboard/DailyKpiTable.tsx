@@ -97,8 +97,36 @@ function DailyDate({ latestDate, prevDate }: { latestDate: string; prevDate: str
 }
 
 export function DailyKpiTable({ data }: { data?: DailyKpiData }) {
+  const [sort, setSort] = React.useState<{ key: string; dir: "asc" | "desc" } | null>(null);
+  const onSort = (key: string) =>
+    setSort((s) => (s && s.key === key ? { key, dir: s.dir === "desc" ? "asc" : "desc" } : { key, dir: "desc" }));
+  const rowsRaw = data?.rows ?? [];
+  const sortVal = (row: DailyOfficerRow, key: string): number | string => {
+    if (key === "name") return row.officer.name;
+    if (key === "total") return row.catTotal.latest;
+    if (key.startsWith("cat:")) return row.cats[key.slice(4)]?.latest ?? -1;
+    if (key.startsWith("w:")) {
+      const w = row.wonders[key.slice(2)];
+      return w ? (w.latestA ?? w.latest) : -1;
+    }
+    return 0;
+  };
+  const sortedRows = React.useMemo(() => {
+    if (!sort) return rowsRaw;
+    return [...rowsRaw].sort((a, b) => {
+      const va = sortVal(a, sort.key);
+      const vb = sortVal(b, sort.key);
+      if (typeof va === "string" || typeof vb === "string") {
+        const r = String(va).localeCompare(String(vb));
+        return sort.dir === "asc" ? r : -r;
+      }
+      return sort.dir === "asc" ? va - vb : vb - va;
+    });
+  }, [rowsRaw, sort]);
+  const arrow = (key: string) => (sort?.key === key ? (sort.dir === "asc" ? " ▲" : " ▼") : "");
+
   if (!data || data.rows.length === 0) return null;
-  const { categories, presets, rows } = data;
+  const { categories, presets } = data;
 
   const renderCat = (cell: DailyCatCell | undefined, isTotal = false) => {
     if (!cell) return <span className="text-white/25">—</span>;
@@ -174,36 +202,44 @@ export function DailyKpiTable({ data }: { data?: DailyKpiData }) {
               ) : null}
             </tr>
             <tr className="bg-[#0c3123] border-b border-emerald-500/20 text-white/90">
-              <th className="py-2 px-2 font-bold uppercase tracking-wider sticky left-0 bg-[#0c3123] z-10 min-w-[120px]">
-                เจ้าหน้าที่
+              <th
+                onClick={() => onSort("name")}
+                className="py-2 px-2 font-bold uppercase tracking-wider sticky left-0 bg-[#0c3123] z-10 min-w-[120px] cursor-pointer select-none hover:text-white"
+              >
+                เจ้าหน้าที่{arrow("name")}
               </th>
               {categories.map((cat, i) => (
                 <th
                   key={cat}
-                  className={`py-2 px-2 font-bold uppercase tracking-wide text-right min-w-[62px] ${i === 0 ? "border-l border-white/10" : ""}`}
+                  onClick={() => onSort(`cat:${cat}`)}
+                  className={`py-2 px-2 font-bold uppercase tracking-wide text-right min-w-[62px] cursor-pointer select-none hover:text-white ${i === 0 ? "border-l border-white/10" : ""}`}
                 >
-                  {cat}
+                  {cat}{arrow(`cat:${cat}`)}
                 </th>
               ))}
-              <th className="py-2 px-2 font-bold uppercase tracking-wide text-right min-w-[68px] text-emerald-300 bg-emerald-500/5">
-                Total
+              <th
+                onClick={() => onSort("total")}
+                className="py-2 px-2 font-bold uppercase tracking-wide text-right min-w-[68px] text-emerald-300 bg-emerald-500/5 cursor-pointer select-none hover:text-emerald-200"
+              >
+                Total{arrow("total")}
               </th>
               {presets.map((p, i) => (
                 <th
                   key={p.id}
-                  className={`py-2 px-2 font-bold uppercase tracking-wide text-right min-w-[66px] ${i === 0 ? "border-l border-white/10" : ""}`}
+                  onClick={() => onSort(`w:${p.id}`)}
+                  className={`py-2 px-2 font-bold uppercase tracking-wide text-right min-w-[66px] cursor-pointer select-none hover:text-white ${i === 0 ? "border-l border-white/10" : ""}`}
                   title={p.labelA + " → " + (p.labelB || "(ไม่มี)")}
                 >
                   <div className="flex items-center justify-end gap-1">
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${colorDot(p.color)}`} />
-                    <span className="truncate max-w-[70px]">{shortWonder(p.name)}</span>
+                    <span className="truncate max-w-[70px]">{shortWonder(p.name)}{arrow(`w:${p.id}`)}</span>
                   </div>
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, idx) => (
+            {sortedRows.map((row, idx) => (
               <tr
                 key={`${row.officer.name}-${idx}`}
                 className="border-b border-white/5 hover:bg-white/5 transition-colors"
