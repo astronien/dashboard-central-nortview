@@ -51,6 +51,9 @@ export interface RunRateOptions {
   stockByProduct?: Record<string, number>;
   /** product-name/code → unit cost (optional, for cash-tied-up) */
   costByProduct?: Record<string, number>;
+  /** full stock item list — lets products with zero sales this period
+   *  still appear (true dead stock) */
+  stockItems?: { name: string; code: string; qty: number }[];
   /** reorder alert threshold in days of cover (default 14) */
   reorderDays?: number;
   /** measure velocity over the last N days of data instead of MTD */
@@ -108,6 +111,26 @@ export function computeRunRate(
       cur.units += units;
       if (!cur.code && code) cur.code = code;
       prodAgg.set(name, cur);
+    }
+  }
+
+  // Inject stock items that had NO sales this period so they surface as
+  // dead stock (they never appear in the sales rows above). Skip ones
+  // already sold (matched by code or name).
+  if (opts.stockItems && opts.stockItems.length) {
+    const soldCodes = new Set<string>();
+    const soldNames = new Set<string>();
+    for (const [nm, v] of prodAgg) {
+      soldNames.add(nm);
+      if (v.code) soldCodes.add(v.code);
+    }
+    for (const it of opts.stockItems) {
+      const code = String(it.code ?? "").trim();
+      const name = String(it.name ?? "").trim();
+      if ((code && soldCodes.has(code)) || (name && soldNames.has(name))) continue;
+      const label = name || code;
+      if (!label || prodAgg.has(label)) continue;
+      prodAgg.set(label, { units: 0, category: "ไม่ได้ขายเดือนนี้", code });
     }
   }
 

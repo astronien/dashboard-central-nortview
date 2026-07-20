@@ -55,13 +55,15 @@ module.exports = async function handler(req, res) {
       const cfg = await getAppConfig(stockKey(branchId));
       let map = {};
       let cost = {};
+      let items = [];
       if (cfg && cfg.value) {
         try {
           const parsed = JSON.parse(cfg.value);
-          // New format { qty, cost }; old format was a flat qty map.
+          // New format { qty, cost, items }; old format was a flat qty map.
           if (parsed && parsed.qty && typeof parsed.qty === "object") {
             map = parsed.qty;
             cost = parsed.cost && typeof parsed.cost === "object" ? parsed.cost : {};
+            items = Array.isArray(parsed.items) ? parsed.items : [];
           } else {
             map = parsed;
           }
@@ -73,7 +75,8 @@ module.exports = async function handler(req, res) {
         ok: true,
         map,
         cost,
-        itemCount: Object.keys(map).length,
+        items,
+        itemCount: items.length || Object.keys(map).length,
         hasCost: Object.keys(cost).length > 0,
         updatedAt: cfg?.updatedAt ?? null,
         updatedBy: cfg?.updatedBy ?? null,
@@ -82,15 +85,16 @@ module.exports = async function handler(req, res) {
     if (req.method === "POST") {
       const map = req.body?.qty ?? req.body?.map;
       const cost = req.body?.cost ?? {};
+      const items = Array.isArray(req.body?.items) ? req.body.items : [];
       if (!map || typeof map !== "object") {
         return res.status(400).json({ ok: false, error: "Missing stock map" });
       }
       await setAppConfig(
         stockKey(branchId),
-        JSON.stringify({ qty: map, cost }),
+        JSON.stringify({ qty: map, cost, items }),
         req.body?.updatedBy ? String(req.body.updatedBy) : null,
       );
-      return res.status(200).json({ ok: true, itemCount: Object.keys(map).length });
+      return res.status(200).json({ ok: true, itemCount: items.length || Object.keys(map).length });
     }
     return res.status(405).json({ ok: false, error: "Method not allowed" });
   }

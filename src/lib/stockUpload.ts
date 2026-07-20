@@ -6,10 +6,14 @@ import * as XLSX from "xlsx";
 // code/SKU/barcode) and a quantity, keyed by BOTH name and code so the
 // run-rate engine can match sales rows by either.
 
+// Note: findHeader matches EXACT first, then "contains". Keep exact tokens
+// (e.g. "name", "product", "number") so short headers like the COM7 stock
+// export (Product / Name / Number) resolve correctly before any fuzzy hit.
 const NAME_KEYS = [
   "product (name)",
   "product name",
   "productname",
+  "name",
   "ชื่อสินค้า",
   "สินค้า",
   "description",
@@ -20,6 +24,7 @@ const CODE_KEYS = [
   "product (code)",
   "product code",
   "productcode",
+  "product",
   "sku",
   "barcode",
   "รหัสสินค้า",
@@ -27,6 +32,7 @@ const CODE_KEYS = [
   "article",
 ];
 const QTY_KEYS = [
+  "number",
   "qty",
   "quantity",
   "stock",
@@ -34,6 +40,7 @@ const QTY_KEYS = [
   "onhand",
   "balance",
   "คงเหลือ",
+  "จำนวนคงเหลือ",
   "จำนวน",
   "สต็อก",
   "ยอดคงเหลือ",
@@ -68,6 +75,12 @@ const findHeader = (headers: string[], keys: string[]): string | null => {
 const toQty = (v: unknown): number =>
   Number(String(v ?? "0").replace(/[^\d.-]/g, "")) || 0;
 
+export interface StockItem {
+  name: string;
+  code: string;
+  qty: number;
+}
+
 export interface StockParseResult {
   ok: boolean;
   error?: string;
@@ -76,6 +89,9 @@ export interface StockParseResult {
   stockMap: Record<string, number>;
   /** productName/code → unit cost (empty if no cost column) */
   costMap: Record<string, number>;
+  /** one entry per product (deduped) — lets the run-rate view show
+   *  stock items that had zero sales this period (true dead stock) */
+  items: StockItem[];
   hasCost: boolean;
   sample: { key: string; qty: number }[];
 }
@@ -116,7 +132,9 @@ export async function parseStockExcelFile(file: File): Promise<StockParseResult>
 
     const stockMap: Record<string, number> = {};
     const costMap: Record<string, number> = {};
-    let count = 0;
+    // dedupe products (serialised items repeat one row per serial) by
+    // identity = code || name, summing quantity
+    const itemMap = new Map<string, StockItem>();
     for (const r of rows) {
       const qty = toQty(qtyH ? r[qtyH] : 0);
       const cost = costH ? toQty(r[costH]) : 0;
@@ -130,18 +148,24 @@ export async function parseStockExcelFile(file: File): Promise<StockParseResult>
         if (name) costMap[name] = cost;
         if (code) costMap[code] = cost;
       }
-      count += 1;
+      const id = code || name;
+      const cur = itemMap.get(id) ?? { name, code, qty: 0 };
+      cur.qty += qty;
+      if (!cur.name && name) cur.name = name;
+      itemMap.set(id, cur);
     }
 
+    const items = Array.from(itemMap.values());
     const sample = Object.entries(stockMap)
       .slice(0, 5)
       .map(([key, qty]) => ({ key, qty }));
 
     return {
       ok: true,
-      itemCount: count,
+      itemCount: items.length,
       stockMap,
       costMap,
+      items,
       hasCost: Boolean(costH) && Object.keys(costMap).length > 0,
       sample,
     };

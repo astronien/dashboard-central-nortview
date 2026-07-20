@@ -1,8 +1,15 @@
 // Client for the stock-on-hand store (folded into /api/trends?resource=stock).
 
+export interface StockItem {
+  name: string;
+  code: string;
+  qty: number;
+}
+
 export interface StockStatus {
   map: Record<string, number>;
   cost: Record<string, number>;
+  items: StockItem[];
   hasCost: boolean;
   itemCount: number;
   updatedAt: string | null;
@@ -21,6 +28,7 @@ export async function fetchStock(branch: string): Promise<StockStatus | undefine
     return {
       map: json.map ?? {},
       cost: json.cost ?? {},
+      items: Array.isArray(json.items) ? json.items : [],
       hasCost: Boolean(json.hasCost),
       itemCount: json.itemCount ?? 0,
       updatedAt: json.updatedAt ?? null,
@@ -35,6 +43,7 @@ export async function saveStock(
   branch: string,
   map: Record<string, number>,
   costMap?: Record<string, number>,
+  items?: StockItem[],
   updatedBy?: string,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
@@ -43,7 +52,7 @@ export async function saveStock(
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ branchId: branch, qty: map, cost: costMap ?? {}, updatedBy }),
+        body: JSON.stringify({ branchId: branch, qty: map, cost: costMap ?? {}, items: items ?? [], updatedBy }),
       },
     );
     const json = await res.json().catch(() => null);

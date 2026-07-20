@@ -2930,6 +2930,7 @@ function AppInternal({
         totalDays: paceInfo.totalDays,
         stockByProduct: stockStatus?.map,
         costByProduct: stockStatus?.cost,
+        stockItems: stockStatus?.items,
         windowDays: runRateWindow || undefined,
       }),
     [displayUploads.current, getCategory, paceInfo, stockStatus, runRateWindow],

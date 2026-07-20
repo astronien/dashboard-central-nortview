@@ -123,7 +123,7 @@ function StockUploadPanel({
     }
     setState("saving");
     setMsg(`พบ ${parsed.itemCount} รายการ${parsed.hasCost ? " (มีต้นทุน)" : ""} — กำลังบันทึก…`);
-    const res = await saveStock(branch, parsed.stockMap, parsed.costMap, updatedBy);
+    const res = await saveStock(branch, parsed.stockMap, parsed.costMap, parsed.items, updatedBy);
     if (res.ok) {
       setState("done");
       setMsg(`บันทึกสต็อก ${parsed.itemCount} รายการแล้ว${parsed.hasCost ? " · มีต้นทุน (เปิดมูลค่าเงินจม)" : ""}`);
