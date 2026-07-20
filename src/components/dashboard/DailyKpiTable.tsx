@@ -68,44 +68,11 @@ const fmtWonderVal = (v: number, calcType: PresetCalcType | undefined): string =
   }
 };
 
-// Small up/down delta chip
-function Delta({
-  d,
-  unit = "",
-  fmt,
-}: {
-  d: number;
-  unit?: string;
-  fmt?: (n: number) => string;
-}) {
-  if (Math.abs(d) < 0.05)
-    return <span className="text-[8px] text-white/30">±0</span>;
-  const up = d > 0;
-  const a = Math.abs(d);
-  const val = fmt ? fmt(a) : Number.isInteger(a) ? String(a) : a.toFixed(1);
-  return (
-    <span className={`text-[8px] font-semibold tabular-nums ${up ? "text-emerald-400" : "text-rose-400"}`}>
-      {up ? "▲" : "▼"}
-      {up ? "+" : "-"}
-      {val}
-      {unit}
-    </span>
-  );
-}
-
-function DailyDate({ latestDate, prevDate }: { latestDate: string; prevDate: string }) {
-  const fmt = (iso: string) => {
-    if (!iso) return "-";
-    const [, m, d] = iso.split("-");
-    return d && m ? `${d}/${m}` : iso;
-  };
-  return (
-    <span>
-      วันล่าสุด <b className="text-white">{fmt(latestDate)}</b> เทียบวันก่อน{" "}
-      <b className="text-white">{fmt(prevDate)}</b>
-    </span>
-  );
-}
+const fmtDayLabel = (iso: string): string => {
+  if (!iso) return "-";
+  const [, m, d] = iso.split("-");
+  return d && m ? `${d}/${m}` : iso;
+};
 
 export function DailyKpiTable({ data }: { data?: DailyKpiData }) {
   const [sort, setSort] = React.useState<{ key: string; dir: "asc" | "desc" } | null>(null);
@@ -143,17 +110,11 @@ export function DailyKpiTable({ data }: { data?: DailyKpiData }) {
     if (!cell) return <span className="text-white/25">—</span>;
     return (
       <div className="flex flex-col items-end gap-0.5 leading-none">
-        <span className="flex items-center gap-1">
-          <span className={`font-mono tabular-nums ${isTotal ? "font-bold text-emerald-200" : "font-semibold text-white"}`}>
-            {Math.round(cell.units)}
-          </span>
-          <Delta d={cell.units - cell.prevUnits} />
+        <span className={`font-mono tabular-nums ${isTotal ? "font-bold text-emerald-200" : "font-semibold text-white"}`}>
+          {Math.round(cell.units)}
         </span>
-        <span className="flex items-center gap-1">
-          <span className="font-mono text-[9px] text-white/50 tabular-nums">
-            ฿{fmtCompact(cell.baht)}
-          </span>
-          <Delta d={cell.baht - cell.prevBaht} fmt={fmtCompact} />
+        <span className="font-mono text-[9px] text-white/50 tabular-nums">
+          ฿{fmtCompact(cell.baht)}
         </span>
       </div>
     );
@@ -165,18 +126,9 @@ export function DailyKpiTable({ data }: { data?: DailyKpiData }) {
     const primary = showAB
       ? `${Math.round(cell.latestA as number)}/${Math.round(cell.latestB as number)}`
       : fmtWonderVal(cell.latest, cell.calcType);
-    const deltaBills =
-      showAB && cell.prevA !== undefined
-        ? Math.round(cell.latestA as number) - Math.round(cell.prevA)
-        : null;
     return (
       <div className="flex flex-col items-end gap-0.5 leading-none">
         <span className="font-mono font-semibold text-white tabular-nums">{primary}</span>
-        {deltaBills !== null ? (
-          <Delta d={deltaBills} unit=" บิล" />
-        ) : (
-          <Delta d={cell.latest - cell.prev} />
-        )}
       </div>
     );
   };
@@ -192,8 +144,8 @@ export function DailyKpiTable({ data }: { data?: DailyKpiData }) {
             ยอดขายตามหมวด + 7 Wonders รายคน (รายวัน)
           </h2>
           <p className="text-[10px] text-white/45">
-            <DailyDate latestDate={data.latestDate} prevDate={data.prevDate} /> · หมวด =
-            จำนวนเครื่อง (unit) · เลขบน = วันล่าสุด · ▲▼ = เทียบวันก่อนหน้า
+            ข้อมูลวันล่าสุด <b className="text-white">{fmtDayLabel(data.latestDate)}</b> ·
+            หมวด = จำนวนเครื่อง (unit) + ฿ · 7 Wonders = แนบ/ฐาน
           </p>
         </div>
       </div>
