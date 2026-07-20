@@ -2616,30 +2616,44 @@ function AppInternal({
           displayUploads.current,
           matchesOfficer,
         );
-        // Daily table shows category UNITS (จำนวนเครื่อง/ชิ้น), not baht —
-        // sum the Number (qty) column for the officer's rows in that category.
+        // Daily table shows category UNITS (จำนวนเครื่อง) + BAHT together —
+        // sum the Number (qty) column and the sale value per category.
         const nId = normalizeId(officerId);
-        const sumUnits = (dayRows: RawRow[], cat: string): number =>
-          dayRows.reduce((s, row) => {
-            const officerName = String(row["Officer (Name)"] ?? "").trim();
-            const rowId = normalizeId(row["STAFF ID"] ?? row.emp_id ?? "");
-            const match =
-              matchesOfficer(officerName, officer.name) ||
-              Boolean(nId && rowId && rowId === nId);
-            if (!match) return s;
-            if (getCategory(row) !== cat) return s;
-            return s + toNumber(row.Number ?? row.number ?? row.qty ?? 0);
-          }, 0);
+        const sumCat = (dayRows: RawRow[], cat: string): { units: number; baht: number } =>
+          dayRows.reduce(
+            (acc, row) => {
+              const officerName = String(row["Officer (Name)"] ?? "").trim();
+              const rowId = normalizeId(row["STAFF ID"] ?? row.emp_id ?? "");
+              const match =
+                matchesOfficer(officerName, officer.name) ||
+                Boolean(nId && rowId && rowId === nId);
+              if (!match) return acc;
+              if (getCategory(row) !== cat) return acc;
+              acc.units += toNumber(row.Number ?? row.number ?? row.qty ?? 0);
+              acc.baht += getCategoryValue(row);
+              return acc;
+            },
+            { units: 0, baht: 0 },
+          );
 
         const cats: Record<string, DailyCatCell> = {};
-        let latestTot = 0;
-        let prevTot = 0;
+        let latestUnits = 0;
+        let prevUnits = 0;
+        let latestBaht = 0;
+        let prevBaht = 0;
         categoriesList.forEach((cat) => {
-          const latest = sumUnits(latestRows, cat);
-          const prev = sumUnits(prevRows, cat);
-          cats[cat] = { latest, prev };
-          latestTot += latest;
-          prevTot += prev;
+          const latest = sumCat(latestRows, cat);
+          const prev = sumCat(prevRows, cat);
+          cats[cat] = {
+            units: latest.units,
+            prevUnits: prev.units,
+            baht: latest.baht,
+            prevBaht: prev.baht,
+          };
+          latestUnits += latest.units;
+          prevUnits += prev.units;
+          latestBaht += latest.baht;
+          prevBaht += prev.baht;
         });
 
         const latestOfficerBills = latestBills.filter((b) => matchesOfficer(b.officerName, officer.name));
@@ -2669,17 +2683,22 @@ function AppInternal({
         return {
           officer,
           cats,
-          catTotal: { latest: latestTot, prev: prevTot },
+          catTotal: {
+            units: latestUnits,
+            prevUnits,
+            baht: latestBaht,
+            prevBaht,
+          },
           wonders,
         };
       })
       .filter(
         (r) =>
-          r.catTotal.latest > 0 ||
-          r.catTotal.prev > 0 ||
+          r.catTotal.units > 0 ||
+          r.catTotal.prevUnits > 0 ||
           Object.values(r.wonders).some((w) => w.latest > 0 || w.prev > 0),
       )
-      .sort((a, b) => b.catTotal.latest - a.catTotal.latest);
+      .sort((a, b) => b.catTotal.baht - a.catTotal.baht);
 
     return {
       categories: categoriesList,

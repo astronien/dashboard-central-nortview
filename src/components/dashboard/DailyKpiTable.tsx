@@ -3,8 +3,10 @@ import { CalendarDays } from "lucide-react";
 import type { Preset, PresetCalcType } from "../../lib/presetTypes";
 
 export interface DailyCatCell {
-  latest: number;
-  prev: number;
+  units: number;
+  prevUnits: number;
+  baht: number;
+  prevBaht: number;
 }
 export interface DailyWonderCell {
   latest: number;
@@ -67,15 +69,24 @@ const fmtWonderVal = (v: number, calcType: PresetCalcType | undefined): string =
 };
 
 // Small up/down delta chip
-function Delta({ d, unit = "" }: { d: number; unit?: string }) {
+function Delta({
+  d,
+  unit = "",
+  fmt,
+}: {
+  d: number;
+  unit?: string;
+  fmt?: (n: number) => string;
+}) {
   if (Math.abs(d) < 0.05)
-    return <span className="text-[8px] text-white/30">เท่าเดิม</span>;
+    return <span className="text-[8px] text-white/30">±0</span>;
   const up = d > 0;
-  const val = Number.isInteger(d) ? d : d.toFixed(1);
+  const a = Math.abs(d);
+  const val = fmt ? fmt(a) : Number.isInteger(a) ? String(a) : a.toFixed(1);
   return (
     <span className={`text-[8px] font-semibold tabular-nums ${up ? "text-emerald-400" : "text-rose-400"}`}>
       {up ? "▲" : "▼"}
-      {up ? "+" : ""}
+      {up ? "+" : "-"}
       {val}
       {unit}
     </span>
@@ -103,8 +114,8 @@ export function DailyKpiTable({ data }: { data?: DailyKpiData }) {
   const rowsRaw = data?.rows ?? [];
   const sortVal = (row: DailyOfficerRow, key: string): number | string => {
     if (key === "name") return row.officer.name;
-    if (key === "total") return row.catTotal.latest;
-    if (key.startsWith("cat:")) return row.cats[key.slice(4)]?.latest ?? -1;
+    if (key === "total") return row.catTotal.units;
+    if (key.startsWith("cat:")) return row.cats[key.slice(4)]?.units ?? -1;
     if (key.startsWith("w:")) {
       const w = row.wonders[key.slice(2)];
       return w ? (w.latestA ?? w.latest) : -1;
@@ -132,10 +143,18 @@ export function DailyKpiTable({ data }: { data?: DailyKpiData }) {
     if (!cell) return <span className="text-white/25">—</span>;
     return (
       <div className="flex flex-col items-end gap-0.5 leading-none">
-        <span className={`font-mono tabular-nums ${isTotal ? "font-bold text-emerald-200" : "font-semibold text-white"}`}>
-          {fmtCompact(cell.latest)}
+        <span className="flex items-center gap-1">
+          <span className={`font-mono tabular-nums ${isTotal ? "font-bold text-emerald-200" : "font-semibold text-white"}`}>
+            {Math.round(cell.units)}
+          </span>
+          <Delta d={cell.units - cell.prevUnits} />
         </span>
-        <Delta d={cell.latest - cell.prev} />
+        <span className="flex items-center gap-1">
+          <span className="font-mono text-[9px] text-white/50 tabular-nums">
+            ฿{fmtCompact(cell.baht)}
+          </span>
+          <Delta d={cell.baht - cell.prevBaht} fmt={fmtCompact} />
+        </span>
       </div>
     );
   };
