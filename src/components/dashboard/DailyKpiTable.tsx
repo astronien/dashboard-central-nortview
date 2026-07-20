@@ -173,8 +173,8 @@ export function DailyKpiTable({ data }: { data?: DailyKpiData }) {
             ยอดขายตามหมวด + 7 Wonders รายคน (รายวัน)
           </h2>
           <p className="text-[10px] text-white/45">
-            <DailyDate latestDate={data.latestDate} prevDate={data.prevDate} /> · เลขบน =
-            วันล่าสุด · ▲▼ = เทียบวันก่อนหน้า
+            <DailyDate latestDate={data.latestDate} prevDate={data.prevDate} /> · หมวด =
+            จำนวนเครื่อง (unit) · เลขบน = วันล่าสุด · ▲▼ = เทียบวันก่อนหน้า
           </p>
         </div>
       </div>
@@ -189,7 +189,7 @@ export function DailyKpiTable({ data }: { data?: DailyKpiData }) {
                   colSpan={categories.length + 1}
                   className="py-1.5 px-2 text-center text-[9px] font-bold uppercase tracking-widest text-emerald-300/80 border-l border-white/10"
                 >
-                  ยอดขายตามหมวด
+                  ยอดขายตามหมวด (จำนวนเครื่อง)
                 </th>
               ) : null}
               {presets.length > 0 ? (

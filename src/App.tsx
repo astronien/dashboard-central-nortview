@@ -73,7 +73,6 @@ import { rowMatchesKpiCategory, type KpiCategoryKey } from "./lib/kpiCategoryAda
 import {
   getOfficerCategoryKpi,
   resolveOfficerId,
-  sumOfficerCategoryActual,
 } from "./lib/officerCategoryKpi";
 import {
   calcAchievementPct,
@@ -2617,12 +2616,27 @@ function AppInternal({
           displayUploads.current,
           matchesOfficer,
         );
+        // Daily table shows category UNITS (จำนวนเครื่อง/ชิ้น), not baht —
+        // sum the Number (qty) column for the officer's rows in that category.
+        const nId = normalizeId(officerId);
+        const sumUnits = (dayRows: RawRow[], cat: string): number =>
+          dayRows.reduce((s, row) => {
+            const officerName = String(row["Officer (Name)"] ?? "").trim();
+            const rowId = normalizeId(row["STAFF ID"] ?? row.emp_id ?? "");
+            const match =
+              matchesOfficer(officerName, officer.name) ||
+              Boolean(nId && rowId && rowId === nId);
+            if (!match) return s;
+            if (getCategory(row) !== cat) return s;
+            return s + toNumber(row.Number ?? row.number ?? row.qty ?? 0);
+          }, 0);
+
         const cats: Record<string, DailyCatCell> = {};
         let latestTot = 0;
         let prevTot = 0;
         categoriesList.forEach((cat) => {
-          const latest = sumOfficerCategoryActual(latestRows, cat, officer.name, officerId, getCategory, matchesOfficer);
-          const prev = sumOfficerCategoryActual(prevRows, cat, officer.name, officerId, getCategory, matchesOfficer);
+          const latest = sumUnits(latestRows, cat);
+          const prev = sumUnits(prevRows, cat);
           cats[cat] = { latest, prev };
           latestTot += latest;
           prevTot += prev;
