@@ -2581,6 +2581,22 @@ function AppInternal({
     const latestBills = parseBills(enrichSalesRowsWithCatDaily(latestRows, lookup));
     const prevBills = parseBills(enrichSalesRowsWithCatDaily(prevRows, lookup));
 
+    // Trade-in agreed trades carry document_date, so count per officer for a
+    // specific day (matched by SALE_CODE digits or cleaned SALE_NAME).
+    const agreedTrades = tradeInData?.agreed ?? [];
+    const tradeCountOnDay = (staffId: string | undefined, name: string, ymd: string): number => {
+      if (!ymd) return 0;
+      const code = String(staffId ?? "").replace(/[^0-9]/g, "");
+      const nm = cleanOfficerName(name ?? "");
+      let n = 0;
+      for (const t of agreedTrades) {
+        if (t.date !== ymd) continue;
+        const tc = String(t.code).replace(/[^0-9]/g, "");
+        if ((code && tc && tc === code) || (nm && cleanOfficerName(t.name) === nm)) n += 1;
+      }
+      return n;
+    };
+
     const officerList: Array<{ name: string; branch: string; staffId?: string }> =
       parsedReport.officers.length > 0
         ? parsedReport.officers.map((o) => ({ name: o.name, branch: o.branch, staffId: o.staffId }))
@@ -2616,8 +2632,14 @@ function AppInternal({
         const prevOfficerBills = prevBills.filter((b) => matchesOfficer(b.officerName, officer.name));
         const wonders: Record<string, DailyWonderCell> = {};
         wonderPresets.forEach((p) => {
-          const ctxL = { tradeInCount: 0, iphoneUnits: iphoneUnitsFromBills(latestOfficerBills) };
-          const ctxP = { tradeInCount: 0, iphoneUnits: iphoneUnitsFromBills(prevOfficerBills) };
+          const ctxL = {
+            tradeInCount: tradeCountOnDay(officer.staffId, officer.name, latestDay),
+            iphoneUnits: iphoneUnitsFromBills(latestOfficerBills),
+          };
+          const ctxP = {
+            tradeInCount: tradeCountOnDay(officer.staffId, officer.name, prevDay ?? ""),
+            iphoneUnits: iphoneUnitsFromBills(prevOfficerBills),
+          };
           const rL = calcPreset(latestOfficerBills, p, ctxL);
           const rP = calcPreset(prevOfficerBills, p, ctxP);
           wonders[p.id] = {
@@ -2660,6 +2682,7 @@ function AppInternal({
     parsedReport.officers,
     getCategory,
     iphoneUnitsFromBills,
+    tradeInData,
   ]);
 
   const dynamicRadarData = useMemo(() => {

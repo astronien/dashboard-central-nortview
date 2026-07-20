@@ -9,18 +9,25 @@ export interface TradeInStaffRate {
   target: number; // รายการเทรดทั้งหมดของพนักงานคนนี้
 }
 
+export interface TradeInAgreed {
+  code: string; // SALE_CODE (= STAFF ID)
+  name: string; // SALE_NAME
+  date: string; // document_date (YYYY-MM-DD)
+}
+
 export interface TradeInResult {
   actual: number; // status 3 (สิ้นสุดการประมูลราคา) — ทั้งสาขา
   today: number; // status 3 วันนี้ — ทั้งสาขา
   target: number; // รายการเทรดทั้งหมด (ใช้แสดงเป็น denominator) — ทั้งสาขา
   perStaff: TradeInStaffRate[]; // แยกตามพนักงาน (SALE_CODE / SALE_NAME)
+  agreed: TradeInAgreed[]; // status-3 trades w/ date — for per-day breakdown
 }
 
 export async function fetchTradeInData(
   branchCode: string,
 ): Promise<TradeInResult> {
   if (!branchCode) {
-    return { actual: 0, today: 0, target: 0, perStaff: [] };
+    return { actual: 0, today: 0, target: 0, perStaff: [], agreed: [] };
   }
 
   // Trade data is keyed to Thailand business days — compute "today" and the
@@ -42,12 +49,12 @@ export async function fetchTradeInData(
 
   if (!res.ok) {
     console.warn(`[TradeIn API] returned ${res.status}`);
-    return { actual: 0, today: 0, target: 0, perStaff: [] };
+    return { actual: 0, today: 0, target: 0, perStaff: [], agreed: [] };
   }
 
   const json = await res.json();
   if (!json.success || !Array.isArray(json.data)) {
-    return { actual: 0, today: 0, target: 0, perStaff: [] };
+    return { actual: 0, today: 0, target: 0, perStaff: [], agreed: [] };
   }
 
   const allTrades = json.data;
@@ -83,7 +90,19 @@ export async function fetchTradeInData(
     }
   }
 
-  return { actual, today, target, perStaff: Array.from(staffMap.values()) };
+  const agreed: TradeInAgreed[] = agreedTrades.map((t: any) => ({
+    code: String(t.SALE_CODE ?? "").trim(),
+    name: String(t.SALE_NAME ?? "").trim(),
+    date: String(t.document_date ?? "").slice(0, 10),
+  }));
+
+  return {
+    actual,
+    today,
+    target,
+    perStaff: Array.from(staffMap.values()),
+    agreed,
+  };
 }
 
 const BRANCH_CODE_KEYS = ["emp_shop_code", "branchId", "Branch ID", "BRANCH CODE"];
