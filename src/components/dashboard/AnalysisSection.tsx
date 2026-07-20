@@ -194,13 +194,28 @@ export function AnalysisSection({
           dateLabel: store.dateLabel,
         }),
       });
-      const data = await res.json();
-      if (data.ok && data.text) {
+      // The function can time out / crash and return an HTML error page
+      // (not JSON), so read as text and parse defensively.
+      const raw = await res.text();
+      let data: { ok?: boolean; text?: string; error?: string } | null = null;
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        data = null;
+      }
+      if (data && data.ok && data.text) {
         setAiText(data.text);
         setAiState("done");
+      } else if (data && data.error) {
+        setAiState("error");
+        setAiMsg(data.error);
       } else {
         setAiState("error");
-        setAiMsg(data.error ?? "สร้างด้วย AI ไม่สำเร็จ");
+        setAiMsg(
+          res.status === 504 || /timeout/i.test(raw)
+            ? "AI ใช้เวลานานเกินไป (timeout) — ลองใหม่ หรือใช้โมเดลที่เร็วขึ้น"
+            : `เซิร์ฟเวอร์ตอบกลับผิดพลาด (${res.status})`,
+        );
       }
     } catch (e) {
       setAiState("error");

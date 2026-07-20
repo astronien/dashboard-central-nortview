@@ -30,9 +30,22 @@ const DEFAULT_MODEL = {
   gemini: "gemini-1.5-flash",
   openai: "gpt-4o-mini",
 };
-// Thai is token-heavy and a full multi-staff report is long — give the
-// model plenty of room so it doesn't get cut off mid-report.
-const MAX_TOKENS = 8000;
+// Thai is token-heavy, but too-large a cap makes generation slow enough to
+// hit the serverless time limit; 4000 covers a full report and stays fast.
+const MAX_TOKENS = 4000;
+// Abort a provider call before Vercel kills the whole function, so we can
+// return a clean JSON error instead of an HTML crash page.
+const PROVIDER_TIMEOUT_MS = 50_000;
+
+async function fetchWithTimeout(url, init) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PROVIDER_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -97,7 +110,7 @@ async function resolveAiConfig() {
 
 // ── provider calls (return text or throw) ──────────────────────────────
 async function callAnthropic(apiKey, model, userMsg) {
-  const r = await fetch("https://api.anthropic.com/v1/messages", {
+  const r = await fetchWithTimeout("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "x-api-key": apiKey,
@@ -124,7 +137,7 @@ async function callGemini(apiKey, model, userMsg) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
     model,
   )}:generateContent?key=${encodeURIComponent(apiKey)}`;
-  const r = await fetch(url, {
+  const r = await fetchWithTimeout(url, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
@@ -148,7 +161,7 @@ async function callGemini(apiKey, model, userMsg) {
 }
 
 async function callOpenAI(apiKey, model, userMsg) {
-  const r = await fetch("https://api.openai.com/v1/chat/completions", {
+  const r = await fetchWithTimeout("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
