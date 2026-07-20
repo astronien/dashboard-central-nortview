@@ -23,10 +23,14 @@ export interface CsatUser {
   empCode: string;
   name: string;
   position: string;
-  /** True per-person average (from the individual survey feed) */
+  /** True per-person average score */
   avgScore: number | null;
-  /** Number of survey responses this person received in the period */
+  /** Survey responses received (CSAT submit_bill for this person) */
   responseCount: number;
+  /** Total bills for this person (CSAT total_bill) */
+  totalBill: number;
+  /** CSAT's own response rate % */
+  responseRate: number;
   maxScore: number;
 }
 

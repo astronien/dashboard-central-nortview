@@ -274,11 +274,16 @@ module.exports = async function handler(req, res) {
         )) ||
       branches[0];
 
-    // 2. Store-level overview + real per-staff aggregation (in parallel)
-    const [overviewJson, surveyData] = await Promise.all([
+    // 2. Store-level overview + per-staff list + survey feed (in parallel)
+    const [overviewJson, staffListJson, surveyData] = await Promise.all([
       csatGet(
         "/overviews",
         { start_date: startDate, end_date: endDate, branch_id: wanted.id },
+        token,
+      ),
+      csatGet(
+        `/branches/${wanted.id}/user-metrics`,
+        { start_date: startDate, end_date: endDate, page: 1, page_size: 200 },
         token,
       ),
       aggregatePerStaff(
@@ -287,7 +292,40 @@ module.exports = async function handler(req, res) {
         token,
       ),
     ]);
-    const { users, lowScores } = surveyData;
+    const { lowScores } = surveyData;
+
+    // 3. Per-person overview (total_bill / submit_bill / score) — CSAT's own
+    // per-staff numbers, same as the website's per-officer view. One call
+    // per staff (fast; a branch has only a handful of officers).
+    const staffList = Array.isArray(staffListJson?.data) ? staffListJson.data : [];
+    const perStaffOverviews = await Promise.all(
+      staffList.map((st) =>
+        csatGet(
+          "/overviews",
+          {
+            start_date: startDate,
+            end_date: endDate,
+            branch_id: wanted.id,
+            staff_id: st.id,
+          },
+          token,
+        )
+          .then((j) => ({ st, o: j?.data ?? {} }))
+          .catch(() => ({ st, o: {} })),
+      ),
+    );
+    const users = perStaffOverviews
+      .map(({ st, o }) => ({
+        empCode: String(st.emp_code ?? ""),
+        name: String(st.name ?? ""),
+        position: String(st.position ?? ""),
+        avgScore: o.avg_score == null ? null : Number(o.avg_score),
+        responseCount: Number(o.submit_bill ?? 0),
+        totalBill: Number(o.total_bill ?? 0),
+        responseRate: Number(o.submit_bill_percent ?? 0),
+        maxScore: Number(o.max_score ?? 5),
+      }))
+      .filter((u) => u.totalBill > 0 || u.responseCount > 0);
 
     const o = overviewJson?.data ?? {};
     const npsBuckets = Array.isArray(o.nps_scores) ? o.nps_scores : [];

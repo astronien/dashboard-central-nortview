@@ -2508,13 +2508,9 @@ function AppInternal({
                 score: csatUser.avgScore,
                 maxScore: csatUser.maxScore,
                 responseCount: csatUser.responseCount,
-                // ตัวหาร = จำนวนบิล "ขายจริง" ของคนนั้นจากไฟล์ Current (นับ
-                // เฉพาะบิลที่มีสินค้า inventory ไม่รวมใบคืน/บริการ) — เป็น
-                // บิลชุดเดียวกับที่ CSAT ใช้ (Doc No จาก POS) ผลรวมจึงใกล้เคียง
-                // "จำนวนบิลทั้งหมด" ของทั้งร้านใน CSAT
-                billCount: officerBills.filter(
-                  (b) => b.itemCount > 0 && b.totalRevenue > 0,
-                ).length,
+                // จำนวนบิลทั้งหมดรายคน จาก CSAT โดยตรง (total_bill) — ตรงกับ
+                // หน้าเว็บ CSAT เมื่อเลือกพนักงานรายคน
+                billCount: csatUser.totalBill,
               }
             : undefined,
         };
@@ -3985,7 +3981,7 @@ function AppInternal({
                 focusDevice={focusDevice}
                 focusWonder={focusWonder}
                 csatUser={csatForOfficer(activeOfficer?.staffId, activeOfficer?.name)}
-                csatBillCount={activeOfficerBills.filter((b) => b.itemCount > 0 && b.totalRevenue > 0).length}
+                csatBillCount={csatForOfficer(activeOfficer?.staffId, activeOfficer?.name)?.totalBill}
                 activeOfficer7WondersPerformance={activeOfficer7WondersPerformance}
                 activeOfficerCategoryPerformance={activeOfficerCategoryPerformance}
                 todaySalesTotal={activeOfficerTodaySales}
