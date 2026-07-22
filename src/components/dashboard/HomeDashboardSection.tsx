@@ -442,14 +442,30 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                     ยอดขายตามหมวด
                   </th>
                 ) : null}
-                {presets.length > 0 ? (
-                  <th
-                    colSpan={presets.length + extraTradeCols}
-                    className="py-1.5 px-2 text-center text-[9px] font-bold uppercase tracking-widest text-amber-300/80 border-l border-white/10"
-                  >
-                    7 Wonders
-                  </th>
-                ) : null}
+                {presets.length > 0
+                  ? (() => {
+                      // Group consecutive non-trade presets under "7 Wonders";
+                      // each Trade-In preset gets its own "TRADE-IN" group of 2.
+                      const segs: { label: string; span: number; trade: boolean }[] = [];
+                      let run = 0;
+                      presets.forEach((p) => {
+                        if (isTradeIn(p)) {
+                          if (run > 0) { segs.push({ label: "7 Wonders", span: run, trade: false }); run = 0; }
+                          segs.push({ label: "TRADE-IN", span: 2, trade: true });
+                        } else run++;
+                      });
+                      if (run > 0) segs.push({ label: "7 Wonders", span: run, trade: false });
+                      return segs.map((s, si) => (
+                        <th
+                          key={si}
+                          colSpan={s.span}
+                          className={`py-1.5 px-2 text-center text-[9px] font-bold uppercase tracking-widest border-l border-white/10 ${s.trade ? "text-teal-300/80" : "text-amber-300/80"}`}
+                        >
+                          {s.label}
+                        </th>
+                      ));
+                    })()
+                  : null}
                 {hasCsat ? (
                   <th className="py-1.5 px-2 text-center text-[9px] font-bold uppercase tracking-widest text-sky-300/80 border-l border-white/10">
                     CSAT
@@ -479,7 +495,27 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                   Total{arrow("total")}
                 </th>
                 {presets.map((p, i) => {
-                  const th = (
+                  if (isTradeIn(p)) {
+                    return [
+                      <th
+                        key={p.id}
+                        onClick={() => onSort(`w:${p.id}`)}
+                        className={`py-2 px-2 font-bold uppercase tracking-wide text-right min-w-[66px] cursor-pointer select-none hover:text-white ${i === 0 ? "border-l border-white/10" : ""}`}
+                        title="สิ้นสุดการประมูล (ตกลง) ÷ iPhone ที่ขายได้"
+                      >
+                        <span className="truncate">ตกลง{arrow(`w:${p.id}`)}</span>
+                      </th>,
+                      <th
+                        key={`${p.id}-appr`}
+                        onClick={() => onSort(`wA:${p.id}`)}
+                        className="py-2 px-2 font-bold uppercase tracking-wide text-right min-w-[66px] cursor-pointer select-none hover:text-white"
+                        title="ยอดประเมิน (รายการเทรดทั้งหมด) ÷ iPhone ที่ขายได้"
+                      >
+                        <span className="truncate">ประเมิน{arrow(`wA:${p.id}`)}</span>
+                      </th>,
+                    ];
+                  }
+                  return (
                     <th
                       key={p.id}
                       onClick={() => onSort(`w:${p.id}`)}
@@ -490,29 +526,11 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                         <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${colorDotClass(p.color)}`} />
                         <span className="truncate max-w-[80px]">
                           {shortWonderName(p.name)}
-                          {isTradeIn(p) ? " (ตกลง)" : ""}
                           {arrow(`w:${p.id}`)}
                         </span>
                       </div>
                     </th>
                   );
-                  if (!isTradeIn(p)) return th;
-                  return [
-                    th,
-                    <th
-                      key={`${p.id}-appr`}
-                      onClick={() => onSort(`wA:${p.id}`)}
-                      className="py-2 px-2 font-bold uppercase tracking-wide text-right min-w-[66px] cursor-pointer select-none hover:text-white"
-                      title="ยอดประเมิน (รายการเทรดทั้งหมด) ÷ iPhone ที่ขายได้"
-                    >
-                      <div className="flex items-center justify-end gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-teal-400" />
-                        <span className="truncate max-w-[80px]">
-                          ประเมิน{arrow(`wA:${p.id}`)}
-                        </span>
-                      </div>
-                    </th>,
-                  ];
                 })}
                 {hasCsat ? (
                   <th
