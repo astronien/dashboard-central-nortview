@@ -47,6 +47,8 @@ export type CombinedWonderCell = {
   actualB?: number;
   achPercent: number;
   calcType?: PresetCalcType;
+  /** Trade In only: ยอดประเมิน (รายการเทรดทั้งหมด) — for the 2nd sub-column */
+  appraisalA?: number;
 };
 
 export type CombinedOfficerRow = {
@@ -310,11 +312,35 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
   const [sort, setSort] = React.useState<{ key: string; dir: "asc" | "desc" } | null>(null);
   const onSort = (key: string) =>
     setSort((s) => (s && s.key === key ? { key, dir: s.dir === "desc" ? "asc" : "desc" } : { key, dir: "desc" }));
+  // Trade-In presets get a 2nd sub-column (ยอดประเมิน / iPhone)
+  const isTradeIn = (p: Preset) => p.calcType === "tradeIn";
+  const extraTradeCols = presets.filter(isTradeIn).length;
+  // Build the appraisal (ยอดประเมิน) cell from a wonder cell
+  const apprCell = (w: CombinedWonderCell | undefined): CombinedWonderCell | undefined => {
+    if (!w || w.appraisalA === undefined) return undefined;
+    const base = w.actualB ?? 0;
+    const rate = base > 0 ? (w.appraisalA / base) * 100 : 0;
+    return {
+      actual: rate,
+      target: 50, // เป้ายอดประเมิน 50% ของ iPhone
+      achPercent: rate,
+      actualA: w.appraisalA,
+      actualB: base,
+      calcType: "tradeIn",
+    };
+  };
+  const apprRate = (w: CombinedWonderCell | undefined): number => {
+    if (!w || w.appraisalA === undefined) return -1;
+    const base = w.actualB ?? 0;
+    return base > 0 ? (w.appraisalA / base) * 100 : 0;
+  };
+
   const sortVal = (row: (typeof rows)[number], key: string): number | string => {
     if (key === "name") return row.officer.name;
     if (key === "total") return row.catTotal.actual;
     if (key === "csat") return row.csat?.score ?? -1;
     if (key.startsWith("cat:")) return row.cats[key.slice(4)]?.actual ?? -1;
+    if (key.startsWith("wA:")) return apprRate(row.wonders[key.slice(3)]);
     if (key.startsWith("w:")) return row.wonders[key.slice(2)]?.actual ?? -1;
     return 0;
   };
@@ -418,7 +444,7 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                 ) : null}
                 {presets.length > 0 ? (
                   <th
-                    colSpan={presets.length}
+                    colSpan={presets.length + extraTradeCols}
                     className="py-1.5 px-2 text-center text-[9px] font-bold uppercase tracking-widest text-amber-300/80 border-l border-white/10"
                   >
                     7 Wonders
@@ -452,19 +478,42 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                 >
                   Total{arrow("total")}
                 </th>
-                {presets.map((p, i) => (
-                  <th
-                    key={p.id}
-                    onClick={() => onSort(`w:${p.id}`)}
-                    className={`py-2 px-2 font-bold uppercase tracking-wide text-right min-w-[66px] cursor-pointer select-none hover:text-white ${i === 0 ? "border-l border-white/10" : ""}`}
-                    title={p.labelA + " → " + (p.labelB || "(ไม่มี)")}
-                  >
-                    <div className="flex items-center justify-end gap-1">
-                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${colorDotClass(p.color)}`} />
-                      <span className="truncate max-w-[70px]">{shortWonderName(p.name)}{arrow(`w:${p.id}`)}</span>
-                    </div>
-                  </th>
-                ))}
+                {presets.map((p, i) => {
+                  const th = (
+                    <th
+                      key={p.id}
+                      onClick={() => onSort(`w:${p.id}`)}
+                      className={`py-2 px-2 font-bold uppercase tracking-wide text-right min-w-[66px] cursor-pointer select-none hover:text-white ${i === 0 ? "border-l border-white/10" : ""}`}
+                      title={p.labelA + " → " + (p.labelB || "(ไม่มี)")}
+                    >
+                      <div className="flex items-center justify-end gap-1">
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${colorDotClass(p.color)}`} />
+                        <span className="truncate max-w-[80px]">
+                          {shortWonderName(p.name)}
+                          {isTradeIn(p) ? " (ตกลง)" : ""}
+                          {arrow(`w:${p.id}`)}
+                        </span>
+                      </div>
+                    </th>
+                  );
+                  if (!isTradeIn(p)) return th;
+                  return [
+                    th,
+                    <th
+                      key={`${p.id}-appr`}
+                      onClick={() => onSort(`wA:${p.id}`)}
+                      className="py-2 px-2 font-bold uppercase tracking-wide text-right min-w-[66px] cursor-pointer select-none hover:text-white"
+                      title="ยอดประเมิน (รายการเทรดทั้งหมด) ÷ iPhone ที่ขายได้"
+                    >
+                      <div className="flex items-center justify-end gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-teal-400" />
+                        <span className="truncate max-w-[80px]">
+                          ประเมิน{arrow(`wA:${p.id}`)}
+                        </span>
+                      </div>
+                    </th>,
+                  ];
+                })}
                 {hasCsat ? (
                   <th
                     onClick={() => onSort("csat")}
@@ -499,14 +548,26 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                   <td className="py-1.5 px-2 text-right align-top bg-emerald-500/5">
                     {renderCatCell(row.catTotal, true)}
                   </td>
-                  {presets.map((p, i) => (
-                    <td
-                      key={p.id}
-                      className={`py-1.5 px-2 text-right align-top ${i === 0 ? "border-l border-white/5" : ""}`}
-                    >
-                      {renderWonderCell(row.wonders[p.id])}
-                    </td>
-                  ))}
+                  {presets.map((p, i) => {
+                    const td = (
+                      <td
+                        key={p.id}
+                        className={`py-1.5 px-2 text-right align-top ${i === 0 ? "border-l border-white/5" : ""}`}
+                      >
+                        {renderWonderCell(row.wonders[p.id])}
+                      </td>
+                    );
+                    if (!isTradeIn(p)) return td;
+                    return [
+                      td,
+                      <td
+                        key={`${p.id}-appr`}
+                        className="py-1.5 px-2 text-right align-top"
+                      >
+                        {renderWonderCell(apprCell(row.wonders[p.id]))}
+                      </td>,
+                    ];
+                  })}
                   {hasCsat ? (
                     <td className="py-1.5 px-2 text-right align-top border-l border-white/5">
                       {row.csat && row.csat.score !== null ? (

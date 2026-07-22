@@ -2132,27 +2132,35 @@ function AppInternal({
   // The Trade API tags each record with SALE_CODE (= STAFF ID) and
   // SALE_NAME, so completed trades can be attributed to each officer.
   const tradeInByOfficer = useMemo(() => {
-    const byCode = new Map<string, number>();
-    const byName = new Map<string, number>();
+    // actual = สิ้นสุดประมูล (agreed); target = รายการเทรดทั้งหมด (ประเมิน)
+    const byCode = new Map<string, { actual: number; target: number }>();
+    const byName = new Map<string, { actual: number; target: number }>();
     for (const s of tradeInData?.perStaff ?? []) {
+      const val = { actual: s.actual, target: s.target };
       const code = String(s.code ?? "").replace(/[^0-9]/g, "");
-      if (code) byCode.set(code, s.actual);
+      if (code) byCode.set(code, val);
       const name = cleanOfficerName(s.name ?? "");
-      if (name) byName.set(name, s.actual);
+      if (name) byName.set(name, val);
     }
     return { byCode, byName };
   }, [tradeInData]);
 
-  const tradeCountForOfficer = React.useCallback(
-    (staffId?: string, name?: string): number => {
+  const tradeForOfficer = React.useCallback(
+    (staffId?: string, name?: string): { actual: number; target: number } => {
       const code = String(staffId ?? "").replace(/[^0-9]/g, "");
       if (code && tradeInByOfficer.byCode.has(code)) {
-        return tradeInByOfficer.byCode.get(code) ?? 0;
+        return tradeInByOfficer.byCode.get(code) ?? { actual: 0, target: 0 };
       }
       const nm = cleanOfficerName(name ?? "");
-      return tradeInByOfficer.byName.get(nm) ?? 0;
+      return tradeInByOfficer.byName.get(nm) ?? { actual: 0, target: 0 };
     },
     [tradeInByOfficer],
+  );
+
+  // Agreed count (สิ้นสุดประมูล) — used as the tradeIn preset's numerator
+  const tradeCountForOfficer = React.useCallback(
+    (staffId?: string, name?: string): number => tradeForOfficer(staffId, name).actual,
+    [tradeForOfficer],
   );
 
   // Per-officer CSAT lookup (emp_code = STAFF ID, fallback = name match)
@@ -2495,6 +2503,10 @@ function AppInternal({
             actualA: r.billsWithAandB,
             actualB: r.billsWithB,
             calcType: p.calcType,
+            // Trade In only: ยอดประเมิน (รายการเทรดทั้งหมด) — second sub-column
+            ...(p.calcType === "tradeIn"
+              ? { appraisalA: tradeForOfficer(officer.staffId, officer.name).target }
+              : {}),
           };
         });
 
@@ -2537,6 +2549,7 @@ function AppInternal({
     parsedReport.officers,
     getCategory,
     tradeCountForOfficer,
+    tradeForOfficer,
     iphoneUnitsFromBills,
     csatForOfficer,
   ]);
