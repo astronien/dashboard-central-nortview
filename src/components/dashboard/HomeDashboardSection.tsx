@@ -315,6 +315,9 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
   // Trade-In presets get a 2nd sub-column (ยอดประเมิน / iPhone)
   const isTradeIn = (p: Preset) => p.calcType === "tradeIn";
   const extraTradeCols = presets.filter(isTradeIn).length;
+  // When a Trade-In preset is present the header has a 3rd row (ตกลง/ประเมิน);
+  // every other header cell spans 2 rows to align.
+  const rs = extraTradeCols > 0 ? 2 : 1;
   // Build the appraisal (ยอดประเมิน) cell from a wonder cell
   const apprCell = (w: CombinedWonderCell | undefined): CombinedWonderCell | undefined => {
     if (!w || w.appraisalA === undefined) return undefined;
@@ -442,30 +445,14 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                     ยอดขายตามหมวด
                   </th>
                 ) : null}
-                {presets.length > 0
-                  ? (() => {
-                      // Group consecutive non-trade presets under "7 Wonders";
-                      // each Trade-In preset gets its own "TRADE-IN" group of 2.
-                      const segs: { label: string; span: number; trade: boolean }[] = [];
-                      let run = 0;
-                      presets.forEach((p) => {
-                        if (isTradeIn(p)) {
-                          if (run > 0) { segs.push({ label: "7 Wonders", span: run, trade: false }); run = 0; }
-                          segs.push({ label: "TRADE-IN", span: 2, trade: true });
-                        } else run++;
-                      });
-                      if (run > 0) segs.push({ label: "7 Wonders", span: run, trade: false });
-                      return segs.map((s, si) => (
-                        <th
-                          key={si}
-                          colSpan={s.span}
-                          className={`py-1.5 px-2 text-center text-[9px] font-bold uppercase tracking-widest border-l border-white/10 ${s.trade ? "text-teal-300/80" : "text-amber-300/80"}`}
-                        >
-                          {s.label}
-                        </th>
-                      ));
-                    })()
-                  : null}
+                {presets.length > 0 ? (
+                  <th
+                    colSpan={presets.length + extraTradeCols}
+                    className="py-1.5 px-2 text-center text-[9px] font-bold uppercase tracking-widest text-amber-300/80 border-l border-white/10"
+                  >
+                    7 Wonders
+                  </th>
+                ) : null}
                 {hasCsat ? (
                   <th className="py-1.5 px-2 text-center text-[9px] font-bold uppercase tracking-widest text-sky-300/80 border-l border-white/10">
                     CSAT
@@ -474,52 +461,47 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
               </tr>
               <tr className="bg-[#0c3123] border-b border-emerald-500/20 text-white/90">
                 <th
+                  rowSpan={rs}
                   onClick={() => onSort("name")}
-                  className="py-2 px-2 font-bold uppercase tracking-wider sticky left-0 bg-[#0c3123] z-10 min-w-[120px] cursor-pointer select-none hover:text-white"
+                  className="py-2 px-2 font-bold uppercase tracking-wider sticky left-0 bg-[#0c3123] z-10 min-w-[120px] cursor-pointer select-none hover:text-white align-bottom"
                 >
                   เจ้าหน้าที่{arrow("name")}
                 </th>
                 {categories.map((cat, i) => (
                   <th
                     key={cat}
+                    rowSpan={rs}
                     onClick={() => onSort(`cat:${cat}`)}
-                    className={`py-2 px-2 font-bold uppercase tracking-wide text-right min-w-[62px] cursor-pointer select-none hover:text-white ${i === 0 ? "border-l border-white/10" : ""}`}
+                    className={`py-2 px-2 font-bold uppercase tracking-wide text-right min-w-[62px] cursor-pointer select-none hover:text-white align-bottom ${i === 0 ? "border-l border-white/10" : ""}`}
                   >
                     {cat}{arrow(`cat:${cat}`)}
                   </th>
                 ))}
                 <th
+                  rowSpan={rs}
                   onClick={() => onSort("total")}
-                  className="py-2 px-2 font-bold uppercase tracking-wide text-right min-w-[68px] text-emerald-300 bg-emerald-500/5 cursor-pointer select-none hover:text-emerald-200"
+                  className="py-2 px-2 font-bold uppercase tracking-wide text-right min-w-[68px] text-emerald-300 bg-emerald-500/5 cursor-pointer select-none hover:text-emerald-200 align-bottom"
                 >
                   Total{arrow("total")}
                 </th>
                 {presets.map((p, i) => {
                   if (isTradeIn(p)) {
-                    return [
+                    return (
                       <th
                         key={p.id}
-                        onClick={() => onSort(`w:${p.id}`)}
-                        className={`py-2 px-2 font-bold uppercase tracking-wide text-right min-w-[66px] cursor-pointer select-none hover:text-white ${i === 0 ? "border-l border-white/10" : ""}`}
-                        title="สิ้นสุดการประมูล (ตกลง) ÷ iPhone ที่ขายได้"
+                        colSpan={2}
+                        className={`py-2 px-2 font-bold uppercase tracking-wide text-center text-teal-300 ${i === 0 ? "border-l border-white/10" : ""}`}
                       >
-                        <span className="truncate">ตกลง{arrow(`w:${p.id}`)}</span>
-                      </th>,
-                      <th
-                        key={`${p.id}-appr`}
-                        onClick={() => onSort(`wA:${p.id}`)}
-                        className="py-2 px-2 font-bold uppercase tracking-wide text-right min-w-[66px] cursor-pointer select-none hover:text-white"
-                        title="ยอดประเมิน (รายการเทรดทั้งหมด) ÷ iPhone ที่ขายได้"
-                      >
-                        <span className="truncate">ประเมิน{arrow(`wA:${p.id}`)}</span>
-                      </th>,
-                    ];
+                        TRADE-IN
+                      </th>
+                    );
                   }
                   return (
                     <th
                       key={p.id}
+                      rowSpan={rs}
                       onClick={() => onSort(`w:${p.id}`)}
-                      className={`py-2 px-2 font-bold uppercase tracking-wide text-right min-w-[66px] cursor-pointer select-none hover:text-white ${i === 0 ? "border-l border-white/10" : ""}`}
+                      className={`py-2 px-2 font-bold uppercase tracking-wide text-right min-w-[66px] cursor-pointer select-none hover:text-white align-bottom ${i === 0 ? "border-l border-white/10" : ""}`}
                       title={p.labelA + " → " + (p.labelB || "(ไม่มี)")}
                     >
                       <div className="flex items-center justify-end gap-1">
@@ -534,8 +516,9 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                 })}
                 {hasCsat ? (
                   <th
+                    rowSpan={rs}
                     onClick={() => onSort("csat")}
-                    className="py-2 px-2 font-bold uppercase tracking-wide text-right min-w-[80px] text-sky-300 border-l border-white/10 cursor-pointer select-none hover:text-sky-200"
+                    className="py-2 px-2 font-bold uppercase tracking-wide text-right min-w-[80px] text-sky-300 border-l border-white/10 cursor-pointer select-none hover:text-sky-200 align-bottom"
                   >
                     <div>CSAT{arrow("csat")}</div>
                     <div className="text-[8px] text-white/40 font-normal normal-case">
@@ -544,6 +527,32 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                   </th>
                 ) : null}
               </tr>
+              {extraTradeCols > 0 ? (
+                <tr className="bg-[#0c3123] border-b border-emerald-500/20 text-white/90">
+                  {presets.map((p) =>
+                    isTradeIn(p)
+                      ? [
+                          <th
+                            key={p.id}
+                            onClick={() => onSort(`w:${p.id}`)}
+                            className="py-1.5 px-2 font-bold uppercase tracking-wide text-right min-w-[66px] cursor-pointer select-none hover:text-white border-l border-white/10"
+                            title="สิ้นสุดการประมูล (ตกลง) ÷ iPhone ที่ขายได้"
+                          >
+                            ตกลง{arrow(`w:${p.id}`)}
+                          </th>,
+                          <th
+                            key={`${p.id}-appr`}
+                            onClick={() => onSort(`wA:${p.id}`)}
+                            className="py-1.5 px-2 font-bold uppercase tracking-wide text-right min-w-[66px] cursor-pointer select-none hover:text-white"
+                            title="ยอดประเมิน (รายการเทรดทั้งหมด) ÷ iPhone ที่ขายได้"
+                          >
+                            ประเมิน{arrow(`wA:${p.id}`)}
+                          </th>,
+                        ]
+                      : null,
+                  )}
+                </tr>
+              ) : null}
             </thead>
             <tbody>
               {sortedRows.map((row, idx) => (
