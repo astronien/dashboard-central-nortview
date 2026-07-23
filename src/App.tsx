@@ -65,7 +65,7 @@ import {
   type TradeInResult,
 } from "./lib/tradeInApi";
 import { fetchCsatData, type CsatResult, type CsatUser } from "./lib/csatApi";
-import { fetchUfundData, type UfundResult } from "./lib/ufundApi";
+import { fetchUfundData, fetchUfundDay, type UfundResult } from "./lib/ufundApi";
 import {
   fetchTradeBranchMappingFromCloud,
   getTradeBranchMapping,
@@ -1307,6 +1307,7 @@ function AppInternal({
   );
   const [csatData, setCsatData] = useState<CsatResult | undefined>(undefined);
   const [ufundData, setUfundData] = useState<UfundResult | undefined>(undefined);
+  const [ufundDailyData, setUfundDailyData] = useState<UfundResult | undefined>(undefined);
   const [csatError, setCsatError] = useState<
     { code: "auth" | "no_token" | "error"; message: string } | undefined
   >(undefined);
@@ -2180,18 +2181,40 @@ function AppInternal({
     return { byCode, byName };
   }, [ufundData]);
 
+  const ufundDailyByOfficer = useMemo(() => {
+    const byCode = new Map<string, { total: number; approved: number }>();
+    const byName = new Map<string, { total: number; approved: number }>();
+    for (const s of ufundDailyData?.perStaff ?? []) {
+      const val = { total: s.total, approved: s.approved };
+      const code = String(s.empCode ?? "").replace(/[^0-9]/g, "");
+      if (code) byCode.set(code, val);
+      const nm = cleanOfficerName(s.name ?? "");
+      if (nm) byName.set(nm, val);
+    }
+    return { byCode, byName };
+  }, [ufundDailyData]);
+
+  const matchUfund = (
+    lut: { byCode: Map<string, { total: number; approved: number }>; byName: Map<string, { total: number; approved: number }> },
+    staffId?: string,
+    name?: string,
+  ): { total: number; approved: number } | undefined => {
+    const code = String(staffId ?? "").replace(/[^0-9]/g, "");
+    if (code && lut.byCode.has(code)) return lut.byCode.get(code);
+    const nm = cleanOfficerName(name ?? "");
+    for (const [k, v] of lut.byName) {
+      if (k && (nm === k || nm.startsWith(k + " ") || nm.split(" ")[0] === k)) return v;
+    }
+    return undefined;
+  };
+
   const ufundForOfficer = React.useCallback(
-    (staffId?: string, name?: string): { total: number; approved: number } | undefined => {
-      const code = String(staffId ?? "").replace(/[^0-9]/g, "");
-      if (code && ufundByOfficer.byCode.has(code)) return ufundByOfficer.byCode.get(code);
-      const nm = cleanOfficerName(name ?? "");
-      // first-name-only fallback: match if the API name is a prefix
-      for (const [k, v] of ufundByOfficer.byName) {
-        if (k && (nm === k || nm.startsWith(k + " ") || nm.split(" ")[0] === k)) return v;
-      }
-      return undefined;
-    },
+    (staffId?: string, name?: string) => matchUfund(ufundByOfficer, staffId, name),
     [ufundByOfficer],
+  );
+  const ufundDailyForOfficer = React.useCallback(
+    (staffId?: string, name?: string) => matchUfund(ufundDailyByOfficer, staffId, name),
+    [ufundDailyByOfficer],
   );
 
   // Per-officer CSAT lookup (emp_code = STAFF ID, fallback = name match)
@@ -2744,6 +2767,17 @@ function AppInternal({
             prevA: rP.billsWithAandB,
             calcType: p.calcType,
           };
+
+          // UFUND รายวัน: ดึง อนุมัติ/ยื่น จาก uFund API ของวันล่าสุด (ตรงกับระบบ
+          // UFUND จริง) แทน attach จากไฟล์ขาย
+          if (/ufund/i.test(p.name)) {
+            const u = ufundDailyForOfficer(officer.staffId, officer.name);
+            if (u) {
+              wonders[p.id].latestA = u.approved;
+              wonders[p.id].latestB = u.total;
+              wonders[p.id].latest = u.total > 0 ? (u.approved / u.total) * 100 : 0;
+            }
+          }
         });
 
         return {
@@ -2782,6 +2816,7 @@ function AppInternal({
     getCategory,
     iphoneUnitsFromBills,
     tradeInData,
+    ufundDailyForOfficer,
   ]);
 
   const dynamicRadarData = useMemo(() => {
@@ -3161,6 +3196,45 @@ function AppInternal({
     const totalDays = new Date(year, month + 1, 0).getDate();
     return { currentDay: Math.min(day, totalDays), totalDays };
   }, [displayUploads.current]);
+
+  // Latest data date (YYYY-MM-DD) in the current upload — for daily API pulls
+  const latestDataYmd = useMemo(() => {
+    let best = 0;
+    let ymd = "";
+    for (const row of displayUploads.current) {
+      const p = parseDocDate(String(row["Doc Date"] ?? row["doc date"] ?? ""));
+      if (p && p.getTime() > best) {
+        best = p.getTime();
+        ymd = `${p.getFullYear()}-${String(p.getMonth() + 1).padStart(2, "0")}-${String(p.getDate()).padStart(2, "0")}`;
+      }
+    }
+    return ymd;
+  }, [displayUploads.current]);
+
+  // uFund per-staff for the latest data day (daily table uses the real API,
+  // not the sales-file attach)
+  useEffect(() => {
+    if (!selectedBranchLoaded || !latestDataYmd) return;
+    const code =
+      csatData?.branch?.refId ||
+      getBranchCodeFromTarget(displayUploads.target) ||
+      getBranchCodeFromString(selectedBranch);
+    if (!code) {
+      setUfundDailyData(undefined);
+      return;
+    }
+    let cancelled = false;
+    fetchUfundDay(code, latestDataYmd)
+      .then((r) => {
+        if (!cancelled) setUfundDailyData(r);
+      })
+      .catch(() => {
+        if (!cancelled) setUfundDailyData(undefined);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [csatData?.branch?.refId, displayUploads.target, selectedBranch, selectedBranchLoaded, latestDataYmd]);
 
   const [stockStatus, setStockStatus] = useState<StockStatus | undefined>(undefined);
   const loadStock = React.useCallback(() => {

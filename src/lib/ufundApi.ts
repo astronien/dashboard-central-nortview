@@ -21,6 +21,44 @@ export interface UfundResult {
   perStaff: UfundStaff[];
 }
 
+/** Unix-second range (Asia/Bangkok) for a YYYY-MM-DD day. */
+function dayRange(ymd: string): { start: number; end: number } | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return null;
+  const start = Math.floor(Date.parse(`${ymd}T00:00:00+07:00`) / 1000);
+  const end = Math.floor(Date.parse(`${ymd}T23:59:59+07:00`) / 1000);
+  if (!isFinite(start) || !isFinite(end)) return null;
+  return { start, end };
+}
+
+/** Per-staff uFund for a single day (ยอดยื่น/อนุมัติ ของวันนั้น). */
+export async function fetchUfundDay(
+  branchCode: string | undefined,
+  ymd: string,
+): Promise<UfundResult> {
+  const range = dayRange(ymd);
+  if (!range) return { perStaff: [] };
+  const q =
+    `?start=${range.start}&end=${range.end}` +
+    (branchCode ? `&branch=${encodeURIComponent(branchCode)}` : "");
+  try {
+    const res = await fetch(`${UFUND_BASE}/reports/employees${q}`);
+    if (!res.ok) return { perStaff: [] };
+    const json = await res.json();
+    const items = Array.isArray(json?.items) ? json.items : [];
+    return {
+      perStaff: items.map((e: Record<string, unknown>) => ({
+        empCode: String(e.empCode ?? ""),
+        name: String(e.name ?? ""),
+        total: Number(e.total ?? 0),
+        approved: Number(e.approved ?? 0),
+        percent: Number(e.percent ?? 0),
+      })),
+    };
+  } catch {
+    return { perStaff: [] };
+  }
+}
+
 export async function fetchUfundData(
   branchCode?: string,
 ): Promise<UfundResult> {
