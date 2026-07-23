@@ -346,6 +346,32 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
     const base = w.appraisalB ?? w.actualB ?? 0;
     return base > 0 ? (w.appraisalA / base) * 100 : 0;
   };
+  // UFUND ยอดประเมิน = อนุมัติ/ยื่น + %อนุมัติ (no target line — approval funnel)
+  const renderUfundApprCell = (w: CombinedWonderCell | undefined) => {
+    if (!w || w.appraisalA === undefined || w.appraisalB === undefined)
+      return <span className="text-white/25">—</span>;
+    const approved = w.appraisalA;
+    const total = w.appraisalB;
+    const rate = total > 0 ? (approved / total) * 100 : 0;
+    const cls =
+      rate >= 50
+        ? "bg-green-500/20 text-green-400 font-bold px-1 py-0.5 rounded border border-green-500/20"
+        : rate >= 25
+          ? "bg-amber-500/20 text-amber-400 font-bold px-1 py-0.5 rounded border border-amber-500/20"
+          : "bg-rose-500/20 text-rose-400 font-bold px-1 py-0.5 rounded border border-rose-500/20";
+    return (
+      <div className="flex flex-col items-end gap-0.5 leading-none">
+        <span className="font-mono font-semibold text-white tabular-nums">
+          {Math.round(approved)}/{Math.round(total)}
+        </span>
+        {total > 0 ? (
+          <span className={`text-[8px] ${cls}`}>{rate.toFixed(0)}%</span>
+        ) : (
+          <span className="text-[8px] text-white/25">—</span>
+        )}
+      </div>
+    );
+  };
 
   const sortVal = (row: (typeof rows)[number], key: string): number | string => {
     if (key === "name") return row.officer.name;
@@ -604,7 +630,9 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                         key={`${p.id}-appr`}
                         className="py-1 px-1 text-right align-top"
                       >
-                        {renderWonderCell(apprCell(row.wonders[p.id]))}
+                        {/ufund/i.test(p.name)
+                          ? renderUfundApprCell(row.wonders[p.id])
+                          : renderWonderCell(apprCell(row.wonders[p.id]))}
                       </td>,
                     ];
                   })}
