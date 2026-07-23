@@ -421,7 +421,7 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
   };
 
   return (
-    <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-4 shadow-[0_8px_32px_rgba(0,0,0,0.12)] overflow-hidden">
+    <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-3 shadow-[0_8px_32px_rgba(0,0,0,0.12)] overflow-hidden">
       <div className="flex items-center gap-3 mb-3">
         <div className="p-2 bg-emerald-500/20 rounded-xl border border-emerald-500/20">
           <Building2 className="w-5 h-5 text-emerald-400" />
@@ -442,14 +442,14 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
         </p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-white/10">
-          <table className="w-full text-left border-collapse text-[10px]">
+          <table className="w-full text-left border-collapse text-[9px]">
             <thead>
               <tr className="bg-[#0c3123] border-b border-emerald-500/10 text-white/70">
-                <th className="py-1.5 px-2 sticky left-0 bg-[#0c3123] z-10" />
+                <th className="py-1 px-1 sticky left-0 bg-[#0c3123] z-10" />
                 {categories.length > 0 ? (
                   <th
                     colSpan={categories.length + 1}
-                    className="py-1.5 px-2 text-center text-[9px] font-bold uppercase tracking-widest text-emerald-300/80 border-l border-white/10"
+                    className="py-1 px-1 text-center text-[9px] font-bold uppercase tracking-widest text-emerald-300/80 border-l border-white/10"
                   >
                     ยอดขายตามหมวด
                   </th>
@@ -457,13 +457,13 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                 {presets.length > 0 ? (
                   <th
                     colSpan={presets.length + extraTradeCols}
-                    className="py-1.5 px-2 text-center text-[9px] font-bold uppercase tracking-widest text-amber-300/80 border-l border-white/10"
+                    className="py-1 px-1 text-center text-[9px] font-bold uppercase tracking-widest text-amber-300/80 border-l border-white/10"
                   >
                     7 Wonders
                   </th>
                 ) : null}
                 {hasCsat ? (
-                  <th className="py-1.5 px-2 text-center text-[9px] font-bold uppercase tracking-widest text-sky-300/80 border-l border-white/10">
+                  <th className="py-1 px-1 text-center text-[9px] font-bold uppercase tracking-widest text-sky-300/80 border-l border-white/10">
                     CSAT
                   </th>
                 ) : null}
@@ -472,7 +472,7 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                 <th
                   rowSpan={rs}
                   onClick={() => onSort("name")}
-                  className="py-2 px-2 font-bold uppercase tracking-wider sticky left-0 bg-[#0c3123] z-10 min-w-[120px] cursor-pointer select-none hover:text-white align-bottom"
+                  className="py-1.5 px-1 font-bold uppercase tracking-wider sticky left-0 bg-[#0c3123] z-10 min-w-[84px] cursor-pointer select-none hover:text-white align-bottom"
                 >
                   เจ้าหน้าที่{arrow("name")}
                 </th>
@@ -481,7 +481,7 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                     key={cat}
                     rowSpan={rs}
                     onClick={() => onSort(`cat:${cat}`)}
-                    className={`py-2 px-2 font-bold uppercase tracking-wide text-right min-w-[62px] cursor-pointer select-none hover:text-white align-bottom ${i === 0 ? "border-l border-white/10" : ""}`}
+                    className={`py-1.5 px-1 font-bold uppercase tracking-wide text-right min-w-[42px] cursor-pointer select-none hover:text-white align-bottom ${i === 0 ? "border-l border-white/10" : ""}`}
                   >
                     {cat}{arrow(`cat:${cat}`)}
                   </th>
@@ -489,7 +489,7 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                 <th
                   rowSpan={rs}
                   onClick={() => onSort("total")}
-                  className="py-2 px-2 font-bold uppercase tracking-wide text-right min-w-[68px] text-emerald-300 bg-emerald-500/5 cursor-pointer select-none hover:text-emerald-200 align-bottom"
+                  className="py-1.5 px-1 font-bold uppercase tracking-wide text-right min-w-[48px] text-emerald-300 bg-emerald-500/5 cursor-pointer select-none hover:text-emerald-200 align-bottom"
                 >
                   Total{arrow("total")}
                 </th>
@@ -499,7 +499,7 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                       <th
                         key={p.id}
                         colSpan={2}
-                        className={`py-2 px-2 font-bold uppercase tracking-wide text-center text-teal-300 ${i === 0 ? "border-l border-white/10" : ""}`}
+                        className={`py-1.5 px-1 font-bold uppercase tracking-wide text-center text-teal-300 ${i === 0 ? "border-l border-white/10" : ""}`}
                       >
                         {splitLabel(p).group}
                       </th>
@@ -510,7 +510,7 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                       key={p.id}
                       rowSpan={rs}
                       onClick={() => onSort(`w:${p.id}`)}
-                      className={`py-2 px-2 font-bold uppercase tracking-wide text-right min-w-[66px] cursor-pointer select-none hover:text-white align-bottom ${i === 0 ? "border-l border-white/10" : ""}`}
+                      className={`py-1.5 px-1 font-bold uppercase tracking-wide text-right min-w-[46px] cursor-pointer select-none hover:text-white align-bottom ${i === 0 ? "border-l border-white/10" : ""}`}
                       title={p.labelA + " → " + (p.labelB || "(ไม่มี)")}
                     >
                       <div className="flex items-center justify-end gap-1">
@@ -527,7 +527,7 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                   <th
                     rowSpan={rs}
                     onClick={() => onSort("csat")}
-                    className="py-2 px-2 font-bold uppercase tracking-wide text-right min-w-[80px] text-sky-300 border-l border-white/10 cursor-pointer select-none hover:text-sky-200 align-bottom"
+                    className="py-1.5 px-1 font-bold uppercase tracking-wide text-right min-w-[58px] text-sky-300 border-l border-white/10 cursor-pointer select-none hover:text-sky-200 align-bottom"
                   >
                     <div>CSAT{arrow("csat")}</div>
                     <div className="text-[8px] text-white/40 font-normal normal-case">
@@ -544,7 +544,7 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                           <th
                             key={p.id}
                             onClick={() => onSort(`w:${p.id}`)}
-                            className="py-1.5 px-2 font-bold uppercase tracking-wide text-right min-w-[66px] cursor-pointer select-none hover:text-white border-l border-white/10"
+                            className="py-1 px-1 font-bold uppercase tracking-wide text-right min-w-[46px] cursor-pointer select-none hover:text-white border-l border-white/10"
                             title={p.labelA + " → " + (p.labelB || "(ไม่มี)")}
                           >
                             {splitLabel(p).primary}{arrow(`w:${p.id}`)}
@@ -552,7 +552,7 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                           <th
                             key={`${p.id}-appr`}
                             onClick={() => onSort(`wA:${p.id}`)}
-                            className="py-1.5 px-2 font-bold uppercase tracking-wide text-right min-w-[66px] cursor-pointer select-none hover:text-white"
+                            className="py-1 px-1 font-bold uppercase tracking-wide text-right min-w-[46px] cursor-pointer select-none hover:text-white"
                             title={
                               /ufund/i.test(p.name)
                                 ? "ยอดยื่น/อนุมัติ (uFund) — อนุมัติ ÷ ยอดยื่น"
@@ -573,26 +573,26 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                   key={`${row.officer.name}-${idx}`}
                   className="border-b border-white/5 hover:bg-white/5 transition-colors"
                 >
-                  <td className="py-1.5 px-2 sticky left-0 bg-[#0a1f17] z-10">
-                    <div className="font-medium text-white truncate max-w-[130px]">{row.officer.name}</div>
-                    <div className="text-[8px] text-white/40 truncate max-w-[130px]">{row.officer.branch || "-"}</div>
+                  <td className="py-1 px-1 sticky left-0 bg-[#0a1f17] z-10">
+                    <div className="font-medium text-white truncate max-w-[84px]">{row.officer.name}</div>
+                    <div className="text-[8px] text-white/40 truncate max-w-[84px]">{row.officer.branch || "-"}</div>
                   </td>
                   {categories.map((cat, i) => (
                     <td
                       key={cat}
-                      className={`py-1.5 px-2 text-right align-top ${i === 0 ? "border-l border-white/5" : ""}`}
+                      className={`py-1 px-1 text-right align-top ${i === 0 ? "border-l border-white/5" : ""}`}
                     >
                       {renderCatCell(row.cats[cat])}
                     </td>
                   ))}
-                  <td className="py-1.5 px-2 text-right align-top bg-emerald-500/5">
+                  <td className="py-1 px-1 text-right align-top bg-emerald-500/5">
                     {renderCatCell(row.catTotal, true)}
                   </td>
                   {presets.map((p, i) => {
                     const td = (
                       <td
                         key={p.id}
-                        className={`py-1.5 px-2 text-right align-top ${i === 0 ? "border-l border-white/5" : ""}`}
+                        className={`py-1 px-1 text-right align-top ${i === 0 ? "border-l border-white/5" : ""}`}
                       >
                         {renderWonderCell(row.wonders[p.id])}
                       </td>
@@ -602,14 +602,14 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                       td,
                       <td
                         key={`${p.id}-appr`}
-                        className="py-1.5 px-2 text-right align-top"
+                        className="py-1 px-1 text-right align-top"
                       >
                         {renderWonderCell(apprCell(row.wonders[p.id]))}
                       </td>,
                     ];
                   })}
                   {hasCsat ? (
-                    <td className="py-1.5 px-2 text-right align-top border-l border-white/5">
+                    <td className="py-1 px-1 text-right align-top border-l border-white/5">
                       {row.csat && row.csat.score !== null ? (
                         <div className="flex flex-col items-end gap-0.5 leading-none">
                           <span
