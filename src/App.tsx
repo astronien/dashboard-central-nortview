@@ -2546,6 +2546,20 @@ function AppInternal({
                 })()
               : {}),
           };
+
+          // UFUND "ตกลง" = จำนวนบิลที่ปิดการขายด้วย UFUND ÷ บิลที่มี iPhone
+          // (บิลฐานเฉพาะ iPhone, ไม่ใช่ยอด item/หมวดอื่น)
+          if (/ufund/i.test(p.name)) {
+            const iphoneBills = officerBills.filter((b) => b.hasIPhone);
+            const ufundIphone = iphoneBills.filter(
+              (b) => calcPreset([b], p, ctx).billsWithAandB > 0,
+            ).length;
+            const rate = iphoneBills.length > 0 ? (ufundIphone / iphoneBills.length) * 100 : 0;
+            wonders[p.id].actualA = ufundIphone;
+            wonders[p.id].actualB = iphoneBills.length;
+            wonders[p.id].actual = rate;
+            wonders[p.id].achPercent = rate;
+          }
         });
 
         const csatUser = csatForOfficer(officer.staffId, officer.name);

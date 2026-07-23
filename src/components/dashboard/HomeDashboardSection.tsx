@@ -318,7 +318,7 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
   // under a sub-group header (TRADE-IN / UFUND) inside 7 Wonders.
   const splitLabel = (p: Preset): { group: string; primary: string; appr: string } => {
     if (p.calcType === "tradeIn") return { group: "TRADE-IN", primary: "ตกลง", appr: "ประเมิน" };
-    if (/ufund/i.test(p.name)) return { group: "UFUND", primary: "แนบ", appr: "ยอดประเมิน" };
+    if (/ufund/i.test(p.name)) return { group: "UFUND", primary: "ตกลง", appr: "ยอดประเมิน" };
     return { group: shortWonderName(p.name), primary: shortWonderName(p.name), appr: "ประเมิน" };
   };
   const isSplit = (p: Preset) =>
