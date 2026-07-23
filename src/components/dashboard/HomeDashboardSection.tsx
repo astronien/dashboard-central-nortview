@@ -47,8 +47,10 @@ export type CombinedWonderCell = {
   actualB?: number;
   achPercent: number;
   calcType?: PresetCalcType;
-  /** Trade In only: ยอดประเมิน (รายการเทรดทั้งหมด) — for the 2nd sub-column */
+  /** 2nd sub-column numerator: Trade-In ยอดประเมิน (all trades) / UFUND อนุมัติ */
   appraisalA?: number;
+  /** 2nd sub-column base (UFUND ยอดยื่น total); Trade-In falls back to iPhone */
+  appraisalB?: number;
 };
 
 export type CombinedOfficerRow = {
@@ -312,20 +314,27 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
   const [sort, setSort] = React.useState<{ key: string; dir: "asc" | "desc" } | null>(null);
   const onSort = (key: string) =>
     setSort((s) => (s && s.key === key ? { key, dir: s.dir === "desc" ? "asc" : "desc" } : { key, dir: "desc" }));
-  // Trade-In presets get a 2nd sub-column (ยอดประเมิน / iPhone)
-  const isTradeIn = (p: Preset) => p.calcType === "tradeIn";
-  const extraTradeCols = presets.filter(isTradeIn).length;
-  // When a Trade-In preset is present the header has a 3rd row (ตกลง/ประเมิน);
-  // every other header cell spans 2 rows to align.
+  // Trade-In and UFUND presets get a 2nd sub-column (ยอดประเมิน), nested
+  // under a sub-group header (TRADE-IN / UFUND) inside 7 Wonders.
+  const splitLabel = (p: Preset): { group: string; primary: string; appr: string } => {
+    if (p.calcType === "tradeIn") return { group: "TRADE-IN", primary: "ตกลง", appr: "ประเมิน" };
+    if (/ufund/i.test(p.name)) return { group: "UFUND", primary: "แนบ", appr: "ยอดประเมิน" };
+    return { group: shortWonderName(p.name), primary: shortWonderName(p.name), appr: "ประเมิน" };
+  };
+  const isSplit = (p: Preset) =>
+    rows.some((r) => r.wonders[p.id]?.appraisalA !== undefined);
+  const extraTradeCols = presets.filter(isSplit).length;
+  // With any split preset the header has a 3rd row; other cells span 2 rows.
   const rs = extraTradeCols > 0 ? 2 : 1;
-  // Build the appraisal (ยอดประเมิน) cell from a wonder cell
+  // Base of the 2nd sub-column: UFUND uses ยอดยื่น (appraisalB); Trade-In
+  // falls back to the iPhone base (actualB). Trade-In target 50%, UFUND 100%.
   const apprCell = (w: CombinedWonderCell | undefined): CombinedWonderCell | undefined => {
     if (!w || w.appraisalA === undefined) return undefined;
-    const base = w.actualB ?? 0;
+    const base = w.appraisalB ?? w.actualB ?? 0;
     const rate = base > 0 ? (w.appraisalA / base) * 100 : 0;
     return {
       actual: rate,
-      target: 50, // เป้ายอดประเมิน 50% ของ iPhone
+      target: w.appraisalB !== undefined ? 100 : 50,
       achPercent: rate,
       actualA: w.appraisalA,
       actualB: base,
@@ -334,7 +343,7 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
   };
   const apprRate = (w: CombinedWonderCell | undefined): number => {
     if (!w || w.appraisalA === undefined) return -1;
-    const base = w.actualB ?? 0;
+    const base = w.appraisalB ?? w.actualB ?? 0;
     return base > 0 ? (w.appraisalA / base) * 100 : 0;
   };
 
@@ -485,14 +494,14 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                   Total{arrow("total")}
                 </th>
                 {presets.map((p, i) => {
-                  if (isTradeIn(p)) {
+                  if (isSplit(p)) {
                     return (
                       <th
                         key={p.id}
                         colSpan={2}
                         className={`py-2 px-2 font-bold uppercase tracking-wide text-center text-teal-300 ${i === 0 ? "border-l border-white/10" : ""}`}
                       >
-                        TRADE-IN
+                        {splitLabel(p).group}
                       </th>
                     );
                   }
@@ -530,23 +539,27 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
               {extraTradeCols > 0 ? (
                 <tr className="bg-[#0c3123] border-b border-emerald-500/20 text-white/90">
                   {presets.map((p) =>
-                    isTradeIn(p)
+                    isSplit(p)
                       ? [
                           <th
                             key={p.id}
                             onClick={() => onSort(`w:${p.id}`)}
                             className="py-1.5 px-2 font-bold uppercase tracking-wide text-right min-w-[66px] cursor-pointer select-none hover:text-white border-l border-white/10"
-                            title="สิ้นสุดการประมูล (ตกลง) ÷ iPhone ที่ขายได้"
+                            title={p.labelA + " → " + (p.labelB || "(ไม่มี)")}
                           >
-                            ตกลง{arrow(`w:${p.id}`)}
+                            {splitLabel(p).primary}{arrow(`w:${p.id}`)}
                           </th>,
                           <th
                             key={`${p.id}-appr`}
                             onClick={() => onSort(`wA:${p.id}`)}
                             className="py-1.5 px-2 font-bold uppercase tracking-wide text-right min-w-[66px] cursor-pointer select-none hover:text-white"
-                            title="ยอดประเมิน (รายการเทรดทั้งหมด) ÷ iPhone ที่ขายได้"
+                            title={
+                              /ufund/i.test(p.name)
+                                ? "ยอดยื่น/อนุมัติ (uFund) — อนุมัติ ÷ ยอดยื่น"
+                                : "ยอดประเมิน (รายการเทรดทั้งหมด) ÷ iPhone ที่ขายได้"
+                            }
                           >
-                            ประเมิน{arrow(`wA:${p.id}`)}
+                            {splitLabel(p).appr}{arrow(`wA:${p.id}`)}
                           </th>,
                         ]
                       : null,
@@ -584,7 +597,7 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                         {renderWonderCell(row.wonders[p.id])}
                       </td>
                     );
-                    if (!isTradeIn(p)) return td;
+                    if (!isSplit(p)) return td;
                     return [
                       td,
                       <td

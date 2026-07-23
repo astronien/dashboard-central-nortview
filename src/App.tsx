@@ -65,6 +65,7 @@ import {
   type TradeInResult,
 } from "./lib/tradeInApi";
 import { fetchCsatData, type CsatResult, type CsatUser } from "./lib/csatApi";
+import { fetchUfundData, type UfundResult } from "./lib/ufundApi";
 import {
   fetchTradeBranchMappingFromCloud,
   getTradeBranchMapping,
@@ -1305,6 +1306,7 @@ function AppInternal({
     undefined,
   );
   const [csatData, setCsatData] = useState<CsatResult | undefined>(undefined);
+  const [ufundData, setUfundData] = useState<UfundResult | undefined>(undefined);
   const [csatError, setCsatError] = useState<
     { code: "auth" | "no_token" | "error"; message: string } | undefined
   >(undefined);
@@ -2163,6 +2165,35 @@ function AppInternal({
     [tradeForOfficer],
   );
 
+  // Per-officer uFund lookup (empCode = STAFF ID; API name is first-name only
+  // so code match is primary, name is a loose fallback).
+  const ufundByOfficer = useMemo(() => {
+    const byCode = new Map<string, { total: number; approved: number }>();
+    const byName = new Map<string, { total: number; approved: number }>();
+    for (const s of ufundData?.perStaff ?? []) {
+      const val = { total: s.total, approved: s.approved };
+      const code = String(s.empCode ?? "").replace(/[^0-9]/g, "");
+      if (code) byCode.set(code, val);
+      const nm = cleanOfficerName(s.name ?? "");
+      if (nm) byName.set(nm, val);
+    }
+    return { byCode, byName };
+  }, [ufundData]);
+
+  const ufundForOfficer = React.useCallback(
+    (staffId?: string, name?: string): { total: number; approved: number } | undefined => {
+      const code = String(staffId ?? "").replace(/[^0-9]/g, "");
+      if (code && ufundByOfficer.byCode.has(code)) return ufundByOfficer.byCode.get(code);
+      const nm = cleanOfficerName(name ?? "");
+      // first-name-only fallback: match if the API name is a prefix
+      for (const [k, v] of ufundByOfficer.byName) {
+        if (k && (nm === k || nm.startsWith(k + " ") || nm.split(" ")[0] === k)) return v;
+      }
+      return undefined;
+    },
+    [ufundByOfficer],
+  );
+
   // Per-officer CSAT lookup (emp_code = STAFF ID, fallback = name match)
   const csatByOfficer = useMemo(() => {
     const byCode = new Map<string, CsatUser>();
@@ -2503,9 +2534,16 @@ function AppInternal({
             actualA: r.billsWithAandB,
             actualB: r.billsWithB,
             calcType: p.calcType,
-            // Trade In only: ยอดประเมิน (รายการเทรดทั้งหมด) — second sub-column
+            // Trade In: ยอดประเมิน (รายการเทรดทั้งหมด) ÷ iPhone — 2nd sub-column
             ...(p.calcType === "tradeIn"
               ? { appraisalA: tradeForOfficer(officer.staffId, officer.name).target }
+              : {}),
+            // UFUND: ยอดประเมิน (ยื่น/อนุมัติ) from the uFund API — 2nd sub-column
+            ...(/ufund/i.test(p.name)
+              ? (() => {
+                  const u = ufundForOfficer(officer.staffId, officer.name);
+                  return u ? { appraisalA: u.approved, appraisalB: u.total } : {};
+                })()
               : {}),
           };
         });
@@ -2550,6 +2588,7 @@ function AppInternal({
     getCategory,
     tradeCountForOfficer,
     tradeForOfficer,
+    ufundForOfficer,
     iphoneUnitsFromBills,
     csatForOfficer,
   ]);
@@ -3633,6 +3672,34 @@ function AppInternal({
       cancelled = true;
     };
   }, [tradeInBranchCode, selectedBranchLoaded]);
+
+  // uFund Tracker — per-staff ยอดยื่น (total) / อนุมัติ (approved). Uses the
+  // store ref code (same "3015" as CSAT); public API, no auth.
+  useEffect(() => {
+    if (!selectedBranchLoaded) return;
+    const code =
+      csatData?.branch?.refId ||
+      getBranchCodeFromTarget(displayUploads.target) ||
+      getBranchCodeFromString(selectedBranch);
+    if (!code) {
+      setUfundData(undefined);
+      return;
+    }
+    let cancelled = false;
+    fetchUfundData(code)
+      .then((result) => {
+        if (!cancelled) setUfundData(result);
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          console.warn("[App] fetchUfundData failed:", e);
+          setUfundData(undefined);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [csatData?.branch?.refId, displayUploads.target, selectedBranch, selectedBranchLoaded]);
 
   // When the user uploads data for a branch that isn't currently
   // selected, auto-switch to the first uploaded branch so the rest of
