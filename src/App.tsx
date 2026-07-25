@@ -1130,6 +1130,8 @@ type CategoryPerformanceRow = {
   actualDay: number;
   diffDay: number;
   achDayPercent: number;
+  units?: number;
+  unitsDay?: number;
   actualA?: number;
   actualB?: number;
   calcType?: PresetCalcType;
@@ -1939,7 +1941,9 @@ function AppInternal({
       let lastMonth = 0;
       let lastYear = 0;
       let actualDay = 0;
-      
+      let units = 0;
+      let unitsDay = 0;
+
       if (hasData) {
         const kpi = getOfficerCategoryKpi({
           category: catName,
@@ -1983,6 +1987,24 @@ function AppInternal({
             kpi.measureType === "quantity"
               ? toNumber(row.Number ?? row.number ?? row.qty ?? 0)
               : getCategoryValue(row);
+          unitsDay += toNumber(row.Number ?? row.number ?? row.qty ?? 0);
+        });
+
+        // MTD units (จำนวนเครื่อง) สำหรับหมวดนี้ทั้งเดือน — นับ qty จากทุก
+        // บิลของพนักงานคนนี้ในหมวดนี้ ภายในช่วง periodStart..periodEnd
+        displayUploads.current.forEach((row) => {
+          const rowOfficerId = String(row["STAFF ID"] ?? row.emp_id ?? "").trim();
+          const officer = String(row["Officer (Name)"] ?? "").trim();
+          const officerMatch =
+            (officerId && rowOfficerId && normalizeId(rowOfficerId) === normalizeId(officerId)) ||
+            matchesOfficer(officer, activeOfficer.name);
+          if (!officerMatch) return;
+          if (getCategory(row) !== catName) return;
+          const parsed = parseDocDate(String(row["Doc Date"] ?? row["doc date"] ?? ""));
+          if (parsed) {
+            if (parsed.getFullYear() !== periodYear || parsed.getMonth() !== periodMonth) return;
+          }
+          units += toNumber(row.Number ?? row.number ?? row.qty ?? 0);
         });
       } else if (!hasData) {
         // Fallback/Mock distribution matching activeOfficer total values!
@@ -2043,9 +2065,11 @@ function AppInternal({
         actualDay,
         diffDay,
         achDayPercent,
+        units,
+        unitsDay,
       };
     });
-    
+
     // 4. Calculate Total row
     const totalTarget = rows.reduce((s, r) => s + r.target, 0);
     const totalActual = rows.reduce((s, r) => s + r.actual, 0);
@@ -2066,7 +2090,9 @@ function AppInternal({
     const totalActualDay = rows.reduce((s, r) => s + r.actualDay, 0);
     const totalDiffDay = totalActualDay - totalTargetDay;
     const totalAchDayPercent = calcTodayAchievementPct(totalActualDay, totalTargetDay);
-    
+    const totalUnits = rows.reduce((s, r) => s + (r.units ?? 0), 0);
+    const totalUnitsDay = rows.reduce((s, r) => s + (r.unitsDay ?? 0), 0);
+
     const totalRow: CategoryPerformanceRow = {
       category: "Total",
       target: totalTarget,
@@ -2082,8 +2108,10 @@ function AppInternal({
       actualDay: totalActualDay,
       diffDay: totalDiffDay,
       achDayPercent: totalAchDayPercent,
+      units: totalUnits,
+      unitsDay: totalUnitsDay,
     };
-    
+
     return [...rows, totalRow];
   }, [activeOfficer, displayUploads, parsedReport, getCategory, todayRows]);
 

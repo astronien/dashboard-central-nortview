@@ -36,6 +36,8 @@ export type PerformanceRow = {
   actualDay: number;
   diffDay: number;
   achDayPercent: number;
+  units?: number;
+  unitsDay?: number;
   actualA?: number;
   actualB?: number;
   calcType?: PresetCalcType;
@@ -931,6 +933,9 @@ export function StaffSection({
                                   ยอดวันนี้
                                 </th>
                                 <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">
+                                  จำนวน
+                                </th>
+                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">
                                   ส่วนต่าง
                                 </th>
                                 <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-center">
@@ -941,6 +946,7 @@ export function StaffSection({
                               <>
                                 <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Target</th>
                                 <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Actual</th>
+                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Units</th>
                                 <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-center">Ach. %</th>
                                 <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Forecast</th>
                                 <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-center">%Forecast</th>
@@ -1038,6 +1044,9 @@ export function StaffSection({
                                       {fmtNum(row.targetDay)}
                                     </td>
                                     <td className="py-2.5 px-3 text-right font-bold">{fmtNum(row.actualDay)}</td>
+                                    <td className="py-2.5 px-3 text-right text-emerald-300/90 font-semibold">
+                                      {(row.unitsDay ?? 0).toLocaleString()}
+                                    </td>
                                     <td className="py-2.5 px-3 text-right">
                                       <span className={getDiffClass(row.diffDay)}>
                                         {getDiffText(row.diffDay)}
@@ -1060,6 +1069,9 @@ export function StaffSection({
                                   <td className="py-2.5 px-3 font-bold">{row.category}</td>
                                   <td className={`py-2.5 px-3 text-right ${isTotal ? "text-white" : "text-white/60"}`}>{fmtNum(row.target)}</td>
                                   <td className="py-2.5 px-3 text-right font-bold">{fmtNum(row.actual)}</td>
+                                  <td className="py-2.5 px-3 text-right text-emerald-300/90 font-semibold">
+                                    {(row.units ?? 0).toLocaleString()}
+                                  </td>
                                   <td className="py-2.5 px-3 text-center">
                                     <span className={getBadgeClass(row.achPercent)}>
                                       {fmtPct(row.achPercent)}
