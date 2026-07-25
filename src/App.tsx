@@ -2546,6 +2546,14 @@ function AppInternal({
           tradeInCount: tradeCountForOfficer(officer.staffId, officer.name),
           iphoneUnits: iphoneUnitsFromBills(officerBills),
         };
+        // ฐาน iPhone ของ UFUND "ตกลง" ให้ตรงกับตัวเลขที่โชว์ใน COVERPLUS เป๊ะ
+        // → ใช้ billsWithB (ฝั่ง iPhone) ของ preset Cover Plus ตัวเดียวกัน
+        const coverPlusPreset = wonderPresets.find((pp) =>
+          /cover\s*\+|cover\s*plus|coverplus/i.test(pp.name),
+        );
+        const coverPlusIphoneBase = coverPlusPreset
+          ? calcPreset(officerBills, coverPlusPreset, ctx).billsWithB
+          : ctx.iphoneUnits;
         const wonders: Record<string, CombinedWonderCell> = {};
         wonderPresets.forEach((p) => {
           const r = calcPreset(officerBills, p, ctx);
@@ -2575,13 +2583,13 @@ function AppInternal({
           // Trade-In (iphoneUnitsFromBills → rowMatchesKpiCategory "iPhone")
           // ไม่ใช่ "จำนวนบิลที่มี iPhone" เพราะบิลเดียวอาจมี iPhone หลายเครื่อง
           if (/ufund/i.test(p.name)) {
-            const iphoneUnits = ctx.iphoneUnits;
+            const iphoneBase = coverPlusIphoneBase;
             const ufundIphone = officerBills.filter(
               (b) => b.hasIPhone && calcPreset([b], p, ctx).billsWithAandB > 0,
             ).length;
-            const rate = iphoneUnits > 0 ? (ufundIphone / iphoneUnits) * 100 : 0;
+            const rate = iphoneBase > 0 ? (ufundIphone / iphoneBase) * 100 : 0;
             wonders[p.id].actualA = ufundIphone;
-            wonders[p.id].actualB = iphoneUnits;
+            wonders[p.id].actualB = iphoneBase;
             wonders[p.id].actual = rate;
             wonders[p.id].achPercent = rate;
           }
