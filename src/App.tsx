@@ -144,12 +144,13 @@ import {
   getPresets as getKpiPresets,
   cleanupTestPresets as cleanupKpiPresets,
 } from "./lib/presetStorage";
-import type { Preset as KpiPreset, PresetResult, PresetCalcType } from "./lib/presetTypes";
+import type { Preset as KpiPreset, PresetResult, PresetCalcType, ItemFilter } from "./lib/presetTypes";
+import { emptyItemFilter } from "./lib/presetTypes";
 import { AuthProvider, useAuth } from "./lib/auth/authContext";
 import LoginPage from "./components/LoginPage";
 import ChangePasswordGate from "./components/ChangePasswordGate";
 import { syncPiaFromOfficers } from "./lib/auth/piSync";
-import { calcPreset, presetDisplayValue, computePresetAchPercent } from "./lib/presetEngine";
+import { calcPreset, presetDisplayValue, computePresetAchPercent, countItemQuantityAnyFilter } from "./lib/presetEngine";
 import { parseBills, type BillSummary } from "./lib/presetBills";
 import { enrichSalesRowsWithCatDaily, buildCatDailyLookup } from "./lib/presetCatDaily";
 
@@ -1918,6 +1919,25 @@ function AppInternal({
     );
     const totalDays = currentMonthTotalDays;
     
+    // บิลของพนักงานคนนี้ (แบบ enriched catDaily แล้ว parse เป็นบิล) — ใช้
+    // สำหรับนับ "Units" ด้วยวิธีเดียวกับ KPI preset (Cover Plus) คือ
+    // countItemQuantityAnyFilter: เฉพาะ inventory item, dedupe ต่อบิล,
+    // รวม quantity — ไม่ใช่การนับ raw row ตรงๆ ที่ให้เลขเกินจริง
+    const unitsCatDailyLookup = buildCatDailyLookup(displayUploads.categoryMaster);
+    const unitsEnriched = enrichSalesRowsWithCatDaily(displayUploads.current, unitsCatDailyLookup);
+    const officerBillsForUnits = parseBills(unitsEnriched).filter(
+      (b) =>
+        matchesOfficer(b.officerName, activeOfficer.name) ||
+        Boolean(officerId && normalizeId(b.officerId) === normalizeId(officerId)),
+    );
+    const countCategoryUnits = (catName: string): number => {
+      const filter: ItemFilter = { ...emptyItemFilter(), categories: [catName] };
+      return officerBillsForUnits.reduce(
+        (s, b) => s + countItemQuantityAnyFilter(b, [filter]),
+        0,
+      );
+    };
+
     const todaySourceRows = todayRows.length ? todayRows : [];
     // Find latest data date by PARSED TIME so different string formats
     // for the same day (e.g. "26/06/2026" vs "26/06/2569") all match.
@@ -1990,20 +2010,9 @@ function AppInternal({
           unitsDay += toNumber(row.Number ?? row.number ?? row.qty ?? 0);
         });
 
-        // MTD units (จำนวนเครื่อง) ของหมวดนี้ — นับ qty จากบิลของพนักงานคนนี้
-        // ในหมวดนี้ โดยใช้เกณฑ์ officer + category "เดียวกับ" ยอด Actual
-        // (sumOfficerCategoryActual) คือนับทุกแถวใน current ไม่กรองวันที่
-        // เพื่อให้จำนวนเครื่องตรงกับยอดขายในแถวเดียวกัน
-        displayUploads.current.forEach((row) => {
-          const officer = String(row["Officer (Name)"] ?? "").trim();
-          const rowOfficerId = normalizeId(row["STAFF ID"] ?? row.emp_id ?? "");
-          const officerMatch =
-            matchesOfficer(officer, activeOfficer.name) ||
-            Boolean(officerId && rowOfficerId && rowOfficerId === normalizeId(officerId));
-          if (!officerMatch) return;
-          if (getCategory(row) !== catName) return;
-          units += toNumber(row.Number ?? row.number ?? row.qty ?? 0);
-        });
+        // MTD units (จำนวนเครื่อง) ของหมวดนี้ — นับด้วยวิธีเดียวกับ KPI preset
+        // Cover Plus (countItemQuantityAnyFilter: inventory item, dedupe, qty)
+        units = countCategoryUnits(catName);
       } else if (!hasData) {
         // Fallback/Mock distribution matching activeOfficer total values!
         const targetRates: Record<string, number> = {
