@@ -1990,20 +1990,18 @@ function AppInternal({
           unitsDay += toNumber(row.Number ?? row.number ?? row.qty ?? 0);
         });
 
-        // MTD units (จำนวนเครื่อง) สำหรับหมวดนี้ทั้งเดือน — นับ qty จากทุก
-        // บิลของพนักงานคนนี้ในหมวดนี้ ภายในช่วง periodStart..periodEnd
+        // MTD units (จำนวนเครื่อง) ของหมวดนี้ — นับ qty จากบิลของพนักงานคนนี้
+        // ในหมวดนี้ โดยใช้เกณฑ์ officer + category "เดียวกับ" ยอด Actual
+        // (sumOfficerCategoryActual) คือนับทุกแถวใน current ไม่กรองวันที่
+        // เพื่อให้จำนวนเครื่องตรงกับยอดขายในแถวเดียวกัน
         displayUploads.current.forEach((row) => {
-          const rowOfficerId = String(row["STAFF ID"] ?? row.emp_id ?? "").trim();
           const officer = String(row["Officer (Name)"] ?? "").trim();
+          const rowOfficerId = normalizeId(row["STAFF ID"] ?? row.emp_id ?? "");
           const officerMatch =
-            (officerId && rowOfficerId && normalizeId(rowOfficerId) === normalizeId(officerId)) ||
-            matchesOfficer(officer, activeOfficer.name);
+            matchesOfficer(officer, activeOfficer.name) ||
+            Boolean(officerId && rowOfficerId && rowOfficerId === normalizeId(officerId));
           if (!officerMatch) return;
           if (getCategory(row) !== catName) return;
-          const parsed = parseDocDate(String(row["Doc Date"] ?? row["doc date"] ?? ""));
-          if (parsed) {
-            if (parsed.getFullYear() !== periodYear || parsed.getMonth() !== periodMonth) return;
-          }
           units += toNumber(row.Number ?? row.number ?? row.qty ?? 0);
         });
       } else if (!hasData) {
