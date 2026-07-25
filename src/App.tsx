@@ -2542,18 +2542,23 @@ function AppInternal({
         });
 
         const officerBills = allBills.filter((b) => matchesOfficer(b.officerName, officer.name));
-        const ctx = {
-          tradeInCount: tradeCountForOfficer(officer.staffId, officer.name),
-          iphoneUnits: iphoneUnitsFromBills(officerBills),
-        };
-        // ฐาน iPhone ของ UFUND "ตกลง" ให้ตรงกับตัวเลขที่โชว์ใน COVERPLUS เป๊ะ
-        // → ใช้ billsWithB (ฝั่ง iPhone) ของ preset Cover Plus ตัวเดียวกัน
+        // ฐาน iPhone ให้ตรงกับตัวเลขที่โชว์ใน COVERPLUS เป๊ะ (ใช้ billsWithB —
+        // ฝั่ง iPhone — ของ preset Cover Plus ตัวเดียวกัน) เพื่อให้ทั้ง Trade-In
+        // และ UFUND นับ iPhone เท่ากับ COVERPLUS ไม่ใช้ iphoneUnitsFromBills
+        // ที่นับคนละแบบ
         const coverPlusPreset = wonderPresets.find((pp) =>
           /cover\s*\+|cover\s*plus|coverplus/i.test(pp.name),
         );
         const coverPlusIphoneBase = coverPlusPreset
-          ? calcPreset(officerBills, coverPlusPreset, ctx).billsWithB
-          : ctx.iphoneUnits;
+          ? calcPreset(officerBills, coverPlusPreset, {
+              tradeInCount: 0,
+              iphoneUnits: 0,
+            }).billsWithB
+          : iphoneUnitsFromBills(officerBills);
+        const ctx = {
+          tradeInCount: tradeCountForOfficer(officer.staffId, officer.name),
+          iphoneUnits: coverPlusIphoneBase,
+        };
         const wonders: Record<string, CombinedWonderCell> = {};
         wonderPresets.forEach((p) => {
           const r = calcPreset(officerBills, p, ctx);
