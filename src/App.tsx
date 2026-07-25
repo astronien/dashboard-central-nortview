@@ -1954,6 +1954,30 @@ function AppInternal({
       });
     }
 
+    // บิลของ "วันล่าสุด" (หรือ Today sheet) สำหรับนับ unitsDay ด้วยวิธี
+    // เดียวกับ Units รายเดือน (countItemQuantityAnyFilter ผ่าน preset)
+    const dayRowsForUnits = todaySourceRows.length
+      ? todaySourceRows
+      : displayUploads.current.filter((row) => {
+          const parsed = parseDocDate(String(row["Doc Date"] ?? row["doc date"] ?? ""));
+          const time = parsed ? parsed.getTime() : 0;
+          return Boolean(time && time === maxDateTime);
+        });
+    const officerDayBills = parseBills(
+      enrichSalesRowsWithCatDaily(dayRowsForUnits, unitsCatDailyLookup),
+    ).filter(
+      (b) =>
+        matchesOfficer(b.officerName, activeOfficer.name) ||
+        Boolean(officerId && normalizeId(b.officerId) === normalizeId(officerId)),
+    );
+    const countCategoryUnitsDay = (catName: string): number => {
+      const filter: ItemFilter = { ...emptyItemFilter(), categories: [catName] };
+      return officerDayBills.reduce(
+        (s, b) => s + countItemQuantityAnyFilter(b, [filter]),
+        0,
+      );
+    };
+
     // 3. For each category, compute target, actual, forecast, lastMonth, lastYear, actualDay
     const rows: CategoryPerformanceRow[] = categoriesList.map((catName) => {
       let target = 0;
@@ -2007,12 +2031,13 @@ function AppInternal({
             kpi.measureType === "quantity"
               ? toNumber(row.Number ?? row.number ?? row.qty ?? 0)
               : getCategoryValue(row);
-          unitsDay += toNumber(row.Number ?? row.number ?? row.qty ?? 0);
         });
 
-        // MTD units (จำนวนเครื่อง) ของหมวดนี้ — นับด้วยวิธีเดียวกับ KPI preset
-        // Cover Plus (countItemQuantityAnyFilter: inventory item, dedupe, qty)
+        // Units (จำนวนเครื่อง) — นับด้วยวิธีเดียวกับ KPI preset Cover Plus
+        // (countItemQuantityAnyFilter: inventory item, dedupe, qty) ทั้ง MTD
+        // และรายวัน
         units = countCategoryUnits(catName);
+        unitsDay = countCategoryUnitsDay(catName);
       } else if (!hasData) {
         // Fallback/Mock distribution matching activeOfficer total values!
         const targetRates: Record<string, number> = {
