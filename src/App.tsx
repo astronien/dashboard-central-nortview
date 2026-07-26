@@ -3790,9 +3790,10 @@ function AppInternal({
       return;
     }
     let cancelled = false;
-    // ยึดเดือนตามวันล่าสุดของข้อมูลยอดขาย (ไม่ใช่เดือนปัจจุบัน) เพื่อให้ Trade-In
-    // ตรงกับเดือนที่แดชบอร์ดกำลังแสดง — เช่น ถ้าอัปโหลดข้อมูลเดือนก่อน
-    fetchTradeInData(tradeInBranchCode, latestDataYmd || undefined)
+    // NOTE: ใช้เดือนปัจจุบันเหมือนเดิม (ไม่ anchor ตามเดือนข้อมูล) — การ anchor
+    // ทำให้ยอดหายถ้า Trade API ไม่มีข้อมูลของเดือนนั้น กลับมาใช้พฤติกรรมเดิม
+    // ที่เคยแสดงยอดได้
+    fetchTradeInData(tradeInBranchCode)
       .then((result) => {
         if (!cancelled) {
           setTradeInData(result);
@@ -3807,7 +3808,7 @@ function AppInternal({
     return () => {
       cancelled = true;
     };
-  }, [tradeInBranchCode, selectedBranchLoaded, latestDataYmd]);
+  }, [tradeInBranchCode, selectedBranchLoaded]);
 
   // CSAT (COM7 backoffice) — store + per-staff satisfaction. Uses the same
   // branch code as Trade In; the API falls back to the first branch the
