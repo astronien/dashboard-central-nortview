@@ -25,6 +25,10 @@ export interface TradeInResult {
 
 export async function fetchTradeInData(
   branchCode: string,
+  // Anchor the month window to the sales data's latest date (YYYY-MM-DD) so
+  // Trade-In matches the same month the dashboard is showing. If omitted,
+  // fall back to the current Asia/Bangkok month.
+  monthAnchor?: string,
 ): Promise<TradeInResult> {
   if (!branchCode) {
     return { actual: 0, today: 0, target: 0, perStaff: [], agreed: [] };
@@ -36,7 +40,10 @@ export async function fetchTradeInData(
   const todayStr = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Bangkok",
   }).format(new Date()); // YYYY-MM-DD
-  const [yearStr, monthStr] = todayStr.split("-");
+  const anchorStr = /^\d{4}-\d{2}-\d{2}$/.test(monthAnchor ?? "")
+    ? (monthAnchor as string)
+    : todayStr;
+  const [yearStr, monthStr] = anchorStr.split("-");
   const totalDays = new Date(Number(yearStr), Number(monthStr), 0).getDate();
   const startDate = `${yearStr}-${monthStr}-01`;
   const endDate = `${yearStr}-${monthStr}-${String(totalDays).padStart(2, "0")}`;

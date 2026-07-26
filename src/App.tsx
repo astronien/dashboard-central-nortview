@@ -65,7 +65,7 @@ import {
   type TradeInResult,
 } from "./lib/tradeInApi";
 import { fetchCsatData, type CsatResult, type CsatUser } from "./lib/csatApi";
-import { fetchUfundData, fetchUfundDay, type UfundResult } from "./lib/ufundApi";
+import { fetchUfundData, fetchUfundDay, fetchUfundMonth, type UfundResult } from "./lib/ufundApi";
 import {
   fetchTradeBranchMappingFromCloud,
   getTradeBranchMapping,
@@ -3790,7 +3790,9 @@ function AppInternal({
       return;
     }
     let cancelled = false;
-    fetchTradeInData(tradeInBranchCode)
+    // ยึดเดือนตามวันล่าสุดของข้อมูลยอดขาย (ไม่ใช่เดือนปัจจุบัน) เพื่อให้ Trade-In
+    // ตรงกับเดือนที่แดชบอร์ดกำลังแสดง — เช่น ถ้าอัปโหลดข้อมูลเดือนก่อน
+    fetchTradeInData(tradeInBranchCode, latestDataYmd || undefined)
       .then((result) => {
         if (!cancelled) {
           setTradeInData(result);
@@ -3805,7 +3807,7 @@ function AppInternal({
     return () => {
       cancelled = true;
     };
-  }, [tradeInBranchCode, selectedBranchLoaded]);
+  }, [tradeInBranchCode, selectedBranchLoaded, latestDataYmd]);
 
   // CSAT (COM7 backoffice) — store + per-staff satisfaction. Uses the same
   // branch code as Trade In; the API falls back to the first branch the
@@ -3849,7 +3851,12 @@ function AppInternal({
       return;
     }
     let cancelled = false;
-    fetchUfundData(code)
+    // ยึดเดือนตามวันล่าสุดของข้อมูล (ถ้ามี) ให้ตรงกับที่แดชบอร์ดแสดง —
+    // ไม่งั้น API จะคืนเดือนปัจจุบันซึ่งอาจว่างถ้าอัปโหลดข้อมูลเดือนก่อน
+    const ufundFetch = latestDataYmd
+      ? fetchUfundMonth(code, latestDataYmd)
+      : fetchUfundData(code);
+    ufundFetch
       .then((result) => {
         if (!cancelled) setUfundData(result);
       })
@@ -3862,7 +3869,7 @@ function AppInternal({
     return () => {
       cancelled = true;
     };
-  }, [csatData?.branch?.refId, displayUploads.target, selectedBranch, selectedBranchLoaded]);
+  }, [csatData?.branch?.refId, displayUploads.target, selectedBranch, selectedBranchLoaded, latestDataYmd]);
 
   // When the user uploads data for a branch that isn't currently
   // selected, auto-switch to the first uploaded branch so the rest of
