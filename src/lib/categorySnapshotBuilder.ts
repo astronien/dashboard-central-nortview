@@ -52,9 +52,27 @@ const SNAPSHOT_CATEGORIES: Array<{ label: string; kpiKey?: KpiCategoryKey }> = [
   { label: "BTB", kpiKey: "BTB" },
   { label: "COVER+", kpiKey: "COVER+" },
   { label: "AC+", kpiKey: "AC+" },
+  { label: "UFUND" },
   { label: "SIM", kpiKey: "SIM" },
   { label: "Trade In" },
 ];
+
+/** UFUND / personal-finance row detector (mirrors App.tsx isUfundRow). */
+function isUfundRow(row: RawRow): boolean {
+  if (!row) return false;
+  const cat = String(row["Category (Name)"] ?? row.category ?? "").toLowerCase();
+  const prod = String(row["Product (Name)"] ?? row.product ?? "").toLowerCase();
+  const sub = String(row["Sub Category"] ?? "").toLowerCase();
+  const text = `${cat} ${sub} ${prod}`.replace(/\s+/g, " ").trim();
+  return text.includes("ufund");
+}
+
+function sumUfundUnits(rows: RawRow[]): number {
+  return rows.reduce(
+    (sum, row) => (isUfundRow(row) ? sum + toNumber(row["Number"] ?? row.number ?? row.qty) : sum),
+    0,
+  );
+}
 
 function getMonthPeriod() {
   const now = new Date();
@@ -212,6 +230,17 @@ export function buildCategorySnapshots(params: {
         measureType = "quantity";
         iphoneBaseUnits = iphoneUnits;
         attachRateActual = iphoneUnits > 0 ? (actual / iphoneUnits) * 100 : 0;
+      }
+    } else if (label === "UFUND") {
+      // Attach rate จริง = ยอด UFUND ที่ขายจริง ÷ จำนวน iPhone ที่ขายจริง
+      measureType = "quantity";
+      actual = sumUfundUnits(currentRows);
+      iphoneBaseUnits = iphoneUnits;
+      attachRateActual = iphoneUnits > 0 ? (actual / iphoneUnits) * 100 : 0;
+      const override = targetOverrides?.["UFUND"];
+      if (typeof override === "number" && Number.isFinite(override)) {
+        targetPctOfIphone = override;
+        target = Math.round((iphoneUnits * override) / 100);
       }
     } else if (label === "Trade In" && tradeInData) {
       measureType = "quantity";

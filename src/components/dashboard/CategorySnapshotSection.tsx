@@ -12,6 +12,7 @@ const ICONS: Record<string, LucideIcon> = {
   BTB: Building,
   "COVER+": ShieldPlus,
   "AC+": ShieldCheck,
+  UFUND: DollarSign,
   SIM: CreditCard,
   "Trade In": RefreshCw,
 };
@@ -23,8 +24,11 @@ function formatValue(item: CategorySnapshotItem): string {
     }
     return item.actual.toLocaleString();
   }
-  // AC+/COVER+: แสดงเป็น "ยอดขายจริง / จำนวน iPhone ที่ขายจริง"
-  if ((item.category === "AC+" || item.category === "COVER+") && item.iphoneBaseUnits != null) {
+  // AC+/COVER+/UFUND: แสดงเป็น "ยอดขายจริง / จำนวน iPhone ที่ขายจริง"
+  if (
+    (item.category === "AC+" || item.category === "COVER+" || item.category === "UFUND") &&
+    item.iphoneBaseUnits != null
+  ) {
     return `${item.actual.toLocaleString()}/${item.iphoneBaseUnits.toLocaleString()}`;
   }
   if (item.measureType === "quantity") {
@@ -54,7 +58,7 @@ function formatMetric(value: number, measureType: "revenue" | "quantity" | undef
   return Math.round(value).toLocaleString();
 }
 
-const QUANTITY_CATEGORIES = new Set(["AC+", "SIM", "COVER+", "Trade In"]);
+const QUANTITY_CATEGORIES = new Set(["AC+", "SIM", "COVER+", "UFUND", "Trade In"]);
 
 function isQuantityItem(item: CategorySnapshotItem): boolean {
   return item.measureType === "quantity" || QUANTITY_CATEGORIES.has(item.category);
@@ -113,7 +117,7 @@ export const CategorySnapshotSection = React.forwardRef<HTMLDivElement, { items:
                 <div className="text-[10px] text-white/50 -mt-2">
                   สิ้นสุดประมูล / รายการเทรดทั้งหมด
                 </div>
-              ) : (item.category === "AC+" || item.category === "COVER+") && item.attachRateActual != null ? (
+              ) : (item.category === "AC+" || item.category === "COVER+" || item.category === "UFUND") && item.attachRateActual != null ? (
                 <div className="text-[10px] text-white/50 -mt-2">
                   ขายจริง / iPhone ที่ขาย{item.targetPctOfIphone != null ? ` · เป้า ${item.targetPctOfIphone}%` : ""}
                 </div>
@@ -169,9 +173,11 @@ export const CategorySnapshotSection = React.forwardRef<HTMLDivElement, { items:
                     </span>
                     <span
                       className={`font-bold ${
-                        item.targetPctOfIphone != null && item.attachRateActual >= item.targetPctOfIphone
-                          ? "text-emerald-400"
-                          : "text-rose-400"
+                        item.targetPctOfIphone == null
+                          ? "text-white/90"
+                          : item.attachRateActual >= item.targetPctOfIphone
+                            ? "text-emerald-400"
+                            : "text-rose-400"
                       }`}
                     >
                       {item.attachRateActual.toFixed(2)}%
