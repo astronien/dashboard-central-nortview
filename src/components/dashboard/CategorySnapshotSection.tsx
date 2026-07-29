@@ -23,6 +23,10 @@ function formatValue(item: CategorySnapshotItem): string {
     }
     return item.actual.toLocaleString();
   }
+  // AC+/COVER+: แสดงเป็น "ยอดขายจริง / จำนวน iPhone ที่ขายจริง"
+  if ((item.category === "AC+" || item.category === "COVER+") && item.iphoneBaseUnits != null) {
+    return `${item.actual.toLocaleString()}/${item.iphoneBaseUnits.toLocaleString()}`;
+  }
   if (item.measureType === "quantity") {
     return item.actual.toLocaleString();
   }
@@ -109,6 +113,10 @@ export const CategorySnapshotSection = React.forwardRef<HTMLDivElement, { items:
                 <div className="text-[10px] text-white/50 -mt-2">
                   สิ้นสุดประมูล / รายการเทรดทั้งหมด
                 </div>
+              ) : (item.category === "AC+" || item.category === "COVER+") && item.attachRateActual != null ? (
+                <div className="text-[10px] text-white/50 -mt-2">
+                  ขายจริง / iPhone ที่ขาย{item.targetPctOfIphone != null ? ` · เป้า ${item.targetPctOfIphone}%` : ""}
+                </div>
               ) : item.targetPctOfIphone != null ? (
                 <div className="text-[10px] text-white/50 -mt-2">
                   Target {item.targetPctOfIphone}% ของ iPhone ({formatTarget(item)})
@@ -153,6 +161,22 @@ export const CategorySnapshotSection = React.forwardRef<HTMLDivElement, { items:
                       </span>
                     </div>
                   </>
+                ) : null}
+                {item.attachRateActual != null ? (
+                  <div className="flex items-center justify-between">
+                    <span className="text-white/50">
+                      Attach จริง (ขาย/iPhone){item.targetPctOfIphone != null ? ` เป้า ${item.targetPctOfIphone}%` : ""}
+                    </span>
+                    <span
+                      className={`font-bold ${
+                        item.targetPctOfIphone != null && item.attachRateActual >= item.targetPctOfIphone
+                          ? "text-emerald-400"
+                          : "text-rose-400"
+                      }`}
+                    >
+                      {item.attachRateActual.toFixed(2)}%
+                    </span>
+                  </div>
                 ) : null}
                 {item.tradeInPerIphonePct != null ? (
                   <div className="flex items-center justify-between">

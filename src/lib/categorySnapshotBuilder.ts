@@ -33,6 +33,10 @@ export type CategorySnapshotItem = {
   measureType?: "revenue" | "quantity";
   /** AC+/COVER+ only: target expressed as % of iPhone units sold */
   targetPctOfIphone?: number;
+  /** AC+/COVER+ only: attach rate จริง = ยอดขายจริง ÷ iPhone ที่ขายจริง × 100 */
+  attachRateActual?: number;
+  /** AC+/COVER+ only: จำนวน iPhone ที่ขายจริง (ตัวหารของ attach rate) */
+  iphoneBaseUnits?: number;
   /** Trade In only: สิ้นสุดประมูล ÷ iPhone units sold × 100 (เป้า 20%) */
   tradeInPerIphonePct?: number;
   /** Trade In only: รายการเทรดทั้งหมด ÷ iPhone units sold × 100 (เป้า 50%) */
@@ -170,6 +174,8 @@ export function buildCategorySnapshots(params: {
     let actual = 0;
     let measureType: "revenue" | "quantity" | undefined = "revenue";
     let targetPctOfIphone: number | undefined;
+    let attachRateActual: number | undefined;
+    let iphoneBaseUnits: number | undefined;
     let tradeInPerIphonePct: number | undefined;
     let tradeInAppraisalPct: number | undefined;
 
@@ -201,6 +207,12 @@ export function buildCategorySnapshots(params: {
         target = override;
       }
       actual = sumKpiActualFromRows(currentRows, kpiKey);
+      if (label === "AC+" || label === "COVER+") {
+        // Attach rate จริง = ยอดที่ขายได้จริง ÷ จำนวน iPhone ที่ขายจริง
+        measureType = "quantity";
+        iphoneBaseUnits = iphoneUnits;
+        attachRateActual = iphoneUnits > 0 ? (actual / iphoneUnits) * 100 : 0;
+      }
     } else if (label === "Trade In" && tradeInData) {
       measureType = "quantity";
       actual = Number(tradeInData.actual ?? 0);
@@ -274,6 +286,8 @@ export function buildCategorySnapshots(params: {
       yoy,
       measureType,
       targetPctOfIphone,
+      attachRateActual,
+      iphoneBaseUnits,
       tradeInPerIphonePct,
       tradeInAppraisalPct,
     };
