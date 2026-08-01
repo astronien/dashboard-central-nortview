@@ -154,6 +154,29 @@ function TelegramSendButton({
     try {
       const pad = 32;
       const h = Math.max(sizeEl.scrollHeight, sizeEl.offsetHeight);
+      // The staff photo is intentionally taller than its card and pokes ABOVE
+      // the card's top edge (h-125%/130% + object-bottom + negative -mt). The
+      // capture canvas starts at the card top, so that overhang (the head)
+      // gets clipped. Measure how far the photo sticks up past the capture
+      // element and grow the TOP padding to include it. Same idea for the
+      // left overhang (-ml-8 + centered image).
+      let padTop = pad;
+      let padLeft = pad;
+      try {
+        const elRect = el.getBoundingClientRect();
+        const heroImg = el.querySelector<HTMLImageElement>(".staff-hero img");
+        if (heroImg) {
+          const imgRect = heroImg.getBoundingClientRect();
+          const overTop = elRect.top - imgRect.top;
+          if (overTop > 0) padTop = Math.ceil(overTop) + pad;
+          const overLeft = elRect.left - imgRect.left;
+          if (overLeft > 0) padLeft = Math.ceil(overLeft) + pad;
+        }
+      } catch {
+        // fall back to symmetric padding
+      }
+      const padRight = pad;
+      const padBottom = pad;
       const dataUrl = await toJpeg(el, {
         quality: 0.92,
         pixelRatio: 1.5,
@@ -162,15 +185,15 @@ function TelegramSendButton({
           getComputedStyle(document.documentElement)
             .getPropertyValue("--capture-bg")
             .trim() || "#1c2722",
-        // Padding is added AROUND the card so the content stays centered
-        // with even margins on every side (width AND height must grow,
-        // otherwise the bottom padding gets clipped).
-        width: w + pad * 2,
-        height: h + pad * 2,
+        // Padding is added AROUND the card. Top/left may be larger than the
+        // base pad to fit the photo overhang; width AND height must grow to
+        // match or the extra padding gets clipped.
+        width: w + padLeft + padRight,
+        height: h + padTop + padBottom,
         style: {
-          padding: `${pad}px`,
-          width: `${w + pad * 2}px`,
-          height: `${h + pad * 2}px`,
+          padding: `${padTop}px ${padRight}px ${padBottom}px ${padLeft}px`,
+          width: `${w + padLeft + padRight}px`,
+          height: `${h + padTop + padBottom}px`,
           boxSizing: "border-box",
           overflow: "visible",
         },
