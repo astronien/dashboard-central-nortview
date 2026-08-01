@@ -32,7 +32,7 @@ export type StaffRosterEntry = {
 };
 
 type RawRow = Record<string, string | number | undefined>;
-type ReportOfficer = { name: string; branch: string };
+type ReportOfficer = { name: string; branch: string; staffId?: string };
 
 export const buildStaffRoster = (
   targetRows: RawRow[],
@@ -40,6 +40,10 @@ export const buildStaffRoster = (
   cleanName: (name: string) => string,
 ): StaffRosterEntry[] => {
   const map = new Map<string, StaffRosterEntry>();
+  // Track which people are already in the roster by officerKey (name) so a
+  // person listed in BOTH the target file and the sales data isn't added
+  // twice under different keys.
+  const seenOfficerKeys = new Set<string>();
 
   for (const row of targetRows) {
     const staffId = String(row["STAFF ID"] ?? row.staffId ?? "").trim();
@@ -56,20 +60,25 @@ export const buildStaffRoster = (
       name: name || staffId,
       branch: String(row["BRANCH NAME"] ?? row.branch ?? "").trim(),
     });
+    if (officerKey) seenOfficerKeys.add(officerKey);
   }
 
-  if (map.size === 0) {
-    reportOfficers.forEach((officer) => {
-      const officerKey = cleanName(officer.name);
-      if (!officerKey || map.has(officerKey)) return;
-      map.set(officerKey, {
-        staffId: officerKey,
-        officerKey,
-        name: officer.name,
-        branch: officer.branch,
-      });
+  // ALWAYS merge in officers seen in the sales data — a new month may add
+  // staff who sold but aren't in the Target Excel yet. Without this they
+  // show in Staff Profile (sales-derived) but not in the photo roster.
+  reportOfficers.forEach((officer) => {
+    const officerKey = cleanName(officer.name);
+    if (!officerKey || seenOfficerKeys.has(officerKey)) return;
+    const staffId = String(officer.staffId ?? "").trim() || officerKey;
+    if (map.has(staffId)) return;
+    map.set(staffId, {
+      staffId,
+      officerKey,
+      name: officer.name,
+      branch: officer.branch,
     });
-  }
+    seenOfficerKeys.add(officerKey);
+  });
 
   return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, "th"));
 };
