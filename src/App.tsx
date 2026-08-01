@@ -3777,10 +3777,15 @@ function AppInternal({
   // uploads-array identity change).
   const tradeInBranchCode = useMemo(
     () =>
+      // 1) explicit user override, 2) the CSAT refId (= real_branch_id ที่
+      // Trade API ใช้ เช่น 3015 — อันเดียวกับที่ UFUND/CSAT ใช้แล้วได้ผล),
+      // 3) โค้ดจากไฟล์เป้า, 4) จากชื่อสาขา. เดิมข้ามข้อ 2 ทำให้ตอนขึ้นเดือนใหม่
+      // ไฟล์เป้าอาจให้ branch_id ผิด (เช่น 1770) แล้ว Trade API คืนค่าว่าง
       tradeBranchMapping[selectedBranch] ||
+      csatData?.branch?.refId ||
       getBranchCodeFromTarget(displayUploads.target) ||
       getBranchCodeFromString(selectedBranch),
-    [selectedBranch, displayUploads.target, tradeBranchMapping],
+    [selectedBranch, displayUploads.target, tradeBranchMapping, csatData?.branch?.refId],
   );
 
   useEffect(() => {
