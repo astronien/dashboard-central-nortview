@@ -3790,10 +3790,10 @@ function AppInternal({
       return;
     }
     let cancelled = false;
-    // NOTE: ใช้เดือนปัจจุบันเหมือนเดิม (ไม่ anchor ตามเดือนข้อมูล) — การ anchor
-    // ทำให้ยอดหายถ้า Trade API ไม่มีข้อมูลของเดือนนั้น กลับมาใช้พฤติกรรมเดิม
-    // ที่เคยแสดงยอดได้
-    fetchTradeInData(tradeInBranchCode)
+    // ยึดเดือนตามวันล่าสุดของไฟล์ยอดขาย (ไม่ใช่เดือนปัจจุบัน) — ตอนขึ้นเดือนใหม่
+    // ไฟล์ยอดขายอาจยังเป็นเดือนก่อน ถ้าดึงเดือนปัจจุบัน Trade API จะว่าง
+    // (ตอนนี้ยิงผ่าน proxy แล้ว ข้อมูลมาครบ จึง anchor ได้ปลอดภัย)
+    fetchTradeInData(tradeInBranchCode, latestDataYmd || undefined)
       .then((result) => {
         if (!cancelled) {
           setTradeInData(result);
@@ -3837,7 +3837,7 @@ function AppInternal({
     return () => {
       cancelled = true;
     };
-  }, [tradeInBranchCode, selectedBranchLoaded]);
+  }, [tradeInBranchCode, selectedBranchLoaded, latestDataYmd]);
 
   // uFund Tracker — per-staff ยอดยื่น (total) / อนุมัติ (approved). Uses the
   // store ref code (same "3015" as CSAT); public API, no auth.
