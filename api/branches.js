@@ -14,11 +14,39 @@ const applyCors = (res) => {
   });
 };
 
+const TRADE_API_BASE = "https://report-trade.vercel.app";
+const TRADE_API_KEY = process.env.TRADE_API_KEY || "techtrade_pro_secret_2026";
+
 module.exports = async function handler(req, res) {
   applyCors(res);
 
   if (req.method === "OPTIONS") {
     return res.status(204).end();
+  }
+
+  // Trade-In proxy — fetch the trade API server-side WITH the X-API-Key
+  // header (avoids browser CORS/preflight on the custom header) and return
+  // the raw JSON. Same-origin for the app; also lets us inspect the fields.
+  if (req.query.resource === "trade") {
+    try {
+      const { branch, zone, start_date, end_date, limit } = req.query;
+      const params = new URLSearchParams();
+      if (branch) params.set("branch", String(branch));
+      if (zone) params.set("zone", String(zone));
+      if (start_date) params.set("start_date", String(start_date));
+      if (end_date) params.set("end_date", String(end_date));
+      params.set("limit", String(limit || "99999"));
+      const url = `${TRADE_API_BASE}/api/v2/trades?${params.toString()}`;
+      const tradeRes = await fetch(url, {
+        headers: { "X-API-Key": TRADE_API_KEY },
+      });
+      const text = await tradeRes.text();
+      res.setHeader("Content-Type", "application/json");
+      return res.status(tradeRes.ok ? 200 : tradeRes.status).send(text);
+    } catch (error) {
+      console.error("[Trade proxy Error]:", error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
   }
 
   try {

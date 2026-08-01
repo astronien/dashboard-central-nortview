@@ -1,5 +1,8 @@
-const TRADE_API_BASE = "https://report-trade.vercel.app";
-const API_KEY = "techtrade_pro_secret_2026";
+// Fetch through our own serverless proxy (/api/branches?resource=trade) so
+// the X-API-Key header is added server-side — the browser can't send a
+// custom header cross-origin without a CORS preflight the trade API may
+// reject, which silently returned empty data.
+const TRADE_PROXY_BASE = "/api/branches?resource=trade";
 
 export interface TradeInStaffRate {
   code: string; // SALE_CODE (= STAFF ID)
@@ -48,11 +51,9 @@ export async function fetchTradeInData(
   const startDate = `${yearStr}-${monthStr}-01`;
   const endDate = `${yearStr}-${monthStr}-${String(totalDays).padStart(2, "0")}`;
 
-  const url = `${TRADE_API_BASE}/api/v2/trades?branch=${encodeURIComponent(branchCode)}&start_date=${startDate}&end_date=${endDate}&limit=99999`;
+  const url = `${TRADE_PROXY_BASE}&branch=${encodeURIComponent(branchCode)}&start_date=${startDate}&end_date=${endDate}&limit=99999`;
 
-  const res = await fetch(url, {
-    headers: { "X-API-Key": API_KEY },
-  });
+  const res = await fetch(url);
 
   if (!res.ok) {
     console.warn(`[TradeIn API] returned ${res.status}`);
