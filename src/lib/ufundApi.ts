@@ -1,4 +1,4 @@
-// uFund Tracker public API (https://ufund-app-in.vercel.app) — read-only,
+// uFund Tracker public API (https://ufund-app.vercel.app) — read-only,
 // no auth, CORS open, so the browser can call it directly (no proxy).
 //
 // /api/v1/reports/employees?branch=<code>&period=monthly returns per-staff
@@ -7,7 +7,7 @@
 //   approved = อนุมัติ (ตกลง)
 //   percent  = approved / total %
 
-const UFUND_BASE = "https://ufund-app-in.vercel.app/api/v1";
+const UFUND_BASE = "https://ufund-app.vercel.app/api/v1";
 
 export interface UfundStaff {
   empCode: string;
