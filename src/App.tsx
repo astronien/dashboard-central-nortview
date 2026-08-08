@@ -454,35 +454,6 @@ const isUfundRow = (row: any): boolean => {
   return false;
 };
 
-/**
- * Sortable value for a sales row's "create time" (เวลาเปิดบิล) — used to
- * order sales within a day. Handles full datetime strings, Excel serials
- * (with fractional day = time), and time-only "HH:MM(:SS)". Returns 0 when
- * unknown so those rows sort first (treated as earliest).
- */
-const createTimeValue = (row: RawRow): number => {
-  const raw =
-    row["create time"] ??
-    row["Create Time"] ??
-    row["create_time"] ??
-    row["createTime"] ??
-    row["created_at"] ??
-    row["Created Time"];
-  if (raw == null || raw === "") return 0;
-  if (typeof raw === "number") {
-    // Excel serial: days since 1899-12-30 (fractional part = time of day)
-    if (raw > 20000 && raw < 80000) return (raw - 25569) * 86400 * 1000;
-    return raw;
-  }
-  const s = String(raw).trim();
-  const parsed = Date.parse(s);
-  if (Number.isFinite(parsed)) return parsed;
-  // time-only "14:30" / "14:30:05"
-  const m = s.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
-  if (m) return Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3] ?? 0);
-  return 0;
-};
-
 const countRows = (
   rows: RawRow[], 
   filterFn: (cat: string, prod: string, sub: string, row?: RawRow) => boolean
@@ -2924,20 +2895,21 @@ function AppInternal({
     ufundDailyForOfficer,
   ]);
 
-  // ─── โควตา Attach รายวัน (Cover/UFUND ต่อ iPhone 1:4) ────────────────────
-  // เกณฑ์ 25%: 4×Attach ≥ iPhone. ถ้า "เมื่อวาน" ไม่ผ่าน → "วันนี้" เข้าโหมด
-  // ส่งต่อ: เครื่องเปล่าที่ขายก่อนการแนบครั้งแรกของวัน (เรียงตาม create time)
-  // ต้องยกให้คนอื่น จนกว่าจะแนบได้ 1 ครั้ง.
+  // ─── โควตา Attach สะสม (Cover/UFUND ต่อ iPhone 1:4) ──────────────────────
+  // สะสมทั้งเดือน: สิทธิ์คงเหลือ = 4×Attach − iPhone.
+  //   ≥0 ผ่าน · −1..−3 กำลังสะสม (ยังไม่ครบบล็อก 4) · ≤−4 ต้องส่งต่อ.
+  // เช็ควันละครั้งตอนปิดร้าน → ใช้ยอดสะสมพอ ไม่ต้องเรียง create time ในวัน.
   const attachQuotaData = useMemo<AttachQuotaData>(() => {
     const empty: AttachQuotaData = {
       rows: [],
-      latestDate: "",
-      prevDate: "",
-      totalHandoff: 0,
+      fromDate: "",
+      toDate: "",
+      handoffCount: 0,
       recipient: null,
     };
     if (displayUploads.current.length === 0) return empty;
 
+    // ช่วงวันที่ของข้อมูล (แรก–ล่าสุด)
     const dayKey = (row: RawRow) => {
       const p = parseDocDate(String(row["Doc Date"] ?? row["doc date"] ?? ""));
       return p
@@ -2949,12 +2921,9 @@ function AppInternal({
       const k = dayKey(r);
       if (k) daySet.add(k);
     });
-    const days = Array.from(daySet).sort().reverse();
-    if (days.length === 0) return empty;
-    const latestDay = days[0];
-    const prevDay = days[1] ?? null;
-    const latestRows = displayUploads.current.filter((r) => dayKey(r) === latestDay);
-    const prevRows = prevDay ? displayUploads.current.filter((r) => dayKey(r) === prevDay) : [];
+    const days = Array.from(daySet).sort();
+    const fromDate = days[0] ?? "";
+    const toDate = days[days.length - 1] ?? "";
 
     const targetRecords = rawTargetRowsToRecords(displayUploads.target);
     const officerList: Array<{ name: string; branch: string; staffId?: string }> =
@@ -2962,7 +2931,7 @@ function AppInternal({
         ? parsedReport.officers.map((o) => ({ name: o.name, branch: o.branch, staffId: o.staffId }))
         : Array.from(
             new Map(
-              latestRows
+              displayUploads.current
                 .filter((r) => r["Officer (Name)"])
                 .map((r) => {
                   const n = String(r["Officer (Name)"]).trim();
@@ -2977,35 +2946,6 @@ function AppInternal({
       return matchesOfficer(oName, name) || Boolean(nId && rId && rId === nId);
     };
 
-    const dayStats = (dayRows: RawRow[], name: string, nId: string) => {
-      let iphone = 0;
-      let cover = 0;
-      let ufund = 0;
-      let firstAttachT = Infinity;
-      const iphoneRows: Array<{ t: number; qty: number }> = [];
-      for (const row of dayRows) {
-        if (!isOfficerRow(row, name, nId)) continue;
-        const qty = toNumber(row.Number ?? row.number ?? row.qty ?? 0);
-        const t = createTimeValue(row);
-        const isIph = rowMatchesKpiCategory(row, "iPhone");
-        const isCov = rowMatchesKpiCategory(row, "COVER+");
-        const isUf = isUfundRow(row);
-        if (isIph) {
-          iphone += qty;
-          iphoneRows.push({ t, qty });
-        }
-        if (isCov) cover += qty;
-        if (isUf) ufund += qty;
-        if (isCov || isUf) firstAttachT = Math.min(firstAttachT, t);
-      }
-      // เครื่องเปล่าที่ขาย "ก่อน" การแนบครั้งแรกของวัน (ถ้าไม่แนบเลย = ทั้งหมด)
-      const bareBeforeFirstAttach = iphoneRows.reduce(
-        (s, r) => s + (r.t < firstAttachT ? r.qty : 0),
-        0,
-      );
-      return { iphone, cover, ufund, bareBeforeFirstAttach };
-    };
-
     const rows = officerList
       .map((officer) => {
         const officerId = resolveOfficerId(
@@ -3016,59 +2956,48 @@ function AppInternal({
           matchesOfficer,
         );
         const nId = normalizeId(officerId);
-        const today = dayStats(latestRows, officer.name, nId);
-        const prev = prevDay ? dayStats(prevRows, officer.name, nId) : null;
-
-        const attach = today.cover + today.ufund;
-        const remaining = 4 * attach - today.iphone;
-        const passToday = today.iphone === 0 ? true : 4 * attach >= today.iphone;
-
-        const prevAttach = prev ? prev.cover + prev.ufund : 0;
-        const prevPass = !prev ? true : prev.iphone === 0 ? true : 4 * prevAttach >= prev.iphone;
-        const inPenalty = prevDay ? !prevPass : false;
-        const clearedToday = inPenalty && attach >= 1;
-        const handoffToday = inPenalty
-          ? attach >= 1
-            ? today.bareBeforeFirstAttach
-            : today.iphone
-          : 0;
+        // นับสะสมทั้งเดือน (ทุกแถวในไฟล์)
+        let iphone = 0;
+        let cover = 0;
+        let ufund = 0;
+        for (const row of displayUploads.current) {
+          if (!isOfficerRow(row, officer.name, nId)) continue;
+          const qty = toNumber(row.Number ?? row.number ?? row.qty ?? 0);
+          if (rowMatchesKpiCategory(row, "iPhone")) iphone += qty;
+          if (rowMatchesKpiCategory(row, "COVER+")) cover += qty;
+          if (isUfundRow(row)) ufund += qty;
+        }
+        const attach = cover + ufund;
+        const remaining = 4 * attach - iphone;
+        const status: "pass" | "accumulating" | "handoff" =
+          remaining >= 0 ? "pass" : remaining <= -4 ? "handoff" : "accumulating";
 
         return {
           name: officer.name,
           branch: officer.branch,
-          iphone: today.iphone,
-          cover: today.cover,
-          ufund: today.ufund,
+          iphone,
+          cover,
+          ufund,
           attach,
           remaining,
-          passToday,
-          inPenalty,
-          clearedToday,
-          handoffToday,
-          owesTomorrow: !passToday,
+          status,
         };
       })
       .filter((r) => r.iphone > 0 || r.cover > 0 || r.ufund > 0)
-      .sort((a, b) => b.iphone - a.iphone);
+      .sort((a, b) => a.remaining - b.remaining); // แย่สุด (ติดลบมากสุด) ขึ้นก่อน
 
-    // ผู้รับช่วง = คนที่ผ่านเกณฑ์วันนี้ + สิทธิ์คงเหลือมากสุด
+    // ผู้รับช่วง = คนที่ผ่านเกณฑ์ + สิทธิ์คงเหลือมากสุด
     let recipient: { name: string; remaining: number } | null = null;
     for (const r of rows) {
-      if (r.passToday && r.remaining > 0) {
+      if (r.status === "pass" && r.remaining > 0) {
         if (!recipient || r.remaining > recipient.remaining) {
           recipient = { name: r.name, remaining: r.remaining };
         }
       }
     }
-    const totalHandoff = rows.reduce((s, r) => s + r.handoffToday, 0);
+    const handoffCount = rows.filter((r) => r.status === "handoff").length;
 
-    return {
-      rows,
-      latestDate: latestDay,
-      prevDate: prevDay ?? "",
-      totalHandoff,
-      recipient,
-    };
+    return { rows, fromDate, toDate, handoffCount, recipient };
   }, [displayUploads.current, displayUploads.target, parsedReport.officers]);
 
   const dynamicRadarData = useMemo(() => {
