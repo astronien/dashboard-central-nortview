@@ -4071,6 +4071,9 @@ function AppInternal({
   // Stat cards + Category KPI Snapshot inside the always-rendered hidden
   // home view — captured at a stable 1200px width regardless of viewport.
   const homeStatsCaptureRef = useRef<HTMLDivElement>(null);
+  // "ยอดขายตามหมวด + 7 Wonders รายคน" table inside the hidden home view —
+  // captured as its own image when the user hits cap on Home.
+  const combinedTableCaptureRef = useRef<HTMLDivElement>(null);
   // Staff profile card element (set by StaffSection) for the camera button.
   const staffProfileCaptureRef = useRef<HTMLDivElement>(null);
   const [staffCaptureProgress, setStaffCaptureProgress] = useState("");
@@ -4078,70 +4081,83 @@ function AppInternal({
   const captureScreen = async () => {
     // On home view, capture the 4 stat cards + Category KPI Snapshot
     const isHome = currentView === "home" && !!homeStatsCaptureRef.current;
-    const el = isHome ? homeStatsCaptureRef.current : mainRef.current;
-    if (!el) return;
-    const w = Math.max((el as HTMLElement).scrollWidth, (el as HTMLElement).offsetWidth);
-    const h = Math.max((el as HTMLElement).scrollHeight, (el as HTMLElement).offsetHeight);
-    // Home capture gets padding + the app's green gradient behind the
-    // cards so the image matches the on-screen look.
-    const pad = isHome ? 28 : 0;
-    // Inject a <style> element as a CHILD of the element so it travels
-    // with the clone into the SVG foreignObject. This hides scrollbars
-    // and box-shadows on all descendants during capture only.
-    const innerStyle = document.createElement("style");
-    innerStyle.textContent = `
-      *::-webkit-scrollbar { display: none !important; }
-      * { scrollbar-width: none !important; }
-      * { --tw-ring-shadow: 0 0 #0000 !important; --tw-ring-offset-shadow: 0 0 #0000 !important; }
-      * { --tw-shadow: 0 0 #0000 !important; }
-      * { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
-    `;
-    el.appendChild(innerStyle);
-    try {
-      const dataUrl = await toJpeg(el, {
-        quality: 0.94,
-        pixelRatio: 1.5,
-        cacheBust: false,
-        backgroundColor:
-          getComputedStyle(document.documentElement)
-            .getPropertyValue("--capture-bg")
-            .trim() || "#1c2722",
-        width: w + pad * 2,
-        ...(isHome ? { height: h + pad * 2 } : {}),
-        style: {
-          width: `${w + pad * 2}px`,
-          height: isHome ? `${h + pad * 2}px` : "auto",
-          boxSizing: "border-box",
-          overflow: "visible",
-          ...(isHome
-            ? {
-                padding: `${pad}px`,
-                background: "linear-gradient(to bottom right, #1b5d44, #123627)",
-              }
-            : {}),
-        },
-        // Drop mix-blend-overlay nodes from the clone — they render as a
-        // dark rectangle when html-to-image uses SVG foreignObject.
-        filter: (node) => {
-          if (node instanceof HTMLElement && node.classList?.contains("mix-blend-overlay")) {
-            return false;
-          }
-          return true;
-        },
-        fetchRequestInit: { mode: "cors" },
-      });
-      const ts = new Date().toISOString().slice(0, 10);
-      const label = currentView === "staff" ? "staff" : currentView;
-      const link = document.createElement("a");
-      link.download = `dashboard-${label}-${ts}.jpeg`;
-      link.href = dataUrl;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } catch (e) {
-      console.error("[captureScreen] failed:", e);
-    } finally {
-      innerStyle.remove();
+    const ts = new Date().toISOString().slice(0, 10);
+
+    // Capture a single element and trigger a download. `homeStyle` adds the
+    // padding + green gradient so home cards/table match the on-screen look.
+    const captureAndDownload = async (
+      el: HTMLElement | null,
+      label: string,
+      homeStyle: boolean,
+    ) => {
+      if (!el) return;
+      const w = Math.max(el.scrollWidth, el.offsetWidth);
+      const h = Math.max(el.scrollHeight, el.offsetHeight);
+      const pad = homeStyle ? 28 : 0;
+      // Inject a <style> element as a CHILD of the element so it travels
+      // with the clone into the SVG foreignObject (hides scrollbars/shadows).
+      const innerStyle = document.createElement("style");
+      innerStyle.textContent = `
+        *::-webkit-scrollbar { display: none !important; }
+        * { scrollbar-width: none !important; }
+        * { --tw-ring-shadow: 0 0 #0000 !important; --tw-ring-offset-shadow: 0 0 #0000 !important; }
+        * { --tw-shadow: 0 0 #0000 !important; }
+        * { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+      `;
+      el.appendChild(innerStyle);
+      try {
+        const dataUrl = await toJpeg(el, {
+          quality: 0.94,
+          pixelRatio: 1.5,
+          cacheBust: false,
+          backgroundColor:
+            getComputedStyle(document.documentElement)
+              .getPropertyValue("--capture-bg")
+              .trim() || "#1c2722",
+          width: w + pad * 2,
+          ...(homeStyle ? { height: h + pad * 2 } : {}),
+          style: {
+            width: `${w + pad * 2}px`,
+            height: homeStyle ? `${h + pad * 2}px` : "auto",
+            boxSizing: "border-box",
+            overflow: "visible",
+            ...(homeStyle
+              ? {
+                  padding: `${pad}px`,
+                  background: "linear-gradient(to bottom right, #1b5d44, #123627)",
+                }
+              : {}),
+          },
+          filter: (node) => {
+            if (node instanceof HTMLElement && node.classList?.contains("mix-blend-overlay")) {
+              return false;
+            }
+            return true;
+          },
+          fetchRequestInit: { mode: "cors" },
+        });
+        const link = document.createElement("a");
+        link.download = `dashboard-${label}-${ts}.jpeg`;
+        link.href = dataUrl;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } catch (e) {
+        console.error("[captureScreen] failed:", e);
+      } finally {
+        innerStyle.remove();
+      }
+    };
+
+    if (isHome) {
+      // 1) stat cards + Category KPI Snapshot
+      await captureAndDownload(homeStatsCaptureRef.current, "home", true);
+      // 2) ยอดขายตามหมวด + 7 Wonders รายคน (แยกเป็นอีก 1 รูป)
+      if (combinedTableCaptureRef.current) {
+        await captureAndDownload(combinedTableCaptureRef.current, "officers", true);
+      }
+    } else {
+      await captureAndDownload(mainRef.current, currentView === "staff" ? "staff" : currentView, false);
     }
   };
 
@@ -4716,6 +4732,7 @@ function AppInternal({
               }}
               categorySnapshotRef={categorySnapshotRef}
               captureRef={homeStatsCaptureRef}
+              combinedTableRef={combinedTableCaptureRef}
             />
           </div>
         </div>

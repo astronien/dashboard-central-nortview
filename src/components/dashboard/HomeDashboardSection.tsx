@@ -83,6 +83,7 @@ export function HomeDashboardSection({
   pace,
   categorySnapshotRef,
   captureRef,
+  combinedTableRef,
 }: {
   derivedHomeStats: DerivedHomeStat[];
   monthlyPerformance: MonthlyPerformance;
@@ -95,6 +96,8 @@ export function HomeDashboardSection({
   categorySnapshotRef?: React.RefObject<HTMLDivElement | null>;
   /** Wraps the stat cards + Category KPI Snapshot for screenshot capture */
   captureRef?: React.RefObject<HTMLDivElement | null>;
+  /** Wraps the "ยอดขายตามหมวด + 7 Wonders รายคน" table for its own capture */
+  combinedTableRef?: React.RefObject<HTMLDivElement | null>;
 }) {
   return (
     <>
@@ -135,7 +138,9 @@ export function HomeDashboardSection({
       ) : null}
 
       {combinedOfficerKpiData && combinedOfficerKpiData.rows.length > 0 ? (
-        <CombinedOfficerKpiTable data={combinedOfficerKpiData} />
+        <div ref={combinedTableRef}>
+          <CombinedOfficerKpiTable data={combinedOfficerKpiData} />
+        </div>
       ) : null}
     </>
   );
