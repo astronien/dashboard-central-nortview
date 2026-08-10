@@ -21,6 +21,42 @@ export function CsatTokenManager({ updatedBy }: { updatedBy?: string }) {
   const [success, setSuccess] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
+  // Bookmarklet: run on backoffice-csat.com7.in after login → reads the
+  // Sanctum token from localStorage and POSTs it to THIS dashboard's
+  // /api/csat?resource=token. Origin is baked in from the current page so
+  // it always targets the right deployment.
+  const bookmarklet = React.useMemo(() => {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    return (
+      "javascript:(function(){" +
+      "var re=/^\\d+\\|[A-Za-z0-9]{20,}$/;" +
+      "var t=(localStorage.getItem('token')||'').trim();" +
+      "if(!re.test(t)){var p=/\\d+\\|[A-Za-z0-9]{20,}/;for(var i=0;i<localStorage.length;i++){var v=localStorage.getItem(localStorage.key(i))||'';var m=String(v).match(p);if(m){t=m[0];break;}}}" +
+      "if(!re.test(t)){alert('ไม่พบ CSAT token — เข้า backoffice-csat.com7.in แล้ว login ก่อน');return;}" +
+      "fetch('" + origin + "/api/csat?resource=token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:t,updatedBy:'bookmarklet'})})" +
+      ".then(function(r){return r.json();}).then(function(j){alert(j&&j.ok?'✅ บันทึก CSAT token สำเร็จ':'❌ '+((j&&j.error)||'ไม่สำเร็จ'));})" +
+      ".catch(function(e){alert('❌ ยิงไม่สำเร็จ: '+e);});})();"
+    );
+  }, []);
+
+  const bmRef = React.useRef<HTMLAnchorElement>(null);
+  React.useEffect(() => {
+    // Set the javascript: href directly on the DOM node — React strips
+    // javascript: URLs from href, but dragging to the bookmarks bar needs
+    // the real attribute present.
+    if (bmRef.current) bmRef.current.setAttribute("href", bookmarklet);
+  }, [bookmarklet]);
+
+  const copyBookmarklet = () => {
+    navigator.clipboard
+      .writeText(bookmarklet)
+      .then(() => {
+        setSuccess("คัดลอก bookmarklet แล้ว — สร้าง bookmark ใหม่แล้ววาง URL นี้");
+        setError(null);
+      })
+      .catch(() => setError("คัดลอกไม่สำเร็จ"));
+  };
+
   const refresh = React.useCallback(() => {
     void getCsatTokenStatus().then(setStatus);
   }, []);
@@ -116,6 +152,50 @@ export function CsatTokenManager({ updatedBy }: { updatedBy?: string }) {
           <li>คัดลอกค่าที่ได้ (รูปแบบ "เลข|ตัวอักษร") มาวางด้านล่าง</li>
         </ol>
       </details>
+
+      {/* One-click: bookmarklet grabs the token from the CSAT site and
+          saves it here — no manual copy/paste. */}
+      <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 mb-4">
+        <div className="flex items-center gap-2 mb-2">
+          <KeyRound className="w-4 h-4 text-emerald-300" />
+          <span className="text-sm font-semibold text-emerald-200">ดึงอัตโนมัติ (คลิกเดียว)</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 mb-2">
+          <a
+            ref={bmRef}
+            href="#"
+            onClick={(e) => e.preventDefault()}
+            draggable
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-100 font-semibold cursor-grab active:cursor-grabbing select-none"
+            title="ลากปุ่มนี้ไปวางที่แถบ Bookmarks ของเบราว์เซอร์"
+          >
+            📌 ดึง CSAT Token
+          </a>
+          <button
+            type="button"
+            onClick={copyBookmarklet}
+            className="text-xs text-emerald-300/80 underline hover:text-emerald-200"
+          >
+            หรือคัดลอกโค้ด bookmarklet
+          </button>
+        </div>
+        <ol className="list-decimal ml-5 text-[12px] text-white/60 space-y-0.5">
+          <li>ลากปุ่ม "📌 ดึง CSAT Token" ไปวางที่แถบ Bookmarks (ทำครั้งเดียว)</li>
+          <li>
+            เปิด{" "}
+            <a
+              href="https://backoffice-csat.com7.in/portal"
+              target="_blank"
+              rel="noreferrer"
+              className="text-sky-300 underline"
+            >
+              backoffice-csat.com7.in
+            </a>{" "}
+            แล้ว login (ผ่าน OTP)
+          </li>
+          <li>กด bookmark ที่เพิ่งวาง → ระบบจะดึง token มาบันทึกให้อัตโนมัติ ✅</li>
+        </ol>
+      </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
