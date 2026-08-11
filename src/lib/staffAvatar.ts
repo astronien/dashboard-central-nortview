@@ -95,14 +95,38 @@ export const getStaffPhotoUrl = (
   },
 ): string => {
   const staffId = opts.staffId != null ? String(opts.staffId) : "";
-  if (staffId && photos[staffId]?.photoUrl) {
-    return photos[staffId].photoUrl;
+  const digits = staffId.replace(/\D/g, "");
+  const officerKey = (opts.officerKey ?? "").trim();
+  const vals = Object.values(photos).filter((p) => p && p.photoUrl);
+
+  // 1. exact staffId key (fastest, most common)
+  if (staffId && photos[staffId]?.photoUrl) return photos[staffId].photoUrl;
+
+  // 2. same STAFF ID by digits — survives format changes ("03015" vs "3015",
+  //    ".0" suffix) when a new target file re-keys the roster.
+  if (digits) {
+    const m = vals.find(
+      (p) => String(p.staffId ?? "").replace(/\D/g, "") === digits,
+    );
+    if (m) return m.photoUrl;
   }
 
-  const officerKey = opts.officerKey ?? "";
+  // 3. exact cleaned-name (officerKey)
   if (officerKey) {
-    const match = Object.values(photos).find((p) => p.officerKey === officerKey);
-    if (match?.photoUrl) return match.photoUrl;
+    const m = vals.find((p) => (p.officerKey ?? "").trim() === officerKey);
+    if (m) return m.photoUrl;
+
+    // 4. first-name prefix — catches a changed/added surname. Only use it
+    //    when it maps to exactly ONE saved photo (avoid grabbing the wrong
+    //    person who shares a first name).
+    const first = officerKey.split(/\s+/)[0];
+    if (first && first.length >= 2) {
+      const matches = vals.filter((p) => {
+        const pk = (p.officerKey ?? "").trim();
+        return pk === first || pk.split(/\s+/)[0] === first;
+      });
+      if (matches.length === 1) return matches[0].photoUrl;
+    }
   }
 
   return "";
