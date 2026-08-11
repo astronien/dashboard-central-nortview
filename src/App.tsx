@@ -4217,7 +4217,7 @@ function AppInternal({
     // ข้าม BM (ผู้จัดการร้าน) — แคปเฉพาะพนักงานขาย (ไม่ใช่ตำแหน่งผู้จัดการ)
     const isBranchManager = (o: { position?: string }): boolean => {
       const p = String(o.position ?? "").trim();
-      return /^bm$|bm|manager|ผู้จัดการ|จัดการ/i.test(p);
+      return /bsm|bm|manager|ผู้จัดการ|จัดการ/i.test(p);
     };
 
     const failed: string[] = [];
