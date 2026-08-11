@@ -4214,9 +4214,16 @@ function AppInternal({
     `;
     document.head.appendChild(styleTag);
 
+    // ข้าม BM (ผู้จัดการร้าน) — แคปเฉพาะพนักงานขาย (ไม่ใช่ตำแหน่งผู้จัดการ)
+    const isBranchManager = (o: { position?: string }): boolean => {
+      const p = String(o.position ?? "").trim();
+      return /^bm$|bm|manager|ผู้จัดการ|จัดการ/i.test(p);
+    };
+
     const failed: string[] = [];
     try {
       for (let idx = 0; idx < officers.length; idx++) {
+        if (isBranchManager(officers[idx])) continue;
         setActiveStaffId(String(idx + 1));
         const officerName = officers[idx].name.trim().replace(/\s+/g, "-");
         for (const view of views) {
