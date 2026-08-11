@@ -2926,6 +2926,19 @@ function AppInternal({
     const toDate = days[days.length - 1] ?? "";
 
     const targetRecords = rawTargetRowsToRecords(displayUploads.target);
+
+    // นับ iPhone / Cover / UFUND ด้วยวิธีเดียวกับ COVERPLUS/UFUND ในตาราง
+    // 7 Wonders (preset engine: เฉพาะ inventory item, dedupe ต่อบิล, รวม qty)
+    // เพื่อให้ยอด iPhone ตรงกับที่โชว์ใน COVERPLUS ไม่ใช่ rowMatchesKpiCategory
+    // ที่นับเกิน (รวม non-inventory/ซ้ำ)
+    const quotaLookup = buildCatDailyLookup(displayUploads.categoryMaster);
+    const quotaBills = parseBills(enrichSalesRowsWithCatDaily(displayUploads.current, quotaLookup));
+    const coverPlusPreset = kpiPresets.find((p) =>
+      /cover\s*\+|cover\s*plus|coverplus/i.test(p.name),
+    );
+    const ufundPreset = kpiPresets.find((p) => /ufund/i.test(p.name));
+    const dummyCtx = { tradeInCount: 0, iphoneUnits: 0 };
+
     const officerList: Array<{ name: string; branch: string; staffId?: string }> =
       parsedReport.officers.length > 0
         ? parsedReport.officers.map((o) => ({ name: o.name, branch: o.branch, staffId: o.staffId }))
@@ -2940,12 +2953,6 @@ function AppInternal({
             ).values(),
           );
 
-    const isOfficerRow = (row: RawRow, name: string, nId: string): boolean => {
-      const oName = String(row["Officer (Name)"] ?? "").trim();
-      const rId = normalizeId(row["STAFF ID"] ?? row.emp_id ?? "");
-      return matchesOfficer(oName, name) || Boolean(nId && rId && rId === nId);
-    };
-
     const rows = officerList
       .map((officer) => {
         const officerId = resolveOfficerId(
@@ -2956,17 +2963,23 @@ function AppInternal({
           matchesOfficer,
         );
         const nId = normalizeId(officerId);
-        // นับสะสมทั้งเดือน (ทุกแถวในไฟล์)
-        let iphone = 0;
-        let cover = 0;
-        let ufund = 0;
-        for (const row of displayUploads.current) {
-          if (!isOfficerRow(row, officer.name, nId)) continue;
-          const qty = toNumber(row.Number ?? row.number ?? row.qty ?? 0);
-          if (rowMatchesKpiCategory(row, "iPhone")) iphone += qty;
-          if (rowMatchesKpiCategory(row, "COVER+")) cover += qty;
-          if (isUfundRow(row)) ufund += qty;
-        }
+        const officerBills = quotaBills.filter(
+          (b) =>
+            matchesOfficer(b.officerName, officer.name) ||
+            Boolean(nId && normalizeId(b.officerId) === nId),
+        );
+        // iPhone = ฐาน iPhone ของ Cover Plus (billsWithB) · Cover = ยอดแนบ Cover
+        // Plus (billsWithAandB) · UFUND = ยอดแนบ UFUND (billsWithAandB)
+        const cpResult = coverPlusPreset
+          ? calcPreset(officerBills, coverPlusPreset, dummyCtx)
+          : null;
+        const iphone = cpResult
+          ? cpResult.billsWithB
+          : iphoneUnitsFromBills(officerBills);
+        const cover = cpResult ? cpResult.billsWithAandB : 0;
+        const ufund = ufundPreset
+          ? calcPreset(officerBills, ufundPreset, dummyCtx).billsWithAandB
+          : 0;
         const attach = cover + ufund;
         const remaining = 4 * attach - iphone;
         const status: "pass" | "accumulating" | "handoff" =
@@ -2998,7 +3011,14 @@ function AppInternal({
     const handoffCount = rows.filter((r) => r.status === "handoff").length;
 
     return { rows, fromDate, toDate, handoffCount, recipient };
-  }, [displayUploads.current, displayUploads.target, parsedReport.officers]);
+  }, [
+    displayUploads.current,
+    displayUploads.target,
+    displayUploads.categoryMaster,
+    parsedReport.officers,
+    kpiPresets,
+    iphoneUnitsFromBills,
+  ]);
 
   const dynamicRadarData = useMemo(() => {
     if (activeStat === "csat") {
