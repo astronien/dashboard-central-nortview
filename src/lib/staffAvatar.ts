@@ -116,14 +116,18 @@ export const getStaffPhotoUrl = (
     const m = vals.find((p) => (p.officerKey ?? "").trim() === officerKey);
     if (m) return m.photoUrl;
 
-    // 4. first-name prefix — catches a changed/added surname. Only use it
-    //    when it maps to exactly ONE saved photo (avoid grabbing the wrong
-    //    person who shares a first name).
-    const first = officerKey.split(/\s+/)[0];
-    if (first && first.length >= 2) {
+    // 4. prefix match — cleaned names have no spaces (firstname+surname are
+    //    concatenated), so a changed/added surname makes the key differ. If
+    //    the shorter cleaned name is a prefix of the other (≥4 chars, i.e.
+    //    same first name), treat as the same person — but only when it maps
+    //    to exactly ONE saved photo (avoid grabbing someone who shares a
+    //    first name).
+    if (officerKey.length >= 4) {
       const matches = vals.filter((p) => {
         const pk = (p.officerKey ?? "").trim();
-        return pk === first || pk.split(/\s+/)[0] === first;
+        if (!pk) return false;
+        const [short, long] = pk.length <= officerKey.length ? [pk, officerKey] : [officerKey, pk];
+        return short.length >= 4 && long.startsWith(short);
       });
       if (matches.length === 1) return matches[0].photoUrl;
     }
