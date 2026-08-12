@@ -1637,6 +1637,32 @@ function AppInternal({
   const [staffPhotos, setStaffPhotos] = useState<StaffPhotosMap>({});
   const [staffPhotoError, setStaffPhotoError] = useState<string | null>(null);
 
+  // Re-anchor uploaded photos to the STAFF ID in the target file. Photos may
+  // have been saved under a name-based key (or a previous id) — build a
+  // name→STAFF ID map from the target and add an alias entry keyed by that
+  // id so lookups by the (stable) target STAFF ID always find the photo,
+  // even after a new month's target re-keys the roster.
+  const reconciledStaffPhotos = useMemo<StaffPhotosMap>(() => {
+    const rows = displayUploads.target;
+    if (!rows.length || Object.keys(staffPhotos).length === 0) return staffPhotos;
+    const nameToId = new Map<string, string>();
+    for (const row of rows) {
+      const id = String(row["STAFF ID"] ?? row.staffId ?? "").trim();
+      const nm = cleanOfficerName(`${row.NAME ?? ""} ${row.SURNAME ?? ""}`.trim());
+      if (id && nm) nameToId.set(nm, id);
+    }
+    if (nameToId.size === 0) return staffPhotos;
+    const out: StaffPhotosMap = { ...staffPhotos };
+    for (const rec of Object.values(staffPhotos)) {
+      const key =
+        cleanOfficerName(String((rec as { officerKey?: string }).officerKey ?? "")) ||
+        cleanOfficerName(String((rec as { displayName?: string }).displayName ?? ""));
+      const targetId = key ? nameToId.get(key) : undefined;
+      if (targetId && !out[targetId]?.photoUrl) out[targetId] = rec;
+    }
+    return out;
+  }, [staffPhotos, displayUploads.target]);
+
   // Load KPI presets from Turso (cloud-backed).
   useEffect(() => {
     void (async () => {
@@ -3531,11 +3557,11 @@ function AppInternal({
     const attachRow = attachOfficerRows.find((row) =>
       attachMatchesOfficer(row.name, activeOfficer.name),
     );
-    return getStaffPhotoUrl(staffPhotos, {
+    return getStaffPhotoUrl(reconciledStaffPhotos, {
       staffId: attachRow?.staffId,
       officerKey: cleanOfficerName(activeOfficer.name),
     });
-  }, [activeOfficer, attachOfficerRows, staffPhotos]);
+  }, [activeOfficer, attachOfficerRows, reconciledStaffPhotos]);
 
   const parsedStoreHeader = useMemo(() => {
     const matchedBranch = parsedReport.branches.find(b => {
@@ -4482,7 +4508,7 @@ function AppInternal({
                             }}
                           >
                             <img
-                              src={getStaffAvatar(staffPhotos, {
+                              src={getStaffAvatar(reconciledStaffPhotos, {
                                 officerKey: cleanOfficerName(officer.name),
                                 fallbackIndex: idx,
                               })}
@@ -4703,7 +4729,7 @@ function AppInternal({
                   sheetBranches={combinedBranches}
                   staffRoster={staffRoster}
                   staffPhotos={Object.fromEntries(
-                    Object.entries(staffPhotos).map(([id, record]) => [id, (record as any).photoUrl]),
+                    Object.entries(reconciledStaffPhotos).map(([id, record]) => [id, (record as any).photoUrl]),
                   )}
                   uploadingPhotoId={uploadingPhotoId}
                   staffPhotoError={staffPhotoError}
