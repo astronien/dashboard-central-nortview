@@ -3310,27 +3310,49 @@ function AppInternal({
     return enrichSalesRowsWithCatDaily(displayUploads.today, lookup);
   }, [displayUploads.today, displayUploads.categoryMaster]);
 
-  const categorySnapshotData = useMemo(
-    () =>
-      buildCategorySnapshots({
-        targetRows: displayUploads.target,
-        currentRows: enrichedCurrentRows,
-        todayRows: enrichedTodayRows,
-        lastMonthRows: displayUploads.lastMonth,
-        lastYearRows: displayUploads.lastYear,
-        targetOverrides: categoryTargetOverrides,
-        tradeInData,
-      }),
-    [
-      displayUploads.target,
-      enrichedCurrentRows,
-      enrichedTodayRows,
-      displayUploads.lastMonth,
-      displayUploads.lastYear,
-      categoryTargetOverrides,
+  const categorySnapshotData = useMemo(() => {
+    // Preset-engine counts (inventory-only, per-bill deduped) so COVER+ / AC+
+    // / UFUND and the iPhone base match the "7 Wonders" combined table
+    // instead of the raw rowMatchesKpiCategory sums.
+    let presetCounts:
+      | { iphoneBase?: number; cover?: number; ac?: number; ufund?: number }
+      | undefined;
+    if (enrichedCurrentRows.length) {
+      const allBills = parseBills(enrichedCurrentRows);
+      const dummy = { tradeInCount: 0, iphoneUnits: 0 };
+      const coverPlusPreset = kpiPresets.find((p) =>
+        /cover\s*\+|cover\s*plus|coverplus/i.test(p.name),
+      );
+      const acPreset = kpiPresets.find((p) => /\bac\s*\+|apple\s*care|applecare/i.test(p.name));
+      const ufundPreset = kpiPresets.find((p) => /ufund/i.test(p.name));
+      const cp = coverPlusPreset ? calcPreset(allBills, coverPlusPreset, dummy) : null;
+      presetCounts = {
+        iphoneBase: cp ? cp.billsWithB : undefined,
+        cover: cp ? cp.billsWithAandB : undefined,
+        ac: acPreset ? calcPreset(allBills, acPreset, dummy).billsWithAandB : undefined,
+        ufund: ufundPreset ? calcPreset(allBills, ufundPreset, dummy).billsWithAandB : undefined,
+      };
+    }
+    return buildCategorySnapshots({
+      targetRows: displayUploads.target,
+      currentRows: enrichedCurrentRows,
+      todayRows: enrichedTodayRows,
+      lastMonthRows: displayUploads.lastMonth,
+      lastYearRows: displayUploads.lastYear,
+      targetOverrides: categoryTargetOverrides,
       tradeInData,
-    ],
-  );
+      presetCounts,
+    });
+  }, [
+    displayUploads.target,
+    enrichedCurrentRows,
+    enrichedTodayRows,
+    displayUploads.lastMonth,
+    displayUploads.lastYear,
+    categoryTargetOverrides,
+    tradeInData,
+    kpiPresets,
+  ]);
 
   // Auto-capture a compact daily snapshot for the trends charts. Keyed by
   // branch + Bangkok date and upserted once per session/day, so simply

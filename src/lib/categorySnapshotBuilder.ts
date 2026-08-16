@@ -157,19 +157,35 @@ export function buildCategorySnapshots(params: {
   lastYearRows: RawRow[];
   targetOverrides?: Record<string, number>;
   tradeInData?: { actual: number; today: number; target: number };
+  /**
+   * Preset-engine counts (inventory-only, per-bill deduped) so COVER+/AC+/
+   * UFUND and the iPhone base MATCH the "7 Wonders" combined table instead
+   * of the raw rowMatchesKpiCategory sums. Optional — falls back to the
+   * adapter counts when not provided.
+   */
+  presetCounts?: {
+    iphoneBase?: number;
+    cover?: number;
+    ac?: number;
+    ufund?: number;
+  };
 }): CategorySnapshotItem[] {
-  const { targetRows, currentRows, todayRows = [], lastMonthRows, lastYearRows, targetOverrides = {}, tradeInData } = params;
+  const { targetRows, currentRows, todayRows = [], lastMonthRows, lastYearRows, targetOverrides = {}, tradeInData, presetCounts } = params;
   const hasData = currentRows.length > 0;
   const { startDate, endDate, currentDay, totalDays } = getMonthPeriod();
   const targets: TargetRecord[] = rawTargetRowsToRecords(targetRows);
   const branchId = resolveBranchId(targetRows, currentRows);
 
   // iPhone units sold this period — the denominator for AC+/COVER+ targets,
-  // which are configured as a % of iPhone sold (no target Excel column).
-  const iphoneUnits = currentRows.reduce(
-    (sum, row) => (rowMatchesKpiCategory(row, "iPhone") ? sum + toNumber(row["Number"]) : sum),
-    0,
-  );
+  // which are configured as a % of iPhone sold. Prefer the preset-engine
+  // count (matches COVERPLUS) when provided.
+  const iphoneUnits =
+    presetCounts?.iphoneBase != null
+      ? presetCounts.iphoneBase
+      : currentRows.reduce(
+          (sum, row) => (rowMatchesKpiCategory(row, "iPhone") ? sum + toNumber(row["Number"]) : sum),
+          0,
+        );
 
   return SNAPSHOT_CATEGORIES.map(({ label, kpiKey }) => {
     if (!hasData || !branchId) {
@@ -225,6 +241,8 @@ export function buildCategorySnapshots(params: {
         target = override;
       }
       actual = sumKpiActualFromRows(currentRows, kpiKey);
+      if (label === "COVER+" && presetCounts?.cover != null) actual = presetCounts.cover;
+      if (label === "AC+" && presetCounts?.ac != null) actual = presetCounts.ac;
       if (label === "AC+" || label === "COVER+") {
         // Attach rate จริง = ยอดที่ขายได้จริง ÷ จำนวน iPhone ที่ขายจริง
         measureType = "quantity";
@@ -234,7 +252,7 @@ export function buildCategorySnapshots(params: {
     } else if (label === "UFUND") {
       // Attach rate จริง = ยอด UFUND ที่ขายจริง ÷ จำนวน iPhone ที่ขายจริง
       measureType = "quantity";
-      actual = sumUfundUnits(currentRows);
+      actual = presetCounts?.ufund != null ? presetCounts.ufund : sumUfundUnits(currentRows);
       iphoneBaseUnits = iphoneUnits;
       attachRateActual = iphoneUnits > 0 ? (actual / iphoneUnits) * 100 : 0;
       const override = targetOverrides?.["UFUND"];
