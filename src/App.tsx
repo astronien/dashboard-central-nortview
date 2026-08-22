@@ -151,7 +151,8 @@ import { AuthProvider, useAuth } from "./lib/auth/authContext";
 import LoginPage from "./components/LoginPage";
 import ChangePasswordGate from "./components/ChangePasswordGate";
 import { syncPiaFromOfficers } from "./lib/auth/piSync";
-import { calcPreset, presetDisplayValue, computePresetAchPercent, countItemQuantityAnyFilter } from "./lib/presetEngine";
+import { calcPreset, presetDisplayValue, computePresetAchPercent, countItemQuantityAnyFilter, sumItemRevenueAnyFilter } from "./lib/presetEngine";
+import { DailyBranchReportSection, type DailyReportData } from "./components/dashboard/DailyBranchReportSection";
 import { parseBills, type BillSummary } from "./lib/presetBills";
 import { enrichSalesRowsWithCatDaily, buildCatDailyLookup } from "./lib/presetCatDaily";
 
@@ -3046,6 +3047,135 @@ function AppInternal({
     iphoneUnitsFromBills,
   ]);
 
+  // ─── รายงานยอดขาย + Attach รายวัน (วันล่าสุด) — รวมสาขา + รายคน ──────────
+  const dailyBranchReport = useMemo<DailyReportData>(() => {
+    const empty: DailyReportData = { latestDate: "", presets: [], rows: [] };
+    if (displayUploads.current.length === 0) return empty;
+
+    const dayKey = (row: RawRow) => {
+      const p = parseDocDate(String(row["Doc Date"] ?? row["doc date"] ?? ""));
+      return p
+        ? `${p.getFullYear()}-${String(p.getMonth() + 1).padStart(2, "0")}-${String(p.getDate()).padStart(2, "0")}`
+        : "";
+    };
+    const daySet = new Set<string>();
+    displayUploads.current.forEach((r) => {
+      const k = dayKey(r);
+      if (k) daySet.add(k);
+    });
+    const days = Array.from(daySet).sort().reverse();
+    if (!days.length) return empty;
+    const latestDay = days[0];
+    const latestRows = displayUploads.current.filter((r) => dayKey(r) === latestDay);
+
+    const lookup = buildCatDailyLookup(displayUploads.categoryMaster);
+    const allBills = parseBills(enrichSalesRowsWithCatDaily(latestRows, lookup));
+    const dummy = { tradeInCount: 0, iphoneUnits: 0 };
+
+    // Trade-In is branch-level (not per-bill) → skip it as a column here.
+    const cols = kpiPresets.filter((p) => p.calcType !== "tradeIn");
+    const kindFor = (ct?: string): "att" | "unit" | "baht" =>
+      ct === "attach" || ct === "catAttach"
+        ? "att"
+        : ct === "baht" || ct === "catBaht" || ct === "bahtRate"
+          ? "baht"
+          : "unit";
+    // ฐาน ATT% ตามที่ตกลง: Pencil/iPad Acc ÷ iPad, AC+ ÷ iPhone+iPad, ที่เหลือ ÷ iPhone
+    const baseKind = (name: string): "iphone" | "ipad" | "both" =>
+      /pencil|ipad\s*acc/i.test(name)
+        ? "ipad"
+        : /\bac\s*\+|apple\s*care|applecare/i.test(name)
+          ? "both"
+          : "iphone";
+
+    const catF = (cat: string): ItemFilter[] => [{ ...emptyItemFilter(), categories: [cat] }];
+    const unitsOf = (bills: BillSummary[], cat: string) =>
+      bills.reduce((s, b) => s + countItemQuantityAnyFilter(b, catF(cat)), 0);
+    const bahtOf = (bills: BillSummary[], cat: string) =>
+      bills.reduce((s, b) => s + sumItemRevenueAnyFilter(b, catF(cat)), 0);
+
+    const officerList = (parsedReport.officers.length > 0
+      ? parsedReport.officers.map((o) => ({ name: o.name, staffId: o.staffId, position: o.position }))
+      : Array.from(
+          new Map(
+            allBills.filter((b) => b.officerName).map((b) => [b.officerName, { name: b.officerName, staffId: undefined, position: undefined }]),
+          ).values(),
+        )
+    ).filter((o) => !/bsm|bm|manager|ผู้จัดการ|จัดการ/i.test(String(o.position ?? "")));
+
+    const officerRows = officerList
+      .map((officer) => {
+        const officerBills = allBills.filter((b) => matchesOfficer(b.officerName, officer.name));
+        const iphoneUnit = unitsOf(officerBills, "iPhone");
+        const ipadUnit = unitsOf(officerBills, "iPad");
+        const totalDevice =
+          iphoneUnit + ipadUnit + unitsOf(officerBills, "Mac") + unitsOf(officerBills, "Apple Watch");
+        const totalBaht = officerBills.reduce((s, b) => s + b.totalRevenue, 0);
+        const cells: Record<string, { kind: "att" | "unit" | "baht"; unit?: number; att?: number; baht?: number }> = {};
+        cols.forEach((p) => {
+          const r = calcPreset(officerBills, p, dummy);
+          const kind = kindFor(p.calcType);
+          if (kind === "baht") {
+            cells[p.id] = { kind, baht: r.totalBaht };
+          } else if (kind === "att") {
+            const bk = baseKind(p.name);
+            const base = bk === "ipad" ? ipadUnit : bk === "both" ? iphoneUnit + ipadUnit : iphoneUnit;
+            cells[p.id] = { kind, unit: r.billsWithAandB, att: base > 0 ? (r.billsWithAandB / base) * 100 : 0 };
+          } else {
+            cells[p.id] = { kind, unit: r.billsWithAandB };
+          }
+        });
+        return {
+          name: officer.name,
+          totalBaht,
+          totalDevice,
+          iphoneUnit,
+          iphoneBaht: bahtOf(officerBills, "iPhone"),
+          ipadUnit,
+          ipadBaht: bahtOf(officerBills, "iPad"),
+          cells,
+        };
+      })
+      .filter((r) => r.totalBaht > 0 || r.totalDevice > 0)
+      .sort((a, b) => b.totalBaht - a.totalBaht);
+
+    // แถวรวมสาขา (บนสุด)
+    const sum = (f: (r: (typeof officerRows)[number]) => number) => officerRows.reduce((s, r) => s + f(r), 0);
+    const totalIphone = sum((r) => r.iphoneUnit);
+    const totalIpad = sum((r) => r.ipadUnit);
+    const totalCells: Record<string, { kind: "att" | "unit" | "baht"; unit?: number; att?: number; baht?: number }> = {};
+    cols.forEach((p) => {
+      const kind = kindFor(p.calcType);
+      if (kind === "baht") {
+        totalCells[p.id] = { kind, baht: sum((r) => r.cells[p.id]?.baht ?? 0) };
+      } else if (kind === "att") {
+        const bk = baseKind(p.name);
+        const base = bk === "ipad" ? totalIpad : bk === "both" ? totalIphone + totalIpad : totalIphone;
+        const unit = sum((r) => r.cells[p.id]?.unit ?? 0);
+        totalCells[p.id] = { kind, unit, att: base > 0 ? (unit / base) * 100 : 0 };
+      } else {
+        totalCells[p.id] = { kind, unit: sum((r) => r.cells[p.id]?.unit ?? 0) };
+      }
+    });
+    const totalRow = {
+      name: "รวมทั้งหมด",
+      isTotal: true,
+      totalBaht: sum((r) => r.totalBaht),
+      totalDevice: sum((r) => r.totalDevice),
+      iphoneUnit: totalIphone,
+      iphoneBaht: sum((r) => r.iphoneBaht),
+      ipadUnit: totalIpad,
+      ipadBaht: sum((r) => r.ipadBaht),
+      cells: totalCells,
+    };
+
+    return {
+      latestDate: latestDay,
+      presets: cols.map((p) => ({ id: p.id, name: p.name, kind: kindFor(p.calcType) })),
+      rows: [totalRow, ...officerRows],
+    };
+  }, [displayUploads.current, displayUploads.categoryMaster, parsedReport.officers, kpiPresets]);
+
   const dynamicRadarData = useMemo(() => {
     if (activeStat === "csat") {
       const wondersRows = activeOfficer7WondersPerformance.filter(r => r.category !== "Average" && r.category !== "Total");
@@ -4599,6 +4729,7 @@ function AppInternal({
                   categorySnapshotRef={categorySnapshotRef}
                 />
                 <DailyKpiTable data={dailyKpiData} />
+                <DailyBranchReportSection data={dailyBranchReport} />
                 <AttachQuotaSection data={attachQuotaData} />
               </motion.div>
             )}
