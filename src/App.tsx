@@ -1384,9 +1384,19 @@ function AppInternal({
       if (lower === "btb apple" || lower === "btb(apple)") {
         return "BTB(Apple)";
       }
+      // Canonicalize device-group labels: a new month's Category Master may
+      // map Mac products to a variant name ("MacBook", "Notebook", "MAC")
+      // that isn't exactly "Mac" — normalize those back so the category KPIs
+      // still count. Device names are mutually exclusive.
+      const m = normalizeText(normalizedMapped);
+      if (m.includes("iphone")) return "iPhone";
+      if (m.includes("ipad")) return "iPad";
+      if (m.includes("macbook") || m.includes("imac") || m.includes("mac") || m.includes("notebook"))
+        return "Mac";
+      if (m.includes("apple watch") || m.includes("watch")) return "Apple Watch";
       return normalizedMapped;
     }
-    
+
     return mapTargetCategoryKey(cat, sub, prod);
   };
 

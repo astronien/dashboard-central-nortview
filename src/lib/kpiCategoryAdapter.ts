@@ -119,7 +119,16 @@ export function rowMatchesKpiCategory(row: RawRow, category: string): boolean {
     // BTB(Apple) ↔ "BTB Apple" / "btb apple" / "BTB(APPLE)" — strip all
     // whitespace and punctuation before comparing
     const strip = (s: string) => s.toLowerCase().replace(/[\s()]+/g, "");
-    return strip(catDaily) === strip(category);
+    if (strip(catDaily) === strip(category)) return true;
+    // catDaily maps to a different group → the row belongs there, so don't
+    // count it here. EXCEPTION: the core device categories, where the master
+    // sometimes labels catDaily with a model/series name (e.g. "MacBook",
+    // "Notebook") that won't equal "Mac" — fall through to the product-text
+    // heuristic below so those still count. Device categories are mutually
+    // exclusive by product type, so this can't double-count.
+    const DEVICE_CATS = ["Mac", "iPad", "iPhone", "Apple Watch"];
+    if (!DEVICE_CATS.includes(category)) return false;
+    // fall through to heuristics for device categories
   }
 
   // Heuristics for rows the master doesn't cover:
