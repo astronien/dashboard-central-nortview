@@ -2140,6 +2140,63 @@ function AppInternal({
       };
     });
 
+    // 3b. "อื่นๆ" — ยอดที่ไม่เข้า 6 หมวดหลัก (เช่น SIM/Smile/หมวดที่ master
+    // ไม่ได้ map เข้ากลุ่มอุปกรณ์) เดิมถูกตัดทิ้ง ทำให้ยอดรวมของตารางน้อยกว่า
+    // ยอดขายจริงของวันนั้น/เดือนนั้น — เติมเป็นอีก 1 แถวเพื่อให้ Total ตรงกับ
+    // ระบบหลังบ้าน
+    if (hasData) {
+      const rowIsOfficer = (row: RawRow): boolean => {
+        const rowOfficerId = String(row["STAFF ID"] ?? row.emp_id ?? "").trim();
+        const officer = String(row["Officer (Name)"] ?? "").trim();
+        return (
+          (Boolean(officerId) &&
+            Boolean(rowOfficerId) &&
+            normalizeId(rowOfficerId) === normalizeId(officerId)) ||
+          matchesOfficer(officer, activeOfficer.name)
+        );
+      };
+
+      let allActual = 0;
+      displayUploads.current.forEach((row) => {
+        if (rowIsOfficer(row)) allActual += getCategoryValue(row);
+      });
+
+      let allActualDay = 0;
+      const dailyRowsAll = todaySourceRows.length ? todaySourceRows : displayUploads.current;
+      dailyRowsAll.forEach((row) => {
+        if (!rowIsOfficer(row)) return;
+        if (!todaySourceRows.length) {
+          const parsed = parseDocDate(String(row["Doc Date"] ?? row["doc date"] ?? ""));
+          const time = parsed ? parsed.getTime() : 0;
+          if (!(time && time === maxDateTime)) return;
+        }
+        allActualDay += getCategoryValue(row);
+      });
+
+      const otherActual = allActual - rows.reduce((s, r) => s + r.actual, 0);
+      const otherActualDay = allActualDay - rows.reduce((s, r) => s + r.actualDay, 0);
+      if (otherActual > 0.5 || otherActualDay > 0.5) {
+        rows.push({
+          category: "อื่นๆ",
+          target: 0,
+          actual: Math.max(0, otherActual),
+          achPercent: 0,
+          forecast: 0,
+          forecastPercent: 0,
+          lastMonth: 0,
+          momPercent: "New",
+          lastYear: 0,
+          yoyPercent: "New",
+          targetDay: 0,
+          actualDay: Math.max(0, otherActualDay),
+          diffDay: Math.max(0, otherActualDay),
+          achDayPercent: 0,
+          units: 0,
+          unitsDay: 0,
+        });
+      }
+    }
+
     // 4. Calculate Total row
     const totalTarget = rows.reduce((s, r) => s + r.target, 0);
     const totalActual = rows.reduce((s, r) => s + r.actual, 0);
