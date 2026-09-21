@@ -3,6 +3,7 @@ import { CategoryTargetsManager } from "./admin/CategoryTargetsManager";
 import { TradeInBranchMapping } from "./admin/TradeInBranchMapping";
 import { CsatTokenManager } from "./admin/CsatTokenManager";
 import { AiSettingsManager } from "./admin/AiSettingsManager";
+import { StaffVisibilityManager } from "./admin/StaffVisibilityManager";
 
 export type StaffRosterEntry = {
   name: string;
@@ -27,6 +28,7 @@ export function SettingsSection({
   adminName,
   onCategoryTargetsChanged,
   tradeBranchMapping,
+  onStaffVisibilityChange,
   onTradeBranchMappingChange,
 }: {
   selectedBranch: string;
@@ -44,6 +46,7 @@ export function SettingsSection({
   adminName?: string;
   onCategoryTargetsChanged?: () => void;
   tradeBranchMapping?: Record<string, string>;
+  onStaffVisibilityChange?: (hidden: string[]) => void;
   onTradeBranchMappingChange?: (mapping: Record<string, string>) => void;
 }) {
   return (
@@ -105,6 +108,14 @@ export function SettingsSection({
       {isAdmin ? <CsatTokenManager updatedBy={adminName} /> : null}
 
       {isAdmin ? <AiSettingsManager updatedBy={adminName} /> : null}
+
+      {isAdmin ? (
+        <StaffVisibilityManager
+          staffRoster={staffRoster as any}
+          updatedBy={adminName}
+          onChange={onStaffVisibilityChange}
+        />
+      ) : null}
 
       <div className="flex-1 bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)] relative z-10 w-full min-h-[400px] overflow-hidden flex flex-col">
         {staffRoster.length === 0 ? (

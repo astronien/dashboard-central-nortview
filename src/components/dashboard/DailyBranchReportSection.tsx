@@ -70,11 +70,63 @@ const attFill = (att: number): string =>
 
 const num = (v: number) => (v ? v.toLocaleString() : "–");
 
-export const DailyBranchReportSection: React.FC<{ data: DailyReportData }> = ({ data }) => {
-  if (!data.rows.length) return null;
+const ORDER_KEY = "daily-branch-report-col-order";
 
-  // Each attach preset takes 2 sub-columns (จำนวน | ATT%); baht/unit take 1.
-  const presets = data.presets;
+export const DailyBranchReportSection: React.FC<{ data: DailyReportData }> = ({ data }) => {
+  // Column order (preset ids) — user can drag the group headers to reorder.
+  // Persisted per browser so the layout sticks between visits.
+  const [order, setOrder] = React.useState<string[]>([]);
+  const dragId = React.useRef<string | null>(null);
+
+  React.useEffect(() => {
+    let saved: string[] = [];
+    try {
+      saved = JSON.parse(localStorage.getItem(ORDER_KEY) ?? "[]");
+    } catch {
+      saved = [];
+    }
+    const ids = data.presets.map((p) => p.id);
+    // keep saved order for ids that still exist, then append any new ones
+    const next = [...saved.filter((id) => ids.includes(id)), ...ids.filter((id) => !saved.includes(id))];
+    setOrder(next);
+  }, [data.presets]);
+
+  const presets = React.useMemo(() => {
+    if (!order.length) return data.presets;
+    const byId = new Map(data.presets.map((p) => [p.id, p]));
+    return order.map((id) => byId.get(id)).filter(Boolean) as DailyReportPreset[];
+  }, [data.presets, order]);
+
+  const onDrop = (targetId: string) => {
+    const from = dragId.current;
+    dragId.current = null;
+    if (!from || from === targetId) return;
+    setOrder((prev) => {
+      const cur = prev.length ? [...prev] : data.presets.map((p) => p.id);
+      const fi = cur.indexOf(from);
+      const ti = cur.indexOf(targetId);
+      if (fi < 0 || ti < 0) return prev;
+      cur.splice(ti, 0, cur.splice(fi, 1)[0]);
+      try {
+        localStorage.setItem(ORDER_KEY, JSON.stringify(cur));
+      } catch {
+        /* ignore */
+      }
+      return cur;
+    });
+  };
+
+  const resetOrder = () => {
+    const ids = data.presets.map((p) => p.id);
+    setOrder(ids);
+    try {
+      localStorage.setItem(ORDER_KEY, JSON.stringify(ids));
+    } catch {
+      /* ignore */
+    }
+  };
+
+  if (!data.rows.length) return null;
 
   return (
     <div className="bg-white rounded-[2rem] border border-slate-200 p-5 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
@@ -84,10 +136,19 @@ export const DailyBranchReportSection: React.FC<{ data: DailyReportData }> = ({ 
           รายงานยอดขาย + Attach รายวัน (วันล่าสุด)
         </h3>
       </div>
-      <p className="text-xs text-slate-400 mb-4">
-        ข้อมูลวันล่าสุด {fmtDay(data.latestDate)} · ATT% = จำนวน ÷ ฐาน (ส่วนใหญ่ ÷ iPhone, AC+ ÷ iPhone+iPad,
-        Pencil/iPad Acc ÷ iPad)
-      </p>
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <p className="text-xs text-slate-400">
+          ข้อมูลวันล่าสุด {fmtDay(data.latestDate)} · ATT% = จำนวน ÷ ฐาน (ส่วนใหญ่ ÷ iPhone, AC+ ÷ iPhone+iPad,
+          Pencil/iPad Acc ÷ iPad) · <span className="text-slate-500">ลากหัวคอลัมน์เพื่อสลับตำแหน่งได้</span>
+        </p>
+        <button
+          type="button"
+          onClick={resetOrder}
+          className="shrink-0 text-[11px] text-slate-400 underline hover:text-slate-600"
+        >
+          รีเซ็ตลำดับคอลัมน์
+        </button>
+      </div>
 
       <div className="overflow-x-auto rounded-xl border border-slate-200">
         <table className="w-full text-left border-collapse text-[10px] whitespace-nowrap text-slate-700">
@@ -116,7 +177,14 @@ export const DailyBranchReportSection: React.FC<{ data: DailyReportData }> = ({ 
                     key={p.id}
                     colSpan={span}
                     rowSpan={span === 1 ? 2 : 1}
-                    className={`py-1.5 px-2 font-bold text-center border-l border-slate-200 ${color}`}
+                    draggable
+                    onDragStart={() => {
+                      dragId.current = p.id;
+                    }}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => onDrop(p.id)}
+                    title="ลากเพื่อสลับตำแหน่งคอลัมน์"
+                    className={`py-1.5 px-2 font-bold text-center border-l border-slate-200 cursor-grab active:cursor-grabbing select-none ${color}`}
                   >
                     {p.name}
                   </th>

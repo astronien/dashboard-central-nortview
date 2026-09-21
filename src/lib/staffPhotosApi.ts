@@ -75,3 +75,32 @@ export const deleteStaffPhoto = async (staffId: string): Promise<boolean> => {
 export const clearLocalStaffPhotos = async (): Promise<void> => {
   await removeItem(STORAGE_KEY);
 };
+
+/** STAFF IDs hidden from the Staff Profile page (stored server-side). */
+export const fetchHiddenStaffIds = async (): Promise<string[]> => {
+  try {
+    const res = await fetch(`${API_URL}?resource=visible-staff`);
+    if (!res.ok) return [];
+    const json = await res.json();
+    return Array.isArray(json?.hidden) ? json.hidden.map(String) : [];
+  } catch {
+    return [];
+  }
+};
+
+export const saveHiddenStaffIds = async (
+  hidden: string[],
+  updatedBy?: string,
+): Promise<boolean> => {
+  try {
+    const res = await fetch(`${API_URL}?resource=visible-staff`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hidden, updatedBy }),
+    });
+    const json = await res.json().catch(() => null);
+    return Boolean(res.ok && json?.ok);
+  } catch {
+    return false;
+  }
+};

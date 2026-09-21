@@ -96,6 +96,8 @@ import {
   deleteStaffPhoto,
   fetchStaffPhotos,
   saveStaffPhoto,
+  fetchHiddenStaffIds,
+  saveHiddenStaffIds,
 } from "./lib/staffPhotosApi";
 import {
   computeAttachRateRows,
@@ -1647,6 +1649,25 @@ function AppInternal({
   const [uploadingPhotoId, setUploadingPhotoId] = useState<string | null>(null);
   const [staffPhotos, setStaffPhotos] = useState<StaffPhotosMap>({});
   const [staffPhotoError, setStaffPhotoError] = useState<string | null>(null);
+  // STAFF IDs hidden from the Staff Profile page (e.g. non-sales roles)
+  const [hiddenStaffIds, setHiddenStaffIds] = useState<string[]>([]);
+  useEffect(() => {
+    void fetchHiddenStaffIds().then(setHiddenStaffIds);
+  }, []);
+  const isStaffHidden = React.useCallback(
+    (officer: { staffId?: string; name?: string }): boolean => {
+      if (!hiddenStaffIds.length) return false;
+      const code = String(officer.staffId ?? "").replace(/\D/g, "");
+      const nm = cleanOfficerName(officer.name ?? "");
+      return hiddenStaffIds.some((h) => {
+        const hs = String(h).trim();
+        const hd = hs.replace(/\D/g, "");
+        if (hd && code && hd === code) return true;
+        return cleanOfficerName(hs) === nm && nm.length > 0;
+      });
+    },
+    [hiddenStaffIds],
+  );
 
   // Re-anchor uploaded photos to the STAFF ID in the target file. Photos may
   // have been saved under a name-based key (or a previous id) — build a
@@ -4717,7 +4738,10 @@ function AppInternal({
                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
                         className="absolute right-0 top-12 w-48 bg-[#0c3123]/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 flex flex-col"
                       >
-                        {parsedReport.officers.map((officer, idx) => (
+                        {parsedReport.officers
+                          .map((officer, idx) => ({ officer, idx }))
+                          .filter(({ officer }) => !isStaffHidden(officer))
+                          .map(({ officer, idx }) => (
                           <button
                             key={`${officer.name}-${idx}`}
                             className={`flex items-center gap-3 w-full text-left px-4 py-3 hover:bg-white/10 transition-colors ${idx === activeOfficerIndex ? "bg-white/5" : ""}`}
@@ -4948,6 +4972,7 @@ function AppInternal({
                   onBranchChange={handleBranchChange}
                   sheetBranches={combinedBranches}
                   staffRoster={staffRoster}
+                  onStaffVisibilityChange={setHiddenStaffIds}
                   staffPhotos={Object.fromEntries(
                     Object.entries(reconciledStaffPhotos).map(([id, record]) => [id, (record as any).photoUrl]),
                   )}

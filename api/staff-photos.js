@@ -38,11 +38,45 @@ const parsePhotoBody = (body) => {
   };
 };
 
+// Which staff are shown on the Staff Profile page. Stored as a JSON array of
+// hidden STAFF IDs in app_config (merged here to stay under the Hobby-plan
+// 12-function limit).
+//   GET  /api/staff-photos?resource=visible-staff → { hidden: string[] }
+//   PUT  /api/staff-photos?resource=visible-staff   body: { hidden: string[] }
+const HIDDEN_STAFF_KEY = "hidden_staff_ids";
+
+async function handleVisibleStaff(req, res) {
+  const { getAppConfig, setAppConfig } = require("./_lib/tursoClient");
+  if (req.method === "GET") {
+    try {
+      const cfg = await getAppConfig(HIDDEN_STAFF_KEY);
+      const hidden = cfg && cfg.value ? JSON.parse(cfg.value) : [];
+      return res.status(200).json({ ok: true, hidden: Array.isArray(hidden) ? hidden : [] });
+    } catch {
+      return res.status(200).json({ ok: true, hidden: [] });
+    }
+  }
+  if (req.method === "PUT" || req.method === "POST") {
+    const list = Array.isArray(req.body?.hidden) ? req.body.hidden.map(String) : [];
+    await setAppConfig(HIDDEN_STAFF_KEY, JSON.stringify(list), req.body?.updatedBy ?? null);
+    return res.status(200).json({ ok: true });
+  }
+  return res.status(405).json({ ok: false, error: "Method not allowed" });
+}
+
 async function handler(req, res) {
   applyCors(res);
 
   if (req.method === "OPTIONS") {
     return res.status(204).end();
+  }
+
+  if (req.query?.resource === "visible-staff") {
+    try {
+      return await handleVisibleStaff(req, res);
+    } catch (e) {
+      return res.status(200).json({ ok: false, hidden: [], error: e.message });
+    }
   }
 
   try {
