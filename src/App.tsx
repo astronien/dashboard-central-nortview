@@ -3990,11 +3990,15 @@ function AppInternal({
     nextUploads: UploadState,
     options?: { skipPersist?: boolean; changedKinds?: UploadKind[] },
   ) => {
+    // Apply the same iPhone 18 exclusion used by displayUploads so the store
+    // totals in parsedReport follow the toggle too.
+    const strip = (rows: RawRow[]) =>
+      excludeIphone18 ? rows.filter((r) => !isIphone18DeviceRow(r)) : rows;
     const filteredTarget = filterRowsByBranch(nextUploads.target, selectedBranch);
-    const filteredCurrent = filterRowsByBranch(nextUploads.current, selectedBranch);
-    const filteredToday = filterRowsByBranch(nextUploads.today ?? [], selectedBranch);
-    const filteredLastMonth = filterRowsByBranch(nextUploads.lastMonth, selectedBranch);
-    const filteredLastYear = filterRowsByBranch(nextUploads.lastYear, selectedBranch);
+    const filteredCurrent = strip(filterRowsByBranch(nextUploads.current, selectedBranch));
+    const filteredToday = strip(filterRowsByBranch(nextUploads.today ?? [], selectedBranch));
+    const filteredLastMonth = strip(filterRowsByBranch(nextUploads.lastMonth, selectedBranch));
+    const filteredLastYear = strip(filterRowsByBranch(nextUploads.lastYear, selectedBranch));
 
     const report = buildReport(
       filteredTarget,
@@ -4195,7 +4199,8 @@ function AppInternal({
     if (uploadedFiles && hasUploadData(uploadedFiles)) {
       rebuildReport(uploadedFiles, { skipPersist: true });
     }
-  }, [selectedBranch, selectedBranchLoaded]);
+    // excludeIphone18 is a dep so toggling it rebuilds the store totals too
+  }, [selectedBranch, selectedBranchLoaded, excludeIphone18]);
 
   useEffect(() => {
     if (!selectedBranchLoaded) return;
