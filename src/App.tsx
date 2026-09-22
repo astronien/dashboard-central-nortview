@@ -457,6 +457,20 @@ const isUfundRow = (row: any): boolean => {
   return false;
 };
 
+/**
+ * iPhone 18-family DEVICE row (iPhone 18 / 18 Plus / 18 Pro / 18 Pro Max / 18e).
+ * Only the device itself — accessories "for iPhone 18" keep counting, so the
+ * toggle removes the new-launch device volume without touching attach items.
+ */
+const isIphone18DeviceRow = (row: RawRow): boolean => {
+  const cat = String(row["Category (Name)"] ?? (row as any).category_name ?? "")
+    .trim()
+    .toLowerCase();
+  if (cat !== "iphone") return false;
+  const text = `${row["Product (Name)"] ?? ""} ${row["Model"] ?? ""} ${row["Sub Category"] ?? ""}`;
+  return /iphone\s*18/i.test(String(text));
+};
+
 const countRows = (
   rows: RawRow[], 
   filterFn: (cat: string, prod: string, sub: string, row?: RawRow) => boolean
@@ -1334,7 +1348,28 @@ function AppInternal({
     };
   }, []);
 
+  // ตัด iPhone ตระกูล 18 ออกจากการคำนวณทั้งหมด (สลับได้จากปุ่มบนหัวหน้าจอ)
+  const [excludeIphone18, setExcludeIphone18] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("dashboard-exclude-iphone18") === "1";
+    } catch {
+      return false;
+    }
+  });
+
   const [kpiPresets, setKpiPresets] = useState<KpiPreset[]>([]);
+
+  const toggleExcludeIphone18 = () => {
+    setExcludeIphone18((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("dashboard-exclude-iphone18", next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
 
   const handleBranchChange = (newBranch: string) => {
     setSelectedBranch(newBranch);
@@ -1343,17 +1378,20 @@ function AppInternal({
     );
   };
 
-  const displayUploads = useMemo<Record<UploadKind, RawRow[]>>(
-    () => ({
+  const displayUploads = useMemo<Record<UploadKind, RawRow[]>>(() => {
+    // Optionally drop iPhone 18-family devices from every calculation
+    // (single chokepoint — all tables/KPIs read from displayUploads).
+    const strip = (rows: RawRow[]) =>
+      excludeIphone18 ? rows.filter((r) => !isIphone18DeviceRow(r)) : rows;
+    return {
       target: filterRowsByBranch(uploadedFiles.target, selectedBranch),
-      current: filterRowsByBranch(uploadedFiles.current, selectedBranch),
-      today: filterRowsByBranch(uploadedFiles.today ?? [], selectedBranch),
-      lastMonth: filterRowsByBranch(uploadedFiles.lastMonth, selectedBranch),
-      lastYear: filterRowsByBranch(uploadedFiles.lastYear, selectedBranch),
+      current: strip(filterRowsByBranch(uploadedFiles.current, selectedBranch)),
+      today: strip(filterRowsByBranch(uploadedFiles.today ?? [], selectedBranch)),
+      lastMonth: strip(filterRowsByBranch(uploadedFiles.lastMonth, selectedBranch)),
+      lastYear: strip(filterRowsByBranch(uploadedFiles.lastYear, selectedBranch)),
       categoryMaster: uploadedFiles.categoryMaster,
-    }),
-    [uploadedFiles, selectedBranch],
-  );
+    };
+  }, [uploadedFiles, selectedBranch, excludeIphone18]);
 
   const categoryMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -4591,6 +4629,24 @@ function AppInternal({
         {/* Top Navigation (Floating Right) */}
         <header className="absolute top-6 right-8 w-1/2 flex justify-end items-center z-50 pointer-events-none">
           <div className="flex items-center gap-6 pointer-events-auto">
+            {/* ตัด iPhone ตระกูล 18 ออกจากการคำนวณทุกตาราง */}
+            <button
+              type="button"
+              onClick={toggleExcludeIphone18}
+              title={
+                excludeIphone18
+                  ? "กำลังตัด iPhone 18 ออกจากการคำนวณ — กดเพื่อนับรวมกลับ"
+                  : "กดเพื่อตัด iPhone ตระกูล 18 ออกจากการคำนวณทั้งหมด"
+              }
+              className={`hidden md:inline-flex items-center gap-1.5 px-3 py-2 rounded-full border text-xs font-semibold backdrop-blur-md shadow-xl transition-colors ${
+                excludeIphone18
+                  ? "bg-amber-500/25 border-amber-400/50 text-amber-100 hover:bg-amber-500/35"
+                  : "bg-white/10 border-white/10 text-white/60 hover:text-white hover:bg-white/15"
+              }`}
+            >
+              <Smartphone className="w-4 h-4" />
+              {excludeIphone18 ? "ตัด iPhone 18 ออกแล้ว" : "ตัด iPhone 18"}
+            </button>
             <nav className="flex items-center space-x-2 lg:space-x-4 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/5 shadow-xl hidden md:flex">
               <button
                 onClick={() => setCurrentView("home")}
