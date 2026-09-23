@@ -1393,6 +1393,13 @@ function AppInternal({
     };
   }, [uploadedFiles, selectedBranch, excludeIphone18]);
 
+  // Branch-filtered but WITHOUT the iPhone 18 exclusion — used to pick the
+  // "latest day" so toggling the filter never changes which date is shown.
+  const currentRowsAllModels = useMemo(
+    () => filterRowsByBranch(uploadedFiles.current, selectedBranch),
+    [uploadedFiles.current, selectedBranch],
+  );
+
   const categoryMap = useMemo(() => {
     const map = new Map<string, string>();
     if (displayUploads.categoryMaster) {
@@ -3184,8 +3191,10 @@ function AppInternal({
         ? `${p.getFullYear()}-${String(p.getMonth() + 1).padStart(2, "0")}-${String(p.getDate()).padStart(2, "0")}`
         : "";
     };
+    // "วันล่าสุด" ยึดจากข้อมูลเต็ม (ก่อนกรอง iPhone 18) เพื่อให้วันที่ที่แสดง
+    // ไม่เปลี่ยนไปมาตอนสลับปุ่มกรอง — กรองมีผลกับ "ตัวเลข" เท่านั้น
     const daySet = new Set<string>();
-    displayUploads.current.forEach((r) => {
+    (currentRowsAllModels.length ? currentRowsAllModels : displayUploads.current).forEach((r) => {
       const k = dayKey(r);
       if (k) daySet.add(k);
     });
@@ -3300,7 +3309,13 @@ function AppInternal({
       presets: cols.map((p) => ({ id: p.id, name: p.name, kind: kindFor(p.calcType) })),
       rows: [totalRow, ...officerRows],
     };
-  }, [displayUploads.current, displayUploads.categoryMaster, parsedReport.officers, kpiPresets]);
+  }, [
+    displayUploads.current,
+    displayUploads.categoryMaster,
+    parsedReport.officers,
+    kpiPresets,
+    currentRowsAllModels,
+  ]);
 
   const dynamicRadarData = useMemo(() => {
     if (activeStat === "csat") {
