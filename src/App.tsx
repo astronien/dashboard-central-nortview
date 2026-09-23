@@ -462,6 +462,27 @@ const isUfundRow = (row: any): boolean => {
  * Only the device itself — accessories "for iPhone 18" keep counting, so the
  * toggle removes the new-launch device volume without touching attach items.
  */
+/** Today's date in Asia/Bangkok as YYYY-MM-DD. */
+const bangkokTodayYmd = (): string =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok" }).format(new Date());
+
+/**
+ * Pick the most recent data day, ignoring rows dated in the FUTURE
+ * (pre-orders / reservations are sometimes booked ahead and would otherwise
+ * hijack "วันล่าสุด" with a day that has almost no sales on it).
+ */
+const latestDayFromKeys = (dayKeys: Iterable<string>): string => {
+  const today = bangkokTodayYmd();
+  const days = Array.from(dayKeys)
+    .filter((d) => d && d <= today)
+    .sort()
+    .reverse();
+  if (days.length) return days[0];
+  // everything is future-dated — fall back to the earliest of those
+  const all = Array.from(dayKeys).filter(Boolean).sort();
+  return all.length ? all[0] : "";
+};
+
 const isIphone18DeviceRow = (row: RawRow): boolean => {
   const cat = String(row["Category (Name)"] ?? (row as any).category_name ?? "")
     .trim()
@@ -2890,9 +2911,13 @@ function AppInternal({
       const k = dayKey(r);
       if (k) daySet.add(k);
     });
-    const days = Array.from(daySet).sort().reverse();
-    if (days.length === 0) return empty;
-    const latestDay = days[0];
+    // ไม่เอาวันในอนาคต (พรีออเดอร์) มาเป็น "วันล่าสุด"
+    const latestDay = latestDayFromKeys(daySet);
+    if (!latestDay) return empty;
+    const days = Array.from(daySet)
+      .filter((d) => d && d <= latestDay)
+      .sort()
+      .reverse();
     const prevDay = days[1] ?? null;
 
     const latestRows = displayUploads.current.filter((r) => dayKey(r) === latestDay);
@@ -3198,9 +3223,8 @@ function AppInternal({
       const k = dayKey(r);
       if (k) daySet.add(k);
     });
-    const days = Array.from(daySet).sort().reverse();
-    if (!days.length) return empty;
-    const latestDay = days[0];
+    const latestDay = latestDayFromKeys(daySet);
+    if (!latestDay) return empty;
     const latestRows = displayUploads.current.filter((r) => dayKey(r) === latestDay);
 
     const lookup = buildCatDailyLookup(displayUploads.categoryMaster);
@@ -3719,16 +3743,16 @@ function AppInternal({
 
   // Latest data date (YYYY-MM-DD) in the current upload — for daily API pulls
   const latestDataYmd = useMemo(() => {
-    let best = 0;
-    let ymd = "";
+    const keys = new Set<string>();
     for (const row of displayUploads.current) {
       const p = parseDocDate(String(row["Doc Date"] ?? row["doc date"] ?? ""));
-      if (p && p.getTime() > best) {
-        best = p.getTime();
-        ymd = `${p.getFullYear()}-${String(p.getMonth() + 1).padStart(2, "0")}-${String(p.getDate()).padStart(2, "0")}`;
+      if (p) {
+        keys.add(
+          `${p.getFullYear()}-${String(p.getMonth() + 1).padStart(2, "0")}-${String(p.getDate()).padStart(2, "0")}`,
+        );
       }
     }
-    return ymd;
+    return latestDayFromKeys(keys);
   }, [displayUploads.current]);
 
   // uFund per-staff for the latest data day (daily table uses the real API,
