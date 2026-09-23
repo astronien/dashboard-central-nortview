@@ -95,14 +95,19 @@ export function rowMatchesKpiCategory(row: RawRow, category: string): boolean {
   // COVER+/AC+ have no CAT Daily group in the Category Master — they are
   // attach-style KPIs detected from product text only, independent of
   // which device group the master assigns the row to.
+  // "coverplus" (no "+"/space) covers newer SKUs such as COVERPLUS1007 for
+  // iPhone 18 — those carry a different product code and would otherwise be
+  // missed by the "cover+" / "cover plus" spellings.
+  const isCoverPlusText = (t: string) =>
+    t.includes("cover+") || t.includes("cover plus") || t.includes("coverplus");
   if (catKey === "cover+" || catKey === "cover plus") {
-    return raw.includes("cover+") || raw.includes("cover plus");
+    return isCoverPlusText(raw);
   }
   if (catKey === "ac+" || catKey === "apple care") {
     // "7CARE+ Free for COVER+ with AppleCare Service" is a COVER+ bundle
     // item (sold paired with COVER+), not an AppleCare sale — anything
     // COVER+-flavored never counts toward AC+.
-    if (raw.includes("cover+") || raw.includes("cover plus") || raw.includes("7care")) {
+    if (isCoverPlusText(raw) || raw.includes("7care")) {
       return false;
     }
     return raw.includes("apple care") || raw.includes("applecare") || raw.includes("ac+");
