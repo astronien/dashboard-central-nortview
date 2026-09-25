@@ -483,13 +483,21 @@ const latestDayFromKeys = (dayKeys: Iterable<string>): string => {
   return all.length ? all[0] : "";
 };
 
+const ATTACH_ITEM_HINT =
+  /cover|film|case|care|glass|adapter|cable|sim|pencil|airpod|strap|bag|charger|power|protect|smile|ufund/i;
+
 const isIphone18DeviceRow = (row: RawRow): boolean => {
   const cat = String(row["Category (Name)"] ?? (row as any).category_name ?? "")
     .trim()
     .toLowerCase();
   if (cat !== "iphone") return false;
-  const text = `${row["Product (Name)"] ?? ""} ${row["Model"] ?? ""} ${row["Sub Category"] ?? ""}`;
-  return /iphone\s*18/i.test(String(text));
+  const sub = String(row["Sub Category"] ?? "");
+  const prod = String(row["Product (Name)"] ?? "");
+  // Attach items (COVER+/COVERPLUS1007, film, case, AppleCare…) live under the
+  // SAME "iPhone" category as the handset and their names mention the model,
+  // so they'd be swept up too. Never treat those as the device.
+  if (ATTACH_ITEM_HINT.test(sub) || ATTACH_ITEM_HINT.test(prod)) return false;
+  return /iphone\s*18/i.test(`${prod} ${row["Model"] ?? ""} ${sub}`);
 };
 
 const countRows = (
