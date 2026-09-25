@@ -83,9 +83,50 @@ export function matchesAnyFilter(
     const brandMatch = matchExact(brnds, brand);
     // productNames: exact on Product (Name), smart cross-field on Sub Category
     const productMatch = matchExact(prodNames, prod) || matchSmart(prodNames, sub);
+    const containsMatch = matchesContains(filter, prod, sub, mod);
+    const notExcluded = !matchesExclude(filter, prod, sub, mod);
 
-    return categoryMatch && subCategoryMatch && modelMatch && brandMatch && productMatch;
+    return (
+      categoryMatch &&
+      subCategoryMatch &&
+      modelMatch &&
+      brandMatch &&
+      productMatch &&
+      containsMatch &&
+      notExcluded
+    );
   });
+}
+
+/**
+ * "จับจากคำในชื่อสินค้า" — substring, case-insensitive. Checked against the
+ * product name (and sub category / model as a fallback) so one keyword like
+ * "COVER+" covers every model variant, current and future.
+ * Empty list = rule not used (always passes).
+ */
+function matchesContains(
+  filter: ItemFilter,
+  prod: string,
+  sub: string,
+  mod: string,
+): boolean {
+  const words = (filter?.productNameContains ?? []).filter((w) => String(w).trim());
+  if (words.length === 0) return true;
+  const hay = `${prod} ${sub} ${mod}`.toLowerCase();
+  return words.some((w) => hay.includes(String(w).trim().toLowerCase()));
+}
+
+/** คำที่ต้องยกเว้น — เจอคำใดคำหนึ่ง = ไม่นับแถวนี้ */
+function matchesExclude(
+  filter: ItemFilter,
+  prod: string,
+  sub: string,
+  mod: string,
+): boolean {
+  const words = (filter?.excludeContains ?? []).filter((w) => String(w).trim());
+  if (words.length === 0) return false;
+  const hay = `${prod} ${sub} ${mod}`.toLowerCase();
+  return words.some((w) => hay.includes(String(w).trim().toLowerCase()));
 }
 
 function rowMatchesFilter(
@@ -119,6 +160,9 @@ function rowMatchesFilter(
   // productNames: exact on Product (Name), smart cross-field on Sub Category
   const productMatch = matchExact(prodNames, prod) || matchSmart(prodNames, sub);
   const docTypeMatch = docTypes.length === 0 || docTypes.includes(docType);
+  // keyword rules (ดูคำอธิบายใน ItemFilter)
+  const containsMatch = matchesContains(filter, prod, sub, mod);
+  const notExcluded = !matchesExclude(filter, prod, sub, mod);
 
   return (
     categoryMatch &&
@@ -127,6 +171,8 @@ function rowMatchesFilter(
     brandMatch &&
     customerMatch &&
     productMatch &&
+    containsMatch &&
+    notExcluded &&
     docTypeMatch
   );
 }

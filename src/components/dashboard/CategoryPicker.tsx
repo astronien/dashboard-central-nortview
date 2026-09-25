@@ -25,6 +25,13 @@ export default function CategoryPicker({
   onChange,
   label,
 }: CategoryPickerProps) {
+  // A row whose upstream field is EMPTY must not be hidden from the
+  // downstream option lists. Real data has gaps (e.g. the iPhone 18 COVER+
+  // rows carry no Model), and excluding them meant brand-new products never
+  // appeared as tick-boxes when building a preset.
+  const passesSel = (v: string, sel?: string[]) =>
+    !sel || sel.length === 0 || !v || sel.includes(v);
+
   const allCategories = useMemo(() => {
     return Array.from(
       new Set(allLines.map((li) => readStr(li, "Category (Name)", "category_name", "Category"))),
@@ -34,14 +41,9 @@ export default function CategoryPicker({
   }, [allLines]);
 
   const allSubCategories = useMemo(() => {
-    const filtered =
-      !value || !value.categories || value.categories.length === 0
-        ? allLines
-        : allLines.filter((li) =>
-            value.categories.includes(
-              readStr(li, "Category (Name)", "category_name", "Category"),
-            ),
-          );
+    const filtered = allLines.filter((li) =>
+      passesSel(readStr(li, "Category (Name)", "category_name", "Category"), value?.categories),
+    );
     return Array.from(new Set(filtered.map((li) => readStr(li, "Sub Category", "sub_category"))))
       .filter(Boolean)
       .sort();
@@ -51,12 +53,12 @@ export default function CategoryPicker({
     let filtered = allLines;
     if (value && value.categories && value.categories.length > 0) {
       filtered = filtered.filter((li) =>
-        value.categories.includes(readStr(li, "Category (Name)", "category_name")),
+        passesSel(readStr(li, "Category (Name)", "category_name"), value.categories),
       );
     }
     if (value && value.subCategories && value.subCategories.length > 0) {
       filtered = filtered.filter((li) =>
-        value.subCategories.includes(readStr(li, "Sub Category", "sub_category")),
+        passesSel(readStr(li, "Sub Category", "sub_category"), value.subCategories),
       );
     }
     return Array.from(new Set(filtered.map((li) => readStr(li, "Model", "model"))))
@@ -68,16 +70,16 @@ export default function CategoryPicker({
     let filtered = allLines;
     if (value?.categories && value.categories.length > 0) {
       filtered = filtered.filter((li) =>
-        value.categories.includes(readStr(li, "Category (Name)", "category_name")),
+        passesSel(readStr(li, "Category (Name)", "category_name"), value.categories),
       );
     }
     if (value?.subCategories && value.subCategories.length > 0) {
       filtered = filtered.filter((li) =>
-        value.subCategories.includes(readStr(li, "Sub Category", "sub_category")),
+        passesSel(readStr(li, "Sub Category", "sub_category"), value.subCategories),
       );
     }
     if (value?.models && value.models.length > 0) {
-      filtered = filtered.filter((li) => value.models.includes(readStr(li, "Model", "model")));
+      filtered = filtered.filter((li) => passesSel(readStr(li, "Model", "model"), value.models));
     }
     return Array.from(new Set(filtered.map((li) => readStr(li, "Brand", "brand"))))
       .filter(Boolean)
@@ -97,23 +99,26 @@ export default function CategoryPicker({
     let filtered = allLines;
     if (value?.categories && value.categories.length > 0) {
       filtered = filtered.filter((li) =>
-        value.categories.includes(readStr(li, "Category (Name)", "category_name")),
+        passesSel(readStr(li, "Category (Name)", "category_name"), value.categories),
       );
     }
     if (value?.subCategories && value.subCategories.length > 0) {
       filtered = filtered.filter((li) =>
-        value.subCategories.includes(readStr(li, "Sub Category", "sub_category")),
+        passesSel(readStr(li, "Sub Category", "sub_category"), value.subCategories),
       );
     }
     if (value?.models && value.models.length > 0) {
-      filtered = filtered.filter((li) => value.models.includes(readStr(li, "Model", "model")));
+      filtered = filtered.filter((li) => passesSel(readStr(li, "Model", "model"), value.models));
     }
     if (value?.brands && value.brands.length > 0) {
-      filtered = filtered.filter((li) => value.brands.includes(readStr(li, "Brand", "brand")));
+      filtered = filtered.filter((li) => passesSel(readStr(li, "Brand", "brand"), value.brands));
     }
     if (value?.customerCodes && value.customerCodes.length > 0) {
       filtered = filtered.filter((li) =>
-        value.customerCodes.includes(readStr(li, "Customer Code", "Customer (Code)", "customer_code")),
+        passesSel(
+          readStr(li, "Customer Code", "Customer (Code)", "customer_code"),
+          value.customerCodes,
+        ),
       );
     }
     return Array.from(new Set(filtered.map((li) => readStr(li, "Product (Name)", "product_name"))))
@@ -148,6 +153,8 @@ export default function CategoryPicker({
       productNames: [],
       docTypes: value?.docTypes || [],
       includeNonInventory: value?.includeNonInventory,
+      productNameContains: value?.productNameContains || [],
+      excludeContains: value?.excludeContains || [],
     });
   };
 
@@ -169,6 +176,8 @@ export default function CategoryPicker({
       productNames: [],
       docTypes: value?.docTypes || [],
       includeNonInventory: value?.includeNonInventory,
+      productNameContains: value?.productNameContains || [],
+      excludeContains: value?.excludeContains || [],
     });
   };
 
@@ -190,6 +199,8 @@ export default function CategoryPicker({
       productNames: value?.productNames || [],
       docTypes: value?.docTypes || [],
       includeNonInventory: value?.includeNonInventory,
+      productNameContains: value?.productNameContains || [],
+      excludeContains: value?.excludeContains || [],
     });
   };
 
@@ -211,6 +222,8 @@ export default function CategoryPicker({
       productNames: value?.productNames || [],
       docTypes: value?.docTypes || [],
       includeNonInventory: value?.includeNonInventory,
+      productNameContains: value?.productNameContains || [],
+      excludeContains: value?.excludeContains || [],
     });
   };
 
@@ -232,6 +245,8 @@ export default function CategoryPicker({
       productNames: value?.productNames || [],
       docTypes: value?.docTypes || [],
       includeNonInventory: value?.includeNonInventory,
+      productNameContains: value?.productNameContains || [],
+      excludeContains: value?.excludeContains || [],
     });
   };
 
@@ -253,6 +268,8 @@ export default function CategoryPicker({
       productNames: next,
       docTypes: value?.docTypes || [],
       includeNonInventory: value?.includeNonInventory,
+      productNameContains: value?.productNameContains || [],
+      excludeContains: value?.excludeContains || [],
     });
   };
 
@@ -274,6 +291,8 @@ export default function CategoryPicker({
       productNames: value?.productNames || [],
       docTypes: next,
       includeNonInventory: value?.includeNonInventory,
+      productNameContains: value?.productNameContains || [],
+      excludeContains: value?.excludeContains || [],
     });
   };
 
@@ -566,6 +585,70 @@ export default function CategoryPicker({
           </div>
           <p className="text-xs text-emerald-400 mt-1 truncate">
             {getSummary(value?.docTypes || [], allDocTypes)}
+          </p>
+        </div>
+      </div>
+
+      {/* จับจากคำในชื่อสินค้า — ครอบคลุมรุ่นใหม่ที่ยังไม่มีในลิสต์ */}
+      <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-semibold text-amber-300 mb-1">
+            จับจากคำในชื่อสินค้า
+          </label>
+          <input
+            type="text"
+            value={(value?.productNameContains || []).join(", ")}
+            onChange={(e) =>
+              onChange({
+                ...(value as ItemFilter),
+                categories: value?.categories || [],
+                subCategories: value?.subCategories || [],
+                models: value?.models || [],
+                brands: value?.brands || [],
+                customerCodes: value?.customerCodes || [],
+                productNames: value?.productNames || [],
+                docTypes: value?.docTypes || [],
+                productNameContains: e.target.value
+                  .split(",")
+                  .map((w) => w.trim())
+                  .filter(Boolean),
+              })
+            }
+            placeholder="เช่น COVER+  (คั่นหลายคำด้วย ,)"
+            className="w-full bg-[#051710] border border-amber-400/30 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-400"
+          />
+          <p className="text-[11px] text-white/40 mt-1">
+            ใส่คำเดียวก็ครอบคลุมทุกรุ่น รวมรุ่นที่ออกใหม่ในอนาคต (ไม่ต้องติ๊กชื่อทีละตัว) — เว้นว่าง = ไม่ใช้
+          </p>
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-rose-300 mb-1">
+            ยกเว้นคำ
+          </label>
+          <input
+            type="text"
+            value={(value?.excludeContains || []).join(", ")}
+            onChange={(e) =>
+              onChange({
+                ...(value as ItemFilter),
+                categories: value?.categories || [],
+                subCategories: value?.subCategories || [],
+                models: value?.models || [],
+                brands: value?.brands || [],
+                customerCodes: value?.customerCodes || [],
+                productNames: value?.productNames || [],
+                docTypes: value?.docTypes || [],
+                excludeContains: e.target.value
+                  .split(",")
+                  .map((w) => w.trim())
+                  .filter(Boolean),
+              })
+            }
+            placeholder="เช่น 7CARE+  (คั่นหลายคำด้วย ,)"
+            className="w-full bg-[#051710] border border-rose-400/30 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-400"
+          />
+          <p className="text-[11px] text-white/40 mt-1">
+            ถ้าชื่อสินค้ามีคำนี้จะไม่ถูกนับ (เช่นตัดของแถมที่ชื่อมี COVER+ ออก)
           </p>
         </div>
       </div>

@@ -36,6 +36,17 @@ export interface ItemFilter {
   productNames: string[];
   docTypes: string[];
   includeNonInventory?: boolean;
+  /**
+   * จับจาก "คำในชื่อสินค้า" (substring, ไม่สนตัวพิมพ์เล็ก/ใหญ่).
+   * ใส่คำเดียวเช่น "COVER+" แล้วจะครอบคลุมทุกรุ่นทั้งที่มีอยู่และที่ออกใหม่
+   * โดยไม่ต้องมาติ๊กชื่อสินค้าทีละตัว. ว่าง = ไม่ใช้เงื่อนไขนี้.
+   */
+  productNameContains?: string[];
+  /**
+   * คำที่ต้อง "ยกเว้น" — ถ้าชื่อสินค้า/ซับแคท/โมเดล มีคำใดคำหนึ่งนี้ จะไม่นับ
+   * (เช่น "7CARE+" ที่เป็นของแถมแต่ชื่อมีคำว่า COVER+ อยู่ด้วย).
+   */
+  excludeContains?: string[];
 }
 
 export const emptyItemFilter = (): ItemFilter => ({
@@ -47,6 +58,8 @@ export const emptyItemFilter = (): ItemFilter => ({
   productNames: [],
   docTypes: [],
   includeNonInventory: false,
+  productNameContains: [],
+  excludeContains: [],
 });
 
 export interface Preset {
