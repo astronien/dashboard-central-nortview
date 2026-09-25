@@ -153,9 +153,9 @@ import { AuthProvider, useAuth } from "./lib/auth/authContext";
 import LoginPage from "./components/LoginPage";
 import ChangePasswordGate from "./components/ChangePasswordGate";
 import { syncPiaFromOfficers } from "./lib/auth/piSync";
-import { calcPreset, presetDisplayValue, computePresetAchPercent, countItemQuantityAnyFilter, sumItemRevenueAnyFilter } from "./lib/presetEngine";
+import { calcPreset, presetDisplayValue, computePresetAchPercent, countItemQuantityAnyFilter, sumItemRevenueAnyFilter, matchesAnyFilter } from "./lib/presetEngine";
 import { DailyBranchReportSection, type DailyReportData } from "./components/dashboard/DailyBranchReportSection";
-import { parseBills, type BillSummary } from "./lib/presetBills";
+import { parseBills, ROW_READERS, type BillSummary } from "./lib/presetBills";
 import { enrichSalesRowsWithCatDaily, buildCatDailyLookup } from "./lib/presetCatDaily";
 
 
@@ -3261,6 +3261,37 @@ function AppInternal({
     const bahtOf = (bills: BillSummary[], cat: string) =>
       bills.reduce((s, b) => s + sumItemRevenueAnyFilter(b, catF(cat)), 0);
 
+    // Split a preset's matched attach items into "รุ่นเก่า" vs "iPhone 18"
+    // (by the product name). Mirrors countItemQuantityAnyFilter: inventory
+    // items only unless the filter says otherwise, deduped per bill.
+    const splitPresetUnits = (bills: BillSummary[], preset: KpiPreset) => {
+      const filters = preset.filtersA ?? (preset.filterA ? [preset.filterA] : []);
+      let older = 0;
+      let gen18 = 0;
+      if (!filters.length) return { older, gen18 };
+      for (const bill of bills) {
+        const seen = new Set<string>();
+        for (const f of filters) {
+          const items = f?.includeNonInventory
+            ? bill.lineItems
+            : bill.lineItems.filter((li) => ROW_READERS.isInventoryItem(li));
+          for (const li of items) {
+            if (!matchesAnyFilter(li as never, [f])) continue;
+            const key = `${ROW_READERS.getProductCode(li as never)}-${
+              ROW_READERS.getSerial(li as never) || "no-serial"
+            }-${ROW_READERS.getProductName(li as never)}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            const qty = ROW_READERS.getQuantity(li as never);
+            const name = String(ROW_READERS.getProductName(li as never) ?? "");
+            if (/iphone\s*18/i.test(name)) gen18 += qty;
+            else older += qty;
+          }
+        }
+      }
+      return { older, gen18 };
+    };
+
     const officerList = (parsedReport.officers.length > 0
       ? parsedReport.officers.map((o) => ({ name: o.name, staffId: o.staffId, position: o.position }))
       : Array.from(
@@ -3278,7 +3309,7 @@ function AppInternal({
         const totalDevice =
           iphoneUnit + ipadUnit + unitsOf(officerBills, "Mac") + unitsOf(officerBills, "Apple Watch");
         const totalBaht = officerBills.reduce((s, b) => s + b.totalRevenue, 0);
-        const cells: Record<string, { kind: "att" | "unit" | "baht"; unit?: number; att?: number; baht?: number }> = {};
+        const cells: Record<string, { kind: "att" | "unit" | "baht"; unit?: number; unit18?: number; att?: number; baht?: number }> = {};
         cols.forEach((p) => {
           const r = calcPreset(officerBills, p, dummy);
           const kind = kindFor(p.calcType);
@@ -3287,7 +3318,23 @@ function AppInternal({
           } else if (kind === "att") {
             const bk = baseKind(p.name);
             const base = bk === "ipad" ? ipadUnit : bk === "both" ? iphoneUnit + ipadUnit : iphoneUnit;
-            cells[p.id] = { kind, unit: r.billsWithAandB, att: base > 0 ? (r.billsWithAandB / base) * 100 : 0 };
+            if (excludeIphone18) {
+              // ตอนกรอง iPhone 18: แยกให้เห็นว่าเป็นของรุ่นเก่ากี่ชิ้น / ของ 18 กี่ชิ้น
+              // และคิด ATT% จากรุ่นเก่าเท่านั้น (ฐาน iPhone ก็ไม่มี 18 แล้ว)
+              const { older, gen18 } = splitPresetUnits(officerBills, p);
+              cells[p.id] = {
+                kind,
+                unit: older,
+                unit18: gen18,
+                att: base > 0 ? (older / base) * 100 : 0,
+              };
+            } else {
+              cells[p.id] = {
+                kind,
+                unit: r.billsWithAandB,
+                att: base > 0 ? (r.billsWithAandB / base) * 100 : 0,
+              };
+            }
           } else {
             cells[p.id] = { kind, unit: r.billsWithAandB };
           }
@@ -3310,7 +3357,7 @@ function AppInternal({
     const sum = (f: (r: (typeof officerRows)[number]) => number) => officerRows.reduce((s, r) => s + f(r), 0);
     const totalIphone = sum((r) => r.iphoneUnit);
     const totalIpad = sum((r) => r.ipadUnit);
-    const totalCells: Record<string, { kind: "att" | "unit" | "baht"; unit?: number; att?: number; baht?: number }> = {};
+    const totalCells: Record<string, { kind: "att" | "unit" | "baht"; unit?: number; unit18?: number; att?: number; baht?: number }> = {};
     cols.forEach((p) => {
       const kind = kindFor(p.calcType);
       if (kind === "baht") {
@@ -3319,7 +3366,13 @@ function AppInternal({
         const bk = baseKind(p.name);
         const base = bk === "ipad" ? totalIpad : bk === "both" ? totalIphone + totalIpad : totalIphone;
         const unit = sum((r) => r.cells[p.id]?.unit ?? 0);
-        totalCells[p.id] = { kind, unit, att: base > 0 ? (unit / base) * 100 : 0 };
+        const u18 = sum((r) => r.cells[p.id]?.unit18 ?? 0);
+        totalCells[p.id] = {
+          kind,
+          unit,
+          ...(excludeIphone18 ? { unit18: u18 } : {}),
+          att: base > 0 ? (unit / base) * 100 : 0,
+        };
       } else {
         totalCells[p.id] = { kind, unit: sum((r) => r.cells[p.id]?.unit ?? 0) };
       }
@@ -3347,6 +3400,7 @@ function AppInternal({
     parsedReport.officers,
     kpiPresets,
     currentRowsAllModels,
+    excludeIphone18,
   ]);
 
   const dynamicRadarData = useMemo(() => {

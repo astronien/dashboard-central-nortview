@@ -6,6 +6,8 @@ export type DailyReportCellKind = "att" | "unit" | "baht";
 export type DailyReportCell = {
   kind: DailyReportCellKind;
   unit?: number;
+  /** เมื่อเปิดกรอง iPhone 18: จำนวนที่เป็นของ iPhone 18 (แยกจาก unit ซึ่งเป็นรุ่นเก่า) */
+  unit18?: number;
   att?: number; // %
   baht?: number;
 };
@@ -126,6 +128,10 @@ export const DailyBranchReportSection: React.FC<{ data: DailyReportData }> = ({ 
     }
   };
 
+  const hasSplit = data.rows.some((r) =>
+    Object.values(r.cells).some((c) => c?.unit18 != null && c.unit18 > 0),
+  );
+
   if (!data.rows.length) return null;
 
   return (
@@ -140,6 +146,11 @@ export const DailyBranchReportSection: React.FC<{ data: DailyReportData }> = ({ 
         <p className="text-xs text-slate-400">
           ข้อมูลวันล่าสุด {fmtDay(data.latestDate)} · ATT% = จำนวน ÷ ฐาน (ส่วนใหญ่ ÷ iPhone, AC+ ÷ iPhone+iPad,
           Pencil/iPad Acc ÷ iPad) · <span className="text-slate-500">ลากหัวคอลัมน์เพื่อสลับตำแหน่งได้</span>
+          {hasSplit ? (
+            <>
+              {" "}· <span className="text-amber-600 font-semibold">ตัวเลขส้ม +N (18) = ของ iPhone 18 แยกออกมา</span>
+            </>
+          ) : null}
         </p>
         <button
           type="button"
@@ -252,7 +263,12 @@ export const DailyBranchReportSection: React.FC<{ data: DailyReportData }> = ({ 
                   const att = c?.att ?? 0;
                   return (
                     <React.Fragment key={p.id}>
-                      <td className="py-1.5 px-2 text-right border-l border-slate-200">{num(c?.unit ?? 0)}</td>
+                      <td className="py-1.5 px-2 text-right border-l border-slate-200">
+                        <div>{num(c?.unit ?? 0)}</div>
+                        {c?.unit18 != null && c.unit18 > 0 ? (
+                          <div className="text-[9px] font-bold text-amber-600">+{c.unit18} (18)</div>
+                        ) : null}
+                      </td>
                       <td className={`py-1.5 px-2 text-center font-bold ${attFill(att)}`}>
                         {c?.unit || att > 0 ? `${att.toFixed(1)}%` : "–"}
                       </td>
