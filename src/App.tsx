@@ -153,9 +153,9 @@ import { AuthProvider, useAuth } from "./lib/auth/authContext";
 import LoginPage from "./components/LoginPage";
 import ChangePasswordGate from "./components/ChangePasswordGate";
 import { syncPiaFromOfficers } from "./lib/auth/piSync";
-import { calcPreset, presetDisplayValue, computePresetAchPercent, countItemQuantityAnyFilter, sumItemRevenueAnyFilter, matchesAnyFilter } from "./lib/presetEngine";
+import { calcPreset, presetDisplayValue, computePresetAchPercent, countItemQuantityAnyFilter, sumItemRevenueAnyFilter } from "./lib/presetEngine";
 import { DailyBranchReportSection, type DailyReportData } from "./components/dashboard/DailyBranchReportSection";
-import { parseBills, ROW_READERS, type BillSummary } from "./lib/presetBills";
+import { parseBills, type BillSummary } from "./lib/presetBills";
 import { enrichSalesRowsWithCatDaily, buildCatDailyLookup } from "./lib/presetCatDaily";
 
 
@@ -3261,32 +3261,27 @@ function AppInternal({
     const bahtOf = (bills: BillSummary[], cat: string) =>
       bills.reduce((s, b) => s + sumItemRevenueAnyFilter(b, catF(cat)), 0);
 
-    // Split a preset's matched attach items into "รุ่นเก่า" vs "iPhone 18"
-    // (by the product name). Mirrors countItemQuantityAnyFilter: inventory
-    // items only unless the filter says otherwise, deduped per bill.
+    // Split a preset's matched attach items into "รุ่นเก่า" vs "iPhone 18".
+    // Reuse countItemQuantityAnyFilter (the exact matcher calcPreset uses —
+    // inventory rule, customer/doc-type constraints and per-bill dedupe) on
+    // two disjoint halves of each bill, so older + gen18 always equals the
+    // unfiltered total.
+    const isIphone18Item = (li: RawRow) =>
+      /iphone\s*18/i.test(String(li["Product (Name)"] ?? (li as any).product_name ?? ""));
+
     const splitPresetUnits = (bills: BillSummary[], preset: KpiPreset) => {
       const filters = preset.filtersA ?? (preset.filterA ? [preset.filterA] : []);
       let older = 0;
       let gen18 = 0;
       if (!filters.length) return { older, gen18 };
       for (const bill of bills) {
-        const seen = new Set<string>();
-        for (const f of filters) {
-          const items = f?.includeNonInventory
-            ? bill.lineItems
-            : bill.lineItems.filter((li) => ROW_READERS.isInventoryItem(li));
-          for (const li of items) {
-            if (!matchesAnyFilter(li as never, [f])) continue;
-            const key = `${ROW_READERS.getProductCode(li as never)}-${
-              ROW_READERS.getSerial(li as never) || "no-serial"
-            }-${ROW_READERS.getProductName(li as never)}`;
-            if (seen.has(key)) continue;
-            seen.add(key);
-            const qty = ROW_READERS.getQuantity(li as never);
-            const name = String(ROW_READERS.getProductName(li as never) ?? "");
-            if (/iphone\s*18/i.test(name)) gen18 += qty;
-            else older += qty;
-          }
+        const items18 = bill.lineItems.filter(isIphone18Item);
+        const itemsOld = bill.lineItems.filter((li) => !isIphone18Item(li));
+        if (items18.length) {
+          gen18 += countItemQuantityAnyFilter({ ...bill, lineItems: items18 }, filters);
+        }
+        if (itemsOld.length) {
+          older += countItemQuantityAnyFilter({ ...bill, lineItems: itemsOld }, filters);
         }
       }
       return { older, gen18 };
