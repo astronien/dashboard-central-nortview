@@ -79,7 +79,7 @@ import {
   calcAchievementPct,
   calcForecastByDays,
   calculateMetrics,
-  calcRequiredPerDay,
+  calcSteppedRequiredPerDay,
   calcTodayAchievementPct,
   normalizeId,
   rawTargetRowsToRecords,
@@ -1175,6 +1175,8 @@ type CategoryPerformanceRow = {
   lastYear: number;
   yoyPercent: number | string;
   targetDay: number;
+  /** ขั้นบันไดที่กำลังไล่ (90 / 105) — null = ผ่านครบแล้ว */
+  targetTierPct?: number | null;
   actualDay: number;
   diffDay: number;
   achDayPercent: number;
@@ -2211,8 +2213,10 @@ function AppInternal({
         yoyPercent = ((actual - lastYear) / lastYear) * 100;
       }
       
-      // เป้าต่อวันสำหรับวันที่เหลือ (เทียบกับ "ยอดวันนี้" ได้ตรงความหมาย)
-      const targetDay = calcRequiredPerDay(target, actual, currentDay, totalDays);
+      // เป้าต่อวันแบบขั้นบันได: ไล่ให้ถึง 90% ก่อน แล้วค่อยไล่ต่อ 105%
+      const stepped = calcSteppedRequiredPerDay(target, actual, currentDay, totalDays);
+      const targetDay = stepped.perDay;
+      const targetTierPct = stepped.tierPct;
       const diffDay = actualDay - targetDay;
       const achDayPercent = calcTodayAchievementPct(actualDay, targetDay);
       
@@ -2228,6 +2232,7 @@ function AppInternal({
         lastYear,
         yoyPercent,
         targetDay,
+        targetTierPct,
         actualDay,
         diffDay,
         achDayPercent,
@@ -2309,7 +2314,13 @@ function AppInternal({
     if (totalLastYear > 0) {
       totalYoyPercent = ((totalActual - totalLastYear) / totalLastYear) * 100;
     }
-    const totalTargetDay = rows.reduce((s, r) => s + r.targetDay, 0);
+    const totalStepped = calcSteppedRequiredPerDay(
+      totalTarget,
+      totalActual,
+      currentDay,
+      totalDays,
+    );
+    const totalTargetDay = totalStepped.perDay;
     const totalActualDay = rows.reduce((s, r) => s + r.actualDay, 0);
     const totalDiffDay = totalActualDay - totalTargetDay;
     const totalAchDayPercent = calcTodayAchievementPct(totalActualDay, totalTargetDay);
@@ -2328,6 +2339,7 @@ function AppInternal({
       lastYear: totalLastYear,
       yoyPercent: totalYoyPercent,
       targetDay: totalTargetDay,
+      targetTierPct: totalStepped.tierPct,
       actualDay: totalActualDay,
       diffDay: totalDiffDay,
       achDayPercent: totalAchDayPercent,

@@ -65,6 +65,35 @@ export function calcRequiredPerDay(
   return gap / remainingDays;
 }
 
+/** ขั้นบันไดของเป้า (% ของเป้าเต็ม) — ไล่ทีละขั้น */
+export const TARGET_TIERS = [90, 105] as const;
+
+/**
+ * เป้าต่อวันแบบ "ขั้นบันได": ไล่ให้ถึงขั้นที่ยังไม่ผ่านก่อน
+ *   เช่น ยังไม่ถึง 90% → คิดเป้าต่อวันเพื่อให้ถึง 90%
+ *        ถึง 90% แล้ว → คิดเป้าต่อวันเพื่อให้ถึง 105%
+ *        ผ่านขั้นสุดท้ายแล้ว → 0 (ไม่ต้องวิ่งต่อ)
+ *
+ * คืน perDay พร้อม tierPct ของขั้นที่กำลังไล่ เพื่อเอาไปแสดงบน UI
+ */
+export function calcSteppedRequiredPerDay(
+  target: number,
+  actual: number,
+  currentDay: number,
+  totalDays: number,
+  tiers: readonly number[] = TARGET_TIERS,
+): { perDay: number; tierPct: number | null } {
+  if (!totalDays || target <= 0) return { perDay: 0, tierPct: null };
+  const remainingDays = Math.max(1, totalDays - currentDay);
+  for (const tier of tiers) {
+    const goal = (target * tier) / 100;
+    if (actual < goal) {
+      return { perDay: (goal - actual) / remainingDays, tierPct: tier };
+    }
+  }
+  return { perDay: 0, tierPct: null };
+}
+
 export const toNumber = (value: unknown) =>
   Number(String(value ?? "").replace(/[^\d.-]/g, "")) || 0;
 

@@ -33,6 +33,7 @@ export type PerformanceRow = {
   lastYear: number;
   yoyPercent: number | string;
   targetDay: number;
+  targetTierPct?: number | null;
   actualDay: number;
   diffDay: number;
   achDayPercent: number;
@@ -977,7 +978,7 @@ export function StaffSection({
                                 <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-center">% MoM</th>
                                 <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Last Year</th>
                                 <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-center">% YoY</th>
-                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right" title="เป้าที่ต้องทำต่อวัน สำหรับวันที่เหลือของเดือน = (เป้า − ยอดสะสม) ÷ วันที่เหลือ">Target/Day<br /><span className="text-[9px] normal-case font-normal text-white/40">(วันที่เหลือ)</span></th>
+                                <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right" title="เป้าที่ต้องทำต่อวัน สำหรับวันที่เหลือของเดือน = (เป้า − ยอดสะสม) ÷ วันที่เหลือ">Target/Day<br /><span className="text-[9px] normal-case font-normal text-white/40">(ขั้นบันได)</span></th>
                                 <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Actual Day</th>
                                 <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Diff Day</th>
                                 <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-center">% Ach Day</th>
@@ -1118,7 +1119,14 @@ export function StaffSection({
                                       {typeof row.yoyPercent === "number" ? fmtPct(row.yoyPercent) : row.yoyPercent}
                                     </span>
                                   </td>
-                                  <td className={`py-2.5 px-3 text-right ${isTotal ? "text-white" : "text-white/60"}`}>{fmtNum(row.targetDay)}</td>
+                                  <td className={`py-2.5 px-3 text-right ${isTotal ? "text-white" : "text-white/60"}`}>
+                                    <div>{fmtNum(row.targetDay)}</div>
+                                    {row.targetTierPct ? (
+                                      <div className="text-[9px] text-amber-300/80">→ {row.targetTierPct}%</div>
+                                    ) : (
+                                      <div className="text-[9px] text-emerald-400/80">ครบแล้ว</div>
+                                    )}
+                                  </td>
                                   <td className="py-2.5 px-3 text-right font-bold">{fmtNum(row.actualDay)}</td>
                                   <td className="py-2.5 px-3 text-right">
                                     <span className={getDiffClass(row.diffDay)}>
