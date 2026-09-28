@@ -79,7 +79,7 @@ import {
   calcAchievementPct,
   calcForecastByDays,
   calculateMetrics,
-  calcTargetToDate,
+  calcRequiredPerDay,
   calcTodayAchievementPct,
   normalizeId,
   rawTargetRowsToRecords,
@@ -2211,7 +2211,8 @@ function AppInternal({
         yoyPercent = ((actual - lastYear) / lastYear) * 100;
       }
       
-      const targetDay = calcTargetToDate(target, currentDay, totalDays);
+      // เป้าต่อวันสำหรับวันที่เหลือ (เทียบกับ "ยอดวันนี้" ได้ตรงความหมาย)
+      const targetDay = calcRequiredPerDay(target, actual, currentDay, totalDays);
       const diffDay = actualDay - targetDay;
       const achDayPercent = calcTodayAchievementPct(actualDay, targetDay);
       

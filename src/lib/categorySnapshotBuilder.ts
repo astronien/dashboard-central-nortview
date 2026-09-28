@@ -3,7 +3,7 @@ import { parseDocDate } from "./dateParser";
 import {
   calcAchievementPct,
   calcForecastByDays,
-  calcTargetToDate,
+  calcRequiredPerDay,
   calcTodayAchievementPct,
   normalizeId,
   toNumber,
@@ -299,7 +299,8 @@ export function buildCategorySnapshots(params: {
         : periodActual(lastYearRows);
 
     const forecast = calcForecastByDays(actual, currentDay, totalDays);
-    const targetToToday = calcTargetToDate(target, currentDay, totalDays);
+    // "Target per Day" = เป้าที่ต้องทำต่อวันสำหรับวันที่เหลือ
+    const targetToToday = calcRequiredPerDay(target, actual, currentDay, totalDays);
     const today =
       label === "Trade In" && tradeInData
         ? Number(tradeInData.today ?? 0)

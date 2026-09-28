@@ -46,6 +46,25 @@ export function calcTodayAchievementPct(actualToday: number, targetToDate: numbe
   return calcAchievementPct(actualToday, targetToDate);
 }
 
+/**
+ * เป้าที่ต้องทำ "ต่อวัน" สำหรับวันที่เหลือของเดือน เพื่อให้ถึงเป้าทั้งเดือน
+ *   = (เป้า − ยอดที่ทำได้แล้ว) ÷ จำนวนวันที่เหลือ
+ *
+ * ใช้แทนเป้าสะสมถึงวันนี้ (calcTargetToDate) ในคอลัมน์ที่เทียบกับ "ยอดวันนี้"
+ * เพราะเป้าสะสมเทียบกับยอดวันเดียวไม่ได้ ถ้าทำเกินเป้าแล้วจะคืน 0.
+ */
+export function calcRequiredPerDay(
+  target: number,
+  actual: number,
+  currentDay: number,
+  totalDays: number,
+): number {
+  if (!totalDays) return 0;
+  const remainingDays = Math.max(1, totalDays - currentDay);
+  const gap = Math.max(0, target - actual);
+  return gap / remainingDays;
+}
+
 export const toNumber = (value: unknown) =>
   Number(String(value ?? "").replace(/[^\d.-]/g, "")) || 0;
 
