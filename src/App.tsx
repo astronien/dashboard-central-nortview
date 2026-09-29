@@ -3268,10 +3268,13 @@ function AppInternal({
   });
   // ยอดขายสะสมรายหมวด × อัตราตามขั้น % achievement ของหมวดนั้น
   // เป้ารวมทั้งร้าน — ใช้เลือกช่วง scheme (1-5 / >5-10 / >10-20 / >20-30 / >30 MB)
-  const storeTargetTotal = useMemo(
-    () => combinedOfficerKpiData.rows.reduce((s, r) => s + (r.catTotal?.target ?? 0), 0),
-    [combinedOfficerKpiData],
-  );
+  // ใช้เป้าของสาขาโดยตรง ไม่ใช่ผลรวมจาก combinedOfficerKpiData เพราะตารางนั้น
+  // กรองคนที่ยังไม่มียอดขายออก ทำให้เป้ารวมต่ำกว่าจริง (ช่วงจะเพี้ยนตอนต้นเดือน)
+  const storeTargetTotal = useMemo(() => {
+    const fromBranches = parsedReport.branches.reduce((s, b) => s + (b.target ?? 0), 0);
+    if (fromBranches > 0) return fromBranches;
+    return combinedOfficerKpiData.rows.reduce((s, r) => s + (r.catTotal?.target ?? 0), 0);
+  }, [parsedReport.branches, combinedOfficerKpiData]);
   const commissionBand = useMemo(
     () => (commissionBandId ? findBandById(commissionBandId) : undefined) ?? findBandByTarget(storeTargetTotal),
     [commissionBandId, storeTargetTotal],
