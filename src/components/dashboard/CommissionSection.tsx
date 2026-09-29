@@ -6,7 +6,9 @@ import {
   SCHEME_BANDS,
   SCHEME_LABEL,
   getRate,
+  BACK_OFFICE_RATES,
   type CommissionStaffRow,
+  type CommissionSplit,
   type SchemeBand,
 } from "../../lib/commissionScheme";
 
@@ -26,14 +28,15 @@ const tierColor = (tierIndex: number): string =>
           : "bg-rose-500/20 text-rose-300";
 
 export const CommissionSection: React.FC<{
-  rows: CommissionStaffRow[];
+  rows: Array<CommissionStaffRow & { netCommission?: number }>;
+  split: CommissionSplit;
   band: SchemeBand;
   bandId: string;
   onBandChange: (id: string) => void;
   newScheme: boolean;
   onNewSchemeChange: (v: boolean) => void;
   storeTargetTotal: number;
-}> = ({ rows, band, bandId, onBandChange, newScheme, onNewSchemeChange, storeTargetTotal }) => {
+}> = ({ rows, split, band, bandId, onBandChange, newScheme, onNewSchemeChange, storeTargetTotal }) => {
   const grandTotal = rows.reduce((s, r) => s + r.totalCommission, 0);
 
   return (
@@ -47,7 +50,7 @@ export const CommissionSection: React.FC<{
             </h3>
           </div>
           <div className="text-right shrink-0">
-            <div className="text-[11px] text-white/50">รวมทั้งร้าน</div>
+            <div className="text-[11px] text-white/50">ก้อนใหญ่ (ค่าคอมรวม)</div>
             <div className="text-2xl font-extrabold text-emerald-300">฿{fmtBaht(grandTotal)}</div>
           </div>
         </div>
@@ -101,9 +104,12 @@ export const CommissionSection: React.FC<{
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-[10px] text-white/40">ค่าคอมรวม</div>
+                    <div className="text-[10px] text-white/40">ได้จริง (หลังแบ่งหลังบ้าน)</div>
                     <div className="text-xl font-extrabold text-emerald-300">
-                      ฿{fmtBaht2(staff.totalCommission)}
+                      ฿{fmtBaht2(staff.netCommission ?? staff.totalCommission)}
+                    </div>
+                    <div className="text-[10px] text-white/30">
+                      ตามสูตร ฿{fmtBaht2(staff.totalCommission)}
                     </div>
                   </div>
                 </div>
@@ -157,6 +163,76 @@ export const CommissionSection: React.FC<{
             ))}
           </div>
         )}
+      </div>
+
+      {/* การแบ่งก้อน: เซล vs หลังบ้าน */}
+      <div className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+        <h3 className="text-base font-bold tracking-tight text-white mb-1">
+          การแบ่งก้อนค่าคอม — เซล vs หลังบ้าน
+        </h3>
+        <p className="text-xs text-white/50 mb-4">
+          หักส่วนหลังบ้านตาม % ของแต่ละตำแหน่งจากก้อนใหญ่ก่อน ที่เหลือแบ่งให้เซลตามสัดส่วนค่าคอมของแต่ละคน
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+          <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+            <div className="text-[10px] text-white/40">ก้อนใหญ่</div>
+            <div className="text-xl font-extrabold text-white">฿{fmtBaht2(split.grossPool)}</div>
+          </div>
+          <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 p-4">
+            <div className="text-[10px] text-white/40">หลังบ้าน ({split.backOfficePct.toFixed(2)}%)</div>
+            <div className="text-xl font-extrabold text-amber-300">฿{fmtBaht2(split.backOfficeAmount)}</div>
+          </div>
+          <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-4">
+            <div className="text-[10px] text-white/40">
+              เซล ({(100 - split.backOfficePct).toFixed(2)}%)
+            </div>
+            <div className="text-xl font-extrabold text-emerald-300">฿{fmtBaht2(split.salesPool)}</div>
+          </div>
+        </div>
+
+        {split.backOffice.length === 0 ? (
+          <p className="text-xs text-rose-300/80">
+            ไม่พบพนักงานหลังบ้านในไฟล์เป้า (ตำแหน่ง BSM / ABM / Trainer / Presenter / PIS / Cashier) —
+            ตอนนี้ค่าคอมทั้งก้อนตกเป็นของเซลทั้งหมด
+          </p>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-emerald-500/10">
+            <table className="w-full text-left border-collapse text-[11px]">
+              <thead>
+                <tr className="bg-[#0c3123] border-b border-emerald-500/20 text-white/90">
+                  <th className="py-2 px-3 font-bold uppercase tracking-wider">พนักงานหลังบ้าน</th>
+                  <th className="py-2 px-3 font-bold uppercase tracking-wider">ตำแหน่ง</th>
+                  <th className="py-2 px-3 font-bold uppercase tracking-wider text-right">%</th>
+                  <th className="py-2 px-3 font-bold uppercase tracking-wider text-right">ได้รับ</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-emerald-500/10 bg-[#052b20]/60">
+                {split.backOffice.map((b, i) => (
+                  <tr key={`${b.staffId ?? b.name}-${i}`} className="text-white/90">
+                    <td className="py-1.5 px-3 font-bold">{b.name}</td>
+                    <td className="py-1.5 px-3">
+                      <span className="px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 font-bold">
+                        {b.position}
+                      </span>
+                    </td>
+                    <td className="py-1.5 px-3 text-right text-white/70">{b.ratePct.toFixed(2)}%</td>
+                    <td className="py-1.5 px-3 text-right font-extrabold text-amber-300">
+                      {fmtBaht2(b.amount)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="mt-3 text-[11px] text-white/40">
+          อัตราหลังบ้าน:{" "}
+          {Object.entries(BACK_OFFICE_RATES)
+            .map(([k, v]) => `${k} ${v}%`)
+            .join(" · ")}
+        </div>
       </div>
 
       {/* ตาราง Scheme อ้างอิง */}

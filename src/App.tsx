@@ -140,7 +140,10 @@ import {
   calcCategoryCommission,
   findBandByTarget,
   findBandById,
+  calcCommissionSplit,
+  normalizePosition,
   type CommissionStaffRow,
+  type CommissionSplit,
 } from "./lib/commissionScheme";
 import { TrendsSection } from "./components/dashboard/TrendsSection";
 import { saveTrendSnapshot } from "./lib/trendsApi";
@@ -3307,6 +3310,29 @@ function AppInternal({
       .sort((a, b) => b.totalCommission - a.totalCommission);
   }, [combinedOfficerKpiData, commissionBand, commissionNewScheme]);
 
+  // หลังบ้าน: ดึงจากรายชื่อพนักงาน (ตำแหน่งในไฟล์เป้า) ที่ไม่ใช่ PIA
+  const commissionSplit = useMemo<CommissionSplit>(() => {
+    const grossPool = commissionRows.reduce((s, r) => s + r.totalCommission, 0);
+    const backOfficeStaff = parsedReport.officers
+      .map((o) => ({
+        name: o.name,
+        staffId: o.staffId,
+        position: normalizePosition(o.position ?? ""),
+      }))
+      .filter((o) => o.position && o.position !== "PIA");
+    return calcCommissionSplit(grossPool, backOfficeStaff);
+  }, [commissionRows, parsedReport.officers]);
+
+  // ค่าคอมที่เซลได้จริง = ก้อนที่เหลือ × สัดส่วนค่าคอมของแต่ละคน
+  const commissionSalesRows = useMemo(() => {
+    const gross = commissionSplit.grossPool;
+    return commissionRows.map((r) => ({
+      ...r,
+      netCommission:
+        gross > 0 ? (commissionSplit.salesPool * r.totalCommission) / gross : 0,
+    }));
+  }, [commissionRows, commissionSplit]);
+
   // ─── รายงานยอดขาย + Attach รายวัน (วันล่าสุด) — รวมสาขา + รายคน ──────────
   const dailyBranchReport = useMemo<DailyReportData>(() => {
     const empty: DailyReportData = { latestDate: "", presets: [], rows: [] };
@@ -5158,7 +5184,8 @@ function AppInternal({
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
                 <CommissionSection
-                  rows={commissionRows}
+                  rows={commissionSalesRows}
+                  split={commissionSplit}
                   band={commissionBand}
                   bandId={commissionBandId}
                   onBandChange={(id) => {

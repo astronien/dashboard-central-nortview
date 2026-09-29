@@ -230,3 +230,86 @@ export function calcCategoryCommission(
     commission: (actual * ratePct) / 100,
   };
 }
+
+// ─── การแบ่งก้อนค่าคอม: เซล (PIA) vs หลังบ้าน ────────────────────────────
+//
+// หลักการ: คิดค่าคอมรวมได้ "1 ก้อน" (ผลรวมค่าคอมของเซลทุกคนตาม scheme)
+// จากนั้นหักส่วนของหลังบ้านออกจากก้อนใหญ่ตาม % ของแต่ละตำแหน่ง
+// ที่เหลือจึงแบ่งให้เซลตามสัดส่วนค่าคอมของแต่ละคน
+
+/** % ที่หลังบ้านได้จากก้อนใหญ่ (ต่อคน ต่อตำแหน่ง) */
+export const BACK_OFFICE_RATES: Record<string, number> = {
+  BSM: 10,
+  ABM: 8,
+  TRAINER: 6,
+  PRESENTER: 5.5,
+  PIS: 4.5,
+  CASHIER: 2.25,
+};
+
+/** แปลงชื่อตำแหน่งให้เป็นคีย์มาตรฐาน (รองรับสะกดต่างกัน/ภาษาไทย) */
+export function normalizePosition(raw: string): string {
+  const p = String(raw ?? "").trim().toUpperCase().replace(/[\s._-]+/g, "");
+  if (!p) return "";
+  if (p.startsWith("BSM")) return "BSM";
+  if (p.startsWith("ABM")) return "ABM";
+  if (p.startsWith("TRAIN")) return "TRAINER";
+  if (p.startsWith("PRESENT")) return "PRESENTER";
+  if (p === "PIS") return "PIS";
+  if (p.startsWith("CASH") || p.startsWith("CASHE") || p.includes("แคชเชียร")) return "CASHIER";
+  if (p.startsWith("PIA")) return "PIA";
+  return p;
+}
+
+export type BackOfficeRow = {
+  name: string;
+  staffId?: string;
+  position: string;
+  ratePct: number;
+  amount: number;
+};
+
+export type CommissionSplit = {
+  /** ก้อนใหญ่ = ผลรวมค่าคอมของเซลทุกคนตาม scheme */
+  grossPool: number;
+  backOffice: BackOfficeRow[];
+  /** % รวมที่หลังบ้านได้ */
+  backOfficePct: number;
+  backOfficeAmount: number;
+  /** ก้อนที่เหลือสำหรับเซล */
+  salesPool: number;
+};
+
+/**
+ * แบ่งก้อนค่าคอม: หักหลังบ้านตาม % แล้วคืนก้อนที่เหลือของเซล
+ * ถ้า % หลังบ้านรวมเกิน 100 จะตัดไม่ให้ก้อนเซลติดลบ
+ */
+export function calcCommissionSplit(
+  grossPool: number,
+  backOfficeStaff: Array<{ name: string; staffId?: string; position: string }>,
+): CommissionSplit {
+  const backOffice: BackOfficeRow[] = backOfficeStaff
+    .map((s) => {
+      const key = normalizePosition(s.position);
+      const ratePct = BACK_OFFICE_RATES[key] ?? 0;
+      return { name: s.name, staffId: s.staffId, position: key, ratePct, amount: 0 };
+    })
+    .filter((r) => r.ratePct > 0);
+
+  const rawPct = backOffice.reduce((s, r) => s + r.ratePct, 0);
+  const backOfficePct = Math.min(100, rawPct);
+  // ถ้าถูกตัดเพดาน ให้ลดตามสัดส่วนเพื่อไม่ให้เกินก้อน
+  const scale = rawPct > 100 ? 100 / rawPct : 1;
+  backOffice.forEach((r) => {
+    r.amount = (grossPool * r.ratePct * scale) / 100;
+  });
+
+  const backOfficeAmount = backOffice.reduce((s, r) => s + r.amount, 0);
+  return {
+    grossPool,
+    backOffice,
+    backOfficePct,
+    backOfficeAmount,
+    salesPool: Math.max(0, grossPool - backOfficeAmount),
+  };
+}
