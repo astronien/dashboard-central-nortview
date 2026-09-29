@@ -138,6 +138,8 @@ import { CommissionSection } from "./components/dashboard/CommissionSection";
 import {
   COMMISSION_CATEGORIES,
   calcCategoryCommission,
+  findBandByTarget,
+  findBandById,
   type CommissionStaffRow,
 } from "./lib/commissionScheme";
 import { TrendsSection } from "./components/dashboard/TrendsSection";
@@ -3249,14 +3251,45 @@ function AppInternal({
   ]);
 
   // ─── ค่าคอมมิชชั่น (PIA Individual) ─────────────────────────────────────
+  // "" = เลือกช่วงอัตโนมัติจากเป้ารวมของร้าน
+  const [commissionBandId, setCommissionBandId] = useState<string>(() => {
+    try {
+      return localStorage.getItem("dashboard-commission-band") ?? "";
+    } catch {
+      return "";
+    }
+  });
+  const [commissionNewScheme, setCommissionNewScheme] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("dashboard-commission-newscheme") === "1";
+    } catch {
+      return false;
+    }
+  });
   // ยอดขายสะสมรายหมวด × อัตราตามขั้น % achievement ของหมวดนั้น
+  // เป้ารวมทั้งร้าน — ใช้เลือกช่วง scheme (1-5 / >5-10 / >10-20 / >20-30 / >30 MB)
+  const storeTargetTotal = useMemo(
+    () => combinedOfficerKpiData.rows.reduce((s, r) => s + (r.catTotal?.target ?? 0), 0),
+    [combinedOfficerKpiData],
+  );
+  const commissionBand = useMemo(
+    () => (commissionBandId ? findBandById(commissionBandId) : undefined) ?? findBandByTarget(storeTargetTotal),
+    [commissionBandId, storeTargetTotal],
+  );
+
   const commissionRows = useMemo<CommissionStaffRow[]>(() => {
     return combinedOfficerKpiData.rows
       .filter((r) => String((r.officer as { position?: string }).position ?? "").toUpperCase() === "PIA")
       .map((r) => {
         const categories = COMMISSION_CATEGORIES.map((cat) => {
           const c = r.cats[cat];
-          return calcCategoryCommission(cat, c?.actual ?? 0, c?.target ?? 0);
+          return calcCategoryCommission(
+            commissionBand,
+            cat,
+            c?.actual ?? 0,
+            c?.target ?? 0,
+            commissionNewScheme,
+          );
         });
         return {
           name: r.officer.name,
@@ -3264,11 +3297,12 @@ function AppInternal({
           branch: r.officer.branch,
           categories,
           totalActual: categories.reduce((s, c) => s + c.actual, 0),
+          totalTarget: categories.reduce((s, c) => s + c.target, 0),
           totalCommission: categories.reduce((s, c) => s + c.commission, 0),
         };
       })
       .sort((a, b) => b.totalCommission - a.totalCommission);
-  }, [combinedOfficerKpiData]);
+  }, [combinedOfficerKpiData, commissionBand, commissionNewScheme]);
 
   // ─── รายงานยอดขาย + Attach รายวัน (วันล่าสุด) — รวมสาขา + รายคน ──────────
   const dailyBranchReport = useMemo<DailyReportData>(() => {
@@ -5120,7 +5154,29 @@ function AppInternal({
                 transition={{ duration: 0.4, ease: "easeOut" }}
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
-                <CommissionSection rows={commissionRows} />
+                <CommissionSection
+                  rows={commissionRows}
+                  band={commissionBand}
+                  bandId={commissionBandId}
+                  onBandChange={(id) => {
+                    setCommissionBandId(id);
+                    try {
+                      localStorage.setItem("dashboard-commission-band", id);
+                    } catch {
+                      /* ignore */
+                    }
+                  }}
+                  newScheme={commissionNewScheme}
+                  onNewSchemeChange={(v) => {
+                    setCommissionNewScheme(v);
+                    try {
+                      localStorage.setItem("dashboard-commission-newscheme", v ? "1" : "0");
+                    } catch {
+                      /* ignore */
+                    }
+                  }}
+                  storeTargetTotal={storeTargetTotal}
+                />
               </motion.div>
             )}
             {!isPia && currentView === "runrate" && (

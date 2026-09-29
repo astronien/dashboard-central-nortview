@@ -2,9 +2,12 @@ import React from "react";
 import { Wallet } from "lucide-react";
 import {
   COMMISSION_CATEGORIES,
-  COMMISSION_RATES,
   COMMISSION_TIERS,
+  SCHEME_BANDS,
+  SCHEME_LABEL,
+  getRate,
   type CommissionStaffRow,
+  type SchemeBand,
 } from "../../lib/commissionScheme";
 
 const fmtBaht = (n: number) => Math.round(n).toLocaleString();
@@ -24,8 +27,13 @@ const tierColor = (tierIndex: number): string =>
 
 export const CommissionSection: React.FC<{
   rows: CommissionStaffRow[];
-  periodLabel?: string;
-}> = ({ rows, periodLabel }) => {
+  band: SchemeBand;
+  bandId: string;
+  onBandChange: (id: string) => void;
+  newScheme: boolean;
+  onNewSchemeChange: (v: boolean) => void;
+  storeTargetTotal: number;
+}> = ({ rows, band, bandId, onBandChange, newScheme, onNewSchemeChange, storeTargetTotal }) => {
   const grandTotal = rows.reduce((s, r) => s + r.totalCommission, 0);
 
   return (
@@ -43,10 +51,41 @@ export const CommissionSection: React.FC<{
             <div className="text-2xl font-extrabold text-emerald-300">฿{fmtBaht(grandTotal)}</div>
           </div>
         </div>
-        <p className="text-xs text-white/50 mb-4">
-          คิดจากยอดขายสะสม {periodLabel ? `(${periodLabel})` : ""} × อัตราตามขั้น % achievement ของแต่ละหมวด ·
-          เฉพาะพนักงานขาย (PIA) · ต่ำกว่า 70% ไม่ได้ค่าคอม
+        <p className="text-xs text-white/50 mb-3">
+          คิดจากยอดขายสะสม × อัตราตามขั้น % achievement ของแต่ละหมวด · เฉพาะพนักงานขาย (PIA) ·
+          ต่ำกว่า 70% ไม่ได้ค่าคอม
         </p>
+
+        <div className="flex flex-wrap items-center gap-3 mb-4 text-xs">
+          <label className="flex items-center gap-2">
+            <span className="text-white/50">ช่วง Scheme:</span>
+            <select
+              value={bandId}
+              onChange={(e) => onBandChange(e.target.value)}
+              className="bg-[#051710] border border-white/15 rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-emerald-400"
+            >
+              <option value="">อัตโนมัติจากเป้ารวมร้าน</option>
+              {SCHEME_BANDS.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <span className="text-white/40">
+            ใช้อยู่: <span className="text-emerald-300 font-semibold">{band.label}</span>
+            {" · "}เป้ารวมร้าน {(storeTargetTotal / 1_000_000).toFixed(2)} MB
+          </span>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={newScheme}
+              onChange={(e) => onNewSchemeChange(e.target.checked)}
+              className="accent-emerald-500"
+            />
+            <span className="text-white/70">ใช้ New Scheme (iPad / iPhone)</span>
+          </label>
+        </div>
 
         {rows.length === 0 ? (
           <p className="text-sm text-white/40 py-8 text-center">ยังไม่มีข้อมูลพนักงานขาย (PIA)</p>
@@ -123,7 +162,8 @@ export const CommissionSection: React.FC<{
       {/* ตาราง Scheme อ้างอิง */}
       <div className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
         <h3 className="text-base font-bold tracking-tight text-white mb-3">
-          ตาราง Scheme (PIA Individual)
+          {band.label}
+          {newScheme ? <span className="text-emerald-300 text-xs ml-2">· New Scheme (iPad/iPhone)</span> : null}
         </h3>
         <div className="overflow-x-auto rounded-xl border border-emerald-500/10">
           <table className="w-full text-left border-collapse text-[11px]">
@@ -132,7 +172,7 @@ export const CommissionSection: React.FC<{
                 <th className="py-2 px-3 font-bold uppercase tracking-wider">% ach step</th>
                 {COMMISSION_CATEGORIES.map((c) => (
                   <th key={c} className="py-2 px-3 font-bold uppercase tracking-wider text-right">
-                    {c === "BTB" ? "BTB(3rd Party)" : c}
+                    {SCHEME_LABEL[c]}
                   </th>
                 ))}
               </tr>
@@ -143,7 +183,7 @@ export const CommissionSection: React.FC<{
                   <td className="py-1.5 px-3 font-bold">{tier.label}</td>
                   {COMMISSION_CATEGORIES.map((c) => (
                     <td key={c} className="py-1.5 px-3 text-right">
-                      {(COMMISSION_RATES[c]?.[i] ?? 0).toFixed(2)}%
+                      {getRate(band, c, i, newScheme).toFixed(2)}%
                     </td>
                   ))}
                 </tr>
