@@ -496,6 +496,9 @@ const latestDayFromKeys = (dayKeys: Iterable<string>): string => {
   return all.length ? all[0] : "";
 };
 
+/** ชื่อหมวด "อื่นๆ" — ยอดที่ไม่เข้า 6 หมวดหลัก */
+const OTHER_CAT = "อื่นๆ";
+
 const ATTACH_ITEM_HINT =
   /cover|film|case|care|glass|adapter|cable|sim|pencil|airpod|strap|bag|charger|power|protect|smile|ufund/i;
 
@@ -2830,6 +2833,27 @@ function AppInternal({
           catTargetSum += kpi.target;
         });
 
+        // "อื่นๆ" — ยอดที่ไม่เข้า 6 หมวดหลัก (SIM/Smile/หมวดที่ไม่ได้จัดกลุ่ม)
+        // ต้องนับเข้ายอดรวมด้วย ไม่งั้น TOTAL ของตารางนี้จะน้อยกว่าที่แสดงใน
+        // staff profile (ซึ่งมีแถว "อื่นๆ" แล้ว) และไม่ตรงกับระบบหลังบ้าน
+        const nIdCat = normalizeId(officerId);
+        let officerAllActual = 0;
+        for (const row of displayUploads.current) {
+          const rowOfficerId = String(row["STAFF ID"] ?? row.emp_id ?? "").trim();
+          const oName = String(row["Officer (Name)"] ?? "").trim();
+          const isMine =
+            (Boolean(nIdCat) &&
+              Boolean(rowOfficerId) &&
+              normalizeId(rowOfficerId) === nIdCat) ||
+            matchesOfficer(oName, officer.name);
+          if (isMine) officerAllActual += getCategoryValue(row);
+        }
+        const otherActual = Math.max(0, officerAllActual - catActualSum);
+        if (otherActual > 0.5) {
+          cats[OTHER_CAT] = { actual: otherActual, target: 0, achPercent: 0 };
+          catActualSum += otherActual;
+        }
+
         const officerBills = allBills.filter((b) => matchesOfficer(b.officerName, officer.name));
         // ฐาน iPhone ให้ตรงกับตัวเลขที่โชว์ใน COVERPLUS เป๊ะ (ใช้ billsWithB —
         // ฝั่ง iPhone — ของ preset Cover Plus ตัวเดียวกัน) เพื่อให้ทั้ง Trade-In
@@ -2919,7 +2943,11 @@ function AppInternal({
       )
       .sort((a, b) => b.catTotal.actual - a.catTotal.actual);
 
-    return { categories: categoriesList, presets: wonderPresets, rows };
+    // โชว์คอลัมน์ "อื่นๆ" เฉพาะเมื่อมีใครมียอดตกนอก 6 หมวดจริงๆ
+    const hasOther = rows.some((r) => (r.cats[OTHER_CAT]?.actual ?? 0) > 0);
+    const cols = hasOther ? [...categoriesList, OTHER_CAT] : categoriesList;
+
+    return { categories: cols, presets: wonderPresets, rows };
   }, [
     kpiPresets,
     displayUploads.current,
