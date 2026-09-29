@@ -105,27 +105,35 @@ export const saveHiddenStaffIds = async (
   }
 };
 
-/** จำนวนพนักงานหลังบ้านต่อตำแหน่ง (ใช้แบ่งก้อนค่าคอม) */
-export const fetchBackOfficeCounts = async (): Promise<Record<string, number>> => {
+/** จำนวนคน + อัตรา % ของพนักงานหลังบ้าน (ใช้แบ่งก้อนค่าคอม) */
+export type BackOfficeConfig = {
+  counts: Record<string, number>;
+  rates: Record<string, number>;
+};
+
+export const fetchBackOfficeConfig = async (): Promise<BackOfficeConfig> => {
   try {
     const res = await fetch(`${API_URL}?resource=backoffice`);
-    if (!res.ok) return {};
+    if (!res.ok) return { counts: {}, rates: {} };
     const json = await res.json();
-    return json?.counts && typeof json.counts === "object" ? json.counts : {};
+    return {
+      counts: json?.counts && typeof json.counts === "object" ? json.counts : {},
+      rates: json?.rates && typeof json.rates === "object" ? json.rates : {},
+    };
   } catch {
-    return {};
+    return { counts: {}, rates: {} };
   }
 };
 
-export const saveBackOfficeCounts = async (
-  counts: Record<string, number>,
+export const saveBackOfficeConfig = async (
+  cfg: BackOfficeConfig,
   updatedBy?: string,
 ): Promise<boolean> => {
   try {
     const res = await fetch(`${API_URL}?resource=backoffice`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ counts, updatedBy }),
+      body: JSON.stringify({ ...cfg, updatedBy }),
     });
     const json = await res.json().catch(() => null);
     return Boolean(res.ok && json?.ok);

@@ -54,39 +54,33 @@ async function handleBackOffice(req, res) {
   if (req.method === "GET") {
     try {
       const cfg = await getAppConfig(BACK_OFFICE_KEY);
-      const counts = cfg && cfg.value ? JSON.parse(cfg.value) : {};
-      return res.status(200).json({ ok: true, counts: counts && typeof counts === "object" ? counts : {} });
+      const parsed = cfg && cfg.value ? JSON.parse(cfg.value) : {};
+      // รูปแบบเดิมเก็บเป็น { BSM: 1, ... } ตรงๆ — รองรับย้อนหลัง
+      const hasShape = parsed && typeof parsed === "object" && ("counts" in parsed || "rates" in parsed);
+      const counts = hasShape ? parsed.counts ?? {} : parsed ?? {};
+      const rates = hasShape ? parsed.rates ?? {} : {};
+      return res.status(200).json({ ok: true, counts, rates });
     } catch {
-      return res.status(200).json({ ok: true, counts: {} });
+      return res.status(200).json({ ok: true, counts: {}, rates: {} });
     }
   }
   if (req.method === "PUT" || req.method === "POST") {
-    const raw = req.body?.counts && typeof req.body.counts === "object" ? req.body.counts : {};
+    const rawCounts = req.body?.counts && typeof req.body.counts === "object" ? req.body.counts : {};
+    const rawRates = req.body?.rates && typeof req.body.rates === "object" ? req.body.rates : {};
     const counts = {};
-    for (const [k, v] of Object.entries(raw)) {
-      const n = Math.max(0, Math.floor(Number(v) || 0));
-      counts[String(k).toUpperCase()] = n;
+    for (const [k, v] of Object.entries(rawCounts)) {
+      counts[String(k).toUpperCase()] = Math.max(0, Math.floor(Number(v) || 0));
     }
-    await setAppConfig(BACK_OFFICE_KEY, JSON.stringify(counts), req.body?.updatedBy ?? null);
-    return res.status(200).json({ ok: true });
-  }
-  return res.status(405).json({ ok: false, error: "Method not allowed" });
-}
-
-async function handleVisibleStaff(req, res) {
-  const { getAppConfig, setAppConfig } = require("./_lib/tursoClient");
-  if (req.method === "GET") {
-    try {
-      const cfg = await getAppConfig(HIDDEN_STAFF_KEY);
-      const hidden = cfg && cfg.value ? JSON.parse(cfg.value) : [];
-      return res.status(200).json({ ok: true, hidden: Array.isArray(hidden) ? hidden : [] });
-    } catch {
-      return res.status(200).json({ ok: true, hidden: [] });
+    const rates = {};
+    for (const [k, v] of Object.entries(rawRates)) {
+      const n = Number(v);
+      if (Number.isFinite(n) && n >= 0) rates[String(k).toUpperCase()] = n;
     }
-  }
-  if (req.method === "PUT" || req.method === "POST") {
-    const list = Array.isArray(req.body?.hidden) ? req.body.hidden.map(String) : [];
-    await setAppConfig(HIDDEN_STAFF_KEY, JSON.stringify(list), req.body?.updatedBy ?? null);
+    await setAppConfig(
+      BACK_OFFICE_KEY,
+      JSON.stringify({ counts, rates }),
+      req.body?.updatedBy ?? null,
+    );
     return res.status(200).json({ ok: true });
   }
   return res.status(405).json({ ok: false, error: "Method not allowed" });

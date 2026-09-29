@@ -49,7 +49,7 @@ export function SettingsSection({
   onCategoryTargetsChanged?: () => void;
   tradeBranchMapping?: Record<string, string>;
   onStaffVisibilityChange?: (hidden: string[]) => void;
-  onBackOfficeChange?: (counts: Record<string, number>) => void;
+  onBackOfficeChange?: (cfg: { counts: Record<string, number>; rates: Record<string, number> }) => void;
   onTradeBranchMappingChange?: (mapping: Record<string, string>) => void;
 }) {
   return (

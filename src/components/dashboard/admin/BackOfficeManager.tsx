@@ -1,6 +1,10 @@
 import React from "react";
 import { Users2, Save, CheckCircle2, AlertCircle } from "lucide-react";
-import { fetchBackOfficeCounts, saveBackOfficeCounts } from "../../../lib/staffPhotosApi";
+import {
+  fetchBackOfficeConfig,
+  saveBackOfficeConfig,
+  type BackOfficeConfig,
+} from "../../../lib/staffPhotosApi";
 import {
   BACK_OFFICE_POSITIONS,
   BACK_OFFICE_RATES,
@@ -25,16 +29,18 @@ export function BackOfficeManager({
   onChange,
 }: {
   updatedBy?: string;
-  onChange?: (counts: Record<string, number>) => void;
+  onChange?: (cfg: BackOfficeConfig) => void;
 }) {
   const [counts, setCounts] = React.useState<Record<string, number>>(EMPTY_BACK_OFFICE_COUNTS);
+  const [rates, setRates] = React.useState<Record<string, number>>(() => ({ ...BACK_OFFICE_RATES }));
   const [saving, setSaving] = React.useState(false);
   const [msg, setMsg] = React.useState<{ ok: boolean; text: string } | null>(null);
 
   React.useEffect(() => {
-    void fetchBackOfficeCounts().then((c) =>
-      setCounts({ ...EMPTY_BACK_OFFICE_COUNTS, ...c }),
-    );
+    void fetchBackOfficeConfig().then((cfg) => {
+      setCounts({ ...EMPTY_BACK_OFFICE_COUNTS, ...cfg.counts });
+      setRates({ ...BACK_OFFICE_RATES, ...cfg.rates });
+    });
   }, []);
 
   const setOne = (pos: string, v: string) => {
@@ -43,20 +49,32 @@ export function BackOfficeManager({
     setMsg(null);
   };
 
+  const setRate = (pos: string, v: string) => {
+    const n = Math.max(0, Number(v) || 0);
+    setRates((prev) => ({ ...prev, [pos]: n }));
+    setMsg(null);
+  };
+
+  const resetRates = () => {
+    setRates({ ...BACK_OFFICE_RATES });
+    setMsg(null);
+  };
+
   const totalPct = BACK_OFFICE_POSITIONS.reduce(
-    (s, p) => s + (BACK_OFFICE_RATES[p] ?? 0) * (counts[p] ?? 0),
+    (s, p) => s + (rates[p] ?? 0) * (counts[p] ?? 0),
     0,
   );
 
   const handleSave = async () => {
     setSaving(true);
-    const ok = await saveBackOfficeCounts(counts, updatedBy);
+    const cfg = { counts, rates };
+    const ok = await saveBackOfficeConfig(cfg, updatedBy);
     setSaving(false);
     setMsg({
       ok,
       text: ok ? "บันทึกแล้ว — หน้า Commission จะคิดส่วนแบ่งใหม่" : "บันทึกไม่สำเร็จ",
     });
-    if (ok) onChange?.(counts);
+    if (ok) onChange?.(cfg);
   };
 
   return (
@@ -83,10 +101,8 @@ export function BackOfficeManager({
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
         {BACK_OFFICE_POSITIONS.map((pos) => (
           <div key={pos} className="rounded-xl border border-white/10 bg-black/20 p-3">
-            <div className="text-sm font-semibold text-white">{LABEL[pos] ?? pos}</div>
-            <div className="text-[10px] text-white/40 mb-2">
-              {(BACK_OFFICE_RATES[pos] ?? 0).toFixed(2)}% ต่อคน
-            </div>
+            <div className="text-sm font-semibold text-white mb-2">{LABEL[pos] ?? pos}</div>
+            <label className="block text-[10px] text-white/40 mb-1">จำนวนคน</label>
             <input
               type="number"
               min={0}
@@ -95,6 +111,23 @@ export function BackOfficeManager({
               onChange={(e) => setOne(pos, e.target.value)}
               className="w-full bg-[#051710] border border-white/15 rounded-lg px-2 py-1.5 text-white text-sm focus:outline-none focus:border-amber-400"
             />
+            <label className="block text-[10px] text-white/40 mt-2 mb-1">% ต่อคน</label>
+            <div className="relative">
+              <input
+                type="number"
+                min={0}
+                step={0.25}
+                value={rates[pos] ?? 0}
+                onChange={(e) => setRate(pos, e.target.value)}
+                className="w-full bg-[#051710] border border-white/15 rounded-lg pl-2 pr-6 py-1.5 text-white text-sm focus:outline-none focus:border-amber-400"
+              />
+              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-white/30">%</span>
+            </div>
+            {(rates[pos] ?? 0) !== (BACK_OFFICE_RATES[pos] ?? 0) ? (
+              <div className="text-[9px] text-amber-300/70 mt-1">
+                เดิม {(BACK_OFFICE_RATES[pos] ?? 0).toFixed(2)}%
+              </div>
+            ) : null}
           </div>
         ))}
       </div>
@@ -112,6 +145,13 @@ export function BackOfficeManager({
             {Math.max(0, 100 - totalPct).toFixed(2)}%
           </span>
         </span>
+        <button
+          type="button"
+          onClick={resetRates}
+          className="text-xs text-white/40 underline hover:text-white/70"
+        >
+          คืนค่า % เริ่มต้น
+        </button>
         {totalPct > 100 ? (
           <span className="text-rose-300 text-xs">
             เกิน 100% — ระบบจะลดตามสัดส่วนไม่ให้ก้อนเซลติดลบ

@@ -99,7 +99,8 @@ import {
   saveStaffPhoto,
   fetchHiddenStaffIds,
   saveHiddenStaffIds,
-  fetchBackOfficeCounts,
+  fetchBackOfficeConfig,
+  type BackOfficeConfig,
 } from "./lib/staffPhotosApi";
 import {
   computeAttachRateRows,
@@ -1747,11 +1748,16 @@ function AppInternal({
     void fetchHiddenStaffIds().then(setHiddenStaffIds);
   }, []);
   // จำนวนพนักงานหลังบ้านต่อตำแหน่ง (ตั้งค่าในหน้า Settings)
-  const [backOfficeCounts, setBackOfficeCounts] =
-    useState<Record<string, number>>(EMPTY_BACK_OFFICE_COUNTS);
+  const [backOfficeCfg, setBackOfficeCfg] = useState<BackOfficeConfig>({
+    counts: EMPTY_BACK_OFFICE_COUNTS,
+    rates: {},
+  });
   useEffect(() => {
-    void fetchBackOfficeCounts().then((c) =>
-      setBackOfficeCounts({ ...EMPTY_BACK_OFFICE_COUNTS, ...c }),
+    void fetchBackOfficeConfig().then((cfg) =>
+      setBackOfficeCfg({
+        counts: { ...EMPTY_BACK_OFFICE_COUNTS, ...cfg.counts },
+        rates: cfg.rates ?? {},
+      }),
     );
   }, []);
   const isStaffHidden = React.useCallback(
@@ -3350,8 +3356,8 @@ function AppInternal({
   // หลังบ้าน: ใช้จำนวนคนที่กรอกไว้ในหน้า Settings
   const commissionSplit = useMemo<CommissionSplit>(() => {
     const grossPool = commissionRows.reduce((s, r) => s + r.totalCommission, 0);
-    return calcCommissionSplit(grossPool, backOfficeCounts);
-  }, [commissionRows, backOfficeCounts]);
+    return calcCommissionSplit(grossPool, backOfficeCfg.counts, backOfficeCfg.rates);
+  }, [commissionRows, backOfficeCfg]);
 
   // ค่าคอมที่เซลได้จริง = ก้อนที่เหลือ × สัดส่วนค่าคอมของแต่ละคน
   const commissionSalesRows = useMemo(() => {
@@ -5322,7 +5328,7 @@ function AppInternal({
                   sheetBranches={combinedBranches}
                   staffRoster={staffRoster}
                   onStaffVisibilityChange={setHiddenStaffIds}
-                  onBackOfficeChange={setBackOfficeCounts}
+                  onBackOfficeChange={setBackOfficeCfg}
                   staffPhotos={Object.fromEntries(
                     Object.entries(reconciledStaffPhotos).map(([id, record]) => [id, (record as any).photoUrl]),
                   )}

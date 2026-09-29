@@ -313,12 +313,18 @@ export const EMPTY_BACK_OFFICE_COUNTS: BackOfficeCounts = {
 export function calcCommissionSplit(
   grossPool: number,
   counts: BackOfficeCounts,
+  /** อัตราที่ปรับเองจากหน้า Settings — ไม่ระบุจะใช้ค่าเริ่มต้น */
+  rates?: Record<string, number>,
 ): CommissionSplit {
   const backOffice: BackOfficeRow[] = BACK_OFFICE_POSITIONS.map((pos) => {
     const count = Math.max(0, Math.floor(Number(counts?.[pos] ?? 0)));
-    const ratePct = BACK_OFFICE_RATES[pos] ?? 0;
+    const override = rates?.[pos];
+    const ratePct =
+      typeof override === "number" && Number.isFinite(override) && override >= 0
+        ? override
+        : BACK_OFFICE_RATES[pos] ?? 0;
     return { position: pos, count, ratePct, totalPct: ratePct * count, amount: 0 };
-  }).filter((r) => r.count > 0);
+  }).filter((r) => r.count > 0 && r.ratePct > 0);
 
   const rawPct = backOffice.reduce((s, r) => s + r.totalPct, 0);
   const backOfficePct = Math.min(100, rawPct);
