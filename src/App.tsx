@@ -24,6 +24,7 @@ import {
   Trash2,
   Rocket,
   Smartphone,
+  Wallet,
   Tablet,
   ShieldCheck,
   Award,
@@ -133,6 +134,12 @@ import {
   type DailyWonderCell,
 } from "./components/dashboard/DailyKpiTable";
 import { AttachQuotaSection, type AttachQuotaData } from "./components/dashboard/AttachQuotaSection";
+import { CommissionSection } from "./components/dashboard/CommissionSection";
+import {
+  COMMISSION_CATEGORIES,
+  calcCategoryCommission,
+  type CommissionStaffRow,
+} from "./lib/commissionScheme";
 import { TrendsSection } from "./components/dashboard/TrendsSection";
 import { saveTrendSnapshot } from "./lib/trendsApi";
 import { RunRateSection } from "./components/dashboard/RunRateSection";
@@ -1309,7 +1316,7 @@ function AppInternal({
 }) {
   const { user, logout, isPia } = useAuth();
   const [currentView, setCurrentView] = useState<
-    "home" | "staff" | "settings" | "reports" | "kpi_preset" | "analysis" | "trends" | "runrate"
+    "home" | "staff" | "settings" | "reports" | "kpi_preset" | "analysis" | "trends" | "runrate" | "commission"
   >("home");
 
   // Light / dark theme. Applied as a `theme-light` class on <html> so a
@@ -2748,9 +2755,14 @@ function AppInternal({
     const enriched = enrichSalesRowsWithCatDaily(displayUploads.current, lookup);
     const allBills = parseBills(enriched);
 
-    const officerList: Array<{ name: string; branch: string; staffId?: string }> =
+    const officerList: Array<{ name: string; branch: string; staffId?: string; position?: string }> =
       parsedReport.officers.length > 0
-        ? parsedReport.officers.map((o) => ({ name: o.name, branch: o.branch, staffId: o.staffId }))
+        ? parsedReport.officers.map((o) => ({
+            name: o.name,
+            branch: o.branch,
+            staffId: o.staffId,
+            position: o.position,
+          }))
         : Array.from(
             new Map(
               allBills
@@ -2967,9 +2979,14 @@ function AppInternal({
       return n;
     };
 
-    const officerList: Array<{ name: string; branch: string; staffId?: string }> =
+    const officerList: Array<{ name: string; branch: string; staffId?: string; position?: string }> =
       parsedReport.officers.length > 0
-        ? parsedReport.officers.map((o) => ({ name: o.name, branch: o.branch, staffId: o.staffId }))
+        ? parsedReport.officers.map((o) => ({
+            name: o.name,
+            branch: o.branch,
+            staffId: o.staffId,
+            position: o.position,
+          }))
         : Array.from(
             new Map(
               latestBills
@@ -3145,9 +3162,14 @@ function AppInternal({
     const ufundPreset = kpiPresets.find((p) => /ufund/i.test(p.name));
     const dummyCtx = { tradeInCount: 0, iphoneUnits: 0 };
 
-    const officerList: Array<{ name: string; branch: string; staffId?: string }> =
+    const officerList: Array<{ name: string; branch: string; staffId?: string; position?: string }> =
       parsedReport.officers.length > 0
-        ? parsedReport.officers.map((o) => ({ name: o.name, branch: o.branch, staffId: o.staffId }))
+        ? parsedReport.officers.map((o) => ({
+            name: o.name,
+            branch: o.branch,
+            staffId: o.staffId,
+            position: o.position,
+          }))
         : Array.from(
             new Map(
               displayUploads.current
@@ -3225,6 +3247,28 @@ function AppInternal({
     kpiPresets,
     iphoneUnitsFromBills,
   ]);
+
+  // ─── ค่าคอมมิชชั่น (PIA Individual) ─────────────────────────────────────
+  // ยอดขายสะสมรายหมวด × อัตราตามขั้น % achievement ของหมวดนั้น
+  const commissionRows = useMemo<CommissionStaffRow[]>(() => {
+    return combinedOfficerKpiData.rows
+      .filter((r) => String((r.officer as { position?: string }).position ?? "").toUpperCase() === "PIA")
+      .map((r) => {
+        const categories = COMMISSION_CATEGORIES.map((cat) => {
+          const c = r.cats[cat];
+          return calcCategoryCommission(cat, c?.actual ?? 0, c?.target ?? 0);
+        });
+        return {
+          name: r.officer.name,
+          staffId: (r.officer as { staffId?: string }).staffId,
+          branch: r.officer.branch,
+          categories,
+          totalActual: categories.reduce((s, c) => s + c.actual, 0),
+          totalCommission: categories.reduce((s, c) => s + c.commission, 0),
+        };
+      })
+      .sort((a, b) => b.totalCommission - a.totalCommission);
+  }, [combinedOfficerKpiData]);
 
   // ─── รายงานยอดขาย + Attach รายวัน (วันล่าสุด) — รวมสาขา + รายคน ──────────
   const dailyBranchReport = useMemo<DailyReportData>(() => {
@@ -4786,6 +4830,13 @@ function AppInternal({
                     <PieChart className="w-5 h-5" />
                   </button>
                   <button
+                    onClick={() => setCurrentView("commission")}
+                    className={`p-2 rounded-full transition-colors ${currentView === "commission" ? "bg-[#0f4430] shadow-inner text-white" : "text-white/60 hover:text-white"}`}
+                    title="ค่าคอมมิชชั่น (PIA)"
+                  >
+                    <Wallet className="w-5 h-5" />
+                  </button>
+                  <button
                     onClick={() => setCurrentView("kpi_preset")}
                     className={`p-2 rounded-full transition-colors ${currentView === "kpi_preset" ? "bg-[#0f4430] shadow-inner text-white" : "text-white/60 hover:text-white"}`}
                     title="KPI Preset"
@@ -5058,6 +5109,18 @@ function AppInternal({
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
                 <TrendsSection branch={selectedBranch} />
+              </motion.div>
+            )}
+            {!isPia && currentView === "commission" && (
+              <motion.div
+                key="commission"
+                initial={{ opacity: 0, scale: 0.96, filter: "blur(8px)" }}
+                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+                exit={{ opacity: 0, scale: 1.04, filter: "blur(8px)" }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+                className="flex flex-col gap-6 w-full h-full relative z-20"
+              >
+                <CommissionSection rows={commissionRows} />
               </motion.div>
             )}
             {!isPia && currentView === "runrate" && (
