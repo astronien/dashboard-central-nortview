@@ -44,6 +44,34 @@ const parsePhotoBody = (body) => {
 //   GET  /api/staff-photos?resource=visible-staff → { hidden: string[] }
 //   PUT  /api/staff-photos?resource=visible-staff   body: { hidden: string[] }
 const HIDDEN_STAFF_KEY = "hidden_staff_ids";
+// จำนวนพนักงานหลังบ้านต่อตำแหน่ง (ใช้แบ่งก้อนค่าคอม)
+//   GET  /api/staff-photos?resource=backoffice → { counts: {...} }
+//   PUT  /api/staff-photos?resource=backoffice   body: { counts: {...} }
+const BACK_OFFICE_KEY = "back_office_counts";
+
+async function handleBackOffice(req, res) {
+  const { getAppConfig, setAppConfig } = require("./_lib/tursoClient");
+  if (req.method === "GET") {
+    try {
+      const cfg = await getAppConfig(BACK_OFFICE_KEY);
+      const counts = cfg && cfg.value ? JSON.parse(cfg.value) : {};
+      return res.status(200).json({ ok: true, counts: counts && typeof counts === "object" ? counts : {} });
+    } catch {
+      return res.status(200).json({ ok: true, counts: {} });
+    }
+  }
+  if (req.method === "PUT" || req.method === "POST") {
+    const raw = req.body?.counts && typeof req.body.counts === "object" ? req.body.counts : {};
+    const counts = {};
+    for (const [k, v] of Object.entries(raw)) {
+      const n = Math.max(0, Math.floor(Number(v) || 0));
+      counts[String(k).toUpperCase()] = n;
+    }
+    await setAppConfig(BACK_OFFICE_KEY, JSON.stringify(counts), req.body?.updatedBy ?? null);
+    return res.status(200).json({ ok: true });
+  }
+  return res.status(405).json({ ok: false, error: "Method not allowed" });
+}
 
 async function handleVisibleStaff(req, res) {
   const { getAppConfig, setAppConfig } = require("./_lib/tursoClient");
@@ -69,6 +97,14 @@ async function handler(req, res) {
 
   if (req.method === "OPTIONS") {
     return res.status(204).end();
+  }
+
+  if (req.query?.resource === "backoffice") {
+    try {
+      return await handleBackOffice(req, res);
+    } catch (e) {
+      return res.status(200).json({ ok: false, counts: {}, error: e.message });
+    }
   }
 
   if (req.query?.resource === "visible-staff") {

@@ -4,6 +4,7 @@ import { TradeInBranchMapping } from "./admin/TradeInBranchMapping";
 import { CsatTokenManager } from "./admin/CsatTokenManager";
 import { AiSettingsManager } from "./admin/AiSettingsManager";
 import { StaffVisibilityManager } from "./admin/StaffVisibilityManager";
+import { BackOfficeManager } from "./admin/BackOfficeManager";
 
 export type StaffRosterEntry = {
   name: string;
@@ -29,6 +30,7 @@ export function SettingsSection({
   onCategoryTargetsChanged,
   tradeBranchMapping,
   onStaffVisibilityChange,
+  onBackOfficeChange,
   onTradeBranchMappingChange,
 }: {
   selectedBranch: string;
@@ -47,6 +49,7 @@ export function SettingsSection({
   onCategoryTargetsChanged?: () => void;
   tradeBranchMapping?: Record<string, string>;
   onStaffVisibilityChange?: (hidden: string[]) => void;
+  onBackOfficeChange?: (counts: Record<string, number>) => void;
   onTradeBranchMappingChange?: (mapping: Record<string, string>) => void;
 }) {
   return (
@@ -108,6 +111,10 @@ export function SettingsSection({
       {isAdmin ? <CsatTokenManager updatedBy={adminName} /> : null}
 
       {isAdmin ? <AiSettingsManager updatedBy={adminName} /> : null}
+
+      {isAdmin ? (
+        <BackOfficeManager updatedBy={adminName} onChange={onBackOfficeChange} />
+      ) : null}
 
       {isAdmin ? (
         <StaffVisibilityManager

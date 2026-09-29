@@ -262,10 +262,13 @@ export function normalizePosition(raw: string): string {
 }
 
 export type BackOfficeRow = {
-  name: string;
-  staffId?: string;
   position: string;
+  /** จำนวนคนในตำแหน่งนี้ */
+  count: number;
+  /** % ต่อคน */
   ratePct: number;
+  /** % รวมของตำแหน่งนี้ (ratePct × count) */
+  totalPct: number;
   amount: number;
 };
 
@@ -280,28 +283,48 @@ export type CommissionSplit = {
   salesPool: number;
 };
 
+/** ลำดับตำแหน่งหลังบ้านที่ใช้แสดง/กรอกจำนวน */
+export const BACK_OFFICE_POSITIONS = [
+  "BSM",
+  "ABM",
+  "TRAINER",
+  "PRESENTER",
+  "PIS",
+  "CASHIER",
+] as const;
+
+export type BackOfficeCounts = Record<string, number>;
+
+export const EMPTY_BACK_OFFICE_COUNTS: BackOfficeCounts = {
+  BSM: 0,
+  ABM: 0,
+  TRAINER: 0,
+  PRESENTER: 0,
+  PIS: 0,
+  CASHIER: 0,
+};
+
 /**
- * แบ่งก้อนค่าคอม: หักหลังบ้านตาม % แล้วคืนก้อนที่เหลือของเซล
- * ถ้า % หลังบ้านรวมเกิน 100 จะตัดไม่ให้ก้อนเซลติดลบ
+ * แบ่งก้อนค่าคอมจาก "จำนวนคน" ของแต่ละตำแหน่งหลังบ้าน
+ *   % ของตำแหน่ง = อัตราต่อคน × จำนวนคน
+ * หักออกจากก้อนใหญ่ก่อน ที่เหลือเป็นของเซล
+ * ถ้า % รวมเกิน 100 จะลดตามสัดส่วนไม่ให้ก้อนเซลติดลบ
  */
 export function calcCommissionSplit(
   grossPool: number,
-  backOfficeStaff: Array<{ name: string; staffId?: string; position: string }>,
+  counts: BackOfficeCounts,
 ): CommissionSplit {
-  const backOffice: BackOfficeRow[] = backOfficeStaff
-    .map((s) => {
-      const key = normalizePosition(s.position);
-      const ratePct = BACK_OFFICE_RATES[key] ?? 0;
-      return { name: s.name, staffId: s.staffId, position: key, ratePct, amount: 0 };
-    })
-    .filter((r) => r.ratePct > 0);
+  const backOffice: BackOfficeRow[] = BACK_OFFICE_POSITIONS.map((pos) => {
+    const count = Math.max(0, Math.floor(Number(counts?.[pos] ?? 0)));
+    const ratePct = BACK_OFFICE_RATES[pos] ?? 0;
+    return { position: pos, count, ratePct, totalPct: ratePct * count, amount: 0 };
+  }).filter((r) => r.count > 0);
 
-  const rawPct = backOffice.reduce((s, r) => s + r.ratePct, 0);
+  const rawPct = backOffice.reduce((s, r) => s + r.totalPct, 0);
   const backOfficePct = Math.min(100, rawPct);
-  // ถ้าถูกตัดเพดาน ให้ลดตามสัดส่วนเพื่อไม่ให้เกินก้อน
   const scale = rawPct > 100 ? 100 / rawPct : 1;
   backOffice.forEach((r) => {
-    r.amount = (grossPool * r.ratePct * scale) / 100;
+    r.amount = (grossPool * r.totalPct * scale) / 100;
   });
 
   const backOfficeAmount = backOffice.reduce((s, r) => s + r.amount, 0);

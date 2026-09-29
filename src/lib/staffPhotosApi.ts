@@ -104,3 +104,32 @@ export const saveHiddenStaffIds = async (
     return false;
   }
 };
+
+/** จำนวนพนักงานหลังบ้านต่อตำแหน่ง (ใช้แบ่งก้อนค่าคอม) */
+export const fetchBackOfficeCounts = async (): Promise<Record<string, number>> => {
+  try {
+    const res = await fetch(`${API_URL}?resource=backoffice`);
+    if (!res.ok) return {};
+    const json = await res.json();
+    return json?.counts && typeof json.counts === "object" ? json.counts : {};
+  } catch {
+    return {};
+  }
+};
+
+export const saveBackOfficeCounts = async (
+  counts: Record<string, number>,
+  updatedBy?: string,
+): Promise<boolean> => {
+  try {
+    const res = await fetch(`${API_URL}?resource=backoffice`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ counts, updatedBy }),
+    });
+    const json = await res.json().catch(() => null);
+    return Boolean(res.ok && json?.ok);
+  } catch {
+    return false;
+  }
+};

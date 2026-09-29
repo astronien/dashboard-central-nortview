@@ -193,7 +193,7 @@ export const CommissionSection: React.FC<{
 
         {split.backOffice.length === 0 ? (
           <p className="text-xs text-rose-300/80">
-            ไม่พบพนักงานหลังบ้านในไฟล์เป้า (ตำแหน่ง BSM / ABM / Trainer / Presenter / PIS / Cashier) —
+            ยังไม่ได้กรอกจำนวนพนักงานหลังบ้าน — ไปที่ Settings → "พนักงานหลังบ้าน (ส่วนแบ่งค่าคอม)"
             ตอนนี้ค่าคอมทั้งก้อนตกเป็นของเซลทั้งหมด
           </p>
         ) : (
@@ -201,22 +201,24 @@ export const CommissionSection: React.FC<{
             <table className="w-full text-left border-collapse text-[11px]">
               <thead>
                 <tr className="bg-[#0c3123] border-b border-emerald-500/20 text-white/90">
-                  <th className="py-2 px-3 font-bold uppercase tracking-wider">พนักงานหลังบ้าน</th>
                   <th className="py-2 px-3 font-bold uppercase tracking-wider">ตำแหน่ง</th>
-                  <th className="py-2 px-3 font-bold uppercase tracking-wider text-right">%</th>
+                  <th className="py-2 px-3 font-bold uppercase tracking-wider text-right">จำนวนคน</th>
+                  <th className="py-2 px-3 font-bold uppercase tracking-wider text-right">% ต่อคน</th>
+                  <th className="py-2 px-3 font-bold uppercase tracking-wider text-right">% รวม</th>
                   <th className="py-2 px-3 font-bold uppercase tracking-wider text-right">ได้รับ</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-emerald-500/10 bg-[#052b20]/60">
-                {split.backOffice.map((b, i) => (
-                  <tr key={`${b.staffId ?? b.name}-${i}`} className="text-white/90">
-                    <td className="py-1.5 px-3 font-bold">{b.name}</td>
+                {split.backOffice.map((b) => (
+                  <tr key={b.position} className="text-white/90">
                     <td className="py-1.5 px-3">
                       <span className="px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 font-bold">
                         {b.position}
                       </span>
                     </td>
-                    <td className="py-1.5 px-3 text-right text-white/70">{b.ratePct.toFixed(2)}%</td>
+                    <td className="py-1.5 px-3 text-right font-semibold">{b.count}</td>
+                    <td className="py-1.5 px-3 text-right text-white/50">{b.ratePct.toFixed(2)}%</td>
+                    <td className="py-1.5 px-3 text-right text-white/70">{b.totalPct.toFixed(2)}%</td>
                     <td className="py-1.5 px-3 text-right font-extrabold text-amber-300">
                       {fmtBaht2(b.amount)}
                     </td>

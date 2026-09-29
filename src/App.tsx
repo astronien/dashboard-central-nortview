@@ -99,6 +99,7 @@ import {
   saveStaffPhoto,
   fetchHiddenStaffIds,
   saveHiddenStaffIds,
+  fetchBackOfficeCounts,
 } from "./lib/staffPhotosApi";
 import {
   computeAttachRateRows,
@@ -141,7 +142,7 @@ import {
   findBandByTarget,
   findBandById,
   calcCommissionSplit,
-  normalizePosition,
+  EMPTY_BACK_OFFICE_COUNTS,
   type CommissionStaffRow,
   type CommissionSplit,
 } from "./lib/commissionScheme";
@@ -1742,6 +1743,14 @@ function AppInternal({
   useEffect(() => {
     void fetchHiddenStaffIds().then(setHiddenStaffIds);
   }, []);
+  // จำนวนพนักงานหลังบ้านต่อตำแหน่ง (ตั้งค่าในหน้า Settings)
+  const [backOfficeCounts, setBackOfficeCounts] =
+    useState<Record<string, number>>(EMPTY_BACK_OFFICE_COUNTS);
+  useEffect(() => {
+    void fetchBackOfficeCounts().then((c) =>
+      setBackOfficeCounts({ ...EMPTY_BACK_OFFICE_COUNTS, ...c }),
+    );
+  }, []);
   const isStaffHidden = React.useCallback(
     (officer: { staffId?: string; name?: string }): boolean => {
       if (!hiddenStaffIds.length) return false;
@@ -3310,18 +3319,11 @@ function AppInternal({
       .sort((a, b) => b.totalCommission - a.totalCommission);
   }, [combinedOfficerKpiData, commissionBand, commissionNewScheme]);
 
-  // หลังบ้าน: ดึงจากรายชื่อพนักงาน (ตำแหน่งในไฟล์เป้า) ที่ไม่ใช่ PIA
+  // หลังบ้าน: ใช้จำนวนคนที่กรอกไว้ในหน้า Settings
   const commissionSplit = useMemo<CommissionSplit>(() => {
     const grossPool = commissionRows.reduce((s, r) => s + r.totalCommission, 0);
-    const backOfficeStaff = parsedReport.officers
-      .map((o) => ({
-        name: o.name,
-        staffId: o.staffId,
-        position: normalizePosition(o.position ?? ""),
-      }))
-      .filter((o) => o.position && o.position !== "PIA");
-    return calcCommissionSplit(grossPool, backOfficeStaff);
-  }, [commissionRows, parsedReport.officers]);
+    return calcCommissionSplit(grossPool, backOfficeCounts);
+  }, [commissionRows, backOfficeCounts]);
 
   // ค่าคอมที่เซลได้จริง = ก้อนที่เหลือ × สัดส่วนค่าคอมของแต่ละคน
   const commissionSalesRows = useMemo(() => {
@@ -5292,6 +5294,7 @@ function AppInternal({
                   sheetBranches={combinedBranches}
                   staffRoster={staffRoster}
                   onStaffVisibilityChange={setHiddenStaffIds}
+                  onBackOfficeChange={setBackOfficeCounts}
                   staffPhotos={Object.fromEntries(
                     Object.entries(reconciledStaffPhotos).map(([id, record]) => [id, (record as any).photoUrl]),
                   )}
