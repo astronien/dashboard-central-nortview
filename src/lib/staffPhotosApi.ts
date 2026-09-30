@@ -91,7 +91,7 @@ export const fetchHiddenStaffIds = async (): Promise<string[]> => {
 export const saveHiddenStaffIds = async (
   hidden: string[],
   updatedBy?: string,
-): Promise<boolean> => {
+): Promise<{ ok: boolean; error?: string }> => {
   try {
     const res = await fetch(`${API_URL}?resource=visible-staff`, {
       method: "PUT",
@@ -99,9 +99,10 @@ export const saveHiddenStaffIds = async (
       body: JSON.stringify({ hidden, updatedBy }),
     });
     const json = await res.json().catch(() => null);
-    return Boolean(res.ok && json?.ok);
-  } catch {
-    return false;
+    if (res.ok && json?.ok) return { ok: true };
+    return { ok: false, error: json?.error ?? `HTTP ${res.status}` };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
 };
 
@@ -128,7 +129,7 @@ export const fetchBackOfficeConfig = async (): Promise<BackOfficeConfig> => {
 export const saveBackOfficeConfig = async (
   cfg: BackOfficeConfig,
   updatedBy?: string,
-): Promise<boolean> => {
+): Promise<{ ok: boolean; error?: string }> => {
   try {
     const res = await fetch(`${API_URL}?resource=backoffice`, {
       method: "PUT",
@@ -136,8 +137,9 @@ export const saveBackOfficeConfig = async (
       body: JSON.stringify({ ...cfg, updatedBy }),
     });
     const json = await res.json().catch(() => null);
-    return Boolean(res.ok && json?.ok);
-  } catch {
-    return false;
+    if (res.ok && json?.ok) return { ok: true };
+    return { ok: false, error: json?.error ?? `HTTP ${res.status}` };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
 };

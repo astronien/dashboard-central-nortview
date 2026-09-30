@@ -68,13 +68,15 @@ export function BackOfficeManager({
   const handleSave = async () => {
     setSaving(true);
     const cfg = { counts, rates };
-    const ok = await saveBackOfficeConfig(cfg, updatedBy);
+    const result = await saveBackOfficeConfig(cfg, updatedBy);
     setSaving(false);
     setMsg({
-      ok,
-      text: ok ? "บันทึกแล้ว — หน้า Commission จะคิดส่วนแบ่งใหม่" : "บันทึกไม่สำเร็จ",
+      ok: result.ok,
+      text: result.ok
+        ? "บันทึกแล้ว — หน้า Commission จะคิดส่วนแบ่งใหม่"
+        : `บันทึกไม่สำเร็จ${result.error ? `: ${result.error}` : ""}`,
     });
-    if (ok) onChange?.(cfg);
+    if (result.ok) onChange?.(cfg);
   };
 
   return (

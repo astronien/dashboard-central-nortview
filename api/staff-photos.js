@@ -50,7 +50,8 @@ const HIDDEN_STAFF_KEY = "hidden_staff_ids";
 const BACK_OFFICE_KEY = "back_office_counts";
 
 async function handleBackOffice(req, res) {
-  const { getAppConfig, setAppConfig } = require("./_lib/tursoClient");
+  const { getAppConfig, setAppConfig, initTelegramSchema } = require("./_lib/tursoClient");
+  await initTelegramSchema();
   if (req.method === "GET") {
     try {
       const cfg = await getAppConfig(BACK_OFFICE_KEY);

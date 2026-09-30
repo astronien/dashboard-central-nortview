@@ -43,10 +43,15 @@ export function StaffVisibilityManager({
   const handleSave = async () => {
     setSaving(true);
     const list = Array.from(hidden);
-    const ok = await saveHiddenStaffIds(list, updatedBy);
+    const result = await saveHiddenStaffIds(list, updatedBy);
     setSaving(false);
-    setMsg({ ok, text: ok ? "บันทึกแล้ว — หน้า Staff Profile จะแสดงเฉพาะคนที่เลือก" : "บันทึกไม่สำเร็จ" });
-    if (ok) onChange?.(list);
+    setMsg({
+      ok: result.ok,
+      text: result.ok
+        ? "บันทึกแล้ว — หน้า Staff Profile จะแสดงเฉพาะคนที่เลือก"
+        : `บันทึกไม่สำเร็จ${result.error ? `: ${result.error}` : ""}`,
+    });
+    if (result.ok) onChange?.(list);
   };
 
   if (!staffRoster.length) return null;
