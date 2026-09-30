@@ -87,6 +87,28 @@ async function handleBackOffice(req, res) {
   return res.status(405).json({ ok: false, error: "Method not allowed" });
 }
 
+async function handleVisibleStaff(req, res) {
+  const { getAppConfig, setAppConfig, initTelegramSchema } = require("./_lib/tursoClient");
+  // app_config ถูกสร้างใน initTelegramSchema — ต้องเรียกก่อน ไม่งั้น setAppConfig
+  // จะ throw (ตอนอ่านมี try/catch เลยเงียบ แต่ตอนบันทึกจะล้มเหลว)
+  await initTelegramSchema();
+  if (req.method === "GET") {
+    try {
+      const cfg = await getAppConfig(HIDDEN_STAFF_KEY);
+      const hidden = cfg && cfg.value ? JSON.parse(cfg.value) : [];
+      return res.status(200).json({ ok: true, hidden: Array.isArray(hidden) ? hidden : [] });
+    } catch {
+      return res.status(200).json({ ok: true, hidden: [] });
+    }
+  }
+  if (req.method === "PUT" || req.method === "POST") {
+    const list = Array.isArray(req.body?.hidden) ? req.body.hidden.map(String) : [];
+    await setAppConfig(HIDDEN_STAFF_KEY, JSON.stringify(list), req.body?.updatedBy ?? null);
+    return res.status(200).json({ ok: true });
+  }
+  return res.status(405).json({ ok: false, error: "Method not allowed" });
+}
+
 async function handler(req, res) {
   applyCors(res);
 
