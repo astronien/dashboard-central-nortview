@@ -186,40 +186,28 @@ function photoUrlOf(snap, r) {
   return `${base}/api/staff-photos?resource=image&id=${encodeURIComponent(r.photoId)}${v}`;
 }
 
-/** header การ์ดรายคน: รูป + ชื่อ */
-function personHeader(snap, r) {
+/** ส่วนบนการ์ดรายคน: รูปใหญ่เต็มความกว้าง พื้นหลังไล่สีเขียวเข้ม
+ *  (รูป PNG โปร่งแสงจากหน้า Staff Profile จะลอยบนพื้นเขียว ไม่มีกรอบขาว) */
+function personHero(snap, r) {
   const url = photoUrlOf(snap, r);
-  const textBox = {
-    type: "box",
-    layout: "vertical",
-    justifyContent: "center",
-    flex: 1,
-    contents: [
-      txt(r.name, { color: "#FFFFFF", weight: "bold", size: "lg" }),
-      txt(`${fmtDate(snap.date)} · ${subTitle(snap)}`, { color: C.brandSub, size: "xs" }),
-    ],
-  };
-  if (!url) return header(r.name, `${fmtDate(snap.date)} · ${subTitle(snap)}`);
+  if (!url) return null;
   return {
     type: "box",
-    layout: "horizontal",
-    backgroundColor: C.brand,
-    paddingAll: "14px",
-    spacing: "md",
+    layout: "vertical",
+    paddingTop: "16px",
+    paddingBottom: "14px",
+    paddingStart: "16px",
+    paddingEnd: "16px",
+    background: {
+      type: "linearGradient",
+      angle: "180deg",
+      startColor: "#14532D",
+      endColor: C.brand,
+    },
     contents: [
-      {
-        type: "box",
-        layout: "vertical",
-        width: "72px",
-        height: "96px",
-        cornerRadius: "12px",
-        backgroundColor: "#D1FAE5",
-        flex: 0,
-        contents: [
-          { type: "image", url, size: "full", aspectRatio: "3:4", aspectMode: "fit", gravity: "top" },
-        ],
-      },
-      textBox,
+      { type: "image", url, size: "full", aspectRatio: "1:1", aspectMode: "fit" },
+      txt(r.name, { color: "#FFFFFF", weight: "bold", size: "xl", align: "center", margin: "md" }),
+      txt(`${fmtDate(snap.date)} · ${subTitle(snap)}`, { color: C.brandSub, size: "xs", align: "center" }),
     ],
   };
 }
@@ -382,7 +370,9 @@ function personBubble(snap, r) {
   return {
     type: "bubble",
     size: "mega",
-    header: personHeader(snap, r),
+    ...(personHero(snap, r)
+      ? { hero: personHero(snap, r) }
+      : { header: header(r.name, `${fmtDate(snap.date)} · ${subTitle(snap)}`) }),
     body: {
       type: "box",
       layout: "vertical",
