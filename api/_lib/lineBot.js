@@ -305,21 +305,26 @@ function banner(text, color, bg) {
   };
 }
 
-/** แถบสรุปบรรทัดเดียว: 🔴 ส่งต่อ 1 · 🟡 ระวัง 1 */
-function compactBanner(redN, yellowN) {
-  const part = (n, label, color) => txt(`${label} ${n}`, { weight: "bold", size: "sm", color, flex: 0, wrap: false });
-  const items = [];
-  if (redN) items.push(part(redN, "🔴 ส่งต่อ", C.red));
-  if (redN && yellowN) items.push(txt("·", { size: "sm", color: C.muted, flex: 0 }));
-  if (yellowN) items.push(part(yellowN, "🟡 ระวัง", C.yellow));
+/** แถบสรุปบรรทัดเดียว: 🔴 ส่งต่อ n · 🟡 ระวัง n · 🟢 ปกติ n (แสดงทุกสถานะเสมอ) */
+function compactBanner(redN, yellowN, greenN) {
+  const part = (label, n, color) =>
+    txt(`${label} ${n}`, { weight: "bold", size: "sm", color: n ? color : C.muted, flex: 0, wrap: false });
+  const dot = () => txt("·", { size: "sm", color: C.muted, flex: 0 });
   return {
     type: "box",
     layout: "horizontal",
     spacing: "sm",
+    justifyContent: "center",
     backgroundColor: "#F8FAFC",
     cornerRadius: "8px",
     paddingAll: "8px",
-    contents: items,
+    contents: [
+      part("🔴 ส่งต่อ", redN, C.red),
+      dot(),
+      part("🟡 ระวัง", yellowN, C.yellow),
+      dot(),
+      part("🟢 ปกติ", greenN, C.green),
+    ],
   };
 }
 
@@ -359,9 +364,7 @@ function summaryBubble(snap) {
   const greens = rows.filter((r) => r.status === "green").sort((a, b) => b.iphone - a.iphone);
 
   // แถบสรุปบรรทัดเดียว (สั้น กระชับ)
-  const headline = reds.length || yellows.length
-    ? compactBanner(reds.length, yellows.length)
-    : banner("✅ ทุกคนแนบครบ", C.green, C.greenBg);
+  const headline = compactBanner(reds.length, yellows.length, greens.length);
 
   const contents = [...staleNotice(snap), headline];
   if (reds.length) {
