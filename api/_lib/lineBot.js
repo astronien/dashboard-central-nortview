@@ -385,34 +385,6 @@ function staffButtonsFooter(rows) {
   };
 }
 
-/** ปุ่มเลือกดูรายคน (ด้านล่างหน้าสรุป) — กดแล้วส่ง "เช็ค ชื่อ" ให้เอง */
-function personButtons(snap) {
-  const people = [...(snap.rows ?? [])].sort(
-    (a, b) => (STATUS_ORDER[a.status] ?? 3) - (STATUS_ORDER[b.status] ?? 3) || b.iphone - a.iphone,
-  );
-  if (!people.length) return undefined;
-  const icon = (r) => (r.status === "red" ? "🔴" : r.status === "yellow" ? "🟡" : "🟢");
-  const btn = (r) => ({
-    type: "button",
-    style: "secondary",
-    height: "sm",
-    flex: 1,
-    action: { type: "message", label: `${icon(r)} ${firstName(r.name)}`.slice(0, 40), text: `เช็ค ${firstName(r.name)}` },
-  });
-  const rowsOf2 = [];
-  for (let i = 0; i < people.length; i += 2) {
-    const pair = people.slice(i, i + 2).map(btn);
-    if (pair.length === 1) pair.push({ type: "filler" });
-    rowsOf2.push({ type: "box", layout: "horizontal", spacing: "sm", contents: pair });
-  }
-  return {
-    type: "box",
-    layout: "vertical",
-    spacing: "sm",
-    contents: [txt("ดูรายคน", { size: "xxs", color: C.muted }), ...rowsOf2],
-  };
-}
-
 function summaryBubble(snap) {
   const rows = snap.rows ?? [];
   const reds = rows.filter((r) => r.status === "red").sort((a, b) => b.iphone - a.iphone);
