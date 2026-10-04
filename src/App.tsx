@@ -3460,8 +3460,15 @@ function AppInternal({
     // UFUND ในไฟล์ขายระบุด้วย Customer (Code) — นับเฉพาะ "UFUND PERSONAL"
     // (ไม่นับ UFUND UNIDAYS / UFUND STUDENT)
     void ufundFilters;
+    // หมายเหตุ: ตอนอัปโหลด คอลัมน์ถูกแปลงชื่อเป็น "Customer Code" (ไม่มีวงเล็บ)
+    const UFUND_PERSONAL_RE = /ufund\s*personal/i;
     const isUfundBill = (b: BillSummary) =>
-      b.lineItems.some((li) => /ufund\s*personal/i.test(String(li["Customer (Code)"] ?? "")));
+      UFUND_PERSONAL_RE.test(String(b.customerCode ?? "")) ||
+      b.lineItems.some((li) =>
+        UFUND_PERSONAL_RE.test(
+          String(li["Customer Code"] ?? li["Customer (Code)"] ?? (li as any).customer_code ?? ""),
+        ),
+      );
     const rawIsIphone = (li: RawRow) => String(li["Category (Name)"] ?? "").trim().toLowerCase() === "iphone";
 
     const officerList = (parsedReport.officers.length > 0
