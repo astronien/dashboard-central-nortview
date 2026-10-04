@@ -3498,6 +3498,9 @@ function AppInternal({
             const rawCat = String(li["Category (Name)"] ?? "").toLowerCase();
             const prod = String(li["Product (Name)"] ?? "");
             if (rawCat.includes("promo") || /ส่วนลด/.test(prod)) continue;
+            // ไม่นับ: ถุงใส่สินค้า (Selling Expense) และของแถมฟรี (เช่น 7CARE+ Free)
+            if (rawCat.includes("selling expense") || /ถุง/.test(prod)) continue;
+            if (/\bfree\b|ฟรี|ของแถม/i.test(prod)) continue;
             piecesInBill += toNumber(li.Number ?? li.number ?? li.qty ?? 0);
           }
           attachPieces += piecesInBill;
