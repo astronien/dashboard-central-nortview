@@ -3462,22 +3462,26 @@ function AppInternal({
       .map((officer) => {
         const officerBills = allBills.filter((b) => matchesOfficer(b.officerName, officer.name));
 
-        // Attach ต่อบิล — นับชิ้นของ UFUND / Cover / SIM / Accessories
-        // (ทุกอย่างที่ไม่ใช่ตัวเครื่อง และไม่ใช่บรรทัดส่วนลด/โปรโมชั่น)
-        // เทียบกับเกณฑ์ 3 ชิ้นต่อบิล
+        // Attach ต่อบิล — บิลจะ "ผ่าน" ก็ต่อเมื่อมีชิ้น attach (UFUND / Cover /
+        // SIM / Accessories = ทุกอย่างที่ไม่ใช่ตัวเครื่องและไม่ใช่บรรทัดส่วนลด)
+        // อย่างน้อย 3 ชิ้นในบิลเดียว
         let attachPieces = 0;
+        let qualifiedBills = 0;
         for (const b of officerBills) {
+          let piecesInBill = 0;
           for (const li of b.lineItems) {
             const catName = getCategory(li);
             if (DEVICE_CATS_FOR_ATTACH.has(catName)) continue;
             const rawCat = String(li["Category (Name)"] ?? "").toLowerCase();
             const prod = String(li["Product (Name)"] ?? "");
             if (rawCat.includes("promo") || /ส่วนลด/.test(prod)) continue;
-            attachPieces += toNumber(li.Number ?? li.number ?? li.qty ?? 0);
+            piecesInBill += toNumber(li.Number ?? li.number ?? li.qty ?? 0);
           }
+          attachPieces += piecesInBill;
+          if (piecesInBill >= ATTACH_PER_BILL_TARGET) qualifiedBills += 1;
         }
         const billCount = officerBills.length;
-        const attachPerBill = billCount > 0 ? attachPieces / billCount : 0;
+        const attachPerBill = billCount > 0 ? (qualifiedBills / billCount) * 100 : 0;
 
         const iphoneUnit = unitsOf(officerBills, "iPhone");
         const ipadUnit = unitsOf(officerBills, "iPad");
@@ -3520,6 +3524,7 @@ function AppInternal({
           totalDevice,
           billCount,
           attachPieces,
+          qualifiedBills,
           attachPerBill,
           iphoneUnit,
           iphoneBaht: bahtOf(officerBills, "iPhone"),
@@ -3557,6 +3562,7 @@ function AppInternal({
     });
     const totalBills = sum((r) => r.billCount);
     const totalPieces = sum((r) => r.attachPieces);
+    const totalQualified = sum((r) => r.qualifiedBills);
     const totalRow = {
       name: "รวมทั้งหมด",
       isTotal: true,
@@ -3564,7 +3570,8 @@ function AppInternal({
       totalDevice: sum((r) => r.totalDevice),
       billCount: totalBills,
       attachPieces: totalPieces,
-      attachPerBill: totalBills > 0 ? totalPieces / totalBills : 0,
+      qualifiedBills: totalQualified,
+      attachPerBill: totalBills > 0 ? (totalQualified / totalBills) * 100 : 0,
       iphoneUnit: totalIphone,
       iphoneBaht: sum((r) => r.iphoneBaht),
       ipadUnit: totalIpad,
