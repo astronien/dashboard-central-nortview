@@ -127,24 +127,6 @@ function header(title, sub) {
   };
 }
 
-function footer(snap) {
-  const url = snap && /^https:\/\//.test(snap.dashboardUrl ?? "") ? snap.dashboardUrl : null;
-  if (!url) return undefined;
-  return {
-    type: "box",
-    layout: "vertical",
-    contents: [
-      {
-        type: "button",
-        style: "primary",
-        color: C.brand,
-        height: "sm",
-        action: { type: "uri", label: "เปิด Dashboard", uri: url },
-      },
-    ],
-  };
-}
-
 function staleNotice(snap) {
   if (!snap || snap.date === bangkokYmd()) return [];
   return [
@@ -356,7 +338,6 @@ function summaryBubble(snap) {
     size: "mega",
     header: header("สรุป Attach วันนี้", `${fmtDate(snap.date)} · ${subTitle(snap)}`),
     body: { type: "box", layout: "vertical", spacing: "none", contents },
-    footer: footer(snap),
   };
 }
 
@@ -471,7 +452,6 @@ function personBubble(snap, r) {
         txt(RULE_TEXT, { size: "xxs", color: C.muted }),
       ],
     },
-    footer: footer(snap),
   };
 }
 
@@ -532,7 +512,6 @@ function nextBubble(snap) {
     size: "mega",
     header: header("ลูกค้า iPhone คนถัดไป", `${fmtDate(snap.date)} · ${subTitle(snap)}`),
     body: { type: "box", layout: "vertical", spacing: "none", contents },
-    footer: footer(snap),
   };
 }
 
