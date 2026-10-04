@@ -4973,6 +4973,8 @@ function AppInternal({
     try {
       for (let idx = 0; idx < officers.length; idx++) {
         if (isBranchManager(officers[idx])) continue;
+        // ข้ามคนที่ตั้งค่าไม่ให้แสดงในหน้า Staff Profile (Settings → แสดงพนักงาน)
+        if (isStaffHidden(officers[idx])) continue;
         setActiveStaffId(String(idx + 1));
         const officerName = officers[idx].name.trim().replace(/\s+/g, "-");
         for (const view of views) {
