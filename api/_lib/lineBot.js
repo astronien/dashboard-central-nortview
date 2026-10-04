@@ -332,9 +332,9 @@ function compactBanner(redN, yellowN, greenN) {
 function shortStatus(r) {
   if (r.status === "red") {
     const missing = Math.max(1, r.required - r.credited);
-    return r.credited === 0 ? "ยังไม่แนบ" : `ขาดอีก ${missing} บิล`;
+    return r.credited === 0 ? "ยังไม่แนบ" : `ขาด ${missing} บิล`;
   }
-  if (r.status === "yellow") return "ต้องแนบเครื่องถัดไป";
+  if (r.status === "yellow") return "ต้องแนบ";
   return `แนบ ${r.credited}`;
 }
 
@@ -351,8 +351,8 @@ function shortRow(r, color, bg) {
     paddingEnd: "10px",
     margin: "xs",
     contents: [
-      txt(firstName(r.name), { weight: "bold", size: "sm", color: "#111827", flex: 4, wrap: false }),
-      txt(`${r.iphone} เครื่อง · ${shortStatus(r)}`, { size: "xs", color, align: "end", flex: 6, wrap: false }),
+      txt(firstName(r.name), { weight: "bold", size: "sm", color: "#111827", flex: 3, wrap: false }),
+      txt(`${r.iphone} เครื่อง · ${shortStatus(r)}`, { size: "xs", color, align: "end", flex: 7, wrap: false }),
     ],
   };
 }
