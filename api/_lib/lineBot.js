@@ -357,34 +357,6 @@ function shortRow(r, color, bg) {
   };
 }
 
-/** footer หน้ารวม: ปุ่มชื่อพนักงาน (2 ปุ่ม/แถว) กดแล้วส่ง "เช็ค ชื่อ" → ได้การ์ดรายคน */
-function staffButtonsFooter(rows) {
-  const people = [...rows].sort(
-    (a, b) => (STATUS_ORDER[a.status] ?? 3) - (STATUS_ORDER[b.status] ?? 3) || b.iphone - a.iphone,
-  );
-  if (!people.length) return undefined;
-  const icon = (r) => (r.status === "red" ? "🔴" : r.status === "yellow" ? "🟡" : "🟢");
-  const btn = (r) => ({
-    type: "button",
-    style: "secondary",
-    height: "sm",
-    flex: 1,
-    action: { type: "message", label: `${icon(r)} ${firstName(r.name)}`.slice(0, 40), text: `เช็ค ${firstName(r.name)}` },
-  });
-  const lines = [];
-  for (let i = 0; i < people.length; i += 2) {
-    const pair = people.slice(i, i + 2).map(btn);
-    if (pair.length === 1) pair.push({ type: "filler" });
-    lines.push({ type: "box", layout: "horizontal", spacing: "sm", contents: pair });
-  }
-  return {
-    type: "box",
-    layout: "vertical",
-    spacing: "sm",
-    contents: [txt("ดูรายคน", { size: "xxs", color: C.muted, align: "center" }), ...lines],
-  };
-}
-
 function summaryBubble(snap) {
   const rows = snap.rows ?? [];
   const reds = rows.filter((r) => r.status === "red").sort((a, b) => b.iphone - a.iphone);
@@ -415,7 +387,6 @@ function summaryBubble(snap) {
     size: "mega",
     header: header("สรุป Attach วันนี้", `${fmtDate(snap.date)} · ${subTitle(snap)}`),
     body: { type: "box", layout: "vertical", spacing: "none", contents },
-    footer: staffButtonsFooter(rows),
   };
 }
 
@@ -683,8 +654,7 @@ async function buildReply(text) {
     : yellows
       ? `👀 ${yellows} คนต้องระวัง`
       : "✅ ทุกคนแนบครบตามกติกา";
-  // หน้าสรุปมีปุ่มชื่อพนักงานใน footer แล้ว → quick reply เหลือแค่ปุ่มคำสั่ง
-  return [{ ...flex(alt, summaryBubble(snap)), quickReply: quickReply(snap, false) }];
+  return [{ ...flex(alt, summaryBubble(snap)), quickReply: qr }];
 }
 
 // ── handlers ───────────────────────────────────────────────────────────────
