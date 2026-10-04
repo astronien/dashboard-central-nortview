@@ -36,6 +36,8 @@ export type DailyReportRow = {
   requiredCredits?: number;
   /** true = ขาย iPhone ครบ 4 เครื่องแต่แนบไม่ถึงโควตา → ช่อง iPhone สีแดง */
   iphoneAttachAlert?: boolean;
+  /** true = ขาย iPhone 3 เครื่อง (ของก้อน 4) แล้วยังไม่มีบิลแนบ → เตือนสีเหลือง */
+  iphoneAttachWarn?: boolean;
   iphoneUnit: number;
   iphoneBaht: number;
   ipadUnit: number;
@@ -161,6 +163,8 @@ export const DailyBranchReportSection: React.FC<{ data: DailyReportData }> = ({ 
           Pencil/iPad Acc ÷ iPad) · <span className="text-emerald-700 font-semibold">บิลผ่าน = บิลที่มี iPhone และมี UFUND+Cover+SIM+Acc ≥ 3 ชิ้น</span>
           {" · "}<span className="px-1 rounded bg-rose-500 text-white font-semibold">iPhone สีแดง</span>{" "}
           = ขาย iPhone ทุก 4 เครื่องแต่ไม่มีบิลที่แนบ Cover / UFUND / SIM / Acc ≥3 ชิ้น
+          {" · "}<span className="px-1 rounded bg-amber-300 text-amber-900 font-semibold">iPhone สีเหลือง</span>{" "}
+          = เตือน ขายไป 3 เครื่องแล้วยังไม่มีบิลแนบ
           {" · "}<span className="text-slate-500">ลากหัวคอลัมน์เพื่อสลับตำแหน่งได้</span>
           {hasSplit ? (
             <>
@@ -267,7 +271,11 @@ export const DailyBranchReportSection: React.FC<{ data: DailyReportData }> = ({ 
                 <td className="py-1.5 px-2 text-right font-semibold">{num(r.totalDevice)}</td>
                 <td
                   className={`py-1.5 px-2 text-right border-l border-slate-200 ${
-                    r.iphoneAttachAlert ? "bg-rose-500 text-white font-extrabold" : ""
+                    r.iphoneAttachAlert
+                      ? "bg-rose-500 text-white font-extrabold"
+                      : r.iphoneAttachWarn
+                        ? "bg-amber-300 text-amber-900 font-extrabold"
+                        : ""
                   }`}
                   title={
                     r.isTotal
@@ -279,7 +287,11 @@ export const DailyBranchReportSection: React.FC<{ data: DailyReportData }> = ({ 
                 </td>
                 <td
                   className={`py-1.5 px-2 text-right ${
-                    r.iphoneAttachAlert ? "bg-rose-500 text-white" : "text-slate-400"
+                    r.iphoneAttachAlert
+                      ? "bg-rose-500 text-white"
+                      : r.iphoneAttachWarn
+                        ? "bg-amber-300 text-amber-900"
+                        : "text-slate-400"
                   }`}
                 >
                   {r.iphoneBaht ? fmtBaht(r.iphoneBaht) : "–"}

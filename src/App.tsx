@@ -3508,6 +3508,9 @@ function AppInternal({
         const iphoneUnitForAlert = unitsOf(officerBills, "iPhone");
         const requiredCredits = Math.floor(iphoneUnitForAlert / 4);
         const iphoneAttachAlert = requiredCredits > 0 && creditedBills < requiredCredits;
+        // เตือนก่อน (เหลือง): อีก 1 เครื่องจะครบ 4 แต่ยังไม่มีบิลแนบสำหรับก้อนนี้
+        const iphoneAttachWarn =
+          !iphoneAttachAlert && iphoneUnitForAlert % 4 === 3 && creditedBills < requiredCredits + 1;
         const billCount = deviceBills;
         const attachPerBill = billCount > 0 ? (qualifiedBills / billCount) * 100 : 0;
 
@@ -3557,6 +3560,7 @@ function AppInternal({
           creditedBills,
           requiredCredits,
           iphoneAttachAlert,
+          iphoneAttachWarn,
           iphoneUnit,
           iphoneBaht: bahtOf(officerBills, "iPhone"),
           ipadUnit,
@@ -3606,6 +3610,7 @@ function AppInternal({
       creditedBills: sum((r) => r.creditedBills),
       requiredCredits: sum((r) => r.requiredCredits),
       iphoneAttachAlert: false,
+      iphoneAttachWarn: false,
       iphoneUnit: totalIphone,
       iphoneBaht: sum((r) => r.iphoneBaht),
       ipadUnit: totalIpad,
