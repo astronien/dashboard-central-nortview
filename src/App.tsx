@@ -497,6 +497,12 @@ const latestDayFromKeys = (dayKeys: Iterable<string>): string => {
   return all.length ? all[0] : "";
 };
 
+/** เกณฑ์ Attach ต่อบิล (UFUND / Cover / SIM / Accessories) */
+const ATTACH_PER_BILL_TARGET = 3;
+
+/** หมวดที่ถือว่าเป็น "ตัวเครื่อง" (ไม่นับเป็นชิ้น attach) */
+const DEVICE_CATS_FOR_ATTACH = new Set(["Mac", "iPad", "iPhone", "Apple Watch"]);
+
 /** ชื่อหมวด "อื่นๆ" — ยอดที่ไม่เข้า 6 หมวดหลัก */
 const OTHER_CAT = "อื่นๆ";
 
@@ -3455,6 +3461,24 @@ function AppInternal({
     const officerRows = officerList
       .map((officer) => {
         const officerBills = allBills.filter((b) => matchesOfficer(b.officerName, officer.name));
+
+        // Attach ต่อบิล — นับชิ้นของ UFUND / Cover / SIM / Accessories
+        // (ทุกอย่างที่ไม่ใช่ตัวเครื่อง และไม่ใช่บรรทัดส่วนลด/โปรโมชั่น)
+        // เทียบกับเกณฑ์ 3 ชิ้นต่อบิล
+        let attachPieces = 0;
+        for (const b of officerBills) {
+          for (const li of b.lineItems) {
+            const catName = getCategory(li);
+            if (DEVICE_CATS_FOR_ATTACH.has(catName)) continue;
+            const rawCat = String(li["Category (Name)"] ?? "").toLowerCase();
+            const prod = String(li["Product (Name)"] ?? "");
+            if (rawCat.includes("promo") || /ส่วนลด/.test(prod)) continue;
+            attachPieces += toNumber(li.Number ?? li.number ?? li.qty ?? 0);
+          }
+        }
+        const billCount = officerBills.length;
+        const attachPerBill = billCount > 0 ? attachPieces / billCount : 0;
+
         const iphoneUnit = unitsOf(officerBills, "iPhone");
         const ipadUnit = unitsOf(officerBills, "iPad");
         const totalDevice =
@@ -3494,6 +3518,9 @@ function AppInternal({
           name: officer.name,
           totalBaht,
           totalDevice,
+          billCount,
+          attachPieces,
+          attachPerBill,
           iphoneUnit,
           iphoneBaht: bahtOf(officerBills, "iPhone"),
           ipadUnit,
@@ -3528,11 +3555,16 @@ function AppInternal({
         totalCells[p.id] = { kind, unit: sum((r) => r.cells[p.id]?.unit ?? 0) };
       }
     });
+    const totalBills = sum((r) => r.billCount);
+    const totalPieces = sum((r) => r.attachPieces);
     const totalRow = {
       name: "รวมทั้งหมด",
       isTotal: true,
       totalBaht: sum((r) => r.totalBaht),
       totalDevice: sum((r) => r.totalDevice),
+      billCount: totalBills,
+      attachPieces: totalPieces,
+      attachPerBill: totalBills > 0 ? totalPieces / totalBills : 0,
       iphoneUnit: totalIphone,
       iphoneBaht: sum((r) => r.iphoneBaht),
       ipadUnit: totalIpad,

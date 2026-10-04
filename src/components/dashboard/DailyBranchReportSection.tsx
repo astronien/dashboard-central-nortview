@@ -18,11 +18,17 @@ export type DailyReportPreset = {
   kind: DailyReportCellKind;
 };
 
+export const ATTACH_PER_BILL_TARGET = 3;
+
 export type DailyReportRow = {
   name: string;
   isTotal?: boolean;
   totalBaht: number;
   totalDevice: number;
+  /** จำนวนบิล · ชิ้น attach (UFUND/Cover/SIM/Acc) · ชิ้นต่อบิล */
+  billCount?: number;
+  attachPieces?: number;
+  attachPerBill?: number;
   iphoneUnit: number;
   iphoneBaht: number;
   ipadUnit: number;
@@ -145,7 +151,8 @@ export const DailyBranchReportSection: React.FC<{ data: DailyReportData }> = ({ 
       <div className="flex items-start justify-between gap-3 mb-4">
         <p className="text-xs text-slate-400">
           ข้อมูลวันล่าสุด {fmtDay(data.latestDate)} · ATT% = จำนวน ÷ ฐาน (ส่วนใหญ่ ÷ iPhone, AC+ ÷ iPhone+iPad,
-          Pencil/iPad Acc ÷ iPad) · <span className="text-slate-500">ลากหัวคอลัมน์เพื่อสลับตำแหน่งได้</span>
+          Pencil/iPad Acc ÷ iPad) · <span className="text-emerald-700 font-semibold">Attach/บิล = UFUND+Cover+SIM+Acc ÷ จำนวนบิล (เป้า 3)</span>
+          {" · "}<span className="text-slate-500">ลากหัวคอลัมน์เพื่อสลับตำแหน่งได้</span>
           {hasSplit ? (
             <>
               {" "}· <span className="text-amber-600 font-semibold">ตัวเลขส้ม +N (18) = ของ iPhone 18 แยกออกมา</span>
@@ -180,6 +187,13 @@ export const DailyBranchReportSection: React.FC<{ data: DailyReportData }> = ({ 
               <th colSpan={2} className="py-1.5 px-2 font-bold text-center bg-slate-50 text-slate-600 border-l border-slate-200">
                 iPad
               </th>
+              <th
+                colSpan={3}
+                className="py-1.5 px-2 font-bold text-center bg-emerald-100 text-emerald-800 border-l border-slate-200"
+                title="UFUND / Cover / SIM / Accessories ต่อบิล — เป้า 3 ชิ้นต่อบิล"
+              >
+                Attach/บิล (เป้า {ATTACH_PER_BILL_TARGET})
+              </th>
               {presets.map((p, i) => {
                 const color = GROUP_COLORS[i % GROUP_COLORS.length];
                 const span = p.kind === "att" ? 2 : 1;
@@ -208,6 +222,9 @@ export const DailyBranchReportSection: React.FC<{ data: DailyReportData }> = ({ 
               <th className="py-1 px-2 text-right bg-slate-100">฿</th>
               <th className="py-1 px-2 text-right bg-slate-50 border-l border-slate-200">จำนวน</th>
               <th className="py-1 px-2 text-right bg-slate-50">฿</th>
+              <th className="py-1 px-2 text-right border-l border-slate-200">บิล</th>
+              <th className="py-1 px-2 text-right">ชิ้น</th>
+              <th className="py-1 px-2 text-center">ต่อบิล</th>
               {presets.map((p) =>
                 p.kind === "att" ? (
                   <React.Fragment key={p.id}>
@@ -243,6 +260,21 @@ export const DailyBranchReportSection: React.FC<{ data: DailyReportData }> = ({ 
                 <td className="py-1.5 px-2 text-right text-slate-400">{r.iphoneBaht ? fmtBaht(r.iphoneBaht) : "–"}</td>
                 <td className="py-1.5 px-2 text-right border-l border-slate-200">{num(r.ipadUnit)}</td>
                 <td className="py-1.5 px-2 text-right text-slate-400">{r.ipadBaht ? fmtBaht(r.ipadBaht) : "–"}</td>
+                <td className="py-1.5 px-2 text-right border-l border-slate-200">{num(r.billCount ?? 0)}</td>
+                <td className="py-1.5 px-2 text-right font-semibold">{num(r.attachPieces ?? 0)}</td>
+                <td
+                  className={`py-1.5 px-2 text-center font-bold ${
+                    (r.attachPerBill ?? 0) >= ATTACH_PER_BILL_TARGET
+                      ? "bg-emerald-100 text-emerald-700"
+                      : (r.attachPerBill ?? 0) >= ATTACH_PER_BILL_TARGET * 0.67
+                        ? "bg-amber-100 text-amber-700"
+                        : (r.attachPerBill ?? 0) > 0
+                          ? "bg-rose-100 text-rose-700"
+                          : "text-slate-300"
+                  }`}
+                >
+                  {r.billCount ? (r.attachPerBill ?? 0).toFixed(2) : "–"}
+                </td>
                 {presets.map((p) => {
                   const c = r.cells[p.id];
                   if (p.kind === "baht") {
