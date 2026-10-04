@@ -3488,7 +3488,6 @@ function AppInternal({
         let creditedBills = 0;
         let ufundIphoneBills = 0;
         let ufundOther = 0; // บิล UFUND ที่ไม่มีแถว iPhone (เช่นตอนกรอง iPhone 18 ออก)
-        let uncreditedBills = 0;
         for (const b of officerBills) {
           if (!b.lineItems.some(rawIsIphone)) {
             if (isUfundBill(b)) ufundOther += 1;
@@ -3523,14 +3522,10 @@ function AppInternal({
           if (piecesInBill >= ATTACH_PER_BILL_TARGET) qualifiedBills += 1;
           if (hasCover || hasUfund || hasSim || piecesInBill >= ATTACH_PER_BILL_TARGET) creditedBills += 1;
           if (hasUfund) ufundIphoneBills += 1;
-          else if (!hasCover && !hasSim && piecesInBill < ATTACH_PER_BILL_TARGET) uncreditedBills += 1;
+
         }
-        // UFUND: ถ้าไฟล์ขายยังไม่มี (บิลไฟแนนซ์มักลงระบบช้า) ใช้ยอดอนุมัติจาก uFund API
-        const ufundApi = ufundDailyForOfficer(officer.staffId, officer.name);
-        const ufundApiApproved = ufundApi?.approved ?? 0;
-        const ufundUnits = Math.max(ufundIphoneBills, ufundApiApproved);
-        // UFUND จาก API ที่ไม่อยู่ในไฟล์ → ถือว่าช่วยบิลที่ยังไม่ผ่านได้
-        creditedBills += Math.min(uncreditedBills, Math.max(0, ufundApiApproved - ufundIphoneBills));
+        // UFUND: นับจากไฟล์ขายอย่างเดียว (Customer Code = UFUND PERSONAL)
+        const ufundUnits = ufundIphoneBills;
         // ทุก iPhone 4 เครื่อง ต้องมีบิลที่แนบได้อย่างน้อย 1 บิล — ไม่ถึงให้ช่อง iPhone เป็นสีแดง
         const iphoneUnitForAlert = unitsOf(officerBills, "iPhone");
         const requiredCredits = Math.floor(iphoneUnitForAlert / 4);
@@ -3666,7 +3661,6 @@ function AppInternal({
     kpiPresets,
     currentRowsAllModels,
     excludeIphone18,
-    ufundDailyForOfficer,
   ]);
 
   const dynamicRadarData = useMemo(() => {
