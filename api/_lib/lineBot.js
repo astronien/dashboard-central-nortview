@@ -305,26 +305,72 @@ function banner(text, color, bg) {
   };
 }
 
+/** แถบสรุปบรรทัดเดียว: 🔴 ส่งต่อ 1 · 🟡 ระวัง 1 */
+function compactBanner(redN, yellowN) {
+  const part = (n, label, color) => txt(`${label} ${n}`, { weight: "bold", size: "sm", color, flex: 0, wrap: false });
+  const items = [];
+  if (redN) items.push(part(redN, "🔴 ส่งต่อ", C.red));
+  if (redN && yellowN) items.push(txt("·", { size: "sm", color: C.muted, flex: 0 }));
+  if (yellowN) items.push(part(yellowN, "🟡 ระวัง", C.yellow));
+  return {
+    type: "box",
+    layout: "horizontal",
+    spacing: "sm",
+    backgroundColor: "#F8FAFC",
+    cornerRadius: "8px",
+    paddingAll: "8px",
+    contents: items,
+  };
+}
+
+/** สถานะสั้นๆ สำหรับหน้าสรุป */
+function shortStatus(r) {
+  if (r.status === "red") {
+    const missing = Math.max(1, r.required - r.credited);
+    return r.credited === 0 ? "ยังไม่แนบ" : `ขาดอีก ${missing} บิล`;
+  }
+  if (r.status === "yellow") return "ต้องแนบเครื่องถัดไป";
+  return `แนบ ${r.credited}`;
+}
+
+/** แถวบรรทัดเดียว: ชื่อ | iPhone n · สถานะสั้น */
+function shortRow(r, color, bg) {
+  return {
+    type: "box",
+    layout: "horizontal",
+    backgroundColor: bg,
+    cornerRadius: "6px",
+    paddingTop: "6px",
+    paddingBottom: "6px",
+    paddingStart: "10px",
+    paddingEnd: "10px",
+    margin: "xs",
+    contents: [
+      txt(firstName(r.name), { weight: "bold", size: "sm", color: "#111827", flex: 4, wrap: false }),
+      txt(`${r.iphone} เครื่อง · ${shortStatus(r)}`, { size: "xs", color, align: "end", flex: 6, wrap: false }),
+    ],
+  };
+}
+
 function summaryBubble(snap) {
   const rows = snap.rows ?? [];
   const reds = rows.filter((r) => r.status === "red").sort((a, b) => b.iphone - a.iphone);
   const yellows = rows.filter((r) => r.status === "yellow").sort((a, b) => b.iphone - a.iphone);
   const greens = rows.filter((r) => r.status === "green").sort((a, b) => b.iphone - a.iphone);
 
-  const headline = reds.length
-    ? banner(`⚠️ ${reds.length} คน ต้องส่งลูกค้า iPhone ให้เพื่อน`, C.red, C.redBg)
-    : yellows.length
-      ? banner(`👀 ${yellows.length} คน ใกล้ครบ 4 เครื่อง ต้องแนบให้ได้`, C.yellow, C.yellowBg)
-      : banner("✅ ทุกคนแนบครบตามกติกา", C.green, C.greenBg);
+  // แถบสรุปบรรทัดเดียว (สั้น กระชับ)
+  const headline = reds.length || yellows.length
+    ? compactBanner(reds.length, yellows.length)
+    : banner("✅ ทุกคนแนบครบ", C.green, C.greenBg);
 
   const contents = [...staleNotice(snap), headline];
   if (reds.length) {
-    contents.push(sectionTitle("🔴 ต้องส่งต่อ — ลูกค้า iPhone คนถัดไปให้เพื่อนรับ", C.red));
-    reds.forEach((r) => contents.push(personRow(r, C.red, C.redBg)));
+    contents.push(sectionTitle("🔴 ส่งต่อ", C.red));
+    reds.forEach((r) => contents.push(shortRow(r, C.red, C.redBg)));
   }
   if (yellows.length) {
-    contents.push(sectionTitle("🟡 ระวัง — ขายไป 3 เครื่องแล้ว ยังไม่มีบิลแนบ", C.yellow));
-    yellows.forEach((r) => contents.push(personRow(r, C.yellow, C.yellowBg)));
+    contents.push(sectionTitle("🟡 ระวัง", C.yellow));
+    yellows.forEach((r) => contents.push(shortRow(r, C.yellow, C.yellowBg)));
   }
   if (greens.length) {
     contents.push(sectionTitle("🟢 ปกติ", C.green));
