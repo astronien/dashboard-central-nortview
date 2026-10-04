@@ -3457,13 +3457,11 @@ function AppInternal({
     };
     const coverFilters = presetFilters(/cover/i);
     const ufundFilters = presetFilters(/ufund/i);
-    // UFUND ในไฟล์ขายระบุด้วย Customer (Code) เช่น "UFUND PERSONAL" / "UFUND UNIDAYS"
-    // / "UFUND STUDENT" (หรือใน Comment) — จับทุกแบบ ไม่พึ่งว่า preset ติ๊กครบไหม
+    // UFUND ในไฟล์ขายระบุด้วย Customer (Code) — นับเฉพาะ "UFUND PERSONAL"
+    // (ไม่นับ UFUND UNIDAYS / UFUND STUDENT)
+    void ufundFilters;
     const isUfundBill = (b: BillSummary) =>
-      (ufundFilters.length > 0 && countItemQuantityAnyFilter(b, ufundFilters) > 0) ||
-      b.lineItems.some((li) =>
-        /ufund/i.test(`${li["Customer (Code)"] ?? ""} ${li["Customer (Name)"] ?? ""} ${li["Comment"] ?? ""}`),
-      );
+      b.lineItems.some((li) => /ufund\s*personal/i.test(String(li["Customer (Code)"] ?? "")));
     const rawIsIphone = (li: RawRow) => String(li["Category (Name)"] ?? "").trim().toLowerCase() === "iphone";
 
     const officerList = (parsedReport.officers.length > 0
