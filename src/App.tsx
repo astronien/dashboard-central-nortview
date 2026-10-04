@@ -3457,6 +3457,14 @@ function AppInternal({
     };
     const coverFilters = presetFilters(/cover/i);
     const ufundFilters = presetFilters(/ufund/i);
+    // UFUND ในไฟล์ขายระบุด้วย Customer (Code) เช่น "UFUND PERSONAL" / "UFUND UNIDAYS"
+    // / "UFUND STUDENT" (หรือใน Comment) — จับทุกแบบ ไม่พึ่งว่า preset ติ๊กครบไหม
+    const isUfundBill = (b: BillSummary) =>
+      (ufundFilters.length > 0 && countItemQuantityAnyFilter(b, ufundFilters) > 0) ||
+      b.lineItems.some((li) =>
+        /ufund/i.test(`${li["Customer (Code)"] ?? ""} ${li["Customer (Name)"] ?? ""} ${li["Comment"] ?? ""}`),
+      );
+    const rawIsIphone = (li: RawRow) => String(li["Category (Name)"] ?? "").trim().toLowerCase() === "iphone";
 
     const officerList = (parsedReport.officers.length > 0
       ? parsedReport.officers.map((o) => ({ name: o.name, staffId: o.staffId, position: o.position }))
@@ -3480,7 +3488,13 @@ function AppInternal({
         let deviceBills = 0;
         // บิล iPhone ที่ "มีอย่างน้อย 1 อย่าง": Cover / UFUND / SIM / Acc ≥3 ชิ้น
         let creditedBills = 0;
+        let ufundIphoneBills = 0;
+        let ufundOther = 0; // บิล UFUND ที่ไม่มีแถว iPhone (เช่นตอนกรอง iPhone 18 ออก)
+        let uncreditedBills = 0;
         for (const b of officerBills) {
+          if (!b.lineItems.some(rawIsIphone)) {
+            if (isUfundBill(b)) ufundOther += 1;
+          }
           // ใช้คอลัมน์ Category (Name) ตรงๆ — getCategory เดาจากชื่อสินค้าด้วย
           // ทำให้ฟิล์ม/เคส "for iPhone" ถูกนับเป็นตัวเครื่อง
           const rawCatOf = (li: RawRow) => String(li["Category (Name)"] ?? "").trim().toLowerCase();
@@ -3491,7 +3505,7 @@ function AppInternal({
             coverFilters.length > 0
               ? countItemQuantityAnyFilter(b, coverFilters) > 0
               : b.lineItems.some((li) => /cover\s*\+|coverplus/i.test(String(li["Product (Name)"] ?? "")));
-          const hasUfund = ufundFilters.length > 0 && countItemQuantityAnyFilter(b, ufundFilters) > 0;
+          const hasUfund = isUfundBill(b);
           const hasSim = b.lineItems.some((li) => {
             const rc = String(li["Category (Name)"] ?? "").toLowerCase();
             return rc.includes("sim") || rc.includes("promo operator");
@@ -3510,7 +3524,15 @@ function AppInternal({
           attachPieces += piecesInBill;
           if (piecesInBill >= ATTACH_PER_BILL_TARGET) qualifiedBills += 1;
           if (hasCover || hasUfund || hasSim || piecesInBill >= ATTACH_PER_BILL_TARGET) creditedBills += 1;
+          if (hasUfund) ufundIphoneBills += 1;
+          else if (!hasCover && !hasSim && piecesInBill < ATTACH_PER_BILL_TARGET) uncreditedBills += 1;
         }
+        // UFUND: ถ้าไฟล์ขายยังไม่มี (บิลไฟแนนซ์มักลงระบบช้า) ใช้ยอดอนุมัติจาก uFund API
+        const ufundApi = ufundDailyForOfficer(officer.staffId, officer.name);
+        const ufundApiApproved = ufundApi?.approved ?? 0;
+        const ufundUnits = Math.max(ufundIphoneBills, ufundApiApproved);
+        // UFUND จาก API ที่ไม่อยู่ในไฟล์ → ถือว่าช่วยบิลที่ยังไม่ผ่านได้
+        creditedBills += Math.min(uncreditedBills, Math.max(0, ufundApiApproved - ufundIphoneBills));
         // ทุก iPhone 4 เครื่อง ต้องมีบิลที่แนบได้อย่างน้อย 1 บิล — ไม่ถึงให้ช่อง iPhone เป็นสีแดง
         const iphoneUnitForAlert = unitsOf(officerBills, "iPhone");
         const requiredCredits = Math.floor(iphoneUnitForAlert / 4);
@@ -3550,6 +3572,15 @@ function AppInternal({
                 kind,
                 unit: r.billsWithAandB,
                 att: base > 0 ? (r.billsWithAandB / base) * 100 : 0,
+              };
+            }
+            // UFUND = บิล iPhone ที่ลูกค้าเป็น UFUND (ทุกรหัส) หรือยอดอนุมัติจาก API
+            if (/ufund/i.test(p.name)) {
+              cells[p.id] = {
+                kind,
+                unit: ufundUnits,
+                ...(excludeIphone18 ? { unit18: ufundOther } : {}),
+                att: base > 0 ? (ufundUnits / base) * 100 : 0,
               };
             }
           } else {
@@ -3637,6 +3668,7 @@ function AppInternal({
     kpiPresets,
     currentRowsAllModels,
     excludeIphone18,
+    ufundDailyForOfficer,
   ]);
 
   const dynamicRadarData = useMemo(() => {
