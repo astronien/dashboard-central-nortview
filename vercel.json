@@ -8,7 +8,17 @@
     }
   },
   "rewrites": [
-    { "source": "/api/uploads/:kind", "destination": "/api/uploads?kind=:kind" },
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    {
+      "source": "/api/uploads/:kind",
+      "destination": "/api/uploads?kind=:kind"
+    },
+    {
+      "source": "/api/line-webhook",
+      "destination": "/api/health?line=1"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
   ]
 }

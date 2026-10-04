@@ -3494,6 +3494,8 @@ function AppInternal({
         // บิล iPhone ที่ "มีอย่างน้อย 1 อย่าง": Cover / UFUND / SIM / Acc ≥3 ชิ้น
         let creditedBills = 0;
         let ufundIphoneBills = 0;
+        let coverIphoneBills = 0;
+        let simIphoneBills = 0;
         let ufundOther = 0; // บิล UFUND ที่ไม่มีแถว iPhone (เช่นตอนกรอง iPhone 18 ออก)
         for (const b of officerBills) {
           if (!b.lineItems.some(rawIsIphone)) {
@@ -3529,6 +3531,8 @@ function AppInternal({
           if (piecesInBill >= ATTACH_PER_BILL_TARGET) qualifiedBills += 1;
           if (hasCover || hasUfund || hasSim || piecesInBill >= ATTACH_PER_BILL_TARGET) creditedBills += 1;
           if (hasUfund) ufundIphoneBills += 1;
+          if (hasCover) coverIphoneBills += 1;
+          if (hasSim) simIphoneBills += 1;
 
         }
         // UFUND: นับจากไฟล์ขายอย่างเดียว (Customer Code = UFUND PERSONAL)
@@ -3599,6 +3603,9 @@ function AppInternal({
           requiredCredits,
           iphoneAttachAlert,
           iphoneAttachWarn,
+          coverBills: coverIphoneBills,
+          ufundBills: ufundIphoneBills,
+          simBills: simIphoneBills,
           iphoneUnit,
           iphoneBaht: bahtOf(officerBills, "iPhone"),
           ipadUnit,
@@ -3669,6 +3676,59 @@ function AppInternal({
     currentRowsAllModels,
     excludeIphone18,
   ]);
+
+  // ─── LINE bot snapshot ───────────────────────────────────────────────────
+  // บันทึกผลตาราง "รายงานยอดขาย + Attach รายวัน" ไว้ที่ server ให้ LINE bot
+  // อ่านไปตอบในกลุ่ม (bot ไม่ต้องคำนวณเอง → ตัวเลขตรงกับหน้าเว็บเสมอ)
+  const lastLineSnapshotRef = React.useRef<string>("");
+  useEffect(() => {
+    if (!dailyBranchReport.latestDate) return;
+    const officers = dailyBranchReport.rows.filter((r) => !(r as { isTotal?: boolean }).isTotal);
+    if (!officers.length) return;
+    const payload = {
+      date: dailyBranchReport.latestDate,
+      branch: selectedBranch,
+      excludeIphone18,
+      dashboardUrl: typeof window !== "undefined" ? window.location.origin : "",
+      rows: officers.map((r) => {
+        const x = r as typeof r & {
+          creditedBills?: number;
+          requiredCredits?: number;
+          iphoneAttachAlert?: boolean;
+          iphoneAttachWarn?: boolean;
+          coverBills?: number;
+          ufundBills?: number;
+          simBills?: number;
+        };
+        return {
+          name: x.name,
+          totalBaht: Math.round(x.totalBaht),
+          iphone: x.iphoneUnit,
+          iphoneBills: x.billCount ?? 0,
+          credited: x.creditedBills ?? 0,
+          required: x.requiredCredits ?? 0,
+          qualified: x.qualifiedBills ?? 0,
+          cover: x.coverBills ?? 0,
+          ufund: x.ufundBills ?? 0,
+          sim: x.simBills ?? 0,
+          status: x.iphoneAttachAlert ? "red" : x.iphoneAttachWarn ? "yellow" : "green",
+        };
+      }),
+    };
+    const key = JSON.stringify(payload);
+    if (key === lastLineSnapshotRef.current) return;
+    const t = window.setTimeout(() => {
+      lastLineSnapshotRef.current = key;
+      void fetch("/api/line-webhook?resource=snapshot", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: key,
+      }).catch(() => {
+        lastLineSnapshotRef.current = "";
+      });
+    }, 1500);
+    return () => window.clearTimeout(t);
+  }, [dailyBranchReport, selectedBranch, excludeIphone18]);
 
   const dynamicRadarData = useMemo(() => {
     if (activeStat === "csat") {

@@ -5,7 +5,13 @@ const {
   initDatabase,
 } = require("./_lib/turso");
 
+const { handleLine } = require("./_lib/lineBot");
+
 module.exports = async function handler(req, res) {
+  // LINE bot (พ่วงไว้ที่นี่เพื่อไม่ให้เกิน 12 functions)
+  //   /api/line-webhook → rewrite → /api/health?line=1
+  if (req.query?.line === "1") return handleLine(req, res);
+
   try {
     const { httpUrl } = getTursoConfig();
     const showTables = req.query?.tables === "1";
@@ -53,4 +59,12 @@ module.exports = async function handler(req, res) {
       error instanceof Error ? error.message : "Turso is not configured.";
     return res.status(503).json({ ok: false, error: message });
   }
+};
+
+// ปิด bodyParser — LINE webhook ต้องใช้ raw body ตรวจลายเซ็น (x-line-signature)
+// ส่วน health เดิมไม่ได้อ่าน body อยู่แล้ว
+module.exports.config = {
+  api: {
+    bodyParser: false,
+  },
 };
