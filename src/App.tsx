@@ -3593,6 +3593,7 @@ function AppInternal({
         });
         return {
           name: officer.name,
+          staffId: officer.staffId,
           totalBaht,
           totalDevice,
           billCount,
@@ -3699,9 +3700,20 @@ function AppInternal({
           coverBills?: number;
           ufundBills?: number;
           simBills?: number;
+          staffId?: string;
         };
+        // รูปจากหน้า Staff Profile → ส่ง key ของรูปใน DB ให้ bot สร้าง URL รูป
+        const photoUrl = getStaffPhotoUrl(reconciledStaffPhotos, {
+          staffId: x.staffId,
+          officerKey: cleanOfficerName(x.name),
+        });
+        const photoRec = photoUrl
+          ? Object.values(reconciledStaffPhotos).find((p) => p.photoUrl === photoUrl)
+          : undefined;
         return {
           name: x.name,
+          photoId: photoRec?.staffId ?? "",
+          photoVer: String(photoRec?.updatedAt ?? "").replace(/\D/g, "").slice(0, 14),
           totalBaht: Math.round(x.totalBaht),
           iphone: x.iphoneUnit,
           iphoneBills: x.billCount ?? 0,
@@ -3728,7 +3740,7 @@ function AppInternal({
       });
     }, 1500);
     return () => window.clearTimeout(t);
-  }, [dailyBranchReport, selectedBranch, excludeIphone18]);
+  }, [dailyBranchReport, selectedBranch, excludeIphone18, reconciledStaffPhotos]);
 
   const dynamicRadarData = useMemo(() => {
     if (activeStat === "csat") {

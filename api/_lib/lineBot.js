@@ -178,6 +178,52 @@ function flex(altText, bubble) {
 
 const RULE_TEXT = "กติกา: ขาย iPhone ทุก 4 เครื่อง ต้องมีอย่างน้อย 1 บิลที่แนบ Cover+ / UFUND / SIM หรือ Acc 3 ชิ้น";
 
+/** URL รูปพนักงาน (จากหน้า Staff Profile) — LINE ต้องเป็น https + JPEG/PNG */
+function photoUrlOf(snap, r) {
+  const base = String(snap?.dashboardUrl ?? "");
+  if (!r.photoId || !/^https:\/\//.test(base)) return null;
+  const v = r.photoVer ? `&v=${r.photoVer}` : "";
+  return `${base}/api/staff-photos?resource=image&id=${encodeURIComponent(r.photoId)}${v}`;
+}
+
+/** header การ์ดรายคน: รูป + ชื่อ */
+function personHeader(snap, r) {
+  const url = photoUrlOf(snap, r);
+  const textBox = {
+    type: "box",
+    layout: "vertical",
+    justifyContent: "center",
+    flex: 1,
+    contents: [
+      txt(r.name, { color: "#FFFFFF", weight: "bold", size: "lg" }),
+      txt(`${fmtDate(snap.date)} · ${subTitle(snap)}`, { color: C.brandSub, size: "xs" }),
+    ],
+  };
+  if (!url) return header(r.name, `${fmtDate(snap.date)} · ${subTitle(snap)}`);
+  return {
+    type: "box",
+    layout: "horizontal",
+    backgroundColor: C.brand,
+    paddingAll: "14px",
+    spacing: "md",
+    contents: [
+      {
+        type: "box",
+        layout: "vertical",
+        width: "72px",
+        height: "96px",
+        cornerRadius: "12px",
+        backgroundColor: "#D1FAE5",
+        flex: 0,
+        contents: [
+          { type: "image", url, size: "full", aspectRatio: "3:4", aspectMode: "fit", gravity: "top" },
+        ],
+      },
+      textBox,
+    ],
+  };
+}
+
 /** เครื่องที่เท่าไหร่ของก้อน 4 ปัจจุบัน (1–4) */
 function blockPos(r) {
   if (r.iphone <= 0) return 0;
@@ -336,7 +382,7 @@ function personBubble(snap, r) {
   return {
     type: "bubble",
     size: "mega",
-    header: header(r.name, `${fmtDate(snap.date)} · ${subTitle(snap)}`),
+    header: personHeader(snap, r),
     body: {
       type: "box",
       layout: "vertical",
@@ -580,6 +626,8 @@ async function handleSnapshot(req, res) {
       dashboardUrl: String(body.dashboardUrl ?? "").slice(0, 200),
       rows: body.rows.slice(0, 40).map((r) => ({
         name: String(r.name ?? "").slice(0, 80),
+        photoId: String(r.photoId ?? "").slice(0, 60),
+        photoVer: String(r.photoVer ?? "").replace(/\D/g, "").slice(0, 14),
         totalBaht: Number(r.totalBaht) || 0,
         iphone: Number(r.iphone) || 0,
         iphoneBills: Number(r.iphoneBills) || 0,

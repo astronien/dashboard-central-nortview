@@ -124,6 +124,36 @@ async function handler(req, res) {
     }
   }
 
+  // รูปพนักงานเป็นไฟล์ภาพจริง (ไม่ใช่ data URI) — ให้ LINE Flex Message ดึงไปแสดง
+  //   GET /api/staff-photos?resource=image&id=<staff_id ใน DB>
+  if (req.query?.resource === "image") {
+    try {
+      const id = String(req.query?.id ?? "").trim();
+      if (!id) return res.status(400).end();
+      const result = await tursoExecute(
+        "SELECT photo_url FROM staff_photos WHERE staff_id = ? LIMIT 1",
+        [id],
+      );
+      const row = (result.rows ?? [])[0];
+      // Turso pipeline: row = [{ type, value }]
+      const cell = row ? (Array.isArray(row) ? row[0] : row.photo_url ?? Object.values(row)[0]) : null;
+      const dataUrl = String(
+        (cell && typeof cell === "object" && "value" in cell ? cell.value : cell) ?? "",
+      );
+      const m = /^data:(image\/(?:png|jpe?g));base64,(.+)$/i.exec(dataUrl);
+      if (!m) return res.status(404).end();
+      const buf = Buffer.from(m[2], "base64");
+      res.setHeader("Content-Type", m[1].toLowerCase().replace("jpg", "jpeg"));
+      res.setHeader("Content-Length", String(buf.length));
+      // URL มี ?v=<updatedAt> อยู่แล้ว → cache ได้นาน
+      res.setHeader("Cache-Control", "public, max-age=86400, s-maxage=604800");
+      return res.status(200).end(buf);
+    } catch (e) {
+      console.error("[api/staff-photos] image", e);
+      return res.status(500).end();
+    }
+  }
+
   if (req.query?.resource === "visible-staff") {
     try {
       return await handleVisibleStaff(req, res);
