@@ -3465,9 +3465,14 @@ function AppInternal({
         // Attach ต่อบิล — บิลจะ "ผ่าน" ก็ต่อเมื่อมีชิ้น attach (UFUND / Cover /
         // SIM / Accessories = ทุกอย่างที่ไม่ใช่ตัวเครื่องและไม่ใช่บรรทัดส่วนลด)
         // อย่างน้อย 3 ชิ้นในบิลเดียว
+        // ฐาน = เฉพาะบิลที่มีตัวเครื่อง (บิลขายอุปกรณ์เสริมล้วนไม่นับ)
         let attachPieces = 0;
         let qualifiedBills = 0;
+        let deviceBills = 0;
         for (const b of officerBills) {
+          const hasDevice = b.lineItems.some((li) => DEVICE_CATS_FOR_ATTACH.has(getCategory(li)));
+          if (!hasDevice) continue;
+          deviceBills += 1;
           let piecesInBill = 0;
           for (const li of b.lineItems) {
             const catName = getCategory(li);
@@ -3480,7 +3485,7 @@ function AppInternal({
           attachPieces += piecesInBill;
           if (piecesInBill >= ATTACH_PER_BILL_TARGET) qualifiedBills += 1;
         }
-        const billCount = officerBills.length;
+        const billCount = deviceBills;
         const attachPerBill = billCount > 0 ? (qualifiedBills / billCount) * 100 : 0;
 
         const iphoneUnit = unitsOf(officerBills, "iPhone");

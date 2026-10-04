@@ -152,7 +152,7 @@ export const DailyBranchReportSection: React.FC<{ data: DailyReportData }> = ({ 
       <div className="flex items-start justify-between gap-3 mb-4">
         <p className="text-xs text-slate-400">
           ข้อมูลวันล่าสุด {fmtDay(data.latestDate)} · ATT% = จำนวน ÷ ฐาน (ส่วนใหญ่ ÷ iPhone, AC+ ÷ iPhone+iPad,
-          Pencil/iPad Acc ÷ iPad) · <span className="text-emerald-700 font-semibold">บิลผ่าน = บิลที่มี UFUND+Cover+SIM+Acc ≥ 3 ชิ้น</span>
+          Pencil/iPad Acc ÷ iPad) · <span className="text-emerald-700 font-semibold">บิลผ่าน = บิลที่มีตัวเครื่อง และมี UFUND+Cover+SIM+Acc ≥ 3 ชิ้น</span>
           {" · "}<span className="text-slate-500">ลากหัวคอลัมน์เพื่อสลับตำแหน่งได้</span>
           {hasSplit ? (
             <>
@@ -223,7 +223,7 @@ export const DailyBranchReportSection: React.FC<{ data: DailyReportData }> = ({ 
               <th className="py-1 px-2 text-right bg-slate-100">฿</th>
               <th className="py-1 px-2 text-right bg-slate-50 border-l border-slate-200">จำนวน</th>
               <th className="py-1 px-2 text-right bg-slate-50">฿</th>
-              <th className="py-1 px-2 text-right border-l border-slate-200">บิลทั้งหมด</th>
+              <th className="py-1 px-2 text-right border-l border-slate-200" title="เฉพาะบิลที่มีตัวเครื่อง (Mac / iPad / iPhone / Apple Watch)">บิลเครื่อง</th>
               <th className="py-1 px-2 text-right">ผ่าน</th>
               <th className="py-1 px-2 text-center">% ผ่าน</th>
               {presets.map((p) =>
