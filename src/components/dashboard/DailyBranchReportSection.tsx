@@ -30,6 +30,12 @@ export type DailyReportRow = {
   attachPieces?: number;
   qualifiedBills?: number;
   attachPerBill?: number;
+  /** บิล iPhone ที่มี Cover / UFUND / SIM / Acc ≥3 อย่างน้อย 1 อย่าง */
+  creditedBills?: number;
+  /** ต้องมีกี่บิล (1 ต่อ iPhone 4 เครื่อง) */
+  requiredCredits?: number;
+  /** true = ขาย iPhone ครบ 4 เครื่องแต่แนบไม่ถึงโควตา → ช่อง iPhone สีแดง */
+  iphoneAttachAlert?: boolean;
   iphoneUnit: number;
   iphoneBaht: number;
   ipadUnit: number;
@@ -153,6 +159,8 @@ export const DailyBranchReportSection: React.FC<{ data: DailyReportData }> = ({ 
         <p className="text-xs text-slate-400">
           ข้อมูลวันล่าสุด {fmtDay(data.latestDate)} · ATT% = จำนวน ÷ ฐาน (ส่วนใหญ่ ÷ iPhone, AC+ ÷ iPhone+iPad,
           Pencil/iPad Acc ÷ iPad) · <span className="text-emerald-700 font-semibold">บิลผ่าน = บิลที่มี iPhone และมี UFUND+Cover+SIM+Acc ≥ 3 ชิ้น</span>
+          {" · "}<span className="px-1 rounded bg-rose-500 text-white font-semibold">iPhone สีแดง</span>{" "}
+          = ขาย iPhone ทุก 4 เครื่องแต่ไม่มีบิลที่แนบ Cover / UFUND / SIM / Acc ≥3 ชิ้น
           {" · "}<span className="text-slate-500">ลากหัวคอลัมน์เพื่อสลับตำแหน่งได้</span>
           {hasSplit ? (
             <>
@@ -257,8 +265,25 @@ export const DailyBranchReportSection: React.FC<{ data: DailyReportData }> = ({ 
                 </td>
                 <td className="py-1.5 px-2 text-right font-semibold bg-slate-50/40">{fmtBaht(r.totalBaht)}</td>
                 <td className="py-1.5 px-2 text-right font-semibold">{num(r.totalDevice)}</td>
-                <td className="py-1.5 px-2 text-right border-l border-slate-200">{num(r.iphoneUnit)}</td>
-                <td className="py-1.5 px-2 text-right text-slate-400">{r.iphoneBaht ? fmtBaht(r.iphoneBaht) : "–"}</td>
+                <td
+                  className={`py-1.5 px-2 text-right border-l border-slate-200 ${
+                    r.iphoneAttachAlert ? "bg-rose-500 text-white font-extrabold" : ""
+                  }`}
+                  title={
+                    r.isTotal
+                      ? undefined
+                      : `บิล iPhone ที่แนบ Cover/UFUND/SIM/Acc≥3: ${r.creditedBills ?? 0} บิล (ต้องมี ${r.requiredCredits ?? 0} — 1 ต่อ iPhone 4 เครื่อง)`
+                  }
+                >
+                  {num(r.iphoneUnit)}
+                </td>
+                <td
+                  className={`py-1.5 px-2 text-right ${
+                    r.iphoneAttachAlert ? "bg-rose-500 text-white" : "text-slate-400"
+                  }`}
+                >
+                  {r.iphoneBaht ? fmtBaht(r.iphoneBaht) : "–"}
+                </td>
                 <td className="py-1.5 px-2 text-right border-l border-slate-200">{num(r.ipadUnit)}</td>
                 <td className="py-1.5 px-2 text-right text-slate-400">{r.ipadBaht ? fmtBaht(r.ipadBaht) : "–"}</td>
                 <td className="py-1.5 px-2 text-right border-l border-slate-200">{num(r.billCount ?? 0)}</td>

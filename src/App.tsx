@@ -3449,6 +3449,13 @@ function AppInternal({
       return { older, gen18 };
     };
 
+    const presetFilters = (re: RegExp) => {
+      const p = kpiPresets.find((x) => re.test(x.name));
+      return p ? p.filtersA ?? (p.filterA ? [p.filterA] : []) : [];
+    };
+    const coverFilters = presetFilters(/cover/i);
+    const ufundFilters = presetFilters(/ufund/i);
+
     const officerList = (parsedReport.officers.length > 0
       ? parsedReport.officers.map((o) => ({ name: o.name, staffId: o.staffId, position: o.position }))
       : Array.from(
@@ -3469,10 +3476,21 @@ function AppInternal({
         let attachPieces = 0;
         let qualifiedBills = 0;
         let deviceBills = 0;
+        // บิล iPhone ที่ "มีอย่างน้อย 1 อย่าง": Cover / UFUND / SIM / Acc ≥3 ชิ้น
+        let creditedBills = 0;
         for (const b of officerBills) {
           const hasIphone = b.lineItems.some((li) => getCategory(li) === "iPhone");
           if (!hasIphone) continue;
           deviceBills += 1;
+          const hasCover =
+            coverFilters.length > 0
+              ? countItemQuantityAnyFilter(b, coverFilters) > 0
+              : b.lineItems.some((li) => /cover\s*\+|coverplus/i.test(String(li["Product (Name)"] ?? "")));
+          const hasUfund = ufundFilters.length > 0 && countItemQuantityAnyFilter(b, ufundFilters) > 0;
+          const hasSim = b.lineItems.some((li) => {
+            const rc = String(li["Category (Name)"] ?? "").toLowerCase();
+            return rc.includes("sim") || rc.includes("promo operator");
+          });
           let piecesInBill = 0;
           for (const li of b.lineItems) {
             const catName = getCategory(li);
@@ -3484,7 +3502,12 @@ function AppInternal({
           }
           attachPieces += piecesInBill;
           if (piecesInBill >= ATTACH_PER_BILL_TARGET) qualifiedBills += 1;
+          if (hasCover || hasUfund || hasSim || piecesInBill >= ATTACH_PER_BILL_TARGET) creditedBills += 1;
         }
+        // ทุก iPhone 4 เครื่อง ต้องมีบิลที่แนบได้อย่างน้อย 1 บิล — ไม่ถึงให้ช่อง iPhone เป็นสีแดง
+        const iphoneUnitForAlert = unitsOf(officerBills, "iPhone");
+        const requiredCredits = Math.floor(iphoneUnitForAlert / 4);
+        const iphoneAttachAlert = requiredCredits > 0 && creditedBills < requiredCredits;
         const billCount = deviceBills;
         const attachPerBill = billCount > 0 ? (qualifiedBills / billCount) * 100 : 0;
 
@@ -3531,6 +3554,9 @@ function AppInternal({
           attachPieces,
           qualifiedBills,
           attachPerBill,
+          creditedBills,
+          requiredCredits,
+          iphoneAttachAlert,
           iphoneUnit,
           iphoneBaht: bahtOf(officerBills, "iPhone"),
           ipadUnit,
@@ -3577,6 +3603,9 @@ function AppInternal({
       attachPieces: totalPieces,
       qualifiedBills: totalQualified,
       attachPerBill: totalBills > 0 ? (totalQualified / totalBills) * 100 : 0,
+      creditedBills: sum((r) => r.creditedBills),
+      requiredCredits: sum((r) => r.requiredCredits),
+      iphoneAttachAlert: false,
       iphoneUnit: totalIphone,
       iphoneBaht: sum((r) => r.iphoneBaht),
       ipadUnit: totalIpad,
