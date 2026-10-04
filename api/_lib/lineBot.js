@@ -186,28 +186,58 @@ function photoUrlOf(snap, r) {
   return `${base}/api/staff-photos?resource=image&id=${encodeURIComponent(r.photoId)}${v}`;
 }
 
-/** ส่วนบนการ์ดรายคน: รูปใหญ่เต็มความกว้าง พื้นหลังไล่สีเขียวเข้ม
- *  (รูป PNG โปร่งแสงจากหน้า Staff Profile จะลอยบนพื้นเขียว ไม่มีกรอบขาว) */
-function personHero(snap, r) {
+/** header การ์ดรายคน: รูป (ซ้าย) + ชื่อ (ขวา)
+ *  - กรอบรูปไม่มีสีพื้น → PNG โปร่งแสงลอยบนพื้นเขียวของ header
+ *  - ช่วงล่างของรูปไล่จางกลืนไปกับสี header */
+function personHeader(snap, r) {
   const url = photoUrlOf(snap, r);
-  if (!url) return null;
+  if (!url) return header(r.name, `${fmtDate(snap.date)} · ${subTitle(snap)}`);
   return {
     type: "box",
-    layout: "vertical",
-    paddingTop: "16px",
-    paddingBottom: "14px",
-    paddingStart: "16px",
-    paddingEnd: "16px",
-    background: {
-      type: "linearGradient",
-      angle: "180deg",
-      startColor: "#14532D",
-      endColor: C.brand,
-    },
+    layout: "horizontal",
+    backgroundColor: C.brand,
+    paddingAll: "14px",
+    paddingBottom: "0px",
+    spacing: "md",
     contents: [
-      { type: "image", url, size: "full", aspectRatio: "1:1", aspectMode: "fit" },
-      txt(r.name, { color: "#FFFFFF", weight: "bold", size: "xl", align: "center", margin: "md" }),
-      txt(`${fmtDate(snap.date)} · ${subTitle(snap)}`, { color: C.brandSub, size: "xs", align: "center" }),
+      {
+        type: "box",
+        layout: "vertical",
+        width: "96px",
+        height: "120px",
+        flex: 0,
+        contents: [
+          { type: "image", url, size: "full", aspectRatio: "4:5", aspectMode: "fit", gravity: "bottom" },
+          {
+            // เฟดด้านล่าง: โปร่งใส → สี header
+            type: "box",
+            layout: "vertical",
+            position: "absolute",
+            offsetBottom: "0px",
+            offsetStart: "0px",
+            offsetEnd: "0px",
+            height: "45%",
+            background: {
+              type: "linearGradient",
+              angle: "0deg",
+              startColor: C.brand,
+              endColor: "#0B3D2E00",
+            },
+            contents: [],
+          },
+        ],
+      },
+      {
+        type: "box",
+        layout: "vertical",
+        justifyContent: "center",
+        paddingBottom: "14px",
+        flex: 1,
+        contents: [
+          txt(r.name, { color: "#FFFFFF", weight: "bold", size: "lg" }),
+          txt(`${fmtDate(snap.date)} · ${subTitle(snap)}`, { color: C.brandSub, size: "xs" }),
+        ],
+      },
     ],
   };
 }
@@ -370,9 +400,7 @@ function personBubble(snap, r) {
   return {
     type: "bubble",
     size: "mega",
-    ...(personHero(snap, r)
-      ? { hero: personHero(snap, r) }
-      : { header: header(r.name, `${fmtDate(snap.date)} · ${subTitle(snap)}`) }),
+    header: personHeader(snap, r),
     body: {
       type: "box",
       layout: "vertical",
