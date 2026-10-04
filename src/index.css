@@ -122,3 +122,48 @@ html.theme-light .text-teal-300\/80 { color: rgb(15 118 110 / 0.9); }
 
 /* Drop-shadowed header text sat on a dark panel; flatten on light */
 html.theme-light .drop-shadow-md { filter: none; }
+
+/* ── เติม: สีโทนอ่อนที่ยังไม่ได้แมป (มองไม่เห็นบนพื้นขาว) ───────────── */
+html.theme-light .text-emerald-50,
+html.theme-light .text-emerald-100,
+html.theme-light .text-emerald-300\/90,
+html.theme-light .text-emerald-400\/80,
+html.theme-light .text-green-300,
+html.theme-light .text-green-300\/80 { color: #047857; }
+html.theme-light .text-teal-100,
+html.theme-light .text-teal-300 { color: #0f766e; }
+html.theme-light .text-sky-100\/90,
+html.theme-light .text-blue-300,
+html.theme-light .text-blue-400 { color: #1d4ed8; }
+html.theme-light .text-purple-200,
+html.theme-light .text-purple-300 { color: #7e22ce; }
+html.theme-light .text-amber-100,
+html.theme-light .text-amber-300\/70,
+html.theme-light .text-yellow-50,
+html.theme-light .text-yellow-400 { color: #b45309; }
+html.theme-light .text-orange-300,
+html.theme-light .text-orange-400 { color: #c2410c; }
+html.theme-light .text-red-100,
+html.theme-light .text-red-200,
+html.theme-light .text-red-300,
+html.theme-light .text-rose-200,
+html.theme-light .text-rose-100\/90,
+html.theme-light .text-rose-300\/80 { color: #be123c; }
+html.theme-light .text-slate-50 { color: #14261e; }
+html.theme-light .text-slate-300 { color: #475569; }
+html.theme-light .fill-emerald-200 { fill: #047857; }
+
+/* ── กราฟ (SVG/Recharts): สีขาวที่ฝังใน attribute → สีเข้ม ──────────── */
+html.theme-light svg text[fill="#fff"],
+html.theme-light svg text[fill="#ffffff"],
+html.theme-light svg text[fill="white"],
+html.theme-light svg text[fill^="rgba(255,255,255"],
+html.theme-light svg text[fill^="rgba(255, 255, 255"],
+html.theme-light svg tspan[fill^="rgba(255,255,255"] { fill: #14261e; }
+html.theme-light svg text[fill="#34d399"] { fill: #047857; }
+html.theme-light svg [stroke^="rgba(255,255,255"],
+html.theme-light svg [stroke^="rgba(255, 255, 255"] { stroke: rgb(15 45 32 / 0.18); }
+/* ป้ายแกน Recharts ที่เป็นสีเทาอ่อน */
+html.theme-light .recharts-cartesian-axis-tick-value,
+html.theme-light .recharts-polar-angle-axis-tick-value { fill: #475569; }
+html.theme-light .recharts-legend-item-text { color: #334155 !important; }
