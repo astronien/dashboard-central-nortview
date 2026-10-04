@@ -615,7 +615,7 @@ function helpBubble() {
 }
 
 /** ปุ่มลัดใต้ข้อความ (Quick Reply) — กดแล้วส่งคำสั่งให้เลย ไม่ต้องพิมพ์ */
-function quickReply(snap) {
+function quickReply(snap, withPeople = true) {
   const items = [
     { label: "📋 เช็ค", text: "เช็ค" },
     { label: "👉 ใครรับต่อ", text: "ใครรับต่อ" },
@@ -623,7 +623,7 @@ function quickReply(snap) {
   const people = [...(snap?.rows ?? [])]
     .filter((r) => r.iphone > 0 || r.status !== "green")
     .sort((a, b) => (STATUS_ORDER[a.status] ?? 3) - (STATUS_ORDER[b.status] ?? 3) || b.iphone - a.iphone);
-  people.slice(0, 11).forEach((r) => {
+  if (withPeople) people.slice(0, 11).forEach((r) => {
     const fn = firstName(r.name);
     const icon = r.status === "red" ? "🔴" : r.status === "yellow" ? "🟡" : "🟢";
     items.push({ label: `${icon} ${fn}`.slice(0, 20), text: `เช็ค ${fn}` });
@@ -683,7 +683,8 @@ async function buildReply(text) {
     : yellows
       ? `👀 ${yellows} คนต้องระวัง`
       : "✅ ทุกคนแนบครบตามกติกา";
-  return [{ ...flex(alt, summaryBubble(snap)), quickReply: qr }];
+  // หน้าสรุปมีปุ่มชื่อพนักงานใน footer แล้ว → quick reply เหลือแค่ปุ่มคำสั่ง
+  return [{ ...flex(alt, summaryBubble(snap)), quickReply: quickReply(snap, false) }];
 }
 
 // ── handlers ───────────────────────────────────────────────────────────────
