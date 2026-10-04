@@ -174,87 +174,165 @@ function flex(altText, bubble) {
 }
 
 // ── bubbles ────────────────────────────────────────────────────────────────
+// หลักออกแบบ: ภาษาพูด ไม่ใช้ตัวย่อ, จัดกลุ่มตามสถานะ, บอก "ต้องทำอะไร" ชัดๆ
+
+const RULE_TEXT = "กติกา: ขาย iPhone ทุก 4 เครื่อง ต้องมีอย่างน้อย 1 บิลที่แนบ Cover+ / UFUND / SIM หรือ Acc 3 ชิ้น";
+
+/** เครื่องที่เท่าไหร่ของก้อน 4 ปัจจุบัน (1–4) */
+function blockPos(r) {
+  if (r.iphone <= 0) return 0;
+  const m = r.iphone % 4;
+  return m === 0 ? 4 : m;
+}
+
+/** ประโยคสั้นๆ อธิบายสถานะของคนนั้น */
+function personSentence(r) {
+  if (r.status === "red") {
+    const missing = Math.max(1, r.required - r.credited);
+    return r.credited === 0
+      ? `ขาย iPhone ${r.iphone} เครื่อง · ยังไม่มีบิลแนบเลย`
+      : `ขาย iPhone ${r.iphone} เครื่อง · แนบแล้ว ${r.credited} บิล ขาดอีก ${missing}`;
+  }
+  if (r.status === "yellow") {
+    return `ขาย iPhone ${r.iphone} เครื่อง · เครื่องถัดไปต้องแนบให้ได้`;
+  }
+  if (r.iphone === 0) return "ยังไม่มียอด iPhone";
+  return `ขาย iPhone ${r.iphone} เครื่อง · แนบแล้ว ${r.credited} บิล`;
+}
+
+function sectionTitle(text, color) {
+  return txt(text, { weight: "bold", size: "sm", color, margin: "lg" });
+}
+
+function personRow(r, color, bg) {
+  return {
+    type: "box",
+    layout: "vertical",
+    backgroundColor: bg,
+    cornerRadius: "8px",
+    paddingAll: "10px",
+    margin: "sm",
+    contents: [
+      txt(r.name, { weight: "bold", size: "sm", color: "#111827" }),
+      txt(personSentence(r), { size: "xs", color }),
+    ],
+  };
+}
+
+function greenRow(r) {
+  return {
+    type: "box",
+    layout: "horizontal",
+    margin: "sm",
+    paddingStart: "4px",
+    contents: [
+      txt(firstName(r.name), { size: "sm", flex: 4, wrap: false }),
+      txt(r.iphone ? `iPhone ${r.iphone} · แนบ ${r.credited} ✓` : "–", {
+        size: "xs",
+        color: C.muted,
+        align: "end",
+        flex: 6,
+      }),
+    ],
+  };
+}
+
+function banner(text, color, bg) {
+  return {
+    type: "box",
+    layout: "vertical",
+    backgroundColor: bg,
+    cornerRadius: "10px",
+    paddingAll: "12px",
+    contents: [txt(text, { weight: "bold", size: "md", color })],
+  };
+}
 
 function summaryBubble(snap) {
-  const rows = [...(snap.rows ?? [])].sort(
-    (a, b) => (STATUS_ORDER[a.status] ?? 3) - (STATUS_ORDER[b.status] ?? 3) || b.iphone - a.iphone,
-  );
-  const count = (s) => rows.filter((r) => r.status === s).length;
+  const rows = snap.rows ?? [];
+  const reds = rows.filter((r) => r.status === "red").sort((a, b) => b.iphone - a.iphone);
+  const yellows = rows.filter((r) => r.status === "yellow").sort((a, b) => b.iphone - a.iphone);
+  const greens = rows.filter((r) => r.status === "green").sort((a, b) => b.iphone - a.iphone);
 
-  const staffRows = rows.map((r) => {
-    const s = statusInfo(r);
-    const attachText = r.required > 0 ? `แนบ ${r.credited}/${r.required}` : `แนบ ${r.credited}`;
-    const line = {
-      type: "box",
-      layout: "horizontal",
-      contents: [
-        txt(`${s.icon} ${firstName(r.name)}`, { weight: r.status === "green" ? "regular" : "bold", size: "sm", flex: 4, wrap: false }),
-        txt(`iPhone ${r.iphone}`, { size: "sm", flex: 3, align: "end", color: C.muted }),
-        txt(attachText, { size: "sm", flex: 3, align: "end", color: s.color, weight: "bold" }),
-      ],
-    };
-    if (r.status === "green") {
-      return { type: "box", layout: "vertical", paddingStart: "10px", paddingEnd: "10px", contents: [line] };
-    }
-    return {
-      type: "box",
-      layout: "vertical",
-      backgroundColor: s.bg,
-      cornerRadius: "8px",
-      paddingAll: "10px",
-      spacing: "xs",
-      contents: [line, txt(s.label, { size: "xxs", color: s.color, weight: "bold" })],
-    };
-  });
+  const headline = reds.length
+    ? banner(`⚠️ ${reds.length} คน ต้องส่งลูกค้า iPhone ให้เพื่อน`, C.red, C.redBg)
+    : yellows.length
+      ? banner(`👀 ${yellows.length} คน ใกล้ครบ 4 เครื่อง ต้องแนบให้ได้`, C.yellow, C.yellowBg)
+      : banner("✅ ทุกคนแนบครบตามกติกา", C.green, C.greenBg);
+
+  const contents = [...staleNotice(snap), headline];
+  if (reds.length) {
+    contents.push(sectionTitle("🔴 ต้องส่งต่อ — ลูกค้า iPhone คนถัดไปให้เพื่อนรับ", C.red));
+    reds.forEach((r) => contents.push(personRow(r, C.red, C.redBg)));
+  }
+  if (yellows.length) {
+    contents.push(sectionTitle("🟡 ระวัง — ขายไป 3 เครื่องแล้ว ยังไม่มีบิลแนบ", C.yellow));
+    yellows.forEach((r) => contents.push(personRow(r, C.yellow, C.yellowBg)));
+  }
+  if (greens.length) {
+    contents.push(sectionTitle("🟢 ปกติ", C.green));
+    greens.forEach((r) => contents.push(greenRow(r)));
+  }
+  contents.push({ type: "separator", color: C.line, margin: "lg" });
+  contents.push(txt(RULE_TEXT, { size: "xxs", color: C.muted, margin: "md" }));
 
   return {
     type: "bubble",
     size: "mega",
-    header: header(`Attach Alert · ${fmtDate(snap.date)}`, subTitle(snap)),
-    body: {
-      type: "box",
-      layout: "vertical",
-      spacing: "md",
-      contents: [
-        ...staleNotice(snap),
-        {
-          type: "box",
-          layout: "horizontal",
-          contents: [
-            txt(`🔴 ${count("red")}`, { weight: "bold", color: C.red, align: "center" }),
-            txt(`🟡 ${count("yellow")}`, { weight: "bold", color: C.yellow, align: "center" }),
-            txt(`🟢 ${count("green")}`, { weight: "bold", color: C.green, align: "center" }),
-          ],
-        },
-        { type: "separator", color: C.line },
-        ...(staffRows.length ? staffRows : [txt("ยังไม่มีข้อมูลพนักงาน", { size: "sm", color: C.muted })]),
-        { type: "separator", color: C.line },
-        txt("กติกา: iPhone ทุก 4 เครื่องต้องมีบิลแนบ Cover / UFUND / SIM / Acc ≥3 ชิ้น อย่างน้อย 1 บิล", {
-          size: "xxs",
-          color: C.muted,
-        }),
-      ],
-    },
+    header: header("สรุป Attach วันนี้", `${fmtDate(snap.date)} · ${subTitle(snap)}`),
+    body: { type: "box", layout: "vertical", spacing: "none", contents },
     footer: footer(snap),
   };
 }
 
-function statLine(label, value, color) {
+/** แถบ 4 ช่อง แสดงว่าก้อนนี้ขายไปกี่เครื่องแล้ว */
+function blockBar(r, color) {
+  const pos = blockPos(r);
+  const cells = [1, 2, 3, 4].map((i) => ({
+    type: "box",
+    layout: "vertical",
+    height: "10px",
+    cornerRadius: "4px",
+    backgroundColor: i <= pos ? color : C.line,
+    contents: [],
+    flex: 1,
+  }));
+  return {
+    type: "box",
+    layout: "vertical",
+    spacing: "xs",
+    contents: [
+      txt(`ก้อนนี้ขายไปแล้ว ${pos} / 4 เครื่อง`, { size: "xs", color: C.muted }),
+      { type: "box", layout: "horizontal", spacing: "xs", contents: cells },
+    ],
+  };
+}
+
+function checkLine(label, n) {
+  const ok = n > 0;
   return {
     type: "box",
     layout: "horizontal",
     contents: [
-      txt(label, { size: "sm", color: C.muted, flex: 5 }),
-      txt(String(value), { size: "sm", weight: "bold", align: "end", flex: 3, ...(color ? { color } : {}) }),
+      txt(`${ok ? "✅" : "▫️"} ${label}`, { size: "sm", flex: 6, color: ok ? "#111827" : C.muted }),
+      txt(ok ? `${n} บิล` : "–", { size: "sm", align: "end", flex: 3, color: ok ? C.green : C.muted, weight: ok ? "bold" : "regular" }),
     ],
   };
 }
 
 function personBubble(snap, r) {
   const s = statusInfo(r);
-  const pass = r.iphoneBills > 0 ? `${((r.qualified / r.iphoneBills) * 100).toFixed(0)}%` : "–";
-  const nextBlock = r.required + 1;
-  const toNext = nextBlock * 4 - r.iphone;
+  const title =
+    r.status === "red" ? "🔴 ต้องส่งต่อ" : r.status === "yellow" ? "🟡 ระวัง" : "🟢 ผ่าน";
+  const advice =
+    r.status === "red"
+      ? "ลูกค้า iPhone คนถัดไป ให้เพื่อนรับก่อน จนกว่าจะแนบได้"
+      : r.status === "yellow"
+        ? "เครื่องถัดไปต้องแนบ Cover+ / UFUND / SIM หรือ Acc 3 ชิ้นให้ได้"
+        : r.iphone > 0
+          ? "แนบครบตามกติกาแล้ว 👍"
+          : "ยังไม่มียอด iPhone วันนี้";
+
   return {
     type: "bubble",
     size: "mega",
@@ -269,25 +347,53 @@ function personBubble(snap, r) {
           type: "box",
           layout: "vertical",
           backgroundColor: s.bg,
-          cornerRadius: "8px",
-          paddingAll: "10px",
-          contents: [txt(`${s.icon} ${s.label}`, { size: "sm", weight: "bold", color: s.color })],
+          cornerRadius: "10px",
+          paddingAll: "12px",
+          spacing: "xs",
+          contents: [
+            txt(title, { weight: "bold", size: "lg", color: s.color }),
+            txt(advice, { size: "sm", color: s.color }),
+          ],
         },
-        statLine("iPhone (เครื่อง)", r.iphone),
-        statLine("บิล iPhone", r.iphoneBills),
-        statLine("บิลที่แนบได้ / ต้องมี", `${r.credited} / ${r.required}`, s.color),
+        {
+          type: "box",
+          layout: "horizontal",
+          contents: [
+            {
+              type: "box",
+              layout: "vertical",
+              contents: [
+                txt(String(r.iphone), { size: "xxl", weight: "bold", align: "center" }),
+                txt("iPhone ที่ขาย", { size: "xxs", color: C.muted, align: "center" }),
+              ],
+            },
+            {
+              type: "box",
+              layout: "vertical",
+              contents: [
+                txt(String(r.credited), { size: "xxl", weight: "bold", align: "center", color: s.color }),
+                txt("บิลที่แนบได้", { size: "xxs", color: C.muted, align: "center" }),
+              ],
+            },
+            {
+              type: "box",
+              layout: "vertical",
+              contents: [
+                txt(String(r.required), { size: "xxl", weight: "bold", align: "center" }),
+                txt("ต้องมีอย่างน้อย", { size: "xxs", color: C.muted, align: "center" }),
+              ],
+            },
+          ],
+        },
+        ...(r.iphone > 0 ? [blockBar(r, s.color)] : []),
         { type: "separator", color: C.line },
-        statLine("บิลมี Cover+", r.cover),
-        statLine("บิลมี UFUND PERSONAL", r.ufund),
-        statLine("บิลมี SIM", r.sim),
-        statLine("บิล Acc ≥3 ชิ้น", `${r.qualified} (${pass})`),
+        txt("สิ่งที่แนบได้ในบิล iPhone วันนี้", { size: "xs", weight: "bold", color: C.muted }),
+        checkLine("Cover+", r.cover),
+        checkLine("UFUND PERSONAL", r.ufund),
+        checkLine("SIM", r.sim),
+        checkLine("Acc 3 ชิ้นขึ้นไป", r.qualified),
         { type: "separator", color: C.line },
-        txt(
-          r.credited >= nextBlock
-            ? "แนบล่วงหน้าไว้แล้ว ✅"
-            : `อีก ${toNext} เครื่องจะครบก้อนถัดไป — ต้องมีบิลแนบเพิ่ม ${nextBlock - r.credited} บิล`,
-          { size: "xs", color: C.muted },
-        ),
+        txt(RULE_TEXT, { size: "xxs", color: C.muted }),
       ],
     },
     footer: footer(snap),
@@ -295,48 +401,62 @@ function personBubble(snap, r) {
 }
 
 function nextBubble(snap) {
-  const rows = (snap.rows ?? []).filter((r) => r.status !== "red");
-  // คะแนน = เครดิตที่เหลือ (บิลแนบ×4 − iPhone) มากสุดก่อน, เสมอกัน → iPhone น้อยกว่า
-  const scored = rows
+  const all = snap.rows ?? [];
+  const ranked = all
+    .filter((r) => r.status !== "red")
     .map((r) => ({ r, slack: r.credited * 4 - r.iphone }))
-    .sort((a, b) => b.slack - a.slack || a.r.iphone - b.r.iphone);
-  const top = scored.slice(0, 3);
-  const reds = (snap.rows ?? []).filter((r) => r.status === "red");
+    .sort((a, b) => b.slack - a.slack || a.r.iphone - b.r.iphone)
+    .map((x) => x.r);
+  const first = ranked[0];
+  const rest = ranked.slice(1, 3);
+  const reds = all.filter((r) => r.status === "red");
+
+  const contents = [...staleNotice(snap)];
+  if (first) {
+    contents.push({
+      type: "box",
+      layout: "vertical",
+      backgroundColor: C.greenBg,
+      cornerRadius: "10px",
+      paddingAll: "14px",
+      spacing: "xs",
+      contents: [
+        txt("แนะนำให้รับ", { size: "xs", color: C.green }),
+        txt(first.name, { size: "xl", weight: "bold", color: C.green }),
+        txt(personSentence(first), { size: "xs", color: C.muted }),
+      ],
+    });
+  } else {
+    contents.push(banner("ทุกคนยังแนบไม่ครบ — ต้องแนบให้ได้ก่อน", C.red, C.redBg));
+  }
+  if (rest.length) {
+    contents.push(sectionTitle("ถัดไป", C.muted));
+    rest.forEach((r, i) => {
+      contents.push({
+        type: "box",
+        layout: "horizontal",
+        margin: "sm",
+        contents: [
+          txt(`${i + 2}. ${firstName(r.name)}`, { size: "sm", flex: 5, wrap: false }),
+          txt(`iPhone ${r.iphone} · แนบ ${r.credited}`, { size: "xs", color: C.muted, align: "end", flex: 5 }),
+        ],
+      });
+    });
+  }
+  if (reds.length) {
+    contents.push({ type: "separator", color: C.line, margin: "lg" });
+    contents.push(sectionTitle("🔴 งดรับ iPhone ไว้ก่อน (ยังแนบไม่ครบ)", C.red));
+    contents.push(txt(reds.map((r) => firstName(r.name)).join(", "), { size: "sm", color: C.red }));
+  }
+  contents.push(
+    txt("เรียงจากคนที่แนบไว้เผื่อมากสุด → น้อยสุด", { size: "xxs", color: C.muted, margin: "lg" }),
+  );
+
   return {
     type: "bubble",
     size: "mega",
-    header: header("ใครรับลูกค้าคนต่อไป", `${fmtDate(snap.date)} · ${subTitle(snap)}`),
-    body: {
-      type: "box",
-      layout: "vertical",
-      spacing: "md",
-      contents: [
-        ...staleNotice(snap),
-        ...(top.length
-          ? top.map(({ r }, i) => ({
-              type: "box",
-              layout: "horizontal",
-              backgroundColor: i === 0 ? C.greenBg : "#FFFFFF",
-              cornerRadius: "8px",
-              paddingAll: "10px",
-              contents: [
-                txt(`${i + 1}. ${firstName(r.name)}`, { weight: "bold", size: "sm", flex: 5, color: i === 0 ? C.green : "#111827" }),
-                txt(`iPhone ${r.iphone} · แนบ ${r.credited}`, { size: "xs", align: "end", color: C.muted, flex: 5 }),
-              ],
-            }))
-          : [txt("ทุกคนติดแดง — ต้องแนบให้ได้ก่อน", { size: "sm", color: C.red })]),
-        ...(reds.length
-          ? [
-              { type: "separator", color: C.line },
-              txt(`🔴 พักรับ iPhone ก่อน: ${reds.map((r) => firstName(r.name)).join(", ")}`, {
-                size: "xs",
-                color: C.red,
-                weight: "bold",
-              }),
-            ]
-          : []),
-      ],
-    },
+    header: header("ลูกค้า iPhone คนถัดไป", `${fmtDate(snap.date)} · ${subTitle(snap)}`),
+    body: { type: "box", layout: "vertical", spacing: "none", contents },
     footer: footer(snap),
   };
 }
@@ -350,14 +470,34 @@ function helpBubble() {
       layout: "vertical",
       spacing: "sm",
       contents: [
-        txt("พิมพ์ในกลุ่ม:", { size: "sm", weight: "bold" }),
-        txt("• เช็ค — สรุปทุกคน 🔴🟡🟢", { size: "sm" }),
-        txt("• เช็ค ชื่อ — ดูรายคน", { size: "sm" }),
-        txt("• ใครรับต่อ — แนะนำคนรับลูกค้าคนถัดไป", { size: "sm" }),
+        txt("พิมพ์ในกลุ่ม หรือกดปุ่มด้านล่าง", { size: "sm", weight: "bold" }),
+        txt("• เช็ค — ดูว่าใครต้องส่งต่อ / ใครต้องระวัง", { size: "sm" }),
+        txt("• เช็ค ชื่อ — ดูละเอียดรายคน", { size: "sm" }),
+        txt("• ใครรับต่อ — ลูกค้า iPhone คนถัดไปควรให้ใครรับ", { size: "sm" }),
         { type: "separator", color: C.line, margin: "md" },
-        txt("ข้อมูลอัปเดตเมื่อเปิดหน้า Dashboard หลังอัปไฟล์ขาย", { size: "xxs", color: C.muted, margin: "md" }),
+        txt(RULE_TEXT, { size: "xxs", color: C.muted, margin: "md" }),
+        txt("ข้อมูลอัปเดตเมื่อเปิดหน้า Dashboard หลังอัปไฟล์ขาย", { size: "xxs", color: C.muted }),
       ],
     },
+  };
+}
+
+/** ปุ่มลัดใต้ข้อความ (Quick Reply) — กดแล้วส่งคำสั่งให้เลย ไม่ต้องพิมพ์ */
+function quickReply(snap) {
+  const items = [
+    { label: "📋 เช็ค", text: "เช็ค" },
+    { label: "👉 ใครรับต่อ", text: "ใครรับต่อ" },
+  ];
+  const people = [...(snap?.rows ?? [])]
+    .filter((r) => r.iphone > 0 || r.status !== "green")
+    .sort((a, b) => (STATUS_ORDER[a.status] ?? 3) - (STATUS_ORDER[b.status] ?? 3) || b.iphone - a.iphone);
+  people.slice(0, 11).forEach((r) => {
+    const fn = firstName(r.name);
+    const icon = r.status === "red" ? "🔴" : r.status === "yellow" ? "🟡" : "🟢";
+    items.push({ label: `${icon} ${fn}`.slice(0, 20), text: `เช็ค ${fn}` });
+  });
+  return {
+    items: items.map((i) => ({ type: "action", action: { type: "message", label: i.label, text: i.text } })),
   };
 }
 
@@ -365,7 +505,10 @@ function helpBubble() {
 
 async function buildReply(text) {
   const t = String(text ?? "").trim();
-  if (/^(help|วิธีใช้|คำสั่ง)$/i.test(t)) return [flex("วิธีใช้ Attach Bot", helpBubble())];
+  if (/^(help|วิธีใช้|คำสั่ง)$/i.test(t)) {
+    const snap = await loadSnapshot().catch(() => null);
+    return [{ ...flex("วิธีใช้ Attach Bot", helpBubble()), quickReply: quickReply(snap) }];
+  }
 
   const isNext = /^(ใครรับต่อ|คิวต่อไป|ส่งต่อใคร|next)$/i.test(t);
   const check = /^(เช็ค|เช็ก|เชค|check)\s*(.*)$/i.exec(t);
@@ -375,27 +518,40 @@ async function buildReply(text) {
   if (!snap || !Array.isArray(snap.rows)) {
     return [{ type: "text", text: "ยังไม่มีข้อมูล — เปิดหน้า Dashboard หลังอัปไฟล์ขายก่อนนะ" }];
   }
+  const qr = quickReply(snap);
 
-  if (isNext) return [flex("ใครรับลูกค้าคนต่อไป", nextBubble(snap))];
+  if (isNext) {
+    return [{ ...flex("ลูกค้า iPhone คนถัดไปควรให้ใครรับ", nextBubble(snap)), quickReply: qr }];
+  }
 
   const q = norm(check[2]);
   if (q) {
     const hits = snap.rows.filter((r) => norm(r.name).includes(q));
-    if (hits.length === 1) return [flex(`สถานะ ${hits[0].name}`, personBubble(snap, hits[0]))];
+    if (hits.length === 1) {
+      const r = hits[0];
+      const st = r.status === "red" ? "ต้องส่งต่อ" : r.status === "yellow" ? "ระวัง" : "ผ่าน";
+      return [{ ...flex(`${r.name}: ${st}`, personBubble(snap, r)), quickReply: qr }];
+    }
     if (hits.length > 1) {
       return [
         {
           type: "text",
           text: `เจอหลายคน: ${hits.map((r) => r.name).join(", ")} — พิมพ์ชื่อให้ชัดขึ้นอีกนิด`,
+          quickReply: qr,
         },
       ];
     }
-    return [{ type: "text", text: `ไม่พบชื่อ "${check[2].trim()}" ในข้อมูลวันที่ ${fmtDate(snap.date)}` }];
+    return [{ type: "text", text: `ไม่พบชื่อ "${check[2].trim()}" ในข้อมูลวันที่ ${fmtDate(snap.date)}`, quickReply: qr }];
   }
 
   const reds = snap.rows.filter((r) => r.status === "red").length;
   const yellows = snap.rows.filter((r) => r.status === "yellow").length;
-  return [flex(`Attach Alert ${fmtDate(snap.date)} · 🔴${reds} 🟡${yellows}`, summaryBubble(snap))];
+  const alt = reds
+    ? `⚠️ ${reds} คนต้องส่งต่อ${yellows ? ` · ${yellows} คนต้องระวัง` : ""}`
+    : yellows
+      ? `👀 ${yellows} คนต้องระวัง`
+      : "✅ ทุกคนแนบครบตามกติกา";
+  return [{ ...flex(alt, summaryBubble(snap)), quickReply: qr }];
 }
 
 // ── handlers ───────────────────────────────────────────────────────────────
@@ -466,7 +622,7 @@ async function handleWebhook(req, res) {
     try {
       if (!ev.replyToken) continue;
       if (ev.type === "join") {
-        await replyMessage(ev.replyToken, [flex("วิธีใช้ Attach Bot", helpBubble())]);
+        await replyMessage(ev.replyToken, await buildReply("help"));
         continue;
       }
       if (ev.type === "message" && ev.message?.type === "text") {
