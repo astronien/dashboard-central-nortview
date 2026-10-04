@@ -201,22 +201,33 @@ function personHeader(snap, r) {
     spacing: "md",
     contents: [
       {
+        // กรอบ 72×96 — รูปสูงเกินกรอบ 15% (113px) แล้วให้กรอบตัดส่วนล่างทิ้ง
         type: "box",
         layout: "vertical",
-        width: "96px",
-        height: "120px",
+        width: "72px",
+        height: "96px",
+        cornerRadius: "2px",
         flex: 0,
         contents: [
-          { type: "image", url, size: "full", aspectRatio: "4:5", aspectMode: "fit", gravity: "bottom" },
           {
-            // เฟดด้านล่าง: โปร่งใส → สี header
+            type: "box",
+            layout: "vertical",
+            position: "absolute",
+            offsetTop: "0px",
+            offsetStart: "0px",
+            width: "72px",
+            height: "113px",
+            contents: [{ type: "image", url, size: "full", aspectRatio: "72:113", aspectMode: "cover" }],
+          },
+          {
+            // เฟดด้านล่าง (หลังตัดแล้ว): โปร่งใส → สี header
             type: "box",
             layout: "vertical",
             position: "absolute",
             offsetBottom: "0px",
             offsetStart: "0px",
             offsetEnd: "0px",
-            height: "45%",
+            height: "40%",
             background: {
               type: "linearGradient",
               angle: "0deg",
