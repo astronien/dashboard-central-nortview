@@ -501,7 +501,9 @@ const latestDayFromKeys = (dayKeys: Iterable<string>): string => {
 const ATTACH_PER_BILL_TARGET = 3;
 
 /** หมวดที่ถือว่าเป็น "ตัวเครื่อง" (ไม่นับเป็นชิ้น attach) */
-const DEVICE_CATS_FOR_ATTACH = new Set(["Mac", "iPad", "iPhone", "Apple Watch"]);
+// ค่าคอลัมน์ Category (Name) ของตัวเครื่อง (ตัวพิมพ์เล็ก) — ห้ามใช้ getCategory
+// เพราะมันจับคำว่า iPhone ในชื่อฟิล์ม/เคสด้วย
+const RAW_DEVICE_CATS = new Set(["mac", "ipad", "iphone", "apple watch"]);
 
 /** ชื่อหมวด "อื่นๆ" — ยอดที่ไม่เข้า 6 หมวดหลัก */
 const OTHER_CAT = "อื่นๆ";
@@ -3479,7 +3481,10 @@ function AppInternal({
         // บิล iPhone ที่ "มีอย่างน้อย 1 อย่าง": Cover / UFUND / SIM / Acc ≥3 ชิ้น
         let creditedBills = 0;
         for (const b of officerBills) {
-          const hasIphone = b.lineItems.some((li) => getCategory(li) === "iPhone");
+          // ใช้คอลัมน์ Category (Name) ตรงๆ — getCategory เดาจากชื่อสินค้าด้วย
+          // ทำให้ฟิล์ม/เคส "for iPhone" ถูกนับเป็นตัวเครื่อง
+          const rawCatOf = (li: RawRow) => String(li["Category (Name)"] ?? "").trim().toLowerCase();
+          const hasIphone = b.lineItems.some((li) => rawCatOf(li) === "iphone");
           if (!hasIphone) continue;
           deviceBills += 1;
           const hasCover =
@@ -3493,9 +3498,8 @@ function AppInternal({
           });
           let piecesInBill = 0;
           for (const li of b.lineItems) {
-            const catName = getCategory(li);
-            if (DEVICE_CATS_FOR_ATTACH.has(catName)) continue;
-            const rawCat = String(li["Category (Name)"] ?? "").toLowerCase();
+            const rawCat = rawCatOf(li);
+            if (RAW_DEVICE_CATS.has(rawCat)) continue;
             const prod = String(li["Product (Name)"] ?? "");
             if (rawCat.includes("promo") || /ส่วนลด/.test(prod)) continue;
             // ไม่นับ: ถุงใส่สินค้า (Selling Expense) และของแถมฟรี (เช่น 7CARE+ Free)
