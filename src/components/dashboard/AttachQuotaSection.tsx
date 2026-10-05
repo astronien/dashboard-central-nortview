@@ -42,7 +42,7 @@ export const AttachQuotaSection: React.FC<{ data: AttachQuotaData; boost?: strin
           โควตา Attach สะสม — Cover/UFUND ต่อ iPhone (1:4)
         </h3>
         {boost ? (
-          <span className="ml-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-orange-500 text-white" title="บิลที่แนบตัวนี้ในช่วงวันที่ = 2 เครดิต">
+          <span className="ml-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-orange-500 text-white" title="ตัวที่เลือก = 2 เครดิต · ตัวอื่น = 0.5">
             🔥 {boost}
           </span>
         ) : null}

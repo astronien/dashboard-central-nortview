@@ -69,6 +69,7 @@ import { fetchCsatData, type CsatResult, type CsatUser } from "./lib/csatApi";
 import {
   EMPTY_ATTACH_BOOST,
   boostLabel,
+  boostInRange,
   boostMultiplier,
   fetchAttachBoost,
   type AttachBoost,
@@ -3276,19 +3277,15 @@ function AppInternal({
         const ufund = ufundPreset
           ? calcPreset(officerBills, ufundPreset, dummyCtx).billsWithAandB
           : 0;
-        // โหมด x2: บิล Cover/UFUND ที่อยู่ในช่วงวันที่ boost ได้เครดิตเพิ่มอีก 1
-        const boostBills = officerBills.filter(
-          (b) => boostMultiplier(attachBoost, "cover", b.docDate) > 1 || boostMultiplier(attachBoost, "ufund", b.docDate) > 1,
-        );
-        const coverBonus =
-          coverPlusPreset && attachBoost.cover && boostBills.length
-            ? calcPreset(boostBills, coverPlusPreset, dummyCtx).billsWithAandB
-            : 0;
-        const ufundBonus =
-          ufundPreset && attachBoost.ufund && boostBills.length
-            ? calcPreset(boostBills, ufundPreset, dummyCtx).billsWithAandB
-            : 0;
-        const attach = cover + ufund + coverBonus + ufundBonus;
+        // โหมด x2: บิลในช่วงวันที่ boost → ตัวที่เลือก ×2, ตัวอื่น ×0.5
+        const boostBills = officerBills.filter((b) => boostInRange(attachBoost, b.docDate));
+        const coverIn =
+          coverPlusPreset && boostBills.length ? calcPreset(boostBills, coverPlusPreset, dummyCtx).billsWithAandB : 0;
+        const ufundIn =
+          ufundPreset && boostBills.length ? calcPreset(boostBills, ufundPreset, dummyCtx).billsWithAandB : 0;
+        const mCover = attachBoost.cover ? 2 : 0.5;
+        const mUfund = attachBoost.ufund ? 2 : 0.5;
+        const attach = cover + coverIn * (mCover - 1) + ufund + ufundIn * (mUfund - 1);
         const remaining = 4 * attach - iphone;
         const status: "pass" | "accumulating" | "handoff" =
           remaining >= 0 ? "pass" : remaining <= -4 ? "handoff" : "accumulating";

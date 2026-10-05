@@ -94,7 +94,7 @@ export function AttachBoostManager({
             ) : null}
           </h2>
           <p className="text-sm text-white/60 mt-1">
-            บิลที่แนบตัวที่เลือก = 2 เครดิต (ครอบคลุม iPhone 8 เครื่อง แทน 4) เฉพาะในช่วงวันที่ที่ตั้งไว้
+            ตัวที่เลือก = 2 เครดิต (ครอบคลุม iPhone 8 เครื่อง) · ตัวที่ไม่ได้เลือก = 0.5 เครดิต (2 เครื่อง) เพื่อ balance — มีผลเฉพาะบิลในช่วงวันที่ที่ตั้งไว้
           </p>
         </div>
         <button
@@ -126,7 +126,7 @@ export function AttachBoostManager({
                   on ? "bg-orange-500 text-white" : "bg-white/10 text-white/40"
                 }`}
               >
-                {on ? "x2" : "x1"}
+                {on ? "x2" : anyBoostOn(boost) ? "x0.5" : "x1"}
               </span>
             </button>
           );

@@ -80,6 +80,8 @@ async function loadSnapshot() {
   }
 }
 
+/** เครดิตอาจเป็น 0.5 (โหมด x2) → แสดง 1 / 1.5 / 0.5 */
+const fc = (n) => (Number.isInteger(n) ? String(n) : String(Math.round(Number(n) * 10) / 10));
 const norm = (s) => String(s ?? "").toLowerCase().replace(/\s+/g, "");
 const firstName = (s) => String(s ?? "").trim().split(/\s+/)[0] || String(s ?? "");
 
@@ -248,7 +250,7 @@ function boostNotice(snap) {
       margin: "sm",
       contents: [
         txt(`🔥 ${snap.boost}`, { size: "xs", weight: "bold", color: "#C2410C" }),
-        txt("บิลที่แนบตัวนี้ = 2 เครดิต (ครอบคลุม iPhone 8 เครื่อง)", { size: "xxs", color: "#C2410C" }),
+        txt("ตัวที่เลือก = 2 เครดิต (iPhone 8 เครื่อง) · ตัวอื่น = 0.5 (2 เครื่อง)", { size: "xxs", color: "#C2410C" }),
       ],
     },
   ];
@@ -264,16 +266,16 @@ function blockPos(r) {
 /** ประโยคสั้นๆ อธิบายสถานะของคนนั้น */
 function personSentence(r) {
   if (r.status === "red") {
-    const missing = Math.max(1, r.required - r.credited);
+    const missing = fc(Math.max(0.5, r.required - r.credited));
     return r.credited === 0
       ? `ขาย iPhone ${r.iphone} เครื่อง · ยังไม่มีบิลแนบเลย`
-      : `ขาย iPhone ${r.iphone} เครื่อง · แนบแล้ว ${r.credited} บิล ขาดอีก ${missing}`;
+      : `ขาย iPhone ${r.iphone} เครื่อง · แนบแล้ว ${fc(r.credited)} บิล ขาดอีก ${missing}`;
   }
   if (r.status === "yellow") {
     return `ขาย iPhone ${r.iphone} เครื่อง · เครื่องถัดไปต้องแนบให้ได้`;
   }
   if (r.iphone === 0) return "ยังไม่มียอด iPhone";
-  return `ขาย iPhone ${r.iphone} เครื่อง · แนบแล้ว ${r.credited} บิล`;
+  return `ขาย iPhone ${r.iphone} เครื่อง · แนบแล้ว ${fc(r.credited)} บิล`;
 }
 
 function sectionTitle(text, color) {
@@ -303,7 +305,7 @@ function greenRow(r) {
     paddingStart: "4px",
     contents: [
       txt(firstName(r.name), { size: "sm", flex: 4, wrap: false }),
-      txt(r.iphone ? `iPhone ${r.iphone} · แนบ ${r.credited} ✓` : "–", {
+      txt(r.iphone ? `iPhone ${r.iphone} · แนบ ${fc(r.credited)} ✓` : "–", {
         size: "xs",
         color: C.muted,
         align: "end",
@@ -350,11 +352,11 @@ function compactBanner(redN, yellowN, greenN) {
 /** สถานะสั้นๆ สำหรับหน้าสรุป */
 function shortStatus(r) {
   if (r.status === "red") {
-    const missing = Math.max(1, r.required - r.credited);
+    const missing = fc(Math.max(0.5, r.required - r.credited));
     return r.credited === 0 ? "ยังไม่แนบ" : `ขาด ${missing} บิล`;
   }
   if (r.status === "yellow") return "ต้องแนบ";
-  return `แนบ ${r.credited}`;
+  return `แนบ ${fc(r.credited)}`;
 }
 
 /** แถวบรรทัดเดียว: ชื่อ | iPhone n · สถานะสั้น */
@@ -496,7 +498,7 @@ function personBubble(snap, r) {
               type: "box",
               layout: "vertical",
               contents: [
-                txt(String(r.credited), { size: "xxl", weight: "bold", align: "center", color: s.color }),
+                txt(fc(r.credited), { size: "xxl", weight: "bold", align: "center", color: s.color }),
                 txt("บิลที่แนบได้", { size: "xxs", color: C.muted, align: "center" }),
               ],
             },
@@ -562,7 +564,7 @@ function nextBubble(snap) {
         margin: "sm",
         contents: [
           txt(`${i + 2}. ${firstName(r.name)}`, { size: "sm", flex: 5, wrap: false }),
-          txt(`iPhone ${r.iphone} · แนบ ${r.credited}`, { size: "xs", color: C.muted, align: "end", flex: 5 }),
+          txt(`iPhone ${r.iphone} · แนบ ${fc(r.credited)}`, { size: "xs", color: C.muted, align: "end", flex: 5 }),
         ],
       });
     });

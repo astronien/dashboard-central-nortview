@@ -2,6 +2,7 @@
  * โหมด x2 (Attach Boost) — หัวหน้าร้านเลือกได้ว่าช่วงนี้จะโฟกัส attach ตัวไหน
  * บิลที่แนบตัวนั้น (ภายในช่วงวันที่ตั้งไว้) จะได้ 2 เครดิต แทน 1
  * → ครอบคลุม iPhone 8 เครื่อง แทน 4 ในกติกา 1:4
+ * ส่วนตัวที่ไม่ได้เลือก จะเหลือ 0.5 เครดิต (ครอบคลุม 2 เครื่อง) เพื่อ balance
  *
  * เก็บใน app_config ผ่าน /api/staff-photos?resource=attach-boost
  */
@@ -50,12 +51,22 @@ export const boostInRange = (b: AttachBoost, date: Date | string | null | undefi
   return true;
 };
 
-/** ตัวคูณของประเภทนั้นในวันนั้น (2 หรือ 1) */
+/** ตัวคูณของประเภทนั้นในวันนั้น
+ *  - ไม่ได้เปิดโหมด / นอกช่วงวันที่ → 1
+ *  - ตัวที่เลือก x2 → 2
+ *  - ตัวอื่นที่ไม่ได้เลือก → 0.5 (ถ่วงให้ balance ระหว่างช่วงโฟกัส) */
 export const boostMultiplier = (
   b: AttachBoost,
   type: AttachBoostType,
   date: Date | string | null | undefined,
-): number => (b[type] && boostInRange(b, date) ? 2 : 1);
+): number => {
+  if (!boostInRange(b, date)) return 1;
+  return b[type] ? 2 : 0.5;
+};
+
+/** แสดงเครดิตแบบอ่านง่าย: 1, 1.5, 0.5 */
+export const fmtCredit = (n: number): string =>
+  Number.isInteger(n) ? String(n) : String(Math.round(n * 10) / 10);
 
 /** ข้อความสั้นๆ เช่น "x2: Cover+, SIM (ถึง 10/10)" — "" ถ้าไม่ได้เปิด */
 export const boostLabel = (b: AttachBoost): string => {
@@ -66,7 +77,8 @@ export const boostLabel = (b: AttachBoost): string => {
     return m ? `${Number(m[3])}/${Number(m[2])}` : s;
   };
   const range = b.from && b.to ? ` (${fmt(b.from)}–${fmt(b.to)})` : b.to ? ` (ถึง ${fmt(b.to)})` : b.from ? ` (ตั้งแต่ ${fmt(b.from)})` : "";
-  return `x2: ${names.join(", ")}${range}`;
+  const allOn = ATTACH_BOOST_TYPES.every((t) => b[t.key]);
+  return `x2: ${names.join(", ")}${allOn ? "" : " · อื่นๆ x0.5"}${range}`;
 };
 
 const normalize = (raw: unknown): AttachBoost => {
