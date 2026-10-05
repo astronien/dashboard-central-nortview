@@ -89,7 +89,7 @@ const num = (v: number) => (v ? v.toLocaleString() : "–");
 
 const ORDER_KEY = "daily-branch-report-col-order";
 
-export const DailyBranchReportSection: React.FC<{ data: DailyReportData }> = ({ data }) => {
+export const DailyBranchReportSection: React.FC<{ data: DailyReportData; boost?: string }> = ({ data, boost }) => {
   // Column order (preset ids) — user can drag the group headers to reorder.
   // Persisted per browser so the layout sticks between visits.
   const [order, setOrder] = React.useState<string[]>([]);
@@ -156,6 +156,11 @@ export const DailyBranchReportSection: React.FC<{ data: DailyReportData }> = ({ 
         <h3 className="text-lg font-bold tracking-tight text-slate-800">
           รายงานยอดขาย + Attach รายวัน (วันล่าสุด)
         </h3>
+        {boost ? (
+          <span className="ml-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-orange-500 text-white" title="บิลที่แนบตัวนี้ในช่วงวันที่ = 2 เครดิต (ครอบคลุม iPhone 8 เครื่อง)">
+            🔥 {boost}
+          </span>
+        ) : null}
       </div>
       <div className="flex items-start justify-between gap-3 mb-4">
         <p className="text-xs text-slate-400">
@@ -280,7 +285,7 @@ export const DailyBranchReportSection: React.FC<{ data: DailyReportData }> = ({ 
                   title={
                     r.isTotal
                       ? undefined
-                      : `บิล iPhone ที่แนบ Cover/UFUND/SIM/Acc≥3: ${r.creditedBills ?? 0} บิล (ต้องมี ${r.requiredCredits ?? 0} — 1 ต่อ iPhone 4 เครื่อง)`
+                      : `เครดิตแนบ (Cover/UFUND/SIM/Acc≥3, โหมด x2 = 2): ${r.creditedBills ?? 0} (ต้องมี ${r.requiredCredits ?? 0} — 1 ต่อ iPhone 4 เครื่อง)`
                   }
                 >
                   {num(r.iphoneUnit)}

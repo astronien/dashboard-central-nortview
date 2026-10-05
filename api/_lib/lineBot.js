@@ -235,6 +235,25 @@ function personHeader(snap, r) {
   };
 }
 
+/** ป้ายโหมด x2 (ถ้าเปิดอยู่) */
+function boostNotice(snap) {
+  if (!snap || !snap.boost) return [];
+  return [
+    {
+      type: "box",
+      layout: "vertical",
+      backgroundColor: "#FFF7ED",
+      cornerRadius: "8px",
+      paddingAll: "8px",
+      margin: "sm",
+      contents: [
+        txt(`🔥 ${snap.boost}`, { size: "xs", weight: "bold", color: "#C2410C" }),
+        txt("บิลที่แนบตัวนี้ = 2 เครดิต (ครอบคลุม iPhone 8 เครื่อง)", { size: "xxs", color: "#C2410C" }),
+      ],
+    },
+  ];
+}
+
 /** เครื่องที่เท่าไหร่ของก้อน 4 ปัจจุบัน (1–4) */
 function blockPos(r) {
   if (r.iphone <= 0) return 0;
@@ -366,7 +385,7 @@ function summaryBubble(snap) {
   // แถบสรุปบรรทัดเดียว (สั้น กระชับ)
   const headline = compactBanner(reds.length, yellows.length, greens.length);
 
-  const contents = [...staleNotice(snap), headline];
+  const contents = [...staleNotice(snap), headline, ...boostNotice(snap)];
   if (reds.length) {
     contents.push(sectionTitle("🔴 ส่งต่อ", C.red));
     reds.forEach((r) => contents.push(shortRow(r, C.red, C.redBg)));
@@ -460,6 +479,7 @@ function personBubble(snap, r) {
             txt(advice, { size: "sm", color: s.color }),
           ],
         },
+        ...boostNotice(snap),
         {
           type: "box",
           layout: "horizontal",
@@ -680,6 +700,7 @@ async function handleSnapshot(req, res) {
       date: String(body.date).slice(0, 10),
       branch: String(body.branch ?? "").slice(0, 80),
       excludeIphone18: Boolean(body.excludeIphone18),
+      boost: String(body.boost ?? "").slice(0, 120),
       dashboardUrl: String(body.dashboardUrl ?? "").slice(0, 200),
       rows: body.rows.slice(0, 40).map((r) => ({
         name: String(r.name ?? "").slice(0, 80),

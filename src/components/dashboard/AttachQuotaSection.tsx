@@ -31,7 +31,7 @@ const fmtDay = (ymd: string): string => {
   return `${d}/${m}/${y}`;
 };
 
-export const AttachQuotaSection: React.FC<{ data: AttachQuotaData }> = ({ data }) => {
+export const AttachQuotaSection: React.FC<{ data: AttachQuotaData; boost?: string }> = ({ data, boost }) => {
   if (!data.rows.length) return null;
 
   return (
@@ -41,6 +41,11 @@ export const AttachQuotaSection: React.FC<{ data: AttachQuotaData }> = ({ data }
         <h3 className="text-lg font-bold tracking-tight text-white">
           โควตา Attach สะสม — Cover/UFUND ต่อ iPhone (1:4)
         </h3>
+        {boost ? (
+          <span className="ml-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-orange-500 text-white" title="บิลที่แนบตัวนี้ในช่วงวันที่ = 2 เครดิต">
+            🔥 {boost}
+          </span>
+        ) : null}
       </div>
       <p className="text-xs text-white/50 mb-4">
         สะสมทั้งเดือน {fmtDay(data.fromDate)}–{fmtDay(data.toDate)} · ต้องแนบ Cover หรือ UFUND อย่างน้อย 1 ต่อ iPhone 4 เครื่อง ·

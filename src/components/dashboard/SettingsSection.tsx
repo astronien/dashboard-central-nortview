@@ -5,6 +5,8 @@ import { CsatTokenManager } from "./admin/CsatTokenManager";
 import { AiSettingsManager } from "./admin/AiSettingsManager";
 import { StaffVisibilityManager } from "./admin/StaffVisibilityManager";
 import { BackOfficeManager } from "./admin/BackOfficeManager";
+import { AttachBoostManager } from "./admin/AttachBoostManager";
+import type { AttachBoost } from "../../lib/attachBoost";
 
 export type StaffRosterEntry = {
   name: string;
@@ -31,6 +33,7 @@ export function SettingsSection({
   tradeBranchMapping,
   onStaffVisibilityChange,
   onBackOfficeChange,
+  onAttachBoostChange,
   onTradeBranchMappingChange,
 }: {
   selectedBranch: string;
@@ -50,6 +53,7 @@ export function SettingsSection({
   tradeBranchMapping?: Record<string, string>;
   onStaffVisibilityChange?: (hidden: string[]) => void;
   onBackOfficeChange?: (cfg: { counts: Record<string, number>; rates: Record<string, number> }) => void;
+  onAttachBoostChange?: (b: AttachBoost) => void;
   onTradeBranchMappingChange?: (mapping: Record<string, string>) => void;
 }) {
   return (
@@ -95,6 +99,8 @@ export function SettingsSection({
         </div>
         {staffPhotoError && <p className="text-sm text-amber-300 lg:max-w-xs">{staffPhotoError}</p>}
       </div>
+
+      {isAdmin ? <AttachBoostManager updatedBy={adminName} onChange={onAttachBoostChange} /> : null}
 
       {isAdmin ? (
         <CategoryTargetsManager selectedBranch={selectedBranch} onChanged={onCategoryTargetsChanged} />

@@ -87,6 +87,40 @@ async function handleBackOffice(req, res) {
   return res.status(405).json({ ok: false, error: "Method not allowed" });
 }
 
+// โหมด x2 (Attach Boost) — หัวหน้าร้านเลือก attach ที่โฟกัสช่วงนี้
+//   GET  /api/staff-photos?resource=attach-boost → { boost }
+//   PUT  /api/staff-photos?resource=attach-boost   body: { boost }
+const ATTACH_BOOST_KEY = "attach_boost";
+
+async function handleAttachBoost(req, res) {
+  const { getAppConfig, setAppConfig, initTelegramSchema } = require("./_lib/tursoClient");
+  await initTelegramSchema();
+  if (req.method === "GET") {
+    try {
+      const cfg = await getAppConfig(ATTACH_BOOST_KEY);
+      const boost = cfg && cfg.value ? JSON.parse(cfg.value) : {};
+      return res.status(200).json({ ok: true, boost });
+    } catch {
+      return res.status(200).json({ ok: true, boost: {} });
+    }
+  }
+  if (req.method === "PUT" || req.method === "POST") {
+    const b = req.body?.boost && typeof req.body.boost === "object" ? req.body.boost : {};
+    const day = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v ?? "")) ? String(v) : "");
+    const clean = {
+      cover: Boolean(b.cover),
+      ufund: Boolean(b.ufund),
+      sim: Boolean(b.sim),
+      acc: Boolean(b.acc),
+      from: day(b.from),
+      to: day(b.to),
+    };
+    await setAppConfig(ATTACH_BOOST_KEY, JSON.stringify(clean), req.body?.updatedBy ?? null);
+    return res.status(200).json({ ok: true });
+  }
+  return res.status(405).json({ ok: false, error: "Method not allowed" });
+}
+
 async function handleVisibleStaff(req, res) {
   const { getAppConfig, setAppConfig, initTelegramSchema } = require("./_lib/tursoClient");
   // app_config ถูกสร้างใน initTelegramSchema — ต้องเรียกก่อน ไม่งั้น setAppConfig
@@ -151,6 +185,14 @@ async function handler(req, res) {
     } catch (e) {
       console.error("[api/staff-photos] image", e);
       return res.status(500).end();
+    }
+  }
+
+  if (req.query?.resource === "attach-boost") {
+    try {
+      return await handleAttachBoost(req, res);
+    } catch (e) {
+      return res.status(200).json({ ok: false, boost: {}, error: e.message });
     }
   }
 

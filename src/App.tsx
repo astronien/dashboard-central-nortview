@@ -66,6 +66,13 @@ import {
   type TradeInResult,
 } from "./lib/tradeInApi";
 import { fetchCsatData, type CsatResult, type CsatUser } from "./lib/csatApi";
+import {
+  EMPTY_ATTACH_BOOST,
+  boostLabel,
+  boostMultiplier,
+  fetchAttachBoost,
+  type AttachBoost,
+} from "./lib/attachBoost";
 import { fetchUfundData, fetchUfundDay, fetchUfundMonth, type UfundResult } from "./lib/ufundApi";
 import {
   fetchTradeBranchMappingFromCloud,
@@ -1768,6 +1775,11 @@ function AppInternal({
       }),
     );
   }, []);
+  // โหมด x2 (Attach Boost) — ตั้งใน Settings
+  const [attachBoost, setAttachBoost] = useState<AttachBoost>({ ...EMPTY_ATTACH_BOOST });
+  useEffect(() => {
+    void fetchAttachBoost().then(setAttachBoost);
+  }, []);
   const isStaffHidden = React.useCallback(
     (officer: { staffId?: string; name?: string }): boolean => {
       if (!hiddenStaffIds.length) return false;
@@ -3264,7 +3276,19 @@ function AppInternal({
         const ufund = ufundPreset
           ? calcPreset(officerBills, ufundPreset, dummyCtx).billsWithAandB
           : 0;
-        const attach = cover + ufund;
+        // โหมด x2: บิล Cover/UFUND ที่อยู่ในช่วงวันที่ boost ได้เครดิตเพิ่มอีก 1
+        const boostBills = officerBills.filter(
+          (b) => boostMultiplier(attachBoost, "cover", b.docDate) > 1 || boostMultiplier(attachBoost, "ufund", b.docDate) > 1,
+        );
+        const coverBonus =
+          coverPlusPreset && attachBoost.cover && boostBills.length
+            ? calcPreset(boostBills, coverPlusPreset, dummyCtx).billsWithAandB
+            : 0;
+        const ufundBonus =
+          ufundPreset && attachBoost.ufund && boostBills.length
+            ? calcPreset(boostBills, ufundPreset, dummyCtx).billsWithAandB
+            : 0;
+        const attach = cover + ufund + coverBonus + ufundBonus;
         const remaining = 4 * attach - iphone;
         const status: "pass" | "accumulating" | "handoff" =
           remaining >= 0 ? "pass" : remaining <= -4 ? "handoff" : "accumulating";
@@ -3302,6 +3326,7 @@ function AppInternal({
     parsedReport.officers,
     kpiPresets,
     iphoneUnitsFromBills,
+    attachBoost,
   ]);
 
   // ─── ค่าคอมมิชชั่น (PIA Individual) ─────────────────────────────────────
@@ -3529,7 +3554,14 @@ function AppInternal({
           }
           attachPieces += piecesInBill;
           if (piecesInBill >= ATTACH_PER_BILL_TARGET) qualifiedBills += 1;
-          if (hasCover || hasUfund || hasSim || piecesInBill >= ATTACH_PER_BILL_TARGET) creditedBills += 1;
+          // เครดิตของบิล = ตัวคูณสูงสุดของสิ่งที่แนบ (โหมด x2 → 2 เครดิต)
+          const billCredit = Math.max(
+            hasCover ? boostMultiplier(attachBoost, "cover", b.docDate) : 0,
+            hasUfund ? boostMultiplier(attachBoost, "ufund", b.docDate) : 0,
+            hasSim ? boostMultiplier(attachBoost, "sim", b.docDate) : 0,
+            piecesInBill >= ATTACH_PER_BILL_TARGET ? boostMultiplier(attachBoost, "acc", b.docDate) : 0,
+          );
+          creditedBills += billCredit;
           if (hasUfund) ufundIphoneBills += 1;
           if (hasCover) coverIphoneBills += 1;
           if (hasSim) simIphoneBills += 1;
@@ -3676,6 +3708,7 @@ function AppInternal({
     kpiPresets,
     currentRowsAllModels,
     excludeIphone18,
+    attachBoost,
   ]);
 
   // ─── LINE bot snapshot ───────────────────────────────────────────────────
@@ -3690,6 +3723,7 @@ function AppInternal({
       date: dailyBranchReport.latestDate,
       branch: selectedBranch,
       excludeIphone18,
+      boost: boostLabel(attachBoost),
       dashboardUrl: typeof window !== "undefined" ? window.location.origin : "",
       rows: officers.map((r) => {
         const x = r as typeof r & {
@@ -3740,7 +3774,7 @@ function AppInternal({
       });
     }, 1500);
     return () => window.clearTimeout(t);
-  }, [dailyBranchReport, selectedBranch, excludeIphone18, reconciledStaffPhotos]);
+  }, [dailyBranchReport, selectedBranch, excludeIphone18, reconciledStaffPhotos, attachBoost]);
 
   const dynamicRadarData = useMemo(() => {
     if (activeStat === "csat") {
@@ -5330,8 +5364,8 @@ function AppInternal({
                   categorySnapshotRef={categorySnapshotRef}
                 />
                 <DailyKpiTable data={dailyKpiData} />
-                <DailyBranchReportSection data={dailyBranchReport} />
-                <AttachQuotaSection data={attachQuotaData} />
+                <DailyBranchReportSection data={dailyBranchReport} boost={boostLabel(attachBoost)} />
+                <AttachQuotaSection data={attachQuotaData} boost={boostLabel(attachBoost)} />
               </motion.div>
             )}
             {currentView === "staff" && (
@@ -5519,6 +5553,7 @@ function AppInternal({
                   staffRoster={staffRoster}
                   onStaffVisibilityChange={setHiddenStaffIds}
                   onBackOfficeChange={setBackOfficeCfg}
+                  onAttachBoostChange={setAttachBoost}
                   staffPhotos={Object.fromEntries(
                     Object.entries(reconciledStaffPhotos).map(([id, record]) => [id, (record as any).photoUrl]),
                   )}
