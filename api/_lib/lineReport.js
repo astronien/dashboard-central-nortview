@@ -173,13 +173,6 @@ function fmtTimeIso(iso) {
 /** กรอบรูปใน carousel — ใช้สัดส่วนเดียวกันทุกใบให้เรียงสวย */
 const CARD_RATIO = "3:4";
 
-/** อัตราส่วนภาพสำหรับ Flex (สูงได้ไม่เกิน 3 เท่าของกว้าง) */
-function flexRatio(w, h) {
-  const ww = Math.max(1, Math.round(w));
-  const hh = Math.min(Math.max(1, Math.round(h)), ww * 3);
-  return `${ww}:${hh}`;
-}
-
 /**
  * ข้อความตอบกลับ "report รายวัน" (ไม่เกิน 5 messages):
  *   1. ข้อความหัว · 2+. carousel รวมรูป Home + รายคน (12 รูป/ชุด)
