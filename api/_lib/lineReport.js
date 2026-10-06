@@ -171,7 +171,7 @@ function fmtTimeIso(iso) {
 }
 
 /** กรอบรูปใน carousel — ใช้สัดส่วนเดียวกันทุกใบให้เรียงสวย */
-const CARD_RATIO = "3:4";
+const CARD_RATIO = "1:1";
 
 /**
  * ข้อความตอบกลับ "report รายวัน" (ไม่เกิน 5 messages):
@@ -211,36 +211,64 @@ async function buildReportReply(baseUrl) {
     },
   ];
 
-  // รวมทุกรูปไว้ใน carousel เดียวกัน: Home 2 รูปก่อน แล้วต่อด้วยรายคน
-  // (สูงสุด 12 bubble ต่อ 1 message → เกินจะแยกเป็นชุดถัดไป)
-  const all = [...homes, ...staff];
-  for (let i = 0; i < all.length && messages.length < 5; i += 12) {
-    const chunk = all.slice(i, i + 12);
+  // การ์ดในชุดเลื่อน (LINE จำกัด 12 การ์ด/ชุด):
+  //   - Home: 1 รูป/การ์ด
+  //   - รายคน: รวม KPI + 7 Wonders ของคนเดียวกันไว้ในการ์ดเดียว (วางคู่กัน)
+  //     → 2 + จำนวนพนักงาน การ์ด อยู่ในแถวเดียว
+  const imgBox = (img, ratio) => ({
+    type: "image",
+    url: fileUrl(img, true),
+    size: "full",
+    aspectRatio: ratio,
+    aspectMode: "fit",
+    backgroundColor: "#1c2722",
+    action: { type: "uri", label: "ดูเต็ม", uri: fileUrl(img, false) },
+  });
+  const nameFooter = (text) => ({
+    type: "box",
+    layout: "vertical",
+    paddingAll: "10px",
+    contents: [{ type: "text", text: text || "-", size: "sm", weight: "bold", wrap: false, align: "center" }],
+  });
+
+  const cards = homes.map((img) => ({
+    type: "bubble",
+    size: "mega",
+    hero: imgBox(img, CARD_RATIO),
+    footer: nameFooter(img.name),
+  }));
+
+  // จับคู่รูปรายคนตามชื่อ ("ชื่อ · KPI" / "ชื่อ · 7 Wonders")
+  const byPerson = new Map();
+  for (const img of staff) {
+    const person = String(img.name ?? "").split(" · ")[0] || img.name;
+    if (!byPerson.has(person)) byPerson.set(person, []);
+    byPerson.get(person).push(img);
+  }
+  for (const [person, imgs] of byPerson) {
+    cards.push({
+      type: "bubble",
+      size: "mega",
+      hero:
+        imgs.length === 1
+          ? imgBox(imgs[0], CARD_RATIO)
+          : {
+              // สองรูปคู่กัน (ช่องละ 1:2) → รวมเป็นกรอบ 1:1 เท่าการ์ดอื่น
+              type: "box",
+              layout: "horizontal",
+              spacing: "none",
+              contents: imgs.slice(0, 2).map((img) => ({ ...imgBox(img, "1:2"), flex: 1 })),
+            },
+      footer: nameFooter(person),
+    });
+  }
+
+  for (let i = 0; i < cards.length && messages.length < 5; i += 12) {
+    const chunk = cards.slice(i, i + 12);
     messages.push({
       type: "flex",
       altText: `รูปรีพอท (${i + 1}–${i + chunk.length})`,
-      contents: {
-        type: "carousel",
-        contents: chunk.map((img) => ({
-          type: "bubble",
-          size: "mega",
-          hero: {
-            type: "image",
-            url: fileUrl(img, true),
-            size: "full",
-            aspectRatio: CARD_RATIO, // ทุกการ์ดขนาดเท่ากัน (รูปย่อพอดีกรอบ ไม่ครอป)
-            aspectMode: "fit",
-            backgroundColor: "#1c2722",
-            action: { type: "uri", label: "ดูเต็ม", uri: fileUrl(img, false) },
-          },
-          footer: {
-            type: "box",
-            layout: "vertical",
-            paddingAll: "10px",
-            contents: [{ type: "text", text: img.name || "-", size: "sm", weight: "bold", wrap: false, align: "center" }],
-          },
-        })),
-      },
+      contents: { type: "carousel", contents: chunk },
     });
   }
   return messages;
