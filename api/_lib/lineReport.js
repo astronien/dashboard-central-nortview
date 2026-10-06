@@ -170,6 +170,9 @@ function fmtTimeIso(iso) {
   return `${String(bkk.getUTCHours()).padStart(2, "0")}:${String(bkk.getUTCMinutes()).padStart(2, "0")}`;
 }
 
+/** กรอบรูปใน carousel — ใช้สัดส่วนเดียวกันทุกใบให้เรียงสวย */
+const CARD_RATIO = "3:4";
+
 /** อัตราส่วนภาพสำหรับ Flex (สูงได้ไม่เกิน 3 เท่าของกว้าง) */
 function flexRatio(w, h) {
   const ww = Math.max(1, Math.round(w));
@@ -232,7 +235,7 @@ async function buildReportReply(baseUrl) {
             type: "image",
             url: fileUrl(img, true),
             size: "full",
-            aspectRatio: flexRatio(img.w, img.h),
+            aspectRatio: CARD_RATIO, // ทุกการ์ดขนาดเท่ากัน (รูปย่อพอดีกรอบ ไม่ครอป)
             aspectMode: "fit",
             backgroundColor: "#1c2722",
             action: { type: "uri", label: "ดูเต็ม", uri: fileUrl(img, false) },
@@ -241,7 +244,7 @@ async function buildReportReply(baseUrl) {
             type: "box",
             layout: "vertical",
             paddingAll: "10px",
-            contents: [{ type: "text", text: img.name || "-", size: "sm", weight: "bold", wrap: true, align: "center" }],
+            contents: [{ type: "text", text: img.name || "-", size: "sm", weight: "bold", wrap: false, align: "center" }],
           },
         })),
       },
