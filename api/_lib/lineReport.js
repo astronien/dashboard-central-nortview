@@ -179,7 +179,7 @@ function flexRatio(w, h) {
 
 /**
  * ข้อความตอบกลับ "report รายวัน" (ไม่เกิน 5 messages):
- *   1. ข้อความหัว · 2–3. รูป Home · 4–5. carousel รูปรายคน (12 รูป/ชุด)
+ *   1. ข้อความหัว · 2+. carousel รวมรูป Home + รายคน (12 รูป/ชุด)
  */
 async function buildReportReply(baseUrl) {
   const meta = await loadMeta();
@@ -211,21 +211,18 @@ async function buildReportReply(baseUrl) {
         (meta.branch ? `\n${meta.branch}` : "") +
         (time ? `\nแคปเมื่อ ${time}` : "") +
         (meta.date !== today ? "\n⚠️ ยังไม่ใช่ข้อมูลของวันนี้" : "") +
-        (staff.length ? `\n👇 รูปรายคนเลื่อนดูด้านล่าง (แตะเพื่อดูเต็ม)` : ""),
+        "\n👇 เลื่อนดูรูปด้านล่าง (แตะเพื่อดูเต็ม)",
     },
   ];
 
-  homes.slice(0, 2).forEach((img) => {
-    messages.push({ type: "image", originalContentUrl: fileUrl(img, false), previewImageUrl: fileUrl(img, true) });
-  });
-
-  // รูปรายคน → carousel (สูงสุด 12 bubble ต่อ 1 message)
-  const slots = 5 - messages.length;
-  for (let i = 0; i < staff.length && messages.length < 5 && slots > 0; i += 12) {
-    const chunk = staff.slice(i, i + 12);
+  // รวมทุกรูปไว้ใน carousel เดียวกัน: Home 2 รูปก่อน แล้วต่อด้วยรายคน
+  // (สูงสุด 12 bubble ต่อ 1 message → เกินจะแยกเป็นชุดถัดไป)
+  const all = [...homes, ...staff];
+  for (let i = 0; i < all.length && messages.length < 5; i += 12) {
+    const chunk = all.slice(i, i + 12);
     messages.push({
       type: "flex",
-      altText: `รูปรายคน (${i + 1}–${i + chunk.length})`,
+      altText: `รูปรีพอท (${i + 1}–${i + chunk.length})`,
       contents: {
         type: "carousel",
         contents: chunk.map((img) => ({
