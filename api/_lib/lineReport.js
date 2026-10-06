@@ -175,7 +175,7 @@ const CARD_RATIO = "1:1";
 
 /**
  * ข้อความตอบกลับ "report รายวัน" (ไม่เกิน 5 messages):
- *   1. ข้อความหัว · 2+. carousel รวมรูป Home + รายคน (12 รูป/ชุด)
+ *   carousel รวมรูป Home + รายคน (12 การ์ด/ชุด) — ไม่มีข้อความนำ
  */
 async function buildReportReply(baseUrl) {
   const meta = await loadMeta();
@@ -199,17 +199,9 @@ async function buildReportReply(baseUrl) {
 
   const today = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
   const time = fmtTimeIso(meta.finishedAt);
-  const messages = [
-    {
-      type: "text",
-      text:
-        `📊 รีพอทยอดขาย ${fmtDate(meta.date)}` +
-        (meta.branch ? `\n${meta.branch}` : "") +
-        (time ? `\nแคปเมื่อ ${time}` : "") +
-        (meta.date !== today ? "\n⚠️ ยังไม่ใช่ข้อมูลของวันนี้" : "") +
-        "\n👇 เลื่อนดูรูปด้านล่าง (แตะเพื่อดูเต็ม)",
-    },
-  ];
+  // ไม่มีข้อความนำ — ส่งรูปเลย (วันที่อยู่ใน altText ที่แจ้งเตือน/แชทลิสต์)
+  const messages = [];
+  const altHead = `📊 รีพอท ${fmtDate(meta.date)}${meta.date !== today ? " (ยังไม่ใช่วันนี้)" : ""}${time ? ` · ${time}` : ""}`;
 
   // การ์ดในชุดเลื่อน (LINE จำกัด 12 การ์ด/ชุด):
   //   - Home: 1 รูป/การ์ด
@@ -267,7 +259,7 @@ async function buildReportReply(baseUrl) {
     const chunk = cards.slice(i, i + 12);
     messages.push({
       type: "flex",
-      altText: `รูปรีพอท (${i + 1}–${i + chunk.length})`,
+      altText: i === 0 ? altHead : `${altHead} (${i + 1}–${i + chunk.length})`,
       contents: { type: "carousel", contents: chunk },
     });
   }
