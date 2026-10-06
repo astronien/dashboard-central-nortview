@@ -516,6 +516,30 @@ const RAW_DEVICE_CATS = new Set(["mac", "ipad", "iphone", "apple watch"]);
 /** ชื่อหมวด "อื่นๆ" — ยอดที่ไม่เข้า 6 หมวดหลัก */
 const OTHER_CAT = "อื่นๆ";
 
+// ─── Case / ฟิล์ม: นับเฉพาะของ iPhone ───────────────────────────────────────
+// preset ที่ชื่อมี case / film / เคส / ฟิล์ม จะตัดบรรทัดเคส/ฟิล์มของ iPad / Mac
+// / AirPods / Watch / AirTag ออกก่อนคำนวณ (ดูจาก Category / Sub Category / ชื่อสินค้า)
+const ACC_CASE_FILM_CAT_RE = /case|film|casing/i;
+const isIphoneAccPreset = (p: { name?: string }) => /case|film|เคส|ฟิล์ม|ฟิม/i.test(String(p.name ?? ""));
+const isNonIphoneCaseFilmLine = (li: RawRow): boolean => {
+  const cat = String(li["Category (Name)"] ?? "");
+  const sub = String(li["Sub Category"] ?? "");
+  if (!ACC_CASE_FILM_CAT_RE.test(`${cat} ${sub}`)) return false; // ไม่ใช่เคส/ฟิล์ม → ไม่ยุ่ง
+  if (/^iphone$/i.test(cat.trim())) return false; // ตัวเครื่อง
+  const text = `${sub} ${li["Product (Name)"] ?? ""}`;
+  if (/iphone/i.test(text)) return false;
+  // ตัดเฉพาะของอุปกรณ์อื่นชัดๆ — ที่เหลือ (MagSafe card holder, สายคล้อง) ถือเป็นของ iPhone
+  return /ipad|macbook|\bmac\b|computer|airpods|apple\s*watch|airtag/i.test(`${cat} ${text}`);
+};
+const iphoneAccOnlyBills = (bills: BillSummary[]): BillSummary[] =>
+  bills.map((b) =>
+    b.lineItems.some(isNonIphoneCaseFilmLine)
+      ? { ...b, lineItems: b.lineItems.filter((li) => !isNonIphoneCaseFilmLine(li)) }
+      : b,
+  );
+const calcPresetIphoneAcc: typeof calcPreset = (bills, preset, ctx) =>
+  calcPreset(isIphoneAccPreset(preset) ? iphoneAccOnlyBills(bills) : bills, preset, ctx);
+
 const ATTACH_ITEM_HINT =
   /cover|film|case|care|glass|adapter|cable|sim|pencil|airpod|strap|bag|charger|power|protect|smile|ufund/i;
 
@@ -2582,7 +2606,7 @@ function AppInternal({
       tradeInCount: tradeCountForOfficer(activeOfficer?.staffId, activeOfficer?.name),
       iphoneUnits: iphoneUnitsFromBills(activeOfficerBills),
     };
-    return staffPresets.map((p) => calcPreset(activeOfficerBills, p, ctx));
+    return staffPresets.map((p) => calcPresetIphoneAcc(activeOfficerBills, p, ctx));
   }, [activeOfficerBills, kpiPresets, activeOfficer, tradeCountForOfficer, iphoneUnitsFromBills]);
 
   const activeOfficer7WondersPerformance = useMemo<CategoryPerformanceRow[]>(() => {
@@ -2749,7 +2773,7 @@ function AppInternal({
           };
           const results: Record<string, number> = {};
           branchPresets.forEach((p) => {
-            const r = calcPreset(officerBills, p, ctx);
+            const r = calcPresetIphoneAcc(officerBills, p, ctx);
             results[p.id] = presetDisplayValue(r);
           });
           return { officer, results };
@@ -2901,7 +2925,7 @@ function AppInternal({
         };
         const wonders: Record<string, CombinedWonderCell> = {};
         wonderPresets.forEach((p) => {
-          const r = calcPreset(officerBills, p, ctx);
+          const r = calcPresetIphoneAcc(officerBills, p, ctx);
           const target = p.targetPercent ?? 0;
           wonders[p.id] = {
             actual: presetDisplayValue(r),
@@ -3125,8 +3149,8 @@ function AppInternal({
             tradeInCount: tradeCountOnDay(officer.staffId, officer.name, prevDay ?? ""),
             iphoneUnits: iphoneUnitsFromBills(prevOfficerBills),
           };
-          const rL = calcPreset(latestOfficerBills, p, ctxL);
-          const rP = calcPreset(prevOfficerBills, p, ctxP);
+          const rL = calcPresetIphoneAcc(latestOfficerBills, p, ctxL);
+          const rP = calcPresetIphoneAcc(prevOfficerBills, p, ctxP);
           wonders[p.id] = {
             latest: presetDisplayValue(rL),
             prev: presetDisplayValue(rP),
@@ -3457,6 +3481,7 @@ function AppInternal({
 
     const splitPresetUnits = (bills: BillSummary[], preset: KpiPreset) => {
       const filters = preset.filtersA ?? (preset.filterA ? [preset.filterA] : []);
+      if (isIphoneAccPreset(preset)) bills = iphoneAccOnlyBills(bills);
       let older = 0;
       let gen18 = 0;
       if (!filters.length) return { older, gen18 };
@@ -3583,7 +3608,7 @@ function AppInternal({
         const totalBaht = officerBills.reduce((s, b) => s + b.totalRevenue, 0);
         const cells: Record<string, { kind: "att" | "unit" | "baht"; unit?: number; unit18?: number; att?: number; baht?: number }> = {};
         cols.forEach((p) => {
-          const r = calcPreset(officerBills, p, dummy);
+          const r = calcPresetIphoneAcc(officerBills, p, dummy);
           const kind = kindFor(p.calcType);
           if (kind === "baht") {
             cells[p.id] = { kind, baht: r.totalBaht };
