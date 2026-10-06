@@ -540,6 +540,22 @@ const iphoneAccOnlyBills = (bills: BillSummary[]): BillSummary[] =>
 const calcPresetIphoneAcc: typeof calcPreset = (bills, preset, ctx) =>
   calcPreset(isIphoneAccPreset(preset) ? iphoneAccOnlyBills(bills) : bills, preset, ctx);
 
+// ─── UFUND = บิลที่ Customer (Code) เป็น "UFUND PERSONAL" เท่านั้น ─────────────
+// (ตอนอัปโหลดคอลัมน์ถูกแปลงชื่อเป็น "Customer Code" — รองรับทั้งสองแบบ)
+const UFUND_PERSONAL_RE = /ufund\s*personal/i;
+const isUfundPersonalBill = (b: BillSummary): boolean =>
+  UFUND_PERSONAL_RE.test(String(b.customerCode ?? "")) ||
+  b.lineItems.some((li) =>
+    UFUND_PERSONAL_RE.test(
+      String(li["Customer Code"] ?? li["Customer (Code)"] ?? (li as Record<string, unknown>).customer_code ?? ""),
+    ),
+  );
+/** จำนวนบิล iPhone ที่ปิดด้วย UFUND PERSONAL */
+const countUfundIphoneBills = (bills: BillSummary[]): number =>
+  bills.filter(
+    (b) => isUfundPersonalBill(b) && b.lineItems.some((li) => /^iphone$/i.test(String(li["Category (Name)"] ?? "").trim())),
+  ).length;
+
 const ATTACH_ITEM_HINT =
   /cover|film|case|care|glass|adapter|cable|sim|pencil|airpod|strap|bag|charger|power|protect|smile|ufund/i;
 
@@ -2953,9 +2969,7 @@ function AppInternal({
           // ไม่ใช่ "จำนวนบิลที่มี iPhone" เพราะบิลเดียวอาจมี iPhone หลายเครื่อง
           if (/ufund/i.test(p.name)) {
             const iphoneBase = coverPlusIphoneBase;
-            const ufundIphone = officerBills.filter(
-              (b) => b.hasIPhone && calcPreset([b], p, ctx).billsWithAandB > 0,
-            ).length;
+            const ufundIphone = countUfundIphoneBills(officerBills);
             const rate = iphoneBase > 0 ? (ufundIphone / iphoneBase) * 100 : 0;
             wonders[p.id].actualA = ufundIphone;
             wonders[p.id].actualB = iphoneBase;
@@ -3252,7 +3266,6 @@ function AppInternal({
     const coverPlusPreset = kpiPresets.find((p) =>
       /cover\s*\+|cover\s*plus|coverplus/i.test(p.name),
     );
-    const ufundPreset = kpiPresets.find((p) => /ufund/i.test(p.name));
     const dummyCtx = { tradeInCount: 0, iphoneUnits: 0 };
 
     const officerList: Array<{ name: string; branch: string; staffId?: string; position?: string }> =
@@ -3298,15 +3311,12 @@ function AppInternal({
           ? cpResult.billsWithB
           : iphoneUnitsFromBills(officerBills);
         const cover = cpResult ? cpResult.billsWithAandB : 0;
-        const ufund = ufundPreset
-          ? calcPreset(officerBills, ufundPreset, dummyCtx).billsWithAandB
-          : 0;
+        const ufund = countUfundIphoneBills(officerBills);
         // โหมด x2: บิลในช่วงวันที่ boost → ตัวที่เลือก ×2, ตัวอื่น ×0.5
         const boostBills = officerBills.filter((b) => boostInRange(attachBoost, b.docDate));
         const coverIn =
           coverPlusPreset && boostBills.length ? calcPreset(boostBills, coverPlusPreset, dummyCtx).billsWithAandB : 0;
-        const ufundIn =
-          ufundPreset && boostBills.length ? calcPreset(boostBills, ufundPreset, dummyCtx).billsWithAandB : 0;
+        const ufundIn = boostBills.length ? countUfundIphoneBills(boostBills) : 0;
         const mCover = attachBoost.cover ? 2 : 0.5;
         const mUfund = attachBoost.ufund ? 2 : 0.5;
         const attach = cover + coverIn * (mCover - 1) + ufund + ufundIn * (mUfund - 1);
@@ -3507,15 +3517,7 @@ function AppInternal({
     // UFUND ในไฟล์ขายระบุด้วย Customer (Code) — นับเฉพาะ "UFUND PERSONAL"
     // (ไม่นับ UFUND UNIDAYS / UFUND STUDENT)
     void ufundFilters;
-    // หมายเหตุ: ตอนอัปโหลด คอลัมน์ถูกแปลงชื่อเป็น "Customer Code" (ไม่มีวงเล็บ)
-    const UFUND_PERSONAL_RE = /ufund\s*personal/i;
-    const isUfundBill = (b: BillSummary) =>
-      UFUND_PERSONAL_RE.test(String(b.customerCode ?? "")) ||
-      b.lineItems.some((li) =>
-        UFUND_PERSONAL_RE.test(
-          String(li["Customer Code"] ?? li["Customer (Code)"] ?? (li as any).customer_code ?? ""),
-        ),
-      );
+    const isUfundBill = isUfundPersonalBill;
     const rawIsIphone = (li: RawRow) => String(li["Category (Name)"] ?? "").trim().toLowerCase() === "iphone";
 
     const officerList = (parsedReport.officers.length > 0
@@ -4076,13 +4078,13 @@ function AppInternal({
         /cover\s*\+|cover\s*plus|coverplus/i.test(p.name),
       );
       const acPreset = kpiPresets.find((p) => /\bac\s*\+|apple\s*care|applecare/i.test(p.name));
-      const ufundPreset = kpiPresets.find((p) => /ufund/i.test(p.name));
       const cp = coverPlusPreset ? calcPreset(allBills, coverPlusPreset, dummy) : null;
       presetCounts = {
         iphoneBase: cp ? cp.billsWithB : undefined,
         cover: cp ? cp.billsWithAandB : undefined,
         ac: acPreset ? calcPreset(allBills, acPreset, dummy).billsWithAandB : undefined,
-        ufund: ufundPreset ? calcPreset(allBills, ufundPreset, dummy).billsWithAandB : undefined,
+        // UFUND = บิล iPhone ที่ Customer Code = UFUND PERSONAL (ไม่พึ่ง filter ของ preset)
+        ufund: countUfundIphoneBills(allBills),
       };
     }
     return buildCategorySnapshots({
