@@ -16,6 +16,7 @@
  */
 const crypto = require("crypto");
 const { getAppConfig, setAppConfig, initTelegramSchema } = require("./tursoClient");
+const { handleReport, buildReportReply, REPORT_CMD_RE } = require("./lineReport");
 
 const SNAPSHOT_KEY = "line_attach_snapshot";
 
@@ -599,6 +600,7 @@ function helpBubble() {
         txt("• เช็ค — ดูว่าใครต้องส่งต่อ / ใครต้องระวัง", { size: "sm" }),
         txt("• เช็ค ชื่อ — ดูละเอียดรายคน", { size: "sm" }),
         txt("• ใครรับต่อ — ลูกค้า iPhone คนถัดไปควรให้ใครรับ", { size: "sm" }),
+        txt("• report รายวัน — รูปรีพอท Home + รายคน", { size: "sm" }),
         { type: "separator", color: C.line, margin: "md" },
         txt(RULE_TEXT, { size: "xxs", color: C.muted, margin: "md" }),
         txt("ข้อมูลอัปเดตเมื่อเปิดหน้า Dashboard หลังอัปไฟล์ขาย", { size: "xxs", color: C.muted }),
@@ -612,11 +614,12 @@ function quickReply(snap, withPeople = true) {
   const items = [
     { label: "📋 เช็ค", text: "เช็ค" },
     { label: "👉 ใครรับต่อ", text: "ใครรับต่อ" },
+    { label: "📊 report", text: "report รายวัน" },
   ];
   const people = [...(snap?.rows ?? [])]
     .filter((r) => r.iphone > 0 || r.status !== "green")
     .sort((a, b) => (STATUS_ORDER[a.status] ?? 3) - (STATUS_ORDER[b.status] ?? 3) || b.iphone - a.iphone);
-  if (withPeople) people.slice(0, 11).forEach((r) => {
+  if (withPeople) people.slice(0, 10).forEach((r) => {
     const fn = firstName(r.name);
     const icon = r.status === "red" ? "🔴" : r.status === "yellow" ? "🟡" : "🟢";
     items.push({ label: `${icon} ${fn}`.slice(0, 20), text: `เช็ค ${fn}` });
@@ -633,6 +636,14 @@ async function buildReply(text) {
   if (/^(help|วิธีใช้|คำสั่ง)$/i.test(t)) {
     const snap = await loadSnapshot().catch(() => null);
     return [{ ...flex("วิธีใช้ Attach Bot", helpBubble()), quickReply: quickReply(snap) }];
+  }
+
+  if (REPORT_CMD_RE.test(t)) {
+    const snap = await loadSnapshot().catch(() => null);
+    const msgs = await buildReportReply(snap?.dashboardUrl);
+    // quick reply ติดที่ข้อความสุดท้าย
+    msgs[msgs.length - 1] = { ...msgs[msgs.length - 1], quickReply: quickReply(snap) };
+    return msgs;
   }
 
   const isNext = /^(ใครรับต่อ|คิวต่อไป|ส่งต่อใคร|next)$/i.test(t);
@@ -767,6 +778,16 @@ async function handleWebhook(req, res) {
 async function handleLine(req, res) {
   try {
     if (req.query?.resource === "snapshot") return await handleSnapshot(req, res);
+    if (/^report-/.test(String(req.query?.resource ?? ""))) {
+      return await handleReport(req, res, async (r) => {
+        const raw = await readRawBody(r);
+        try {
+          return JSON.parse(raw || "{}");
+        } catch {
+          return {};
+        }
+      });
+    }
     return await handleWebhook(req, res);
   } catch (e) {
     console.error("[lineBot]", e);

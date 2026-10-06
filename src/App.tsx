@@ -67,6 +67,12 @@ import {
 } from "./lib/tradeInApi";
 import { fetchCsatData, type CsatResult, type CsatUser } from "./lib/csatApi";
 import {
+  beginLineReport,
+  fetchLineReportMeta,
+  finishLineReport,
+  uploadLineReportImage,
+} from "./lib/lineReport";
+import {
   EMPTY_ATTACH_BOOST,
   boostLabel,
   boostInRange,
@@ -4905,6 +4911,94 @@ function AppInternal({
   const staffProfileCaptureRef = useRef<HTMLDivElement>(null);
   const [staffCaptureProgress, setStaffCaptureProgress] = useState("");
 
+  // ─── ตัวเรนเดอร์รูป (ใช้ร่วม: ปุ่มแคป / ส่ง LINE อัตโนมัติ) ─────────────
+  /** แคป element เป็น JPEG — homeStyle เติม padding + พื้นไล่สีเขียวแบบหน้า Home */
+  const renderElementJpeg = async (el: HTMLElement, homeStyle: boolean): Promise<string> => {
+    const w = Math.max(el.scrollWidth, el.offsetWidth);
+    const h = Math.max(el.scrollHeight, el.offsetHeight);
+    const pad = homeStyle ? 28 : 0;
+    // Inject a <style> element as a CHILD of the element so it travels
+    // with the clone into the SVG foreignObject (hides scrollbars/shadows).
+    const innerStyle = document.createElement("style");
+    innerStyle.textContent = `
+      *::-webkit-scrollbar { display: none !important; }
+      * { scrollbar-width: none !important; }
+      * { --tw-ring-shadow: 0 0 #0000 !important; --tw-ring-offset-shadow: 0 0 #0000 !important; }
+      * { --tw-shadow: 0 0 #0000 !important; }
+      * { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+    `;
+    el.appendChild(innerStyle);
+    try {
+      return await toJpeg(el, {
+        quality: 0.94,
+        pixelRatio: 1.5,
+        cacheBust: false,
+        backgroundColor:
+          getComputedStyle(document.documentElement).getPropertyValue("--capture-bg").trim() || "#1c2722",
+        width: w + pad * 2,
+        ...(homeStyle ? { height: h + pad * 2 } : {}),
+        style: {
+          width: `${w + pad * 2}px`,
+          height: homeStyle ? `${h + pad * 2}px` : "auto",
+          boxSizing: "border-box",
+          overflow: "visible",
+          ...(homeStyle
+            ? {
+                padding: `${pad}px`,
+                background: "linear-gradient(to bottom right, #1b5d44, #123627)",
+              }
+            : {}),
+        },
+        filter: (node) => {
+          if (node instanceof HTMLElement && node.classList?.contains("mix-blend-overlay")) {
+            return false;
+          }
+          return true;
+        },
+        fetchRequestInit: { mode: "cors" },
+      });
+    } finally {
+      innerStyle.remove();
+    }
+  };
+
+  /** แคปการ์ด Staff Profile (ต้องใส่ global style ปิด backdrop-filter ก่อนเรียก) */
+  const renderStaffCardJpeg = async (el: HTMLElement): Promise<string> => {
+    const w = Math.max(el.scrollWidth, el.offsetWidth);
+    const h = Math.max(el.scrollHeight, el.offsetHeight);
+    const pad = 32;
+    return toJpeg(el, {
+      quality: 0.92,
+      pixelRatio: 1.5,
+      cacheBust: false,
+      backgroundColor:
+        getComputedStyle(document.documentElement).getPropertyValue("--capture-bg").trim() || "#1c2722",
+      // Padding is added AROUND the card (w/h + pad*2) so the content
+      // stays centered with even margins on every side.
+      width: w + pad * 2,
+      height: h + pad * 2,
+      style: {
+        padding: `${pad}px`,
+        width: `${w + pad * 2}px`,
+        height: `${h + pad * 2}px`,
+        boxSizing: "border-box",
+        overflow: "visible",
+      },
+      // mix-blend-* layers (e.g. the emerald glow behind the photo)
+      // render as solid green blobs in the SVG clone — drop them.
+      filter: (node) => !(node instanceof HTMLElement && String(node.className).includes("mix-blend-")),
+      fetchRequestInit: { mode: "cors" },
+    });
+  };
+
+  const CAPTURE_GLOBAL_CSS = `
+    * { scrollbar-width: none !important; }
+    *::-webkit-scrollbar { display: none !important; }
+    * { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+  `;
+  const isBranchManagerOfficer = (o: { position?: string }): boolean =>
+    /bsm|bm|manager|ผู้จัดการ|จัดการ/i.test(String(o.position ?? "").trim());
+
   const captureScreen = async () => {
     // On home view, capture the 4 stat cards + Category KPI Snapshot
     const isHome = currentView === "home" && !!homeStatsCaptureRef.current;
@@ -4918,51 +5012,8 @@ function AppInternal({
       homeStyle: boolean,
     ) => {
       if (!el) return;
-      const w = Math.max(el.scrollWidth, el.offsetWidth);
-      const h = Math.max(el.scrollHeight, el.offsetHeight);
-      const pad = homeStyle ? 28 : 0;
-      // Inject a <style> element as a CHILD of the element so it travels
-      // with the clone into the SVG foreignObject (hides scrollbars/shadows).
-      const innerStyle = document.createElement("style");
-      innerStyle.textContent = `
-        *::-webkit-scrollbar { display: none !important; }
-        * { scrollbar-width: none !important; }
-        * { --tw-ring-shadow: 0 0 #0000 !important; --tw-ring-offset-shadow: 0 0 #0000 !important; }
-        * { --tw-shadow: 0 0 #0000 !important; }
-        * { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
-      `;
-      el.appendChild(innerStyle);
       try {
-        const dataUrl = await toJpeg(el, {
-          quality: 0.94,
-          pixelRatio: 1.5,
-          cacheBust: false,
-          backgroundColor:
-            getComputedStyle(document.documentElement)
-              .getPropertyValue("--capture-bg")
-              .trim() || "#1c2722",
-          width: w + pad * 2,
-          ...(homeStyle ? { height: h + pad * 2 } : {}),
-          style: {
-            width: `${w + pad * 2}px`,
-            height: homeStyle ? `${h + pad * 2}px` : "auto",
-            boxSizing: "border-box",
-            overflow: "visible",
-            ...(homeStyle
-              ? {
-                  padding: `${pad}px`,
-                  background: "linear-gradient(to bottom right, #1b5d44, #123627)",
-                }
-              : {}),
-          },
-          filter: (node) => {
-            if (node instanceof HTMLElement && node.classList?.contains("mix-blend-overlay")) {
-              return false;
-            }
-            return true;
-          },
-          fetchRequestInit: { mode: "cors" },
-        });
+        const dataUrl = await renderElementJpeg(el, homeStyle);
         const link = document.createElement("a");
         link.download = `dashboard-${label}-${ts}.jpeg`;
         link.href = dataUrl;
@@ -4971,8 +5022,6 @@ function AppInternal({
         document.body.removeChild(link);
       } catch (e) {
         console.error("[captureScreen] failed:", e);
-      } finally {
-        innerStyle.remove();
       }
     };
 
@@ -5046,37 +5095,7 @@ function AppInternal({
           if (!el) continue;
           // One failed capture must not abort the rest of the roster
           try {
-            const w = Math.max(el.scrollWidth, el.offsetWidth);
-            const h = Math.max(el.scrollHeight, el.offsetHeight);
-            const pad = 32;
-            const dataUrl = await toJpeg(el, {
-              quality: 0.92,
-              pixelRatio: 1.5,
-              cacheBust: false,
-              backgroundColor:
-          getComputedStyle(document.documentElement)
-            .getPropertyValue("--capture-bg")
-            .trim() || "#1c2722",
-              // Padding is added AROUND the card (w/h + pad*2) so the content
-              // stays centered with even margins on every side.
-              width: w + pad * 2,
-              height: h + pad * 2,
-              style: {
-                padding: `${pad}px`,
-                width: `${w + pad * 2}px`,
-                height: `${h + pad * 2}px`,
-                boxSizing: "border-box",
-                overflow: "visible",
-              },
-              // mix-blend-* layers (e.g. the emerald glow behind the photo)
-              // render as solid green blobs in the SVG clone — drop them.
-              filter: (node) =>
-                !(
-                  node instanceof HTMLElement &&
-                  String(node.className).includes("mix-blend-")
-                ),
-              fetchRequestInit: { mode: "cors" },
-            });
+            const dataUrl = await renderStaffCardJpeg(el);
             const link = document.createElement("a");
             link.download = `staff-${String(idx + 1).padStart(2, "0")}-${officerName}-${view.label}-${ts}.jpeg`;
             link.href = dataUrl;
@@ -5105,6 +5124,125 @@ function AppInternal({
     }
   };
 
+  // ─── LINE "report รายวัน": แคปอัตโนมัติแล้วเก็บไว้ให้ bot ──────────────────
+  // เมื่อเปิด Dashboard (บนคอม, ไม่ใช่บัญชี PIA) แล้วข้อมูลยอดขายเปลี่ยนจากชุดที่
+  // แคปไว้ล่าสุด → แคปรูป Home 2 รูป + Staff Profile รายคน แล้วอัปขึ้น server
+  // ให้ LINE bot ตอบกลับด้วยรูปเหล่านี้เมื่อมีคนพิมพ์ "report รายวัน"
+  const [lineReportProgress, setLineReportProgress] = useState("");
+  const lineReportBusyRef = useRef(false);
+  const lineReportDoneSigRef = useRef<string>("");
+
+  const lineReportSig = useMemo(() => {
+    if (!dailyBranchReport.latestDate) return "";
+    const total = dailyBranchReport.rows.find((r) => (r as { isTotal?: boolean }).isTotal);
+    return [
+      selectedBranch,
+      dailyBranchReport.latestDate,
+      displayUploads.current.length,
+      Math.round(Number(total?.totalBaht ?? 0)),
+    ].join("|");
+  }, [dailyBranchReport, selectedBranch, displayUploads.current.length]);
+
+  const autoCaptureForLine = async (sig: string, date: string) => {
+    if (lineReportBusyRef.current || staffCaptureProgress) return;
+    lineReportBusyRef.current = true;
+    const prevView = currentView;
+    const prevStaffId = activeStaffId;
+    const prevStat = activeStat;
+    const styleTag = document.createElement("style");
+    styleTag.textContent = CAPTURE_GLOBAL_CSS;
+    let ok = false;
+    try {
+      setLineReportProgress("เริ่มแคปรีพอท…");
+      await beginLineReport(date, sig, selectedBranch);
+      let seq = 0;
+
+      // 1) Home (วิวซ่อนที่ render ไว้ตลอด — ไม่ต้องสลับหน้า)
+      setLineReportProgress("แคปหน้า Home…");
+      if (homeStatsCaptureRef.current) {
+        const img = await renderElementJpeg(homeStatsCaptureRef.current, true);
+        await uploadLineReportImage(seq++, "home", "ภาพรวม + Category KPI", img);
+      }
+      if (combinedTableCaptureRef.current) {
+        const img = await renderElementJpeg(combinedTableCaptureRef.current, true);
+        await uploadLineReportImage(seq++, "home", "ยอดขายตามหมวด + 7 Wonders รายคน", img);
+      }
+
+      // 2) Staff Profile รายคน (ต้องสลับไปหน้า staff ชั่วคราว)
+      const officers = parsedReport.officers
+        .map((o, idx) => ({ o, idx }))
+        .filter(({ o }) => !isBranchManagerOfficer(o) && !isStaffHidden(o));
+      if (officers.length) {
+        setCurrentView("staff");
+        await new Promise((r) => setTimeout(r, 1500));
+        document.head.appendChild(styleTag);
+        const views: Array<{ stat: "sales" | "csat"; label: string }> = [
+          { stat: "sales", label: "KPI" },
+          { stat: "csat", label: "7 Wonders" },
+        ];
+        for (let i = 0; i < officers.length; i++) {
+          const { o, idx } = officers[i];
+          setActiveStaffId(String(idx + 1));
+          for (const view of views) {
+            setActiveStat(view.stat);
+            setLineReportProgress(`แคปรายคน ${i + 1}/${officers.length} — ${view.label}`);
+            await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 3500)));
+            const el = staffProfileCaptureRef.current;
+            if (!el) continue;
+            try {
+              const img = await renderStaffCardJpeg(el);
+              await uploadLineReportImage(seq++, "staff", `${o.name} · ${view.label}`, img);
+            } catch (e) {
+              console.error("[lineReport] staff capture failed", o.name, view.label, e);
+            }
+          }
+        }
+      }
+
+      setLineReportProgress("กำลังบันทึก…");
+      await finishLineReport(date, sig);
+      ok = true;
+    } catch (e) {
+      console.error("[lineReport] auto capture failed", e);
+    } finally {
+      styleTag.remove();
+      setCurrentView(prevView);
+      setActiveStaffId(prevStaffId);
+      setActiveStat(prevStat);
+      setLineReportProgress("");
+      lineReportBusyRef.current = false;
+      // สำเร็จ หรือพังก็ตาม — ไม่ลองซ้ำกับข้อมูลชุดเดิมใน session นี้ (กันวนลูป)
+      lineReportDoneSigRef.current = sig;
+      if (!ok) console.warn("[lineReport] will retry next time the dashboard is opened");
+    }
+  };
+
+  useEffect(() => {
+    if (!user || isPia || isInitialLoading) return;
+    if (!kpiPresetsLoaded || !staffPhotosLoaded) return;
+    if (!lineReportSig || !parsedReport.officers.length || !dailyBranchReport.latestDate) return;
+    if (typeof window === "undefined" || window.innerWidth < 1024) return; // แคปบนคอมเท่านั้น
+    if (lineReportDoneSigRef.current === lineReportSig) return;
+    const sig = lineReportSig;
+    const date = dailyBranchReport.latestDate;
+    // รอข้อมูลนิ่งก่อน (อัปไฟล์/คำนวณเสร็จ) แล้วค่อยเช็คกับ server
+    const t = window.setTimeout(async () => {
+      if (lineReportBusyRef.current) return;
+      const meta = await fetchLineReportMeta();
+      if (meta?.sig === sig && meta.status === "done") {
+        lineReportDoneSigRef.current = sig;
+        return;
+      }
+      // อีกเครื่องกำลังแคปอยู่ (เริ่มไม่เกิน 3 นาที) → ไม่แย่ง
+      if (meta?.status === "uploading" && meta.sig === sig && meta.startedAt) {
+        if (Date.now() - new Date(meta.startedAt).getTime() < 3 * 60 * 1000) return;
+      }
+      void autoCaptureForLine(sig, date);
+    }, 10000);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, isPia, isInitialLoading, kpiPresetsLoaded, staffPhotosLoaded, lineReportSig]);
+
   return (
     <div className="app-root min-h-screen bg-[#1c2722] p-4 font-sans text-white md:p-8 flex flex-col items-center">
       {isInitialLoading && (
@@ -5115,6 +5253,17 @@ function AppInternal({
           </div>
         </div>
       )}
+      {lineReportProgress ? (
+        <div className="fixed inset-0 z-[998] bg-black/40 flex items-end justify-center p-6 pointer-events-auto">
+          <div className="rounded-2xl bg-[#0c3123] border border-emerald-400/30 px-5 py-4 shadow-2xl flex items-center gap-3 text-white">
+            <div className="w-6 h-6 border-[3px] border-white/20 border-t-emerald-400 rounded-full animate-spin" />
+            <div>
+              <div className="text-sm font-bold">กำลังเตรียมรีพอทสำหรับ LINE อัตโนมัติ</div>
+              <div className="text-xs text-white/60">{lineReportProgress} · รอสักครู่ ไม่ต้องกดอะไร</div>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <div className="app-panel w-full max-w-[1440px] h-auto min-h-[90vh] bg-gradient-to-br from-[#1b5d44] to-[#123627] rounded-[2rem] border border-white/10 shadow-2xl flex flex-col relative overflow-x-hidden">
         {/* Logo (Absolute Left) */}
         <div className="absolute top-6 left-8 z-50 flex items-center gap-4 pointer-events-auto">
