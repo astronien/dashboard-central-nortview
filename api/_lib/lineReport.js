@@ -205,7 +205,7 @@ async function buildReportReply(baseUrl) {
 
   // การ์ดในชุดเลื่อน (LINE จำกัด 12 การ์ด/ชุด):
   //   - Home: 1 รูป/การ์ด
-  //   - รายคน: รวม KPI + 7 Wonders ของคนเดียวกันไว้ในการ์ดเดียว (วางคู่กัน)
+  //   - รายคน: รวม KPI (บน) + 7 Wonders (ล่าง) ของคนเดียวกันไว้ในการ์ดเดียว
   //     → 2 + จำนวนพนักงาน การ์ด อยู่ในแถวเดียว
   const imgBox = (img, ratio) => ({
     type: "image",
@@ -245,11 +245,11 @@ async function buildReportReply(baseUrl) {
         imgs.length === 1
           ? imgBox(imgs[0], CARD_RATIO)
           : {
-              // สองรูปคู่กัน (ช่องละ 1:2) → รวมเป็นกรอบ 1:1 เท่าการ์ดอื่น
+              // KPI (บน) + 7 Wonders (ล่าง) ช่องละ 2:1 → รวมเป็นกรอบ 1:1 เท่าการ์ดอื่น
               type: "box",
-              layout: "horizontal",
+              layout: "vertical",
               spacing: "none",
-              contents: imgs.slice(0, 2).map((img) => ({ ...imgBox(img, "1:2"), flex: 1 })),
+              contents: imgs.slice(0, 2).map((img) => imgBox(img, "2:1")),
             },
       footer: nameFooter(person),
     });
