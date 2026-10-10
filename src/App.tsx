@@ -3518,6 +3518,10 @@ function AppInternal({
       const p = kpiPresets.find((x) => re.test(x.name));
       return p ? p.filtersA ?? (p.filterA ? [p.filterA] : []) : [];
     };
+    // preset Cover ตัวเดียวกับคอลัมน์ "Attach Coverplus" ในตาราง
+    const coverPresetForBills =
+      kpiPresets.find((x) => /cover\s*\+|cover\s*plus|coverplus/i.test(x.name)) ??
+      kpiPresets.find((x) => /cover/i.test(x.name));
     const coverFilters = presetFilters(/cover/i);
     const ufundFilters = presetFilters(/ufund/i);
     // UFUND ในไฟล์ขายระบุด้วย Customer (Code) — นับเฉพาะ "UFUND PERSONAL"
@@ -3562,10 +3566,11 @@ function AppInternal({
           const hasIphone = b.lineItems.some((li) => rawCatOf(li) === "iphone");
           if (!hasIphone) continue;
           deviceBills += 1;
-          const hasCover =
-            coverFilters.length > 0
-              ? countItemQuantityAnyFilter(b, coverFilters) > 0
-              : b.lineItems.some((li) => /cover\s*\+|coverplus/i.test(String(li["Product (Name)"] ?? "")));
+          // ใช้ calcPreset ตัวเดียวกับคอลัมน์ Cover ในตาราง (ตรงกันแน่นอน)
+          const hasCover = coverPresetForBills
+            ? calcPreset([b], coverPresetForBills, dummy).billsWithAandB > 0 ||
+              (coverFilters.length > 0 && countItemQuantityAnyFilter(b, coverFilters) > 0)
+            : b.lineItems.some((li) => /cover\s*\+|coverplus/i.test(String(li["Product (Name)"] ?? "")));
           const hasUfund = isUfundBill(b);
           const hasSim = b.lineItems.some((li) => {
             const rc = String(li["Category (Name)"] ?? "").toLowerCase();
@@ -3666,7 +3671,10 @@ function AppInternal({
           requiredCredits,
           iphoneAttachAlert,
           iphoneAttachWarn,
-          coverBills: coverIphoneBills,
+          // ให้ LINE ใช้ตัวเลขเดียวกับคอลัมน์ในตาราง (รวมส่วน iPhone 18 ถ้าแยกไว้)
+          coverBills: coverPresetForBills && cells[coverPresetForBills.id]
+            ? (cells[coverPresetForBills.id].unit ?? 0) + (cells[coverPresetForBills.id].unit18 ?? 0)
+            : coverIphoneBills,
           ufundBills: ufundIphoneBills,
           simBills: simIphoneBills,
           iphoneUnit,
