@@ -3333,7 +3333,12 @@ function AppInternal({
         const ufundOut = boostBills.length ? countUfundIphoneBills(normalBills) : ufund;
         let boostCredit = 0;
         for (const b of boostBills) {
-          const hasCov = coverPlusPreset ? calcPreset([b], coverPlusPreset, dummyCtx).billsWithAandB > 0 : false;
+          const hasCov =
+            (coverPlusPreset ? calcPreset([b], coverPlusPreset, dummyCtx).billsWithAandB > 0 : false) ||
+            b.lineItems.some((li) => {
+              const name = String(li["Product (Name)"] ?? "");
+              return /cover\s*\+|coverplus/i.test(`${name} ${li["Product (Code)"] ?? ""}`) && !/free|ฟรี/i.test(name);
+            });
           const hasUf = countUfundIphoneBills([b]) > 0;
           boostCredit += Math.max(
             hasCov ? boostMultiplier(attachBoost, "cover", b.docDate) : 0,
@@ -3537,7 +3542,7 @@ function AppInternal({
     const coverPresetForBills =
       kpiPresets.find((x) => /cover\s*\+|cover\s*plus|coverplus/i.test(x.name)) ??
       kpiPresets.find((x) => /cover/i.test(x.name));
-    const coverFilters = presetFilters(/cover/i);
+    const coverPresetsAll = kpiPresets.filter((x) => /cover/i.test(x.name));
     const ufundFilters = presetFilters(/ufund/i);
     // UFUND ในไฟล์ขายระบุด้วย Customer (Code) — นับเฉพาะ "UFUND PERSONAL"
     // (ไม่นับ UFUND UNIDAYS / UFUND STUDENT)
@@ -3568,6 +3573,7 @@ function AppInternal({
         // บิล iPhone ที่ "มีอย่างน้อย 1 อย่าง": Cover / UFUND / SIM / Acc ≥3 ชิ้น
         let creditedBills = 0;
         let ufundIphoneBills = 0;
+        const creditLog: string[] = [];
         let coverIphoneBills = 0;
         let simIphoneBills = 0;
         let ufundOther = 0; // บิล UFUND ที่ไม่มีแถว iPhone (เช่นตอนกรอง iPhone 18 ออก)
@@ -3581,11 +3587,14 @@ function AppInternal({
           const hasIphone = b.lineItems.some((li) => rawCatOf(li) === "iphone");
           if (!hasIphone) continue;
           deviceBills += 1;
-          // ใช้ calcPreset ตัวเดียวกับคอลัมน์ Cover ในตาราง (ตรงกันแน่นอน)
-          const hasCover = coverPresetForBills
-            ? calcPreset([b], coverPresetForBills, dummy).billsWithAandB > 0 ||
-              (coverFilters.length > 0 && countItemQuantityAnyFilter(b, coverFilters) > 0)
-            : b.lineItems.some((li) => /cover\s*\+|coverplus/i.test(String(li["Product (Name)"] ?? "")));
+          // มี Cover ในบิล = preset ที่ชื่อมี "cover" ตัวใดตัวหนึ่งจับเจอ (ฝั่ง A)
+          // หรือมีสินค้า COVER+ จริง (ไม่นับของแถม 7CARE+ Free)
+          const hasCover =
+            coverPresetsAll.some((cp) => calcPreset([b], cp, dummy).billsWithAandB > 0) ||
+            b.lineItems.some((li) => {
+              const name = String(li["Product (Name)"] ?? "");
+              return /cover\s*\+|coverplus/i.test(`${name} ${li["Product (Code)"] ?? ""}`) && !/free|ฟรี/i.test(name);
+            });
           const hasUfund = isUfundBill(b);
           const hasSim = b.lineItems.some((li) => {
             const rc = String(li["Category (Name)"] ?? "").toLowerCase();
@@ -3613,6 +3622,18 @@ function AppInternal({
             piecesInBill >= ATTACH_PER_BILL_TARGET ? boostMultiplier(attachBoost, "acc", b.docDate) : 0,
           );
           creditedBills += billCredit;
+          {
+            const parts: string[] = [];
+            const tag = (label: string, t: "cover" | "ufund" | "sim" | "acc") => {
+              const m = boostMultiplier(attachBoost, t, b.docDate);
+              parts.push(m === 1 ? label : `${label}×${m}`);
+            };
+            if (hasCover) tag("Cover", "cover");
+            if (hasUfund) tag("UFUND", "ufund");
+            if (hasSim) tag("SIM", "sim");
+            if (piecesInBill >= ATTACH_PER_BILL_TARGET) tag(`Acc${piecesInBill}`, "acc");
+            creditLog.push(`${b.docNo || "-"}: ${parts.length ? parts.join(" + ") : "ไม่มีแนบ"} → ${billCredit}`);
+          }
           if (hasUfund) ufundIphoneBills += 1;
           if (hasCover) coverIphoneBills += 1;
           if (hasSim) simIphoneBills += 1;

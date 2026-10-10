@@ -38,6 +38,8 @@ export type DailyReportRow = {
   iphoneAttachAlert?: boolean;
   /** true = ขาย iPhone 3 เครื่อง (ของก้อน 4) แล้วยังไม่มีบิลแนบ → เตือนสีเหลือง */
   iphoneAttachWarn?: boolean;
+  /** รายละเอียดเครดิตต่อบิล (แสดงใน tooltip) */
+  creditLog?: string[];
   iphoneUnit: number;
   iphoneBaht: number;
   ipadUnit: number;
@@ -285,7 +287,8 @@ export const DailyBranchReportSection: React.FC<{ data: DailyReportData; boost?:
                   title={
                     r.isTotal
                       ? undefined
-                      : `เครดิตแนบ (Cover/UFUND/SIM/Acc≥3, โหมด x2 = 2 / ตัวอื่น 0.5): ${Math.round((r.creditedBills ?? 0) * 10) / 10} (ต้องมี ${r.requiredCredits ?? 0} — 1 ต่อ iPhone 4 เครื่อง)`
+                      : `เครดิตแนบ (Cover/UFUND/SIM/Acc≥3, โหมด x2 = 2 / ตัวอื่น 0.5): ${Math.round((r.creditedBills ?? 0) * 10) / 10} (ต้องมี ${r.requiredCredits ?? 0} — 1 ต่อ iPhone 4 เครื่อง)` +
+                        (r.creditLog?.length ? `\n\nรายบิล:\n${r.creditLog.join("\n")}` : "")
                   }
                 >
                   {num(r.iphoneUnit)}
