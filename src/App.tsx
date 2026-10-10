@@ -3318,14 +3318,29 @@ function AppInternal({
           : iphoneUnitsFromBills(officerBills);
         const cover = cpResult ? cpResult.billsWithAandB : 0;
         const ufund = countUfundIphoneBills(officerBills);
-        // โหมด x2: บิลในช่วงวันที่ boost → ตัวที่เลือก ×2, ตัวอื่น ×0.5
+        // โหมด x2: บิลในช่วงวันที่ boost คิดเครดิต "ต่อบิล" — ถ้าบิลมีตัวที่ x2
+        // ใช้ตัวนั้นก่อน (2 เครดิต) ไม่บวกตัวอื่นเพิ่ม · ไม่มีตัว x2 → ตัวอื่น 0.5
+        // บิลนอกช่วง boost คิดแบบเดิม (Cover + UFUND นับแยกกัน)
         const boostBills = officerBills.filter((b) => boostInRange(attachBoost, b.docDate));
-        const coverIn =
-          coverPlusPreset && boostBills.length ? calcPreset(boostBills, coverPlusPreset, dummyCtx).billsWithAandB : 0;
-        const ufundIn = boostBills.length ? countUfundIphoneBills(boostBills) : 0;
-        const mCover = attachBoost.cover ? 2 : 0.5;
-        const mUfund = attachBoost.ufund ? 2 : 0.5;
-        const attach = cover + coverIn * (mCover - 1) + ufund + ufundIn * (mUfund - 1);
+        const normalBills = boostBills.length
+          ? officerBills.filter((b) => !boostInRange(attachBoost, b.docDate))
+          : officerBills;
+        const coverOut = boostBills.length
+          ? coverPlusPreset
+            ? calcPreset(normalBills, coverPlusPreset, dummyCtx).billsWithAandB
+            : 0
+          : cover;
+        const ufundOut = boostBills.length ? countUfundIphoneBills(normalBills) : ufund;
+        let boostCredit = 0;
+        for (const b of boostBills) {
+          const hasCov = coverPlusPreset ? calcPreset([b], coverPlusPreset, dummyCtx).billsWithAandB > 0 : false;
+          const hasUf = countUfundIphoneBills([b]) > 0;
+          boostCredit += Math.max(
+            hasCov ? boostMultiplier(attachBoost, "cover", b.docDate) : 0,
+            hasUf ? boostMultiplier(attachBoost, "ufund", b.docDate) : 0,
+          );
+        }
+        const attach = coverOut + ufundOut + boostCredit;
         const remaining = 4 * attach - iphone;
         const status: "pass" | "accumulating" | "handoff" =
           remaining >= 0 ? "pass" : remaining <= -4 ? "handoff" : "accumulating";
@@ -3589,7 +3604,8 @@ function AppInternal({
           }
           attachPieces += piecesInBill;
           if (piecesInBill >= ATTACH_PER_BILL_TARGET) qualifiedBills += 1;
-          // เครดิตของบิล = ตัวคูณสูงสุดของสิ่งที่แนบ (โหมด x2 → 2 เครดิต)
+          // เครดิตของบิล = ตัวคูณสูงสุดของสิ่งที่แนบ — บิลมีตัว x2 ใช้ตัวนั้นก่อน (2)
+          // ไม่บวกตัวอื่น (0.5) ซ้อน
           const billCredit = Math.max(
             hasCover ? boostMultiplier(attachBoost, "cover", b.docDate) : 0,
             hasUfund ? boostMultiplier(attachBoost, "ufund", b.docDate) : 0,
