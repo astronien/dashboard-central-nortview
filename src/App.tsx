@@ -1825,7 +1825,20 @@ function AppInternal({
   // โหมด x2 (Attach Boost) — ตั้งใน Settings
   const [attachBoost, setAttachBoost] = useState<AttachBoost>({ ...EMPTY_ATTACH_BOOST });
   useEffect(() => {
-    void fetchAttachBoost().then(setAttachBoost);
+    // โหลดค่าใหม่ตอนเปิดเว็บ + ทุกครั้งที่กลับมาที่แท็บ + ทุก 2 นาที
+    // (ตั้งค่าจากอีกเครื่อง/อีกแท็บ หน้าที่เปิดค้างไว้จะได้ค่าล่าสุดเสมอ)
+    const load = () =>
+      void fetchAttachBoost().then((b) =>
+        setAttachBoost((prev) => (JSON.stringify(prev) === JSON.stringify(b) ? prev : b)),
+      );
+    load();
+    const onFocus = () => load();
+    window.addEventListener("focus", onFocus);
+    const iv = window.setInterval(load, 2 * 60 * 1000);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      window.clearInterval(iv);
+    };
   }, []);
   const isStaffHidden = React.useCallback(
     (officer: { staffId?: string; name?: string }): boolean => {

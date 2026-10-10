@@ -288,6 +288,7 @@ export const DailyBranchReportSection: React.FC<{ data: DailyReportData; boost?:
                     r.isTotal
                       ? undefined
                       : `เครดิตแนบ (Cover/UFUND/SIM/Acc≥3, โหมด x2 = 2 / ตัวอื่น 0.5): ${Math.round((r.creditedBills ?? 0) * 10) / 10} (ต้องมี ${r.requiredCredits ?? 0} — 1 ต่อ iPhone 4 เครื่อง)` +
+                        (boost ? `\nโหมดตอนนี้: ${boost}` : "") +
                         (r.creditLog?.length ? `\n\nรายบิล:\n${r.creditLog.join("\n")}` : "")
                   }
                 >
