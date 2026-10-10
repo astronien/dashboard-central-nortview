@@ -3344,18 +3344,33 @@ function AppInternal({
             : 0
           : cover;
         const ufundOut = boostBills.length ? countUfundIphoneBills(normalBills) : ufund;
+        // บิลในช่วง boost คิดเครดิตต่อบิล = ตัวคูณสูงสุด (x2 มาก่อน)
+        // บิล UFUND + บิล Cover ที่เปิดแยก = นับเป็นบิลเดียวกัน
+        const coverInBill = (b: BillSummary) =>
+          (coverPlusPreset ? calcPreset([b], coverPlusPreset, dummyCtx).billsWithAandB > 0 : false) ||
+          b.lineItems.some((li) => {
+            const name = String(li["Product (Name)"] ?? "");
+            return /cover\s*\+|coverplus/i.test(`${name} ${li["Product (Code)"] ?? ""}`) && !/free|ฟรี/i.test(name);
+          });
+        const isIphoneBill = (b: BillSummary) =>
+          b.lineItems.some((li) => /^iphone$/i.test(String(li["Category (Name)"] ?? "").trim()));
+        const slots = boostBills.map((b) => ({
+          b,
+          iphone: isIphoneBill(b),
+          cov: coverInBill(b),
+          uf: countUfundIphoneBills([b]) > 0,
+        }));
+        for (const loose of slots.filter((x) => !x.iphone && x.cov)) {
+          const target = slots.find((x) => x.iphone && x.uf && !x.cov);
+          if (!target) continue;
+          target.cov = true;
+          loose.cov = false; // ย้ายไปนับในบิล UFUND แล้ว
+        }
         let boostCredit = 0;
-        for (const b of boostBills) {
-          const hasCov =
-            (coverPlusPreset ? calcPreset([b], coverPlusPreset, dummyCtx).billsWithAandB > 0 : false) ||
-            b.lineItems.some((li) => {
-              const name = String(li["Product (Name)"] ?? "");
-              return /cover\s*\+|coverplus/i.test(`${name} ${li["Product (Code)"] ?? ""}`) && !/free|ฟรี/i.test(name);
-            });
-          const hasUf = countUfundIphoneBills([b]) > 0;
+        for (const x of slots) {
           boostCredit += Math.max(
-            hasCov ? boostMultiplier(attachBoost, "cover", b.docDate) : 0,
-            hasUf ? boostMultiplier(attachBoost, "ufund", b.docDate) : 0,
+            x.cov ? boostMultiplier(attachBoost, "cover", x.b.docDate) : 0,
+            x.uf ? boostMultiplier(attachBoost, "ufund", x.b.docDate) : 0,
           );
         }
         const attach = coverOut + ufundOut + boostCredit;
@@ -3590,29 +3605,40 @@ function AppInternal({
         let coverIphoneBills = 0;
         let simIphoneBills = 0;
         let ufundOther = 0; // บิล UFUND ที่ไม่มีแถว iPhone (เช่นตอนกรอง iPhone 18 ออก)
-        for (const b of officerBills) {
-          if (!b.lineItems.some(rawIsIphone)) {
-            if (isUfundBill(b)) ufundOther += 1;
-          }
-          // ใช้คอลัมน์ Category (Name) ตรงๆ — getCategory เดาจากชื่อสินค้าด้วย
-          // ทำให้ฟิล์ม/เคส "for iPhone" ถูกนับเป็นตัวเครื่อง
-          const rawCatOf = (li: RawRow) => String(li["Category (Name)"] ?? "").trim().toLowerCase();
-          const hasIphone = b.lineItems.some((li) => rawCatOf(li) === "iphone");
-          if (!hasIphone) continue;
-          deviceBills += 1;
-          // มี Cover ในบิล = preset ที่ชื่อมี "cover" ตัวใดตัวหนึ่งจับเจอ (ฝั่ง A)
-          // หรือมีสินค้า COVER+ จริง (ไม่นับของแถม 7CARE+ Free)
-          const hasCover =
-            coverPresetsAll.some((cp) => calcPreset([b], cp, dummy).billsWithAandB > 0) ||
-            b.lineItems.some((li) => {
-              const name = String(li["Product (Name)"] ?? "");
-              return /cover\s*\+|coverplus/i.test(`${name} ${li["Product (Code)"] ?? ""}`) && !/free|ฟรี/i.test(name);
-            });
-          const hasUfund = isUfundBill(b);
-          const hasSim = b.lineItems.some((li) => {
-            const rc = String(li["Category (Name)"] ?? "").toLowerCase();
+        const rawCatOf = (li: RawRow) => String(li["Category (Name)"] ?? "").trim().toLowerCase();
+        // มี Cover ในบิล = preset ที่ชื่อมี "cover" ตัวใดตัวหนึ่งจับเจอ (ฝั่ง A)
+        // หรือมีสินค้า COVER+ จริง (ไม่นับของแถม 7CARE+ Free)
+        const billHasCover = (b: BillSummary) =>
+          coverPresetsAll.some((cp) => calcPreset([b], cp, dummy).billsWithAandB > 0) ||
+          b.lineItems.some((li) => {
+            const name = String(li["Product (Name)"] ?? "");
+            return /cover\s*\+|coverplus/i.test(`${name} ${li["Product (Code)"] ?? ""}`) && !/free|ฟรี/i.test(name);
+          });
+        const billHasSim = (b: BillSummary) =>
+          b.lineItems.some((li) => {
+            const rc = rawCatOf(li);
             return rc.includes("sim") || rc.includes("promo operator");
           });
+
+        // ── รอบ 1: สถานะของแต่ละบิล iPhone ──
+        type IphoneBillFlags = {
+          b: BillSummary;
+          cover: boolean;
+          ufund: boolean;
+          sim: boolean;
+          pieces: number;
+          merged: string[]; // เลขบิลแยกที่เอามารวม
+        };
+        const iphoneBills: IphoneBillFlags[] = [];
+        // Cover ที่เปิดเป็น "บิลแยก" (ไม่มี iPhone ในบิล) — ใช้รวมกับบิล UFUND
+        const looseCover: BillSummary[] = [];
+        for (const b of officerBills) {
+          const hasIphone = b.lineItems.some((li) => rawCatOf(li) === "iphone");
+          if (!hasIphone) {
+            if (isUfundBill(b)) ufundOther += 1;
+            if (billHasCover(b)) looseCover.push(b);
+            continue;
+          }
           let piecesInBill = 0;
           for (const li of b.lineItems) {
             const rawCat = rawCatOf(li);
@@ -3624,33 +3650,60 @@ function AppInternal({
             if (/\bfree\b|ฟรี|ของแถม/i.test(prod)) continue;
             piecesInBill += toNumber(li.Number ?? li.number ?? li.qty ?? 0);
           }
-          attachPieces += piecesInBill;
-          if (piecesInBill >= ATTACH_PER_BILL_TARGET) qualifiedBills += 1;
+          iphoneBills.push({
+            b,
+            cover: billHasCover(b),
+            ufund: isUfundBill(b),
+            sim: billHasSim(b),
+            pieces: piecesInBill,
+            merged: [],
+          });
+        }
+
+        // ── รอบ 2: รวมบิล Cover แยก เข้ากับบิล UFUND ──
+        const creditOf = (f: IphoneBillFlags) =>
+          Math.max(
+            f.cover ? boostMultiplier(attachBoost, "cover", f.b.docDate) : 0,
+            f.ufund ? boostMultiplier(attachBoost, "ufund", f.b.docDate) : 0,
+            f.sim ? boostMultiplier(attachBoost, "sim", f.b.docDate) : 0,
+            f.pieces >= ATTACH_PER_BILL_TARGET ? boostMultiplier(attachBoost, "acc", f.b.docDate) : 0,
+          );
+        // บิล UFUND + บิล Cover ที่เปิดแยก = นับเป็นบิลเดียวกัน
+        // (ขาย UFUND มักแยกบิล Cover+ ออกมา) → รวม Cover เข้ากับบิล iPhone ที่เป็น
+        // UFUND และยังไม่มี Cover · กรณีอื่นไม่รวม
+        for (const lb of looseCover) {
+          const target = iphoneBills.find((f) => f.ufund && !f.cover);
+          if (!target) break;
+          target.cover = true;
+          target.merged.push(lb.docNo || "-");
+        }
+
+        // ── รอบ 3: นับเครดิต ──
+        for (const f of iphoneBills) {
+          deviceBills += 1;
+          attachPieces += f.pieces;
+          if (f.pieces >= ATTACH_PER_BILL_TARGET) qualifiedBills += 1;
           // เครดิตของบิล = ตัวคูณสูงสุดของสิ่งที่แนบ — บิลมีตัว x2 ใช้ตัวนั้นก่อน (2)
           // ไม่บวกตัวอื่น (0.5) ซ้อน
-          const billCredit = Math.max(
-            hasCover ? boostMultiplier(attachBoost, "cover", b.docDate) : 0,
-            hasUfund ? boostMultiplier(attachBoost, "ufund", b.docDate) : 0,
-            hasSim ? boostMultiplier(attachBoost, "sim", b.docDate) : 0,
-            piecesInBill >= ATTACH_PER_BILL_TARGET ? boostMultiplier(attachBoost, "acc", b.docDate) : 0,
-          );
+          const billCredit = creditOf(f);
           creditedBills += billCredit;
-          {
-            const parts: string[] = [];
-            const tag = (label: string, t: "cover" | "ufund" | "sim" | "acc") => {
-              const m = boostMultiplier(attachBoost, t, b.docDate);
-              parts.push(m === 1 ? label : `${label}×${m}`);
-            };
-            if (hasCover) tag("Cover", "cover");
-            if (hasUfund) tag("UFUND", "ufund");
-            if (hasSim) tag("SIM", "sim");
-            if (piecesInBill >= ATTACH_PER_BILL_TARGET) tag(`Acc${piecesInBill}`, "acc");
-            creditLog.push(`${b.docNo || "-"}: ${parts.length ? parts.join(" + ") : "ไม่มีแนบ"} → ${billCredit}`);
-          }
-          if (hasUfund) ufundIphoneBills += 1;
-          if (hasCover) coverIphoneBills += 1;
-          if (hasSim) simIphoneBills += 1;
-
+          const parts: string[] = [];
+          const tag = (label: string, t: "cover" | "ufund" | "sim" | "acc") => {
+            const m = boostMultiplier(attachBoost, t, f.b.docDate);
+            parts.push(m === 1 ? label : `${label}×${m}`);
+          };
+          if (f.cover) tag("Cover", "cover");
+          if (f.ufund) tag("UFUND", "ufund");
+          if (f.sim) tag("SIM", "sim");
+          if (f.pieces >= ATTACH_PER_BILL_TARGET) tag(`Acc${f.pieces}`, "acc");
+          creditLog.push(
+            `${f.b.docNo || "-"}${f.merged.length ? ` (+บิลแยก ${f.merged.join(", ")})` : ""}: ${
+              parts.length ? parts.join(" + ") : "ไม่มีแนบ"
+            } → ${billCredit}`,
+          );
+          if (f.ufund) ufundIphoneBills += 1;
+          if (f.cover) coverIphoneBills += 1;
+          if (f.sim) simIphoneBills += 1;
         }
         // UFUND: นับจากไฟล์ขายอย่างเดียว (Customer Code = UFUND PERSONAL)
         const ufundUnits = ufundIphoneBills;
