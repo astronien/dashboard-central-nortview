@@ -25,6 +25,24 @@ const fmt = (n: number) => Math.round(n).toLocaleString();
 const fmt1 = (n: number) => n.toFixed(1);
 const fmtBaht = (n: number) => `฿${Math.round(n).toLocaleString()}`;
 
+/** ป้ายสถานะสต็อกแบบภาษาคน */
+function CoverBadge({ coverDays, reorder }: { coverDays?: number | null; reorder?: boolean }) {
+  if (coverDays == null) return <span className="text-white/30">—</span>;
+  const d = Math.round(coverDays);
+  const [cls, label] = reorder
+    ? ["bg-rose-500/20 text-rose-300 border-rose-400/40", "ต้องสั่ง"]
+    : d <= 30
+      ? ["bg-amber-500/20 text-amber-300 border-amber-400/40", "ใกล้หมด"]
+      : d >= 90
+        ? ["bg-white/10 text-white/50 border-white/15", "ค้าง"]
+        : ["bg-emerald-500/15 text-emerald-300 border-emerald-400/30", "พอขาย"];
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-bold ${cls}`}>
+      {label} · {d} วัน
+    </span>
+  );
+}
+
 function RunRateTable({
   rows,
   hasStock,
@@ -34,20 +52,21 @@ function RunRateTable({
   hasStock: boolean;
   showSub?: boolean;
 }) {
+  const maxShare = Math.max(1, ...rows.map((r) => r.sharePct));
   return (
     <div className="overflow-x-auto rounded-xl border border-white/10">
-      <table className="w-full text-left border-collapse text-[11px]">
+      <table className="w-full text-left border-collapse text-[12px]">
         <thead>
-          <tr className="bg-[#0c3123] border-b border-emerald-500/20 text-white/80">
-            <th className="py-2 px-3 font-bold uppercase tracking-wide min-w-[160px]">รายการ</th>
-            <th className="py-2 px-3 font-bold uppercase tracking-wide text-right">ขายแล้ว</th>
-            <th className="py-2 px-3 font-bold uppercase tracking-wide text-right">เฉลี่ย/วัน</th>
-            <th className="py-2 px-3 font-bold uppercase tracking-wide text-right">คาดสิ้นเดือน</th>
-            <th className="py-2 px-3 font-bold uppercase tracking-wide text-right">สัดส่วน</th>
+          <tr className="bg-[#0c3123] border-b border-emerald-500/20 text-white/70 text-[11px]">
+            <th className="py-2.5 px-3 font-semibold min-w-[180px]">สินค้า / หมวด</th>
+            <th className="py-2.5 px-3 font-semibold text-right" title="จำนวนที่ขายไปแล้วในช่วงที่เลือก">ขายแล้ว</th>
+            <th className="py-2.5 px-3 font-semibold text-right" title="ขายได้เฉลี่ยวันละกี่ชิ้น">วันละ</th>
+            <th className="py-2.5 px-3 font-semibold text-right" title="ถ้าขายเท่านี้ต่อไป สิ้นเดือนจะได้ประมาณ">ถึงสิ้นเดือน ≈</th>
+            <th className="py-2.5 px-3 font-semibold min-w-[120px]" title="สัดส่วนของยอดขายทั้งหมด">สัดส่วน</th>
             {hasStock ? (
               <>
-                <th className="py-2 px-3 font-bold uppercase tracking-wide text-right">สต็อก</th>
-                <th className="py-2 px-3 font-bold uppercase tracking-wide text-right">ขายหมดใน</th>
+                <th className="py-2.5 px-3 font-semibold text-right">คงเหลือ</th>
+                <th className="py-2.5 px-3 font-semibold" title="ของที่มีอยู่จะขายได้อีกกี่วัน">พอขายอีก</th>
               </>
             ) : null}
           </tr>
@@ -56,34 +75,32 @@ function RunRateTable({
           {rows.map((r, i) => (
             <tr key={`${r.key}-${i}`} className="border-b border-white/5 hover:bg-white/5 transition-colors">
               <td className="py-2 px-3">
-                <div className="font-medium text-white truncate max-w-[280px]">{r.label}</div>
-                {showSub && r.sub ? (
-                  <div className="text-[9px] text-white/40">{r.sub}</div>
-                ) : null}
+                <div className="font-medium text-white truncate max-w-[300px]">{r.label}</div>
+                {showSub && r.sub ? <div className="text-[10px] text-white/40">{r.sub}</div> : null}
               </td>
-              <td className="py-2 px-3 text-right font-mono text-white tabular-nums">{fmt(r.units)}</td>
-              <td className="py-2 px-3 text-right font-mono font-semibold text-emerald-300 tabular-nums">
+              <td className="py-2 px-3 text-right font-mono text-white/80 tabular-nums">{fmt(r.units)}</td>
+              <td className="py-2 px-3 text-right font-mono font-bold text-emerald-300 tabular-nums">
                 {fmt1(r.unitsPerDay)}
               </td>
-              <td className="py-2 px-3 text-right font-mono text-white/80 tabular-nums">{fmt(r.projectedUnits)}</td>
-              <td className="py-2 px-3 text-right text-white/60 tabular-nums">{r.sharePct.toFixed(1)}%</td>
+              <td className="py-2 px-3 text-right font-mono text-white/70 tabular-nums">{fmt(r.projectedUnits)}</td>
+              <td className="py-2 px-3">
+                <div className="flex items-center gap-2">
+                  <div className="h-1.5 flex-1 rounded-full bg-white/10 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-emerald-400/70"
+                      style={{ width: `${Math.max(2, (r.sharePct / maxShare) * 100)}%` }}
+                    />
+                  </div>
+                  <span className="w-10 text-right text-[11px] text-white/60 tabular-nums">{r.sharePct.toFixed(0)}%</span>
+                </div>
+              </td>
               {hasStock ? (
                 <>
                   <td className="py-2 px-3 text-right font-mono text-white/80 tabular-nums">
                     {r.stock != null ? fmt(r.stock) : "—"}
                   </td>
-                  <td className="py-2 px-3 text-right">
-                    {r.coverDays == null ? (
-                      <span className="text-white/30">—</span>
-                    ) : (
-                      <span
-                        className={`font-mono font-bold tabular-nums ${
-                          r.reorderFlag ? "text-rose-400" : r.coverDays <= 30 ? "text-amber-400" : "text-emerald-300"
-                        }`}
-                      >
-                        {Math.round(r.coverDays)} วัน{r.reorderFlag ? " ⚠️" : ""}
-                      </span>
-                    )}
+                  <td className="py-2 px-3">
+                    <CoverBadge coverDays={r.coverDays} reorder={r.reorderFlag} />
                   </td>
                 </>
               ) : null}
@@ -220,6 +237,7 @@ export function RunRateSection({
   const [targetCover, setTargetCover] = React.useState(30);
   const [deadCover, setDeadCover] = React.useState(90);
   const [catFilter, setCatFilter] = React.useState<string>("all");
+  const [tab, setTab] = React.useState<"overview" | "fast" | "reorder" | "dead" | "stock">("overview");
   const productCats = React.useMemo(
     () =>
       Array.from(
@@ -289,105 +307,263 @@ export function RunRateSection({
     </select>
   );
 
+  const totalPerDay = data.categories.reduce((sum, c) => sum + c.unitsPerDay, 0);
+  const totalProjected = data.categories.reduce((sum, c) => sum + c.projectedUnits, 0);
+  const topCat = [...data.categories].sort((x, y) => y.unitsPerDay - x.unitsPerDay)[0];
+
+  const tabs: Array<{ id: typeof tab; label: string; count?: number; tone?: string }> = [
+    { id: "overview", label: "ภาพรวมรายหมวด" },
+    { id: "fast", label: "ขายดี / ขายช้า" },
+    ...(hasStock
+      ? [
+          { id: "reorder" as const, label: "ต้องสั่งเพิ่ม", count: reorderList.length, tone: "rose" },
+          { id: "dead" as const, label: "ของค้าง", count: deadStock.length, tone: "amber" },
+        ]
+      : []),
+    { id: "stock", label: "อัปโหลดสต็อก" },
+  ];
+
+  const Card = ({
+    icon,
+    label,
+    value,
+    hint,
+    tone,
+    onClick,
+  }: {
+    icon: React.ReactNode;
+    label: string;
+    value: string;
+    hint?: string;
+    tone: "emerald" | "rose" | "amber" | "sky";
+    onClick?: () => void;
+  }) => {
+    const toneCls = {
+      emerald: "border-emerald-400/25 text-emerald-300",
+      rose: "border-rose-400/30 text-rose-300",
+      amber: "border-amber-400/30 text-amber-300",
+      sky: "border-sky-400/25 text-sky-300",
+    }[tone];
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={`text-left rounded-2xl border bg-black/20 px-4 py-3 transition-colors ${toneCls} ${
+          onClick ? "hover:bg-black/30 cursor-pointer" : "cursor-default"
+        }`}
+      >
+        <div className="flex items-center gap-2 text-[11px] text-white/60">
+          {icon}
+          {label}
+        </div>
+        <div className="mt-1 text-2xl font-extrabold tabular-nums">{value}</div>
+        {hint ? <div className="text-[10px] text-white/45 mt-0.5">{hint}</div> : null}
+      </button>
+    );
+  };
+
   return (
     <div className="flex flex-col gap-6">
-      {/* Header */}
+      {/* Header + สรุป */}
       <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-emerald-500/20 rounded-xl border border-emerald-500/20">
               <Gauge className="w-5 h-5 text-emerald-400" />
             </div>
             <div>
-              <h2 className="text-lg font-bold tracking-tight text-white">Run Rate — อัตราการขาย</h2>
+              <h2 className="text-lg font-bold tracking-tight text-white">Run Rate — ขายได้วันละเท่าไหร่</h2>
               <p className="text-[11px] text-white/50">
-                คิดจาก {data.windowLabel} · คาดการณ์สิ้นเดือนเทียบ {data.totalDays} วัน
+                ดูว่าแต่ละสินค้าขายเร็วแค่ไหน ของพอขายอีกกี่วัน และควรสั่งเพิ่มอะไร · คิดจาก {data.windowLabel}
               </p>
             </div>
           </div>
-          {/* Velocity window toggle */}
           <div className="inline-flex rounded-xl border border-white/15 bg-black/20 p-0.5 text-[12px] shrink-0">
-            <button
-              onClick={() => onWindowChange?.(0)}
-              className={`px-3 py-1.5 rounded-lg font-semibold transition-colors ${windowDays === 0 ? "bg-emerald-500/25 text-emerald-200" : "text-white/60 hover:text-white"}`}
-            >
-              ทั้งเดือน
-            </button>
-            <button
-              onClick={() => onWindowChange?.(7)}
-              className={`px-3 py-1.5 rounded-lg font-semibold transition-colors ${windowDays === 7 ? "bg-emerald-500/25 text-emerald-200" : "text-white/60 hover:text-white"}`}
-            >
-              7 วันล่าสุด
-            </button>
-          </div>
-        </div>
-        {!hasStock ? (
-          <div className="mt-3 flex items-start gap-2 rounded-xl border border-sky-400/20 bg-sky-500/10 px-3 py-2 text-[11px] text-sky-100/90">
-            <Info className="w-4 h-4 shrink-0 mt-0.5 text-sky-300" />
-            <span>
-              อัปโหลดไฟล์สต็อกด้านล่างเพื่อเปิดคอลัมน์ "ขายหมดในกี่วัน" และแจ้งเตือนเติมของ (reorder เมื่อเหลือ ≤14 วัน)
-            </span>
-          </div>
-        ) : null}
-      </div>
-
-      {branch ? (
-        <StockUploadPanel
-          branch={branch}
-          stockStatus={stockStatus}
-          updatedBy={updatedBy}
-          onSaved={onStockSaved}
-        />
-      ) : null}
-
-      {/* Stock value / cash tied up */}
-      {hasValue ? (
-        <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-emerald-500/20 rounded-xl border border-emerald-500/20">
-              <Wallet className="w-5 h-5 text-emerald-400" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold tracking-tight text-white">มูลค่าเงินจมในสต็อก</h2>
-              <p className="text-[11px] text-white/50">
-                รวม {fmtBaht(totalStockValue)} · ของค้าง (dead) {fmtBaht(deadValue)}
-              </p>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {valueByCat.map((v) => (
-              <div key={v.cat} className="bg-black/20 rounded-xl border border-white/5 px-3 py-2">
-                <div className="text-[10px] text-white/50 truncate">{v.cat}</div>
-                <div className="text-sm font-bold text-white tabular-nums">{fmtBaht(v.value)}</div>
-                <div className="text-[9px] text-white/40">
-                  {((v.value / (totalStockValue || 1)) * 100).toFixed(0)}% ของสต็อก
-                </div>
-              </div>
+            {[
+              { d: 0, label: "ทั้งเดือน" },
+              { d: 7, label: "7 วันล่าสุด" },
+            ].map((o) => (
+              <button
+                key={o.d}
+                onClick={() => onWindowChange?.(o.d)}
+                className={`px-3 py-1.5 rounded-lg font-semibold transition-colors ${
+                  windowDays === o.d ? "bg-emerald-500/25 text-emerald-200" : "text-white/60 hover:text-white"
+                }`}
+              >
+                {o.label}
+              </button>
             ))}
           </div>
         </div>
+
+        <div className="mt-5 grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <Card
+            icon={<Zap className="w-3.5 h-3.5" />}
+            label="ขายเฉลี่ยรวม"
+            value={`${fmt1(totalPerDay)} ชิ้น/วัน`}
+            hint={topCat ? `ขายเร็วสุด: ${topCat.label} (${fmt1(topCat.unitsPerDay)}/วัน)` : undefined}
+            tone="emerald"
+            onClick={() => setTab("overview")}
+          />
+          <Card
+            icon={<Gauge className="w-3.5 h-3.5" />}
+            label="คาดว่าทั้งเดือนจะขายได้"
+            value={`${fmt(totalProjected)} ชิ้น`}
+            hint={`ผ่านมาแล้ว ${data.daysElapsed}/${data.totalDays} วัน`}
+            tone="sky"
+          />
+          {hasStock ? (
+            <>
+              <Card
+                icon={<ShoppingCart className="w-3.5 h-3.5" />}
+                label="ต้องสั่งเพิ่มด่วน"
+                value={`${reorderList.length} รายการ`}
+                hint={`ของจะหมดภายใน ${leadDays} วัน`}
+                tone={reorderList.length ? "rose" : "emerald"}
+                onClick={() => setTab("reorder")}
+              />
+              <Card
+                icon={<Snail className="w-3.5 h-3.5" />}
+                label="ของค้าง (ขายช้ามาก)"
+                value={`${deadStock.length} รายการ`}
+                hint={hasValue ? `เงินจม ${fmtBaht(deadValue)} จากสต็อก ${fmtBaht(totalStockValue)}` : `พอขายเกิน ${deadCover} วัน`}
+                tone="amber"
+                onClick={() => setTab("dead")}
+              />
+            </>
+          ) : (
+            <div className="col-span-2 flex items-start gap-2 rounded-2xl border border-sky-400/20 bg-sky-500/10 px-4 py-3 text-[12px] text-sky-100/90">
+              <Info className="w-4 h-4 shrink-0 mt-0.5 text-sky-300" />
+              <span>
+                ยังไม่มีข้อมูลสต็อก —{" "}
+                <button className="underline font-semibold" onClick={() => setTab("stock")}>
+                  อัปโหลดสต็อก
+                </button>{" "}
+                เพื่อดูว่าของพอขายอีกกี่วัน / ต้องสั่งอะไร / อะไรค้าง
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex flex-wrap gap-2">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-semibold border transition-colors ${
+              tab === t.id
+                ? "bg-emerald-500/25 border-emerald-400/50 text-white"
+                : "bg-white/5 border-white/10 text-white/60 hover:text-white"
+            }`}
+          >
+            {t.label}
+            {t.count != null ? (
+              <span
+                className={`rounded-full px-1.5 text-[10px] font-bold ${
+                  t.count === 0
+                    ? "bg-white/10 text-white/50"
+                    : t.tone === "rose"
+                      ? "bg-rose-500 text-white"
+                      : "bg-amber-500 text-white"
+                }`}
+              >
+                {t.count}
+              </span>
+            ) : null}
+          </button>
+        ))}
+      </div>
+
+      {tab === "overview" ? (
+        <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+          <div className="flex items-center gap-3 mb-1">
+            <Package className="w-5 h-5 text-emerald-400" />
+            <h2 className="text-base font-bold tracking-tight text-white">ขายได้วันละเท่าไหร่ — รายหมวด</h2>
+          </div>
+          <p className="text-[11px] text-white/45 mb-4">
+            "วันละ" = ขายเฉลี่ยต่อวัน · "ถึงสิ้นเดือน ≈" = ถ้าขายเท่านี้ต่อไปจะได้ประมาณเท่าไหร่
+          </p>
+          <RunRateTable rows={data.categories} hasStock={hasStock} />
+          {hasValue && valueByCat.length ? (
+            <div className="mt-5">
+              <div className="flex items-center gap-2 mb-2 text-[12px] text-white/70 font-semibold">
+                <Wallet className="w-4 h-4 text-emerald-400" /> มูลค่าสต็อกตามหมวด (รวม {fmtBaht(totalStockValue)})
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                {valueByCat.map((v) => (
+                  <div key={v.cat} className="bg-black/20 rounded-xl border border-white/5 px-3 py-2">
+                    <div className="text-[10px] text-white/50 truncate">{v.cat}</div>
+                    <div className="text-sm font-bold text-white tabular-nums">{fmtBaht(v.value)}</div>
+                    <div className="text-[9px] text-white/40">
+                      {((v.value / (totalStockValue || 1)) * 100).toFixed(0)}% ของสต็อก
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
       ) : null}
 
-      {/* Reorder worklist */}
-      {hasStock ? (
+      {tab === "fast" ? (
+        <>
+          <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div className="flex items-center gap-3">
+                <Zap className="w-5 h-5 text-amber-400" />
+                <div>
+                  <h2 className="text-base font-bold tracking-tight text-white">ขายดี — Top {products.length}</h2>
+                  <p className="text-[11px] text-white/45">เรียงจากขายได้ต่อวันมากสุด</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                {CatFilter}
+                {filteredProducts.length > 12 ? (
+                  <button
+                    onClick={() => setShowAllProducts((v) => !v)}
+                    className="text-[11px] text-amber-300 hover:text-amber-200 font-medium"
+                  >
+                    {showAllProducts ? "แสดงเฉพาะ Top 12" : `ดูทั้งหมด (${filteredProducts.length})`}
+                  </button>
+                ) : null}
+              </div>
+            </div>
+            <RunRateTable rows={products} hasStock={hasStock} showSub />
+          </div>
+          {slow.length > 0 ? (
+            <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+              <div className="flex items-center gap-3 mb-4">
+                <Snail className="w-5 h-5 text-white/60" />
+                <div>
+                  <h2 className="text-base font-bold tracking-tight text-white">
+                    ขายช้า{catFilter !== "all" ? ` · ${catFilter}` : ""}
+                  </h2>
+                  <p className="text-[11px] text-white/45">ขายได้น้อยที่สุดต่อวัน — ระวังของค้าง</p>
+                </div>
+              </div>
+              <RunRateTable rows={slow} hasStock={hasStock} showSub />
+            </div>
+          ) : null}
+        </>
+      ) : null}
+
+      {tab === "reorder" && hasStock ? (
         <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-rose-400/20 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-rose-500/20 rounded-xl border border-rose-500/20">
-                <ShoppingCart className="w-5 h-5 text-rose-400" />
-              </div>
+              <ShoppingCart className="w-5 h-5 text-rose-400" />
               <div>
-                <h2 className="text-base font-bold tracking-tight text-white">
-                  รายการต้องสั่งซื้อ ({reorderList.length})
-                </h2>
-                <p className="text-[11px] text-white/50">
-                  สินค้าที่ของจะหมดภายใน lead time — สั่งให้พอขายถึงเป้า cover
+                <h2 className="text-base font-bold tracking-tight text-white">ต้องสั่งเพิ่ม ({reorderList.length})</h2>
+                <p className="text-[11px] text-white/45">
+                  ของจะหมดก่อนของใหม่มาถึง — "ควรสั่ง" = จำนวนที่ทำให้พอขายอีก {targetCover} วัน
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2 text-[11px] text-white/60">
+            <div className="flex items-center gap-3 text-[11px] text-white/60">
               <label className="flex items-center gap-1">
-                Lead time
+                ของมาถึงใน
                 <input
                   type="number"
                   value={leadDays}
@@ -397,7 +573,7 @@ export function RunRateSection({
                 วัน
               </label>
               <label className="flex items-center gap-1">
-                สั่งให้พอ
+                สั่งให้พอขาย
                 <input
                   type="number"
                   value={targetCover}
@@ -409,37 +585,35 @@ export function RunRateSection({
             </div>
           </div>
           {reorderList.length === 0 ? (
-            <p className="text-[12px] text-emerald-300/90">
-              ✅ ไม่มีสินค้าที่ต้องสั่งด่วน (ทุกตัว cover &gt; {leadDays} วัน)
-            </p>
+            <p className="text-[13px] text-emerald-300/90">✅ ยังไม่มีอะไรต้องสั่งด่วน — ทุกตัวพอขายเกิน {leadDays} วัน</p>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-white/10">
-              <table className="w-full text-left border-collapse text-[11px]">
+              <table className="w-full text-left border-collapse text-[12px]">
                 <thead>
-                  <tr className="bg-[#0c3123] border-b border-emerald-500/20 text-white/80">
-                    <th className="py-2 px-3 font-bold uppercase tracking-wide min-w-[180px]">สินค้า</th>
-                    <th className="py-2 px-3 font-bold uppercase tracking-wide text-right">คงเหลือ</th>
-                    <th className="py-2 px-3 font-bold uppercase tracking-wide text-right">ขาย/วัน</th>
-                    <th className="py-2 px-3 font-bold uppercase tracking-wide text-right">พอขายอีก</th>
-                    <th className="py-2 px-3 font-bold uppercase tracking-wide text-right">ควรสั่งเพิ่ม</th>
+                  <tr className="bg-[#0c3123] border-b border-emerald-500/20 text-white/70 text-[11px]">
+                    <th className="py-2.5 px-3 font-semibold min-w-[180px]">สินค้า</th>
+                    <th className="py-2.5 px-3 font-semibold text-right">คงเหลือ</th>
+                    <th className="py-2.5 px-3 font-semibold text-right">ขาย/วัน</th>
+                    <th className="py-2.5 px-3 font-semibold">พอขายอีก</th>
+                    <th className="py-2.5 px-3 font-semibold text-right">ควรสั่ง</th>
                   </tr>
                 </thead>
                 <tbody>
                   {reorderList.map((r, i) => (
                     <tr key={`${r.label}-${i}`} className="border-b border-white/5 hover:bg-white/5">
                       <td className="py-2 px-3">
-                        <div className="font-medium text-white truncate max-w-[280px]">{r.label}</div>
-                        {r.sub ? <div className="text-[9px] text-white/40">{r.sub}</div> : null}
+                        <div className="font-medium text-white truncate max-w-[300px]">{r.label}</div>
+                        {r.sub ? <div className="text-[10px] text-white/40">{r.sub}</div> : null}
                       </td>
                       <td className="py-2 px-3 text-right font-mono text-white/80 tabular-nums">{fmt(r.stock)}</td>
                       <td className="py-2 px-3 text-right font-mono text-emerald-300 tabular-nums">{fmt1(r.unitsPerDay)}</td>
-                      <td className="py-2 px-3 text-right">
-                        <span className={`font-mono font-bold tabular-nums ${r.coverDays <= leadDays / 2 ? "text-rose-400" : "text-amber-400"}`}>
-                          {Math.round(r.coverDays)} วัน
-                        </span>
+                      <td className="py-2 px-3">
+                        <CoverBadge coverDays={r.coverDays} reorder />
                       </td>
-                      <td className="py-2 px-3 text-right font-mono font-bold text-white tabular-nums">
-                        +{fmt(r.suggestQty)}
+                      <td className="py-2 px-3 text-right">
+                        <span className="inline-block rounded-lg bg-rose-500/20 border border-rose-400/40 px-2.5 py-0.5 font-mono font-extrabold text-rose-200 tabular-nums">
+                          +{fmt(r.suggestQty)}
+                        </span>
                       </td>
                     </tr>
                   ))}
@@ -450,25 +624,20 @@ export function RunRateSection({
         </div>
       ) : null}
 
-      {/* Dead stock */}
-      {hasStock ? (
+      {tab === "dead" && hasStock ? (
         <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-white/10 rounded-xl border border-white/10">
-                <Snail className="w-5 h-5 text-white/60" />
-              </div>
+              <Snail className="w-5 h-5 text-amber-300" />
               <div>
-                <h2 className="text-base font-bold tracking-tight text-white">
-                  ของค้าง / เงินจม ({deadStock.length})
-                </h2>
-                <p className="text-[11px] text-white/50">
-                  มีสต็อกแต่แทบไม่ขาย (cover ≥ {deadCover} วัน) — พิจารณาจัดโปรระบาย
+                <h2 className="text-base font-bold tracking-tight text-white">ของค้าง ({deadStock.length})</h2>
+                <p className="text-[11px] text-white/45">
+                  มีของแต่ขายช้ามาก (พอขายเกิน {deadCover} วัน หรือไม่ขายเลย) — พิจารณาจัดโปรระบาย
                 </p>
               </div>
             </div>
             <label className="flex items-center gap-1 text-[11px] text-white/60">
-              เกณฑ์ค้าง ≥
+              ถือว่าค้างเมื่อพอขายเกิน
               <input
                 type="number"
                 value={deadCover}
@@ -479,32 +648,36 @@ export function RunRateSection({
             </label>
           </div>
           {deadStock.length === 0 ? (
-            <p className="text-[12px] text-emerald-300/90">✅ ไม่มีของค้างเกินเกณฑ์</p>
+            <p className="text-[13px] text-emerald-300/90">✅ ไม่มีของค้างเกินเกณฑ์</p>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-white/10">
-              <table className="w-full text-left border-collapse text-[11px]">
+              <table className="w-full text-left border-collapse text-[12px]">
                 <thead>
-                  <tr className="bg-[#0c3123] border-b border-emerald-500/20 text-white/80">
-                    <th className="py-2 px-3 font-bold uppercase tracking-wide min-w-[180px]">สินค้า</th>
-                    <th className="py-2 px-3 font-bold uppercase tracking-wide text-right">คงเหลือ</th>
-                    <th className="py-2 px-3 font-bold uppercase tracking-wide text-right">ขาย/วัน</th>
-                    <th className="py-2 px-3 font-bold uppercase tracking-wide text-right">cover</th>
-                    {hasValue ? (
-                      <th className="py-2 px-3 font-bold uppercase tracking-wide text-right">เงินจม</th>
-                    ) : null}
+                  <tr className="bg-[#0c3123] border-b border-emerald-500/20 text-white/70 text-[11px]">
+                    <th className="py-2.5 px-3 font-semibold min-w-[180px]">สินค้า</th>
+                    <th className="py-2.5 px-3 font-semibold text-right">คงเหลือ</th>
+                    <th className="py-2.5 px-3 font-semibold text-right">ขาย/วัน</th>
+                    <th className="py-2.5 px-3 font-semibold">พอขายอีก</th>
+                    {hasValue ? <th className="py-2.5 px-3 font-semibold text-right">เงินจม</th> : null}
                   </tr>
                 </thead>
                 <tbody>
-                  {deadStock.slice(0, 20).map((d, i) => (
+                  {deadStock.slice(0, 30).map((d, i) => (
                     <tr key={`${d.label}-${i}`} className="border-b border-white/5 hover:bg-white/5">
                       <td className="py-2 px-3">
-                        <div className="font-medium text-white truncate max-w-[280px]">{d.label}</div>
-                        {d.sub ? <div className="text-[9px] text-white/40">{d.sub}</div> : null}
+                        <div className="font-medium text-white truncate max-w-[300px]">{d.label}</div>
+                        {d.sub ? <div className="text-[10px] text-white/40">{d.sub}</div> : null}
                       </td>
                       <td className="py-2 px-3 text-right font-mono text-white/80 tabular-nums">{fmt(d.stock)}</td>
                       <td className="py-2 px-3 text-right font-mono text-white/50 tabular-nums">{fmt1(d.unitsPerDay)}</td>
-                      <td className="py-2 px-3 text-right font-mono text-white/60 tabular-nums">
-                        {d.coverDays == null ? "ไม่ขายเลย" : `${Math.round(d.coverDays)} วัน`}
+                      <td className="py-2 px-3">
+                        {d.coverDays == null ? (
+                          <span className="inline-flex rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-[10px] font-bold text-white/50">
+                            ไม่ขายเลย
+                          </span>
+                        ) : (
+                          <CoverBadge coverDays={d.coverDays} />
+                        )}
                       </td>
                       {hasValue ? (
                         <td className="py-2 px-3 text-right font-mono font-semibold text-amber-300 tabular-nums">
@@ -520,62 +693,8 @@ export function RunRateSection({
         </div>
       ) : null}
 
-      {/* Category run rate */}
-      <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-emerald-500/20 rounded-xl border border-emerald-500/20">
-            <Package className="w-5 h-5 text-emerald-400" />
-          </div>
-          <h2 className="text-base font-bold tracking-tight text-white">อัตราการขายรายหมวด</h2>
-        </div>
-        <RunRateTable rows={data.categories} hasStock={hasStock} />
-      </div>
-
-      {/* Fast movers */}
-      <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
-        <div className="flex items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-amber-500/20 rounded-xl border border-amber-500/20">
-              <Zap className="w-5 h-5 text-amber-400" />
-            </div>
-            <h2 className="text-base font-bold tracking-tight text-white">
-              สินค้าขายเร็ว (Top {products.length})
-            </h2>
-          </div>
-          <div className="flex items-center gap-3">
-            {CatFilter}
-            {filteredProducts.length > 12 ? (
-              <button
-                onClick={() => setShowAllProducts((v) => !v)}
-                className="text-[11px] text-amber-300 hover:text-amber-200 font-medium"
-              >
-                {showAllProducts ? "แสดงเฉพาะ Top 12" : `ดูทั้งหมด (${filteredProducts.length})`}
-              </button>
-            ) : null}
-          </div>
-        </div>
-        <RunRateTable rows={products} hasStock={hasStock} showSub />
-      </div>
-
-      {/* Slow movers */}
-      {slow.length > 0 ? (
-        <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
-          <div className="flex items-center justify-between gap-3 mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-white/10 rounded-xl border border-white/10">
-                <Snail className="w-5 h-5 text-white/60" />
-              </div>
-              <div>
-                <h2 className="text-base font-bold tracking-tight text-white">
-                  สินค้าขายช้า{catFilter !== "all" ? ` · ${catFilter}` : ""}
-                </h2>
-                <p className="text-[11px] text-white/50">ขายได้น้อยที่สุดต่อวัน — เสี่ยงเงินจม/ค้างสต็อก</p>
-              </div>
-            </div>
-            {CatFilter}
-          </div>
-          <RunRateTable rows={slow} hasStock={hasStock} showSub />
-        </div>
+      {tab === "stock" && branch ? (
+        <StockUploadPanel branch={branch} stockStatus={stockStatus} updatedBy={updatedBy} onSaved={onStockSaved} />
       ) : null}
     </div>
   );
