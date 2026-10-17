@@ -120,6 +120,8 @@ export function rowMatchesKpiCategory(row: RawRow, category: string): boolean {
   const rawCat = String(row["Category (Name)"] ?? row.category ?? "").trim().toLowerCase();
   if (["iphone", "ipad", "mac", "apple watch"].includes(catKey)) {
     if (RAW_DEVICE[rawCat]) return RAW_DEVICE[rawCat] === category;
+    // มี Category แต่ไม่ใช่ตัวเครื่อง (เคส ฟิล์ม Smile ฯลฯ) → ไม่นับเข้าหมวดตัวเครื่อง
+    if (rawCat) return false;
   } else if (RAW_DEVICE[rawCat]) {
     // ตัวเครื่องไม่นับเข้าหมวดอื่น (ยกเว้นหมวดที่จับจากข้อความ เช่น BTB ด้านล่าง)
     if (catKey !== "btb" && catKey !== "btb(apple)" && catKey !== "btb apple") return false;

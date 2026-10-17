@@ -1558,6 +1558,12 @@ function AppInternal({
       // that isn't exactly "Mac" — normalize those back so the category KPIs
       // still count. Device names are mutually exclusive.
       const m = normalizeText(normalizedMapped);
+      // master จัดอุปกรณ์เสริม (เคส/ฟิล์ม "for iPhone") ไว้กลุ่มตัวเครื่อง —
+      // ระบบบริษัทนับหมวดตัวเครื่องเฉพาะ Category = ตัวเครื่อง → ไม่นับเข้า
+      // (ไปอยู่ "อื่นๆ" แทน)
+      const isDeviceGroup =
+        m.includes("iphone") || m.includes("ipad") || m.includes("mac") || m.includes("notebook") || m.includes("watch");
+      if (isDeviceGroup && cat) return "Accessories";
       if (m.includes("iphone")) return "iPhone";
       if (m.includes("ipad")) return "iPad";
       if (m.includes("macbook") || m.includes("imac") || m.includes("mac") || m.includes("notebook"))
