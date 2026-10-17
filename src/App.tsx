@@ -4,6 +4,7 @@ import {
   Building,
   Calendar,
   Camera,
+  Send,
   ChevronDown,
   DollarSign,
   Home,
@@ -5351,31 +5352,24 @@ function AppInternal({
     }
   };
 
-  useEffect(() => {
-    if (!user || isPia || isInitialLoading) return;
-    if (!kpiPresetsLoaded || !staffPhotosLoaded) return;
-    if (!lineReportSig || !parsedReport.officers.length || !dailyBranchReport.latestDate) return;
-    if (typeof window === "undefined" || window.innerWidth < 1024) return; // แคปบนคอมเท่านั้น
-    if (lineReportDoneSigRef.current === lineReportSig) return;
-    const sig = lineReportSig;
-    const date = dailyBranchReport.latestDate;
-    // รอข้อมูลนิ่งก่อน (อัปไฟล์/คำนวณเสร็จ) แล้วค่อยเช็คกับ server
-    const t = window.setTimeout(async () => {
-      if (lineReportBusyRef.current) return;
-      const meta = await fetchLineReportMeta();
-      if (meta?.sig === sig && meta.status === "done") {
-        lineReportDoneSigRef.current = sig;
-        return;
-      }
-      // อีกเครื่องกำลังแคปอยู่ (เริ่มไม่เกิน 3 นาที) → ไม่แย่ง
-      if (meta?.status === "uploading" && meta.sig === sig && meta.startedAt) {
-        if (Date.now() - new Date(meta.startedAt).getTime() < 3 * 60 * 1000) return;
-      }
-      void autoCaptureForLine(sig, date);
-    }, 10000);
-    return () => window.clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, isPia, isInitialLoading, kpiPresetsLoaded, staffPhotosLoaded, lineReportSig]);
+  // กดปุ่ม "ส่งรีพอทเข้า LINE" (ไม่แคปอัตโนมัติแล้ว — ใช้วันละครั้งตอนปิดร้าน)
+  const [lineReportDone, setLineReportDone] = useState<string>("");
+  const sendLineReportNow = async () => {
+    if (lineReportBusyRef.current || !dailyBranchReport.latestDate || !lineReportSig) return;
+    if (!parsedReport.officers.length) {
+      window.alert("ยังไม่มีข้อมูลพนักงาน — อัปโหลดไฟล์ Target/ยอดขายก่อน");
+      return;
+    }
+    setLineReportDone("");
+    await autoCaptureForLine(lineReportSig, dailyBranchReport.latestDate);
+    const meta = await fetchLineReportMeta();
+    if (meta?.status === "done" && meta.sig === lineReportSig) {
+      setLineReportDone(`ส่งแล้ว ${meta.images?.length ?? 0} รูป — พิมพ์ "report" ใน LINE ได้เลย`);
+    } else {
+      setLineReportDone("ส่งไม่สำเร็จ ลองใหม่อีกครั้ง");
+    }
+    window.setTimeout(() => setLineReportDone(""), 8000);
+  };
 
   return (
     <div className="app-root min-h-screen bg-[#1c2722] p-4 font-sans text-white md:p-8 flex flex-col items-center">
@@ -5392,7 +5386,7 @@ function AppInternal({
           <div className="rounded-2xl bg-[#0c3123] border border-emerald-400/30 px-5 py-4 shadow-2xl flex items-center gap-3 text-white">
             <div className="w-6 h-6 border-[3px] border-white/20 border-t-emerald-400 rounded-full animate-spin" />
             <div>
-              <div className="text-sm font-bold">กำลังเตรียมรีพอทสำหรับ LINE อัตโนมัติ</div>
+              <div className="text-sm font-bold">กำลังแคปรีพอทส่งเข้า LINE</div>
               <div className="text-xs text-white/60">{lineReportProgress} · รอสักครู่ ไม่ต้องกดอะไร</div>
             </div>
           </div>
@@ -5417,6 +5411,26 @@ function AppInternal({
         {/* Top Navigation (Floating Right) */}
         <header className="absolute top-6 right-8 w-1/2 flex justify-end items-center z-50 pointer-events-none">
           <div className="flex items-center gap-6 pointer-events-auto">
+            {/* ส่งรีพอท (Home + Staff Profile) ให้ LINE bot — กดวันละครั้งตอนปิดร้าน */}
+            {!isPia ? (
+              <div className="relative hidden md:block">
+                <button
+                  type="button"
+                  onClick={() => void sendLineReportNow()}
+                  disabled={!!lineReportProgress || !dailyBranchReport.latestDate}
+                  title="แคปหน้า Home + Staff Profile ทุกคน แล้วเก็บไว้ให้ LINE bot (พิมพ์ report ในกลุ่มเพื่อดูรูป)"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full border text-xs font-semibold backdrop-blur-md shadow-xl transition-colors bg-[#06c755]/20 border-[#06c755]/50 text-white hover:bg-[#06c755]/30 disabled:opacity-50"
+                >
+                  <Send className="w-4 h-4" />
+                  {lineReportProgress ? "กำลังส่ง…" : "ส่งรีพอทเข้า LINE"}
+                </button>
+                {lineReportDone ? (
+                  <div className="absolute right-0 top-full mt-2 whitespace-nowrap rounded-lg bg-[#0c3123] border border-emerald-400/30 px-3 py-1.5 text-[11px] text-emerald-200 shadow-xl">
+                    {lineReportDone}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
             {/* ตัด iPhone ตระกูล 18 ออกจากการคำนวณทุกตาราง */}
             <button
               type="button"
