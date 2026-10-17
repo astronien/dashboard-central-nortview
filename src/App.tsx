@@ -1572,7 +1572,12 @@ function AppInternal({
       return normalizedMapped;
     }
 
-    return mapTargetCategoryKey(cat, sub, prod);
+    // ไม่มีใน Category Master (เช่น หมวดย่อยใหม่ CASING IPHONE 18 PRO MAX /
+    // CAMERA FILM) → เดาจากข้อความ แต่ห้ามจัดอุปกรณ์เสริมเข้าหมวดตัวเครื่อง
+    // เพราะชื่อมีคำว่า "iPhone" (ตัวเครื่องจริงถูกจับจาก Category ด้านบนแล้ว)
+    const guessed = mapTargetCategoryKey(cat, sub, prod);
+    if (cat && ["iPhone", "iPad", "Mac", "Apple Watch"].includes(guessed)) return "Accessories";
+    return guessed;
   };
 
   const todayRows = useMemo(() => {
