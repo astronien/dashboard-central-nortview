@@ -518,6 +518,13 @@ const ATTACH_PER_BILL_TARGET = 3;
 // ค่าคอลัมน์ Category (Name) ของตัวเครื่อง (ตัวพิมพ์เล็ก) — ห้ามใช้ getCategory
 // เพราะมันจับคำว่า iPhone ในชื่อฟิล์ม/เคสด้วย
 const RAW_DEVICE_CATS = new Set(["mac", "ipad", "iphone", "apple watch"]);
+/** ค่า Category (Name) ดิบของตัวเครื่อง → ชื่อหมวด KPI */
+const RAW_DEVICE_CATEGORY: Record<string, string> = {
+  iphone: "iPhone",
+  ipad: "iPad",
+  mac: "Mac",
+  "apple watch": "Apple Watch",
+};
 
 /** ชื่อหมวด "อื่นๆ" — ยอดที่ไม่เข้า 6 หมวดหลัก */
 const OTHER_CAT = "อื่นๆ";
@@ -1527,6 +1534,11 @@ function AppInternal({
     const sub = String(row["Sub Category"] ?? row.sub_category ?? row.SubCategory ?? "").trim();
     const prod = String(row["Product (Name)"] ?? row.product_name ?? row.Product ?? "").trim();
     
+    // หมวดตัวเครื่องยึดคอลัมน์ Category (Name) ของไฟล์ขายก่อนเสมอ (ตรงกับระบบ
+    // บริษัท) — กัน Category Master จับ iPhone บางรุ่นไปหมวดอื่น/คีย์ชนกัน
+    const rawDevice = RAW_DEVICE_CATEGORY[cat.toLowerCase()];
+    if (rawDevice) return rawDevice;
+
     const keyCombo = normalizeText(`${cat}${sub}`);
     const keyCat = normalizeText(cat);
     const keyProd = normalizeText(prod);
@@ -2925,7 +2937,7 @@ function AppInternal({
         const nIdCat = normalizeId(officerId);
         let officerAllActual = 0;
         for (const row of displayUploads.current) {
-          const rowOfficerId = String(row["STAFF ID"] ?? row.emp_id ?? "").trim();
+          const rowOfficerId = String(row["STAFF ID"] ?? row.emp_id ?? row["Officer (ID)"] ?? "").trim();
           const oName = String(row["Officer (Name)"] ?? "").trim();
           const isMine =
             (Boolean(nIdCat) &&

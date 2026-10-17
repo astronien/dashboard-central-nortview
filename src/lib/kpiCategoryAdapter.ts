@@ -113,6 +113,18 @@ export function rowMatchesKpiCategory(row: RawRow, category: string): boolean {
     return raw.includes("apple care") || raw.includes("applecare") || raw.includes("ac+");
   }
 
+  // หมวดตัวเครื่อง: ยึดคอลัมน์ Category (Name) ดิบก่อน (ตรงกับระบบบริษัท)
+  // — iPhone = แถวที่ Category เป็น "iPhone" เท่านั้น ไม่เดาจากชื่อสินค้า
+  // (กันเคส/ฟิล์ม "for iPhone" ถูกนับ และกัน master จับ iPhone ไปหมวดอื่น)
+  const RAW_DEVICE: Record<string, string> = { iphone: "iPhone", ipad: "iPad", mac: "Mac", "apple watch": "Apple Watch" };
+  const rawCat = String(row["Category (Name)"] ?? row.category ?? "").trim().toLowerCase();
+  if (["iphone", "ipad", "mac", "apple watch"].includes(catKey)) {
+    if (RAW_DEVICE[rawCat]) return RAW_DEVICE[rawCat] === category;
+  } else if (RAW_DEVICE[rawCat]) {
+    // ตัวเครื่องไม่นับเข้าหมวดอื่น (ยกเว้นหมวดที่จับจากข้อความ เช่น BTB ด้านล่าง)
+    if (catKey !== "btb" && catKey !== "btb(apple)" && catKey !== "btb apple") return false;
+  }
+
   // If the row was enriched with `catDaily` by the Category Master
   // (see enrichSalesRowsWithCatDaily), that is the source of truth for
   // the grouped categories — the row counts only toward its assigned
@@ -180,7 +192,9 @@ export function sumKpiActualFromRows(
       if (branch !== normalizeId(filter.branchId)) return sum;
     }
     if (filter?.officerId) {
-      const rowOfficerId = normalizeId(row["STAFF ID"] ?? row.emp_id ?? row.officerId ?? "");
+      const rowOfficerId = normalizeId(
+        row["STAFF ID"] ?? row.emp_id ?? row.officerId ?? row["Officer (ID)"] ?? "",
+      );
       if (rowOfficerId && rowOfficerId !== normalizeId(filter.officerId)) return sum;
     }
     if (filter?.officerName) {

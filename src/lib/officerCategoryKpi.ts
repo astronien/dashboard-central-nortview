@@ -95,7 +95,7 @@ export function sumOfficerCategoryActual(
   const nId = normalizeId(officerId);
   return rows.reduce((sum, row) => {
     const officer = String(row["Officer (Name)"] ?? "").trim();
-    const rowOfficerId = normalizeId(row["STAFF ID"] ?? row.emp_id ?? "");
+    const rowOfficerId = normalizeId(row["STAFF ID"] ?? row.emp_id ?? row["Officer (ID)"] ?? "");
     const officerMatch =
       matchesOfficer(officer, officerName) ||
       Boolean(nId && rowOfficerId && rowOfficerId === nId);
