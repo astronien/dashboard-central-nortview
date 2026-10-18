@@ -51,6 +51,8 @@ export type DailyReportData = {
   latestDate: string;
   presets: DailyReportPreset[];
   rows: DailyReportRow[];
+  /** มีค่า = ตารางรายเดือน (YYYY-MM-01) */
+  monthFrom?: string;
 };
 
 const fmtDay = (ymd: string): string => {
@@ -92,6 +94,7 @@ const num = (v: number) => (v ? v.toLocaleString() : "–");
 const ORDER_KEY = "daily-branch-report-col-order";
 
 export const DailyBranchReportSection: React.FC<{ data: DailyReportData; boost?: string }> = ({ data, boost }) => {
+  const isMonthly = Boolean(data.monthFrom);
   // Column order (preset ids) — user can drag the group headers to reorder.
   // Persisted per browser so the layout sticks between visits.
   const [order, setOrder] = React.useState<string[]>([]);
@@ -156,7 +159,7 @@ export const DailyBranchReportSection: React.FC<{ data: DailyReportData; boost?:
       <div className="flex items-center gap-2 mb-1">
         <LayoutGrid className="w-5 h-5 text-emerald-600" />
         <h3 className="text-lg font-bold tracking-tight text-slate-800">
-          รายงานยอดขาย + Attach รายวัน (วันล่าสุด)
+          {isMonthly ? "รายงานยอดขาย + Attach รายเดือน (เดือนล่าสุด)" : "รายงานยอดขาย + Attach รายวัน (วันล่าสุด)"}
         </h3>
         {boost ? (
           <span className="ml-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-orange-500 text-white" title="ตัวที่เลือก = 2 เครดิต (iPhone 8 เครื่อง) · ตัวอื่น = 0.5 (2 เครื่อง)">
@@ -166,7 +169,9 @@ export const DailyBranchReportSection: React.FC<{ data: DailyReportData; boost?:
       </div>
       <div className="flex items-start justify-between gap-3 mb-4">
         <p className="text-xs text-slate-400">
-          ข้อมูลวันล่าสุด {fmtDay(data.latestDate)} · ATT% = จำนวน ÷ ฐาน (ส่วนใหญ่ ÷ iPhone, AC+ ÷ iPhone+iPad,
+          {isMonthly
+            ? `สะสมทั้งเดือน ${fmtDay(data.monthFrom ?? "")} – ${fmtDay(data.latestDate)}`
+            : `ข้อมูลวันล่าสุด ${fmtDay(data.latestDate)}`} · ATT% = จำนวน ÷ ฐาน (ส่วนใหญ่ ÷ iPhone, AC+ ÷ iPhone+iPad,
           Pencil/iPad Acc ÷ iPad) · <span className="text-emerald-700 font-semibold">บิลผ่าน = บิลที่มี iPhone และมี UFUND+Cover+SIM+Acc ≥ 3 ชิ้น</span>
           {" · "}<span className="px-1 rounded bg-rose-500 text-white font-semibold">iPhone สีแดง</span>{" "}
           = ขาย iPhone ทุก 4 เครื่องแต่ไม่มีบิลที่แนบ Cover / UFUND / SIM / Acc ≥3 ชิ้น

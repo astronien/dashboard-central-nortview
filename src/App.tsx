@@ -3512,8 +3512,10 @@ function AppInternal({
   }, [commissionRows, commissionSplit]);
 
   // ─── รายงานยอดขาย + Attach รายวัน (วันล่าสุด) — รวมสาขา + รายคน ──────────
-  const dailyBranchReport = useMemo<DailyReportData>(() => {
-    const empty: DailyReportData = { latestDate: "", presets: [], rows: [] };
+  // ตาราง "รายงานยอดขาย + Attach" — คำนวณ 2 ชุด: วันล่าสุด / ทั้งเดือนล่าสุด
+  const branchReports = useMemo<{ daily: DailyReportData; monthly: DailyReportData }>(() => {
+    const empty0: DailyReportData = { latestDate: "", presets: [], rows: [] };
+    const empty = { daily: empty0, monthly: empty0 };
     if (displayUploads.current.length === 0) return empty;
 
     const dayKey = (row: RawRow) => {
@@ -3532,9 +3534,16 @@ function AppInternal({
     const latestDay = latestDayFromKeys(daySet);
     if (!latestDay) return empty;
     const latestRows = displayUploads.current.filter((r) => dayKey(r) === latestDay);
+    // เดือนล่าสุด = ทุกวันในเดือนเดียวกับวันล่าสุด (ถึงวันล่าสุด)
+    const monthPrefix = latestDay.slice(0, 7);
+    const monthRows = displayUploads.current.filter((r) => {
+      const k = dayKey(r);
+      return k.startsWith(monthPrefix) && k <= latestDay;
+    });
 
     const lookup = buildCatDailyLookup(displayUploads.categoryMaster);
-    const allBills = parseBills(enrichSalesRowsWithCatDaily(latestRows, lookup));
+    const build = (scopeRows: RawRow[]): DailyReportData => {
+    const allBills = parseBills(enrichSalesRowsWithCatDaily(scopeRows, lookup));
     const dummy = { tradeInCount: 0, iphoneUnits: 0 };
 
     // Trade-In is branch-level (not per-bill) → skip it as a column here.
@@ -3866,6 +3875,11 @@ function AppInternal({
       presets: cols.map((p) => ({ id: p.id, name: p.name, kind: kindFor(p.calcType) })),
       rows: [totalRow, ...officerRows],
     };
+    };
+    return {
+      daily: build(latestRows),
+      monthly: { ...build(monthRows), monthFrom: `${monthPrefix}-01` },
+    };
   }, [
     displayUploads.current,
     displayUploads.categoryMaster,
@@ -3875,6 +3889,8 @@ function AppInternal({
     excludeIphone18,
     attachBoost,
   ]);
+  const dailyBranchReport = branchReports.daily;
+  const monthlyBranchReport = branchReports.monthly;
 
   // ─── LINE bot snapshot ───────────────────────────────────────────────────
   // บันทึกผลตาราง "รายงานยอดขาย + Attach รายวัน" ไว้ที่ server ให้ LINE bot
@@ -5686,6 +5702,7 @@ function AppInternal({
                 />
                 <DailyKpiTable data={dailyKpiData} />
                 <DailyBranchReportSection data={dailyBranchReport} boost={boostLabel(attachBoost)} />
+                <DailyBranchReportSection data={monthlyBranchReport} boost={boostLabel(attachBoost)} />
                 <AttachQuotaSection data={attachQuotaData} boost={boostLabel(attachBoost)} />
               </motion.div>
             )}
