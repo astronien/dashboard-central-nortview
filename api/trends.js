@@ -78,8 +78,8 @@ module.exports = async function handler(req, res) {
         items,
         itemCount: items.length || Object.keys(map).length,
         hasCost: Object.keys(cost).length > 0,
-        updatedAt: cfg?.updatedAt ?? null,
-        updatedBy: cfg?.updatedBy ?? null,
+        updatedAt: cfg?.updated_at ?? cfg?.updatedAt ?? null,
+        updatedBy: cfg?.updated_by ?? cfg?.updatedBy ?? null,
       });
     }
     if (req.method === "POST") {

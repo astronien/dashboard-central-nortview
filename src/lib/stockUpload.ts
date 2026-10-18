@@ -73,7 +73,7 @@ const findHeader = (headers: string[], keys: string[]): string | null => {
 };
 
 const toQty = (v: unknown): number =>
-  Number(String(v ?? "0").replace(/[^\d.-]/g, "")) || 0;
+  typeof v === "number" ? v : Number(String(v ?? "0").replace(/[^\d.-]/g, "")) || 0;
 
 export interface StockItem {
   name: string;
@@ -104,9 +104,11 @@ export async function parseStockExcelFile(file: File): Promise<StockParseResult>
     if (!sheet) {
       return { ok: false, error: "ไม่พบชีตในไฟล์", itemCount: 0, stockMap: {}, sample: [] };
     }
+    // raw: true — อ่านค่าจริงของเซลล์ (รหัสสินค้า 13 หลักไม่กลายเป็น 1.95951E+11
+    // และจำนวนไม่ถูกจัดรูปแบบ)
     const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
       defval: "",
-      raw: false,
+      raw: true,
     });
     if (rows.length === 0) {
       return { ok: false, error: "ไฟล์ว่างเปล่า", itemCount: 0, stockMap: {}, costMap: {}, hasCost: false, sample: [] };
@@ -139,7 +141,9 @@ export async function parseStockExcelFile(file: File): Promise<StockParseResult>
       const qty = toQty(qtyH ? r[qtyH] : 0);
       const cost = costH ? toQty(r[costH]) : 0;
       const name = nameH ? String(r[nameH] ?? "").trim() : "";
-      const code = codeH ? String(r[codeH] ?? "").trim() : "";
+      const rawCode = codeH ? r[codeH] : "";
+      const code =
+        typeof rawCode === "number" ? String(Math.round(rawCode)) : String(rawCode ?? "").trim();
       if (!name && !code) continue;
       // sum in case the same product appears in multiple rows
       if (name) stockMap[name] = (stockMap[name] ?? 0) + qty;

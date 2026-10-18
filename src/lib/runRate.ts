@@ -105,7 +105,9 @@ export function computeRunRate(
     const name = String(
       row["Product (Name)"] ?? row.product_name ?? row.Product ?? "",
     ).trim();
-    const code = String(row["Product (Code)"] ?? row.product_code ?? "").trim();
+    const rawCode = row["Product (Code)"] ?? row.product_code ?? "";
+    const code =
+      typeof rawCode === "number" ? String(Math.round(rawCode)) : String(rawCode ?? "").trim().replace(/\.0+$/, "");
     if (name) {
       const cur = prodAgg.get(name) ?? { units: 0, category: cat, code };
       cur.units += units;
@@ -136,9 +138,31 @@ export function computeRunRate(
 
   const totalUnits = Array.from(catAgg.values()).reduce((s, v) => s + v, 0) || 1;
 
+  // จับคู่สต็อก: รหัสสินค้าตรงตัวก่อน (แม่นสุด) → ชื่อแบบตรงตัว → ชื่อแบบ
+  // ไม่สนตัวพิมพ์/ช่องว่าง (ชื่อในไฟล์สต็อกกับไฟล์ขายอาจเว้นวรรคต่างกัน)
+  const normKey = (k: string) => String(k ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+  const normIndex = new WeakMap<object, Map<string, number>>();
+  const getNormMap = (map: Record<string, number>) => {
+    let m = normIndex.get(map);
+    if (!m) {
+      m = new Map();
+      for (const [k, v] of Object.entries(map)) {
+        const nk = normKey(k);
+        // ถ้าชื่อซ้ำหลายคีย์ (เว้นวรรคต่างกัน) ให้รวมกัน
+        m.set(nk, (m.get(nk) ?? 0) + (Number(v) || 0));
+      }
+      normIndex.set(map, m);
+    }
+    return m;
+  };
   const lookup = (map: Record<string, number> | undefined, candidates: string[]) => {
     if (!map) return undefined;
     for (const c of candidates) if (c && c in map) return Number(map[c]) || 0;
+    const nm = getNormMap(map);
+    for (const c of candidates) {
+      const nk = normKey(c);
+      if (nk && nm.has(nk)) return nm.get(nk) ?? 0;
+    }
     return undefined;
   };
 
@@ -175,7 +199,8 @@ export function computeRunRate(
     .sort((a, b) => b.unitsPerDay - a.unitsPerDay);
 
   const products = Array.from(prodAgg.entries())
-    .map(([name, v]) => mkRow(name, name, v.units, [name, v.code], v.category))
+    // รหัสก่อนชื่อ — ชื่อซ้ำ/คล้ายกันได้ แต่รหัสสินค้าไม่ซ้ำ
+    .map(([name, v]) => mkRow(name, name, v.units, [v.code, name], v.category))
     .sort((a, b) => b.unitsPerDay - a.unitsPerDay);
 
   return { daysElapsed: days, totalDays, totalUnits, windowLabel, categories, products };
