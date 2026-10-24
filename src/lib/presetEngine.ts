@@ -53,6 +53,89 @@ function matchSmart(filters: string[], ...values: string[]): boolean {
   return false;
 }
 
+// ─── รุ่นใหม่ที่ preset ไม่ได้ติ๊กไว้ ──────────────────────────────────────────
+// preset ส่วนใหญ่ติ๊กรายชื่อ Sub Category / Model / ชื่อสินค้าแบบตายตัว พอมีรุ่น
+// ใหม่ (iPhone Duo, iPhone 18) ที่ใช้ SKU / Sub ใหม่ ก็หลุดจากการนับ:
+//   1. COVER+ — preset ที่อ้าง COVER+ จะนับ SKU COVER+ ตัวอื่นที่ระยะเวลาเดียวกัน
+//      (1 / 2 / 3 ปี) ให้อัตโนมัติ (ไม่นับของแถม 7CARE+ Free)
+//   2. iPhone — preset ที่ติ๊ก Sub "IPHONE …" ไว้ จะนับ Sub ตัวเครื่องรุ่นใหม่
+//      กว่า (หรือรุ่นที่ไม่มีเลข เช่น DUO / AIR) ให้อัตโนมัติ
+
+const COVER_RE = /cover\s*\+|cover\s*plus|coverplus/i;
+const COVER_FREEBIE_RE = /free|ฟรี|7care/i;
+
+/** ระยะเวลา COVER+ จากข้อความ: "(1-Year)" / "(2Y)" / "(1+1)" → "1" / "2" / "1" */
+function coverTermsOf(text: string): string[] {
+  const out = new Set<string>();
+  for (const m of text.matchAll(/(\d)\s*-?\s*year|\((\d)\s*y\)/gi)) out.add(m[1] ?? m[2]);
+  if (/\(\s*1\s*\+\s*1\s*\)/.test(text)) out.add("1");
+  return [...out];
+}
+
+const iphoneGen = (sub: string): number | null => {
+  const m = /^iphone\s*(\d{1,2})/i.exec(sub.trim());
+  return m ? Number(m[1]) : null;
+};
+
+type AutoRules = {
+  /** null = ไม่ใช่ preset COVER+; [] = ทุกระยะเวลา */
+  coverTerms: string[] | null;
+  /** null = ไม่ได้ติ๊ก Sub iPhone; ตัวเลข = รุ่นต่ำสุดที่ติ๊กไว้ */
+  iphoneMinGen: number | null;
+};
+const autoRulesCache = new WeakMap<ItemFilter, AutoRules>();
+
+function autoRulesOf(filter: ItemFilter): AutoRules {
+  const cached = autoRulesCache.get(filter);
+  if (cached) return cached;
+  const named = [...(filter.models ?? []), ...(filter.productNames ?? []), ...(filter.subCategories ?? [])];
+  const coverNamed = named.filter((v) => COVER_RE.test(v) && !COVER_FREEBIE_RE.test(v));
+  // ใช้ "จับจากคำในชื่อสินค้า" อยู่แล้ว = ครอบคลุมรุ่นใหม่เองแล้ว
+  const usesKeyword = (filter.productNameContains ?? []).some((w) => String(w).trim());
+  const coverTerms = coverNamed.length && !usesKeyword ? [...new Set(coverNamed.flatMap(coverTermsOf))] : null;
+
+  const subs = filter.subCategories ?? [];
+  const cats = (filter.categories ?? []).map((c) => c.toLowerCase());
+  const gens = subs.map(iphoneGen).filter((g): g is number => g !== null);
+  const iphoneMinGen =
+    cats.includes("iphone") && gens.length > 0 && subs.every((v) => /^iphone\b/i.test(v.trim()))
+      ? Math.min(...gens)
+      : null;
+
+  const rules = { coverTerms, iphoneMinGen };
+  autoRulesCache.set(filter, rules);
+  return rules;
+}
+
+/**
+ * แถวที่ไม่ผ่านรายการที่ติ๊กไว้ แต่เป็นรุ่นใหม่ของสิ่งที่ preset ตั้งใจนับ
+ * (เงื่อนไขอื่น — Category / ลูกค้า / ประเภทเอกสาร / คำยกเว้น — ยังต้องผ่าน)
+ */
+function matchesNewModel(
+  filter: ItemFilter,
+  row: Record<string, unknown>,
+  parts: { cat: string; sub: string; prod: string; brandMatch: boolean },
+): boolean {
+  const rules = autoRulesOf(filter);
+  if (rules.coverTerms) {
+    const code = ROW_READERS.getProductCode(row as any);
+    const text = `${parts.prod} ${code}`;
+    if (COVER_RE.test(text) && !COVER_FREEBIE_RE.test(parts.prod)) {
+      const terms = coverTermsOf(parts.prod);
+      if (!rules.coverTerms.length || !terms.length || terms.some((t) => rules.coverTerms!.includes(t))) {
+        return true;
+      }
+    }
+  }
+  if (rules.iphoneMinGen !== null && parts.cat.toLowerCase() === "iphone" && /^iphone\b/i.test(parts.sub)) {
+    const gen = iphoneGen(parts.sub);
+    // ตัวเครื่องเท่านั้น (Sub เป็นชื่อรุ่น) — กันสินค้าแนบที่อยู่ Category เดียวกัน
+    const looksLikeModel = /^iphone\s*(\d{1,2}e?|air|duo|se)(\s*(pro\s*max|pro|plus|max|mini))?$/i.test(parts.sub.trim());
+    if (looksLikeModel && parts.brandMatch && (gen === null || gen >= rules.iphoneMinGen)) return true;
+  }
+  return false;
+}
+
 /**
  * Check if a single line item matches any of the given filters (OR logic).
  */
@@ -86,15 +169,10 @@ export function matchesAnyFilter(
     const containsMatch = matchesContains(filter, prod, sub, mod);
     const notExcluded = !matchesExclude(filter, prod, sub, mod);
 
-    return (
-      categoryMatch &&
-      subCategoryMatch &&
-      modelMatch &&
-      brandMatch &&
-      productMatch &&
-      containsMatch &&
-      notExcluded
-    );
+    if (categoryMatch && subCategoryMatch && modelMatch && brandMatch && productMatch && containsMatch && notExcluded) {
+      return true;
+    }
+    return categoryMatch && notExcluded && matchesNewModel(filter, row, { cat, sub, prod, brandMatch });
   });
 }
 
@@ -164,7 +242,7 @@ function rowMatchesFilter(
   const containsMatch = matchesContains(filter, prod, sub, mod);
   const notExcluded = !matchesExclude(filter, prod, sub, mod);
 
-  return (
+  if (
     categoryMatch &&
     subCategoryMatch &&
     modelMatch &&
@@ -174,6 +252,15 @@ function rowMatchesFilter(
     containsMatch &&
     notExcluded &&
     docTypeMatch
+  ) {
+    return true;
+  }
+  return (
+    categoryMatch &&
+    customerMatch &&
+    docTypeMatch &&
+    notExcluded &&
+    matchesNewModel(filter, row, { cat, sub, prod, brandMatch })
   );
 }
 
