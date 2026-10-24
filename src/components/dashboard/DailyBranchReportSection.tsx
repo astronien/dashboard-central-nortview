@@ -6,7 +6,7 @@ export type DailyReportCellKind = "att" | "unit" | "baht";
 export type DailyReportCell = {
   kind: DailyReportCellKind;
   unit?: number;
-  /** เมื่อเปิดกรอง iPhone 18: จำนวนที่เป็นของ iPhone 18 (แยกจาก unit ซึ่งเป็นรุ่นเก่า) */
+  /** เมื่อเลือกตัด iPhone บางรุ่น: จำนวนที่เป็นของรุ่นที่ตัด (แยกจาก unit ซึ่งเป็นรุ่นที่นับ) */
   unit18?: number;
   att?: number; // %
   baht?: number;
@@ -180,7 +180,7 @@ export const DailyBranchReportSection: React.FC<{ data: DailyReportData; boost?:
           {" · "}<span className="text-slate-500">ลากหัวคอลัมน์เพื่อสลับตำแหน่งได้</span>
           {hasSplit ? (
             <>
-              {" "}· <span className="text-amber-600 font-semibold">ตัวเลขส้ม +N (18) = ของ iPhone 18 แยกออกมา</span>
+              {" "}· <span className="text-amber-600 font-semibold">ตัวเลขส้ม +N (ตัด) = ของ iPhone รุ่นที่เลือกตัด แยกออกมา</span>
             </>
           ) : null}
         </p>
@@ -350,7 +350,7 @@ export const DailyBranchReportSection: React.FC<{ data: DailyReportData; boost?:
                       <td className="py-1.5 px-2 text-right border-l border-slate-200">
                         <div>{num(c?.unit ?? 0)}</div>
                         {c?.unit18 != null && c.unit18 > 0 ? (
-                          <div className="text-[9px] font-bold text-amber-600">+{c.unit18} (18)</div>
+                          <div className="text-[9px] font-bold text-amber-600">+{c.unit18} (ตัด)</div>
                         ) : null}
                       </td>
                       <td className={`py-1.5 px-2 text-center font-bold ${attFill(att)}`}>

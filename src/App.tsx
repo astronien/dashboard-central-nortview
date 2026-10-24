@@ -24,7 +24,6 @@ import {
   ImagePlus,
   Trash2,
   Rocket,
-  Smartphone,
   Wallet,
   Tablet,
   ShieldCheck,
@@ -186,6 +185,21 @@ import { calcPreset, presetDisplayValue, computePresetAchPercent, countItemQuant
 import { DailyBranchReportSection, type DailyReportData } from "./components/dashboard/DailyBranchReportSection";
 import { parseBills, type BillSummary } from "./lib/presetBills";
 import { enrichSalesRowsWithCatDaily, buildCatDailyLookup } from "./lib/presetCatDaily";
+import {
+  isExcludedIphoneDeviceRow,
+  LEGACY_IPHONE18_MODELS,
+  listIphoneModels,
+  mentionsExcludedIphoneModel,
+  normalizeDemoIphoneRows,
+} from "./lib/iphoneModels";
+import { buildFallbackMasterRows, findUnmappedCategoryPairs, type CategoryOverrides } from "./lib/categoryFallback";
+import {
+  fetchCategoryOverridesFromCloud,
+  getCategoryOverrides,
+  setCategoryOverrides,
+} from "./lib/categoryOverrideStorage";
+import { IphoneModelExcludePicker } from "./components/dashboard/IphoneModelExcludePicker";
+import { CategoryFallbackAlert } from "./components/dashboard/CategoryFallbackAlert";
 
 
 // Neutral placeholder shown before any data is uploaded — no demo profiles.
@@ -486,11 +500,6 @@ const isUfundRow = (row: any): boolean => {
   return false;
 };
 
-/**
- * iPhone 18-family DEVICE row (iPhone 18 / 18 Plus / 18 Pro / 18 Pro Max / 18e).
- * Only the device itself — accessories "for iPhone 18" keep counting, so the
- * toggle removes the new-launch device volume without touching attach items.
- */
 /** Today's date in Asia/Bangkok as YYYY-MM-DD. */
 const bangkokTodayYmd = (): string =>
   new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok" }).format(new Date());
@@ -572,20 +581,6 @@ const countUfundIphoneBills = (bills: BillSummary[]): number =>
 
 const ATTACH_ITEM_HINT =
   /cover|film|case|care|glass|adapter|cable|sim|pencil|airpod|strap|bag|charger|power|protect|smile|ufund/i;
-
-const isIphone18DeviceRow = (row: RawRow): boolean => {
-  const cat = String(row["Category (Name)"] ?? (row as any).category_name ?? "")
-    .trim()
-    .toLowerCase();
-  if (cat !== "iphone") return false;
-  const sub = String(row["Sub Category"] ?? "");
-  const prod = String(row["Product (Name)"] ?? "");
-  // Attach items (COVER+/COVERPLUS1007, film, case, AppleCare…) live under the
-  // SAME "iPhone" category as the handset and their names mention the model,
-  // so they'd be swept up too. Never treat those as the device.
-  if (ATTACH_ITEM_HINT.test(sub) || ATTACH_ITEM_HINT.test(prod)) return false;
-  return /iphone\s*18/i.test(`${prod} ${row["Model"] ?? ""} ${sub}`);
-};
 
 const countRows = (
   rows: RawRow[], 
@@ -1466,27 +1461,48 @@ function AppInternal({
     };
   }, []);
 
-  // ตัด iPhone ตระกูล 18 ออกจากการคำนวณทั้งหมด (สลับได้จากปุ่มบนหัวหน้าจอ)
-  const [excludeIphone18, setExcludeIphone18] = useState<boolean>(() => {
+  // รุ่น iPhone ที่ผู้ใช้ติ๊กไม่นับยอด (ตัวเครื่องเท่านั้น) — ตัดออกจากการคำนวณทั้งหมด
+  // ค่าเดิมของปุ่ม "ตัด iPhone 18" ย้ายมาเป็นรุ่นตระกูล 18 ทั้งหมด
+  const [excludedIphoneModels, setExcludedIphoneModels] = useState<string[]>(() => {
     try {
-      return localStorage.getItem("dashboard-exclude-iphone18") === "1";
+      const raw = localStorage.getItem("dashboard-exclude-iphone-models");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed.map(String);
+      }
+      return localStorage.getItem("dashboard-exclude-iphone18") === "1" ? [...LEGACY_IPHONE18_MODELS] : [];
     } catch {
-      return false;
+      return [];
     }
   });
+  const excludedIphoneModelSet = useMemo(() => new Set(excludedIphoneModels), [excludedIphoneModels]);
+  const excludingIphoneModels = excludedIphoneModelSet.size > 0;
 
   const [kpiPresets, setKpiPresets] = useState<KpiPreset[]>([]);
 
-  const toggleExcludeIphone18 = () => {
-    setExcludeIphone18((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem("dashboard-exclude-iphone18", next ? "1" : "0");
-      } catch {
-        /* ignore */
-      }
-      return next;
+  const updateExcludedIphoneModels = (next: string[]) => {
+    setExcludedIphoneModels(next);
+    try {
+      localStorage.setItem("dashboard-exclude-iphone-models", JSON.stringify(next));
+      localStorage.removeItem("dashboard-exclude-iphone18");
+    } catch {
+      /* ignore */
+    }
+  };
+
+  // หมวดที่ผู้ใช้เลือกให้หมวดย่อยใหม่ที่ Category Master ยังไม่มี (แชร์ผ่าน cloud)
+  const [categoryOverrides, setCategoryOverridesState] = useState<CategoryOverrides>(() => getCategoryOverrides());
+  useEffect(() => {
+    let cancelled = false;
+    void fetchCategoryOverridesFromCloud().then((cloud) => {
+      if (!cancelled && cloud) setCategoryOverridesState(cloud);
     });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const saveCategoryOverrides = (changes: CategoryOverrides) => {
+    setCategoryOverridesState(setCategoryOverrides(changes));
   };
 
   const handleBranchChange = (newBranch: string) => {
@@ -1496,27 +1512,56 @@ function AppInternal({
     );
   };
 
+  // Branch-filtered sales rows (Demo iPhone → หมวด iPhone) BEFORE the model
+  // exclusion — the base for the model picker and the "latest day".
+  const branchSalesRows = useMemo(
+    () => ({
+      current: normalizeDemoIphoneRows(filterRowsByBranch(uploadedFiles.current, selectedBranch)),
+      today: normalizeDemoIphoneRows(filterRowsByBranch(uploadedFiles.today ?? [], selectedBranch)),
+      lastMonth: normalizeDemoIphoneRows(filterRowsByBranch(uploadedFiles.lastMonth, selectedBranch)),
+      lastYear: normalizeDemoIphoneRows(filterRowsByBranch(uploadedFiles.lastYear, selectedBranch)),
+    }),
+    [uploadedFiles, selectedBranch],
+  );
+
+  // หมวดย่อยใหม่ที่ master ยังไม่มี → เดาจาก Sub อื่นใน Category เดียวกัน /
+  // ใช้หมวดที่ผู้ใช้เลือก แล้วต่อท้าย master เป็นแถวเสริม
+  const unmappedCategoryPairs = useMemo(
+    () =>
+      findUnmappedCategoryPairs(
+        {
+          current: branchSalesRows.current,
+          others: [branchSalesRows.today, branchSalesRows.lastMonth, branchSalesRows.lastYear],
+        },
+        uploadedFiles.categoryMaster,
+      ),
+    [branchSalesRows, uploadedFiles.categoryMaster],
+  );
+  const effectiveCategoryMaster = useMemo(() => {
+    const extra = buildFallbackMasterRows(unmappedCategoryPairs, categoryOverrides);
+    return extra.length ? [...uploadedFiles.categoryMaster, ...extra] : uploadedFiles.categoryMaster;
+  }, [uploadedFiles.categoryMaster, unmappedCategoryPairs, categoryOverrides]);
+
+  const iphoneModelOptions = useMemo(() => listIphoneModels(branchSalesRows.current), [branchSalesRows.current]);
+
   const displayUploads = useMemo<Record<UploadKind, RawRow[]>>(() => {
-    // Optionally drop iPhone 18-family devices from every calculation
-    // (single chokepoint — all tables/KPIs read from displayUploads).
+    // Optionally drop the ticked iPhone models (devices only) from every
+    // calculation (single chokepoint — all tables/KPIs read from displayUploads).
     const strip = (rows: RawRow[]) =>
-      excludeIphone18 ? rows.filter((r) => !isIphone18DeviceRow(r)) : rows;
+      excludingIphoneModels ? rows.filter((r) => !isExcludedIphoneDeviceRow(r, excludedIphoneModelSet)) : rows;
     return {
       target: filterRowsByBranch(uploadedFiles.target, selectedBranch),
-      current: strip(filterRowsByBranch(uploadedFiles.current, selectedBranch)),
-      today: strip(filterRowsByBranch(uploadedFiles.today ?? [], selectedBranch)),
-      lastMonth: strip(filterRowsByBranch(uploadedFiles.lastMonth, selectedBranch)),
-      lastYear: strip(filterRowsByBranch(uploadedFiles.lastYear, selectedBranch)),
-      categoryMaster: uploadedFiles.categoryMaster,
+      current: strip(branchSalesRows.current),
+      today: strip(branchSalesRows.today),
+      lastMonth: strip(branchSalesRows.lastMonth),
+      lastYear: strip(branchSalesRows.lastYear),
+      categoryMaster: effectiveCategoryMaster,
     };
-  }, [uploadedFiles, selectedBranch, excludeIphone18]);
+  }, [uploadedFiles.target, branchSalesRows, selectedBranch, excludedIphoneModelSet, effectiveCategoryMaster]);
 
-  // Branch-filtered but WITHOUT the iPhone 18 exclusion — used to pick the
+  // Branch-filtered but WITHOUT the model exclusion — used to pick the
   // "latest day" so toggling the filter never changes which date is shown.
-  const currentRowsAllModels = useMemo(
-    () => filterRowsByBranch(uploadedFiles.current, selectedBranch),
-    [uploadedFiles.current, selectedBranch],
-  );
+  const currentRowsAllModels = branchSalesRows.current;
 
   const categoryMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -3524,7 +3569,7 @@ function AppInternal({
         ? `${p.getFullYear()}-${String(p.getMonth() + 1).padStart(2, "0")}-${String(p.getDate()).padStart(2, "0")}`
         : "";
     };
-    // "วันล่าสุด" ยึดจากข้อมูลเต็ม (ก่อนกรอง iPhone 18) เพื่อให้วันที่ที่แสดง
+    // "วันล่าสุด" ยึดจากข้อมูลเต็ม (ก่อนตัด iPhone บางรุ่น) เพื่อให้วันที่ที่แสดง
     // ไม่เปลี่ยนไปมาตอนสลับปุ่มกรอง — กรองมีผลกับ "ตัวเลข" เท่านั้น
     const daySet = new Set<string>();
     (currentRowsAllModels.length ? currentRowsAllModels : displayUploads.current).forEach((r) => {
@@ -3568,13 +3613,12 @@ function AppInternal({
     const bahtOf = (bills: BillSummary[], cat: string) =>
       bills.reduce((s, b) => s + sumItemRevenueAnyFilter(b, catF(cat)), 0);
 
-    // Split a preset's matched attach items into "รุ่นเก่า" vs "iPhone 18".
+    // Split a preset's matched attach items into "รุ่นเก่า" vs "รุ่นที่ตัด".
     // Reuse countItemQuantityAnyFilter (the exact matcher calcPreset uses —
     // inventory rule, customer/doc-type constraints and per-bill dedupe) on
     // two disjoint halves of each bill, so older + gen18 always equals the
     // unfiltered total.
-    const isIphone18Item = (li: RawRow) =>
-      /iphone\s*18/i.test(String(li["Product (Name)"] ?? (li as any).product_name ?? ""));
+    const isExcludedModelItem = (li: RawRow) => mentionsExcludedIphoneModel(li, excludedIphoneModelSet);
 
     const splitPresetUnits = (bills: BillSummary[], preset: KpiPreset) => {
       const filters = preset.filtersA ?? (preset.filterA ? [preset.filterA] : []);
@@ -3583,8 +3627,8 @@ function AppInternal({
       let gen18 = 0;
       if (!filters.length) return { older, gen18 };
       for (const bill of bills) {
-        const items18 = bill.lineItems.filter(isIphone18Item);
-        const itemsOld = bill.lineItems.filter((li) => !isIphone18Item(li));
+        const items18 = bill.lineItems.filter(isExcludedModelItem);
+        const itemsOld = bill.lineItems.filter((li) => !isExcludedModelItem(li));
         if (items18.length) {
           gen18 += countItemQuantityAnyFilter({ ...bill, lineItems: items18 }, filters);
         }
@@ -3637,7 +3681,7 @@ function AppInternal({
         const creditLog: string[] = [];
         let coverIphoneBills = 0;
         let simIphoneBills = 0;
-        let ufundOther = 0; // บิล UFUND ที่ไม่มีแถว iPhone (เช่นตอนกรอง iPhone 18 ออก)
+        let ufundOther = 0; // บิล UFUND ที่ไม่มีแถว iPhone (เช่นตอนตัด iPhone บางรุ่นออก)
         const rawCatOf = (li: RawRow) => String(li["Category (Name)"] ?? "").trim().toLowerCase();
         // มี Cover ในบิล = preset ที่ชื่อมี "cover" ตัวใดตัวหนึ่งจับเจอ (ฝั่ง A)
         // หรือมีสินค้า COVER+ จริง (ไม่นับของแถม 7CARE+ Free)
@@ -3764,9 +3808,9 @@ function AppInternal({
           } else if (kind === "att") {
             const bk = baseKind(p.name);
             const base = bk === "ipad" ? ipadUnit : bk === "both" ? iphoneUnit + ipadUnit : iphoneUnit;
-            if (excludeIphone18) {
-              // ตอนกรอง iPhone 18: แยกให้เห็นว่าเป็นของรุ่นเก่ากี่ชิ้น / ของ 18 กี่ชิ้น
-              // และคิด ATT% จากรุ่นเก่าเท่านั้น (ฐาน iPhone ก็ไม่มี 18 แล้ว)
+            if (excludingIphoneModels) {
+              // ตอนตัด iPhone บางรุ่น: แยกให้เห็นว่าเป็นของรุ่นที่นับกี่ชิ้น / รุ่นที่ตัดกี่ชิ้น
+              // และคิด ATT% จากรุ่นที่นับเท่านั้น (ฐาน iPhone ก็ไม่มีรุ่นที่ตัดแล้ว)
               const { older, gen18 } = splitPresetUnits(officerBills, p);
               cells[p.id] = {
                 kind,
@@ -3786,7 +3830,7 @@ function AppInternal({
               cells[p.id] = {
                 kind,
                 unit: ufundUnits,
-                ...(excludeIphone18 ? { unit18: ufundOther } : {}),
+                ...(excludingIphoneModels ? { unit18: ufundOther } : {}),
                 att: base > 0 ? (ufundUnits / base) * 100 : 0,
               };
             }
@@ -3807,7 +3851,7 @@ function AppInternal({
           requiredCredits,
           iphoneAttachAlert,
           iphoneAttachWarn,
-          // ให้ LINE ใช้ตัวเลขเดียวกับคอลัมน์ในตาราง (รวมส่วน iPhone 18 ถ้าแยกไว้)
+          // ให้ LINE ใช้ตัวเลขเดียวกับคอลัมน์ในตาราง (รวมส่วนรุ่นที่ตัด ถ้าแยกไว้)
           coverBills: coverPresetForBills && cells[coverPresetForBills.id]
             ? (cells[coverPresetForBills.id].unit ?? 0) + (cells[coverPresetForBills.id].unit18 ?? 0)
             : coverIphoneBills,
@@ -3840,7 +3884,7 @@ function AppInternal({
         totalCells[p.id] = {
           kind,
           unit,
-          ...(excludeIphone18 ? { unit18: u18 } : {}),
+          ...(excludingIphoneModels ? { unit18: u18 } : {}),
           att: base > 0 ? (unit / base) * 100 : 0,
         };
       } else {
@@ -3886,7 +3930,7 @@ function AppInternal({
     parsedReport.officers,
     kpiPresets,
     currentRowsAllModels,
-    excludeIphone18,
+    excludedIphoneModelSet,
     attachBoost,
   ]);
   const dailyBranchReport = branchReports.daily;
@@ -3903,7 +3947,7 @@ function AppInternal({
     const payload = {
       date: dailyBranchReport.latestDate,
       branch: selectedBranch,
-      excludeIphone18,
+      excludeIphone18: excludingIphoneModels,
       boost: boostLabel(attachBoost),
       dashboardUrl: typeof window !== "undefined" ? window.location.origin : "",
       rows: officers.map((r) => {
@@ -3955,7 +3999,7 @@ function AppInternal({
       });
     }, 1500);
     return () => window.clearTimeout(t);
-  }, [dailyBranchReport, selectedBranch, excludeIphone18, reconciledStaffPhotos, attachBoost]);
+  }, [dailyBranchReport, selectedBranch, excludedIphoneModels, reconciledStaffPhotos, attachBoost]);
 
   const dynamicRadarData = useMemo(() => {
     if (activeStat === "csat") {
@@ -4645,24 +4689,32 @@ function AppInternal({
     nextUploads: UploadState,
     options?: { skipPersist?: boolean; changedKinds?: UploadKind[] },
   ) => {
-    // Apply the same iPhone 18 exclusion used by displayUploads so the store
-    // totals in parsedReport follow the toggle too.
+    // Same Demo → iPhone, model exclusion and Category Master fallback as
+    // displayUploads so the store totals in parsedReport follow them too.
+    const branchRows = (rows: RawRow[]) => normalizeDemoIphoneRows(filterRowsByBranch(rows, selectedBranch));
     const strip = (rows: RawRow[]) =>
-      excludeIphone18 ? rows.filter((r) => !isIphone18DeviceRow(r)) : rows;
+      excludingIphoneModels ? rows.filter((r) => !isExcludedIphoneDeviceRow(r, excludedIphoneModelSet)) : rows;
     const filteredTarget = filterRowsByBranch(nextUploads.target, selectedBranch);
-    const filteredCurrent = strip(filterRowsByBranch(nextUploads.current, selectedBranch));
-    const filteredToday = strip(filterRowsByBranch(nextUploads.today ?? [], selectedBranch));
-    const filteredLastMonth = strip(filterRowsByBranch(nextUploads.lastMonth, selectedBranch));
-    const filteredLastYear = strip(filterRowsByBranch(nextUploads.lastYear, selectedBranch));
+    const branchCurrent = branchRows(nextUploads.current);
+    const branchToday = branchRows(nextUploads.today ?? []);
+    const branchLastMonth = branchRows(nextUploads.lastMonth);
+    const branchLastYear = branchRows(nextUploads.lastYear);
+    const fallbackMasterRows = buildFallbackMasterRows(
+      findUnmappedCategoryPairs(
+        { current: branchCurrent, others: [branchToday, branchLastMonth, branchLastYear] },
+        nextUploads.categoryMaster,
+      ),
+      categoryOverrides,
+    );
 
     const report = buildReport(
       filteredTarget,
-      filteredCurrent,
-      filteredLastMonth,
-      filteredLastYear,
-      nextUploads.categoryMaster,
+      strip(branchCurrent),
+      strip(branchLastMonth),
+      strip(branchLastYear),
+      fallbackMasterRows.length ? [...nextUploads.categoryMaster, ...fallbackMasterRows] : nextUploads.categoryMaster,
       "uploaded-data",
-      filteredToday,
+      strip(branchToday),
     );
     setParsedReport(report);
     if (!options?.skipPersist) {
@@ -4854,8 +4906,8 @@ function AppInternal({
     if (uploadedFiles && hasUploadData(uploadedFiles)) {
       rebuildReport(uploadedFiles, { skipPersist: true });
     }
-    // excludeIphone18 is a dep so toggling it rebuilds the store totals too
-  }, [selectedBranch, selectedBranchLoaded, excludeIphone18]);
+    // model exclusion / category choices are deps so changing them rebuilds the store totals too
+  }, [selectedBranch, selectedBranchLoaded, excludedIphoneModels, categoryOverrides]);
 
   useEffect(() => {
     if (!selectedBranchLoaded) return;
@@ -5447,24 +5499,12 @@ function AppInternal({
                 ) : null}
               </div>
             ) : null}
-            {/* ตัด iPhone ตระกูล 18 ออกจากการคำนวณทุกตาราง */}
-            <button
-              type="button"
-              onClick={toggleExcludeIphone18}
-              title={
-                excludeIphone18
-                  ? "กำลังตัด iPhone 18 ออกจากการคำนวณ — กดเพื่อนับรวมกลับ"
-                  : "กดเพื่อตัด iPhone ตระกูล 18 ออกจากการคำนวณทั้งหมด"
-              }
-              className={`hidden md:inline-flex items-center gap-1.5 px-3 py-2 rounded-full border text-xs font-semibold backdrop-blur-md shadow-xl transition-colors ${
-                excludeIphone18
-                  ? "bg-amber-500/25 border-amber-400/50 text-amber-100 hover:bg-amber-500/35"
-                  : "bg-white/10 border-white/10 text-white/60 hover:text-white hover:bg-white/15"
-              }`}
-            >
-              <Smartphone className="w-4 h-4" />
-              {excludeIphone18 ? "ตัด iPhone 18 ออกแล้ว" : "ตัด iPhone 18"}
-            </button>
+            {/* ติ๊กเลือกรุ่น iPhone ที่ไม่นับยอด (ตัดออกจากการคำนวณทุกตาราง) */}
+            <IphoneModelExcludePicker
+              options={iphoneModelOptions}
+              selected={excludedIphoneModels}
+              onChange={updateExcludedIphoneModels}
+            />
             <nav className="flex items-center space-x-2 lg:space-x-4 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/5 shadow-xl hidden md:flex">
               <button
                 onClick={() => setCurrentView("home")}
@@ -5915,6 +5955,16 @@ function AppInternal({
             )}
           </AnimatePresence>
         </main>
+
+        {/* แจ้งเตือนหมวดย่อยใหม่ที่ Category Master ยังไม่มี — นอก <main> ไม่ติดไปกับรูปที่แคป */}
+        {!isPia ? (
+          <CategoryFallbackAlert
+            pairs={unmappedCategoryPairs}
+            overrides={categoryOverrides}
+            onSave={saveCategoryOverrides}
+            showManage={currentView === "settings"}
+          />
+        ) : null}
 
         {/* Hidden home view for Telegram screenshot capture (always rendered,
             visible in DOM but invisible via opacity:0 so charts render).
