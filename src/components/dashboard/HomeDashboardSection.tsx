@@ -666,12 +666,18 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                   key={`${row.officer.name}-${idx}`}
                   className={
                     isTotal
-                      ? "border-b-2 border-emerald-400/40 bg-emerald-500/10"
+                      ? "total-row border-y-2 border-amber-400/70 bg-amber-400/20 shadow-[inset_4px_0_0_0_rgba(251,191,36,0.9)]"
                       : "border-b border-white/5 hover:bg-white/5 transition-colors"
                   }
                 >
-                  <td className={`py-1 px-1 sticky left-0 z-10 ${isTotal ? "bg-[#0f4430]" : "bg-[#0a1f17]"}`}>
-                    <div className={`truncate max-w-[84px] ${isTotal ? "font-extrabold text-emerald-200" : "font-medium text-white"}`}>{row.officer.name}</div>
+                  <td
+                    className={`py-1 px-1 sticky left-0 z-10 ${
+                      isTotal ? "total-sticky bg-[#4a3c10] shadow-[inset_4px_0_0_0_rgba(251,191,36,0.9)]" : "bg-[#0a1f17]"
+                    }`}
+                  >
+                    <div className={`truncate max-w-[84px] ${isTotal ? "text-[11px] font-extrabold text-amber-200" : "font-medium text-white"}`}>
+                      {isTotal ? "Σ " : ""}{row.officer.name}
+                    </div>
                     <div className="text-[8px] text-white/40 truncate max-w-[84px]">{row.officer.branch || "-"}</div>
                   </td>
                   {categories.map((cat, i) => (

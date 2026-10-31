@@ -259,3 +259,11 @@ html.theme-light.theme-sand .bg-\[\#0c3123\] { background-color: #ece3d4; }
 html.theme-light.theme-sand .bg-\[\#0f4430\] { background-color: #e6dac6; }
 html.theme-light.theme-sand .bg-\[\#1b3a2c\] { background-color: #efe6d8; }
 html.theme-light.theme-sand .bg-\[\#052b20\] { background-color: #f6f0e6; }
+
+/* แถว "รวมทั้งหมด" ในตารางยอดขายตามหมวด + 7 Wonders — เด่นทุกธีม */
+.total-row td { font-weight: 700; }
+.total-row td .font-mono { color: #fde68a; font-weight: 800; }
+html.theme-light .total-row { background-color: #fdecb5 !important; }
+html.theme-light .total-row td .font-mono { color: #7c4a03; }
+html.theme-light .total-sticky { background-color: #fbe08a !important; }
+html.theme-light .total-sticky .text-amber-200 { color: #7c4a03; }
