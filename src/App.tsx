@@ -75,6 +75,13 @@ import {
 } from "./lib/lineReport";
 import { THEMES, applyTheme, findTheme, type ThemeId } from "./lib/themes";
 import {
+  EMPTY_TARGET_UPLIFT,
+  applyTargetUplift,
+  fetchTargetUplift,
+  upliftLabel,
+  type TargetUplift,
+} from "./lib/targetUplift";
+import {
   EMPTY_ATTACH_BOOST,
   boostLabel,
   boostInRange,
@@ -1585,20 +1592,32 @@ function AppInternal({
 
   const iphoneModelOptions = useMemo(() => listIphoneModels(branchSalesRows.current), [branchSalesRows.current]);
 
+  // ปรับเป้าเพิ่ม (Stretch Target) — ตั้งใน Settings
+  const [targetUplift, setTargetUplift] = useState<TargetUplift>({ ...EMPTY_TARGET_UPLIFT });
+  useEffect(() => {
+    const load = () =>
+      void fetchTargetUplift().then((c) =>
+        setTargetUplift((prev) => (JSON.stringify(prev) === JSON.stringify(c) ? prev : c)),
+      );
+    load();
+    window.addEventListener("focus", load);
+    return () => window.removeEventListener("focus", load);
+  }, []);
+
   const displayUploads = useMemo<Record<UploadKind, RawRow[]>>(() => {
     // Optionally drop the ticked iPhone models (devices only) from every
     // calculation (single chokepoint — all tables/KPIs read from displayUploads).
     const strip = (rows: RawRow[]) =>
       excludingIphoneModels ? rows.filter((r) => !isExcludedIphoneDeviceRow(r, excludedIphoneModelSet)) : rows;
     return {
-      target: filterRowsByBranch(uploadedFiles.target, selectedBranch),
+      target: applyTargetUplift(filterRowsByBranch(uploadedFiles.target, selectedBranch), targetUplift),
       current: strip(branchSalesRows.current),
       today: strip(branchSalesRows.today),
       lastMonth: strip(branchSalesRows.lastMonth),
       lastYear: strip(branchSalesRows.lastYear),
       categoryMaster: effectiveCategoryMaster,
     };
-  }, [uploadedFiles.target, branchSalesRows, selectedBranch, excludedIphoneModelSet, effectiveCategoryMaster]);
+  }, [uploadedFiles.target, branchSalesRows, selectedBranch, excludedIphoneModelSet, effectiveCategoryMaster, targetUplift]);
 
   // Branch-filtered but WITHOUT the model exclusion — used to pick the
   // "latest day" so toggling the filter never changes which date is shown.
@@ -4762,7 +4781,7 @@ function AppInternal({
     const branchRows = (rows: RawRow[]) => normalizeDemoIphoneRows(filterRowsByBranch(rows, selectedBranch));
     const strip = (rows: RawRow[]) =>
       excludingIphoneModels ? rows.filter((r) => !isExcludedIphoneDeviceRow(r, excludedIphoneModelSet)) : rows;
-    const filteredTarget = filterRowsByBranch(nextUploads.target, selectedBranch);
+    const filteredTarget = applyTargetUplift(filterRowsByBranch(nextUploads.target, selectedBranch), targetUplift);
     const branchCurrent = branchRows(nextUploads.current);
     const branchToday = branchRows(nextUploads.today ?? []);
     const branchLastMonth = branchRows(nextUploads.lastMonth);
@@ -4975,7 +4994,7 @@ function AppInternal({
       rebuildReport(uploadedFiles, { skipPersist: true });
     }
     // model exclusion / category choices are deps so changing them rebuilds the store totals too
-  }, [selectedBranch, selectedBranchLoaded, excludedIphoneModels, categoryOverrides]);
+  }, [selectedBranch, selectedBranchLoaded, excludedIphoneModels, categoryOverrides, targetUplift]);
 
   useEffect(() => {
     if (!selectedBranchLoaded) return;
@@ -5551,6 +5570,15 @@ function AppInternal({
         {/* Top Navigation (Floating Right) */}
         <header className="absolute top-6 right-8 w-1/2 flex justify-end items-center z-50 pointer-events-none">
           <div className="flex items-center gap-6 pointer-events-auto">
+            {/* ป้ายเตือนว่ากำลังใช้เป้าที่ปรับเพิ่ม (ตั้งใน Settings) */}
+            {upliftLabel(targetUplift) ? (
+              <span
+                title="กำลังใช้เป้าที่ปรับเพิ่มจากเป้าจริง — ปิดได้ที่ Settings → ปรับเป้าเพิ่ม"
+                className="hidden md:inline-flex items-center gap-1.5 px-3 py-2 rounded-full border text-xs font-bold backdrop-blur-md shadow-xl bg-sky-500/25 border-sky-400/50 text-sky-100"
+              >
+                🎯 {upliftLabel(targetUplift)}
+              </span>
+            ) : null}
             {/* ส่งรีพอท (Home + Staff Profile) ให้ LINE bot — กดวันละครั้งตอนปิดร้าน */}
             {!isPia ? (
               <div className="relative hidden md:block">
@@ -6052,6 +6080,7 @@ function AppInternal({
                   onStaffVisibilityChange={setHiddenStaffIds}
                   onBackOfficeChange={setBackOfficeCfg}
                   onAttachBoostChange={setAttachBoost}
+                  onTargetUpliftChange={setTargetUplift}
                   staffPhotos={Object.fromEntries(
                     Object.entries(reconciledStaffPhotos).map(([id, record]) => [id, (record as any).photoUrl]),
                   )}

@@ -121,6 +121,38 @@ async function handleAttachBoost(req, res) {
   return res.status(405).json({ ok: false, error: "Method not allowed" });
 }
 
+// ปรับเป้าเพิ่ม (Stretch Target) — % เพิ่มจากเป้าจริง เปิด/ปิดได้
+//   GET/PUT /api/staff-photos?resource=target-uplift  { uplift: { enabled, pct, perCat } }
+const TARGET_UPLIFT_KEY = "target_uplift";
+
+async function handleTargetUplift(req, res) {
+  const { getAppConfig, setAppConfig, initTelegramSchema } = require("./_lib/tursoClient");
+  await initTelegramSchema();
+  if (req.method === "GET") {
+    try {
+      const cfg = await getAppConfig(TARGET_UPLIFT_KEY);
+      return res.status(200).json({ ok: true, uplift: cfg && cfg.value ? JSON.parse(cfg.value) : {} });
+    } catch {
+      return res.status(200).json({ ok: true, uplift: {} });
+    }
+  }
+  if (req.method === "PUT" || req.method === "POST") {
+    const u = req.body?.uplift && typeof req.body.uplift === "object" ? req.body.uplift : {};
+    const num = (v) => (Number.isFinite(Number(v)) ? Math.max(-90, Math.min(500, Number(v))) : 0);
+    const perCat = {};
+    if (u.perCat && typeof u.perCat === "object") {
+      for (const [k, v] of Object.entries(u.perCat)) {
+        if (v === null || v === "" || v === undefined) continue;
+        if (Number.isFinite(Number(v))) perCat[String(k).slice(0, 20)] = num(v);
+      }
+    }
+    const clean = { enabled: Boolean(u.enabled), pct: num(u.pct), perCat };
+    await setAppConfig(TARGET_UPLIFT_KEY, JSON.stringify(clean), req.body?.updatedBy ?? null);
+    return res.status(200).json({ ok: true });
+  }
+  return res.status(405).json({ ok: false, error: "Method not allowed" });
+}
+
 async function handleVisibleStaff(req, res) {
   const { getAppConfig, setAppConfig, initTelegramSchema } = require("./_lib/tursoClient");
   // app_config ถูกสร้างใน initTelegramSchema — ต้องเรียกก่อน ไม่งั้น setAppConfig
@@ -185,6 +217,14 @@ async function handler(req, res) {
     } catch (e) {
       console.error("[api/staff-photos] image", e);
       return res.status(500).end();
+    }
+  }
+
+  if (req.query?.resource === "target-uplift") {
+    try {
+      return await handleTargetUplift(req, res);
+    } catch (e) {
+      return res.status(200).json({ ok: false, uplift: {}, error: e.message });
     }
   }
 

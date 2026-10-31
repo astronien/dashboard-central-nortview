@@ -6,6 +6,8 @@ import { AiSettingsManager } from "./admin/AiSettingsManager";
 import { StaffVisibilityManager } from "./admin/StaffVisibilityManager";
 import { BackOfficeManager } from "./admin/BackOfficeManager";
 import { AttachBoostManager } from "./admin/AttachBoostManager";
+import { TargetUpliftManager } from "./admin/TargetUpliftManager";
+import type { TargetUplift } from "../../lib/targetUplift";
 import type { AttachBoost } from "../../lib/attachBoost";
 
 export type StaffRosterEntry = {
@@ -34,6 +36,7 @@ export function SettingsSection({
   onStaffVisibilityChange,
   onBackOfficeChange,
   onAttachBoostChange,
+  onTargetUpliftChange,
   onTradeBranchMappingChange,
 }: {
   selectedBranch: string;
@@ -54,6 +57,7 @@ export function SettingsSection({
   onStaffVisibilityChange?: (hidden: string[]) => void;
   onBackOfficeChange?: (cfg: { counts: Record<string, number>; rates: Record<string, number> }) => void;
   onAttachBoostChange?: (b: AttachBoost) => void;
+  onTargetUpliftChange?: (c: TargetUplift) => void;
   onTradeBranchMappingChange?: (mapping: Record<string, string>) => void;
 }) {
   return (
@@ -99,6 +103,8 @@ export function SettingsSection({
         </div>
         {staffPhotoError && <p className="text-sm text-amber-300 lg:max-w-xs">{staffPhotoError}</p>}
       </div>
+
+      {isAdmin ? <TargetUpliftManager updatedBy={adminName} onChange={onTargetUpliftChange} /> : null}
 
       {isAdmin ? <AttachBoostManager updatedBy={adminName} onChange={onAttachBoostChange} /> : null}
 
