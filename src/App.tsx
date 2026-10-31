@@ -207,6 +207,7 @@ import {
   getCategoryOverrides,
   setCategoryOverrides,
 } from "./lib/categoryOverrideStorage";
+import { SettingsGate } from "./components/dashboard/SettingsGate";
 import { IphoneModelExcludePicker } from "./components/dashboard/IphoneModelExcludePicker";
 import { CategoryFallbackAlert } from "./components/dashboard/CategoryFallbackAlert";
 
@@ -6072,6 +6073,7 @@ function AppInternal({
                 transition={{ duration: 0.4, ease: "easeOut" }}
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
+                <SettingsGate updatedBy={user?.name ?? user?.username}>
                 <SettingsSection
                   selectedBranch={selectedBranch}
                   onBranchChange={handleBranchChange}
@@ -6100,6 +6102,7 @@ function AppInternal({
                   tradeBranchMapping={tradeBranchMapping}
                   onTradeBranchMappingChange={setTradeBranchMapping}
                 />
+                </SettingsGate>
               </motion.div>
             )}
           </AnimatePresence>

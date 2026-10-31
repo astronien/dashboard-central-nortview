@@ -153,6 +153,66 @@ async function handleTargetUplift(req, res) {
   return res.status(405).json({ ok: false, error: "Method not allowed" });
 }
 
+// รหัสเข้าหน้าตั้งค่า (เก็บเป็น hash + salt ใน app_config — ไม่เก็บรหัสจริง)
+//   GET  ?resource=settings-pin                       → { hasPin }
+//   POST ?resource=settings-pin { action: "verify", pin }          → { ok, valid }
+//   POST ?resource=settings-pin { action: "set", pin, newPin }     → { ok }
+//        (ครั้งแรกที่ยังไม่มีรหัส ไม่ต้องใส่ pin เดิม)
+const SETTINGS_PIN_KEY = "settings_pin";
+
+async function handleSettingsPin(req, res) {
+  const crypto = require("crypto");
+  const { getAppConfig, setAppConfig, initTelegramSchema } = require("./_lib/tursoClient");
+  await initTelegramSchema();
+  const cfg = await getAppConfig(SETTINGS_PIN_KEY);
+  let stored = null;
+  try {
+    stored = cfg && cfg.value ? JSON.parse(cfg.value) : null;
+  } catch {
+    stored = null;
+  }
+  const hashOf = (pin, salt) =>
+    crypto.scryptSync(String(pin), salt, 32).toString("hex");
+  const matches = (pin) => {
+    if (!stored || !stored.hash || !stored.salt) return false;
+    const a = Buffer.from(hashOf(pin, stored.salt), "hex");
+    const b = Buffer.from(String(stored.hash), "hex");
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+  };
+
+  if (req.method === "GET") {
+    return res.status(200).json({ ok: true, hasPin: Boolean(stored && stored.hash) });
+  }
+  if (req.method !== "POST" && req.method !== "PUT") {
+    return res.status(405).json({ ok: false, error: "Method not allowed" });
+  }
+  const action = String(req.body?.action ?? "");
+  const pin = String(req.body?.pin ?? "");
+  if (action === "verify") {
+    // หน่วงเล็กน้อยกันการเดารหัสรัวๆ
+    await new Promise((r) => setTimeout(r, 400));
+    return res.status(200).json({ ok: true, valid: matches(pin) });
+  }
+  if (action === "set") {
+    const newPin = String(req.body?.newPin ?? "");
+    if (!/^\d{4,8}$/.test(newPin)) {
+      return res.status(400).json({ ok: false, error: "รหัสต้องเป็นตัวเลข 4–8 หลัก" });
+    }
+    if (stored && stored.hash && !matches(pin)) {
+      await new Promise((r) => setTimeout(r, 400));
+      return res.status(403).json({ ok: false, error: "รหัสเดิมไม่ถูกต้อง" });
+    }
+    const salt = crypto.randomBytes(16).toString("hex");
+    await setAppConfig(
+      SETTINGS_PIN_KEY,
+      JSON.stringify({ salt, hash: hashOf(newPin, salt) }),
+      req.body?.updatedBy ?? null,
+    );
+    return res.status(200).json({ ok: true });
+  }
+  return res.status(400).json({ ok: false, error: "unknown action" });
+}
+
 async function handleVisibleStaff(req, res) {
   const { getAppConfig, setAppConfig, initTelegramSchema } = require("./_lib/tursoClient");
   // app_config ถูกสร้างใน initTelegramSchema — ต้องเรียกก่อน ไม่งั้น setAppConfig
@@ -217,6 +277,14 @@ async function handler(req, res) {
     } catch (e) {
       console.error("[api/staff-photos] image", e);
       return res.status(500).end();
+    }
+  }
+
+  if (req.query?.resource === "settings-pin") {
+    try {
+      return await handleSettingsPin(req, res);
+    } catch (e) {
+      return res.status(200).json({ ok: false, error: e.message });
     }
   }
 
