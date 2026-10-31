@@ -36,6 +36,7 @@ import {
   LogOut,
   Loader2,
   Sun,
+  Palette,
   Moon,
   Gauge,
 } from "lucide-react";
@@ -72,6 +73,7 @@ import {
   finishLineReport,
   uploadLineReportImage,
 } from "./lib/lineReport";
+import { THEMES, applyTheme, findTheme, type ThemeId } from "./lib/themes";
 import {
   EMPTY_ATTACH_BOOST,
   boostLabel,
@@ -1396,15 +1398,18 @@ function AppInternal({
 
   // Light / dark theme. Applied as a `theme-light` class on <html> so a
   // small set of CSS overrides (index.css) can re-map the dark palette.
-  const [theme, setTheme] = useState<"dark" | "light">(() => {
+  const [theme, setTheme] = useState<ThemeId>(() => {
     try {
-      return localStorage.getItem("theme") === "light" ? "light" : "dark";
+      const saved = localStorage.getItem("theme");
+      // ค่าเดิม "dark" / "light" ยังใช้ได้
+      return findTheme(saved === "dark" ? "forest" : saved).id;
     } catch {
-      return "dark";
+      return "forest";
     }
   });
+  const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   useEffect(() => {
-    document.documentElement.classList.toggle("theme-light", theme === "light");
+    applyTheme(theme);
     try {
       localStorage.setItem("theme", theme);
     } catch {
@@ -5148,7 +5153,11 @@ function AppInternal({
           ...(homeStyle
             ? {
                 padding: `${pad}px`,
-                background: "linear-gradient(to bottom right, #1b5d44, #123627)",
+                // พื้นหลังรูปแคปตามธีมที่เลือก
+                background:
+                  (document.querySelector(".app-panel") &&
+                    getComputedStyle(document.querySelector(".app-panel") as Element).backgroundImage) ||
+                  "linear-gradient(to bottom right, #1b5d44, #123627)",
               }
             : {}),
         },
@@ -5577,13 +5586,53 @@ function AppInternal({
 
             {/* Screenshot capture button */}
             <div className="pointer-events-auto hidden md:flex items-center gap-2 pl-2 ml-2 border-l border-white/10">
-              <button
-                onClick={() => setTheme((t) => (t === "light" ? "dark" : "light"))}
-                title={theme === "light" ? "สลับเป็นโหมดมืด" : "สลับเป็นโหมดสว่าง"}
-                className="p-2 rounded-full transition-colors text-white/60 hover:text-white hover:bg-white/10"
-              >
-                {theme === "light" ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
-              </button>
+              <div className="relative">
+                <button
+                  onClick={() => setThemeMenuOpen((v) => !v)}
+                  title="เลือกธีมสี"
+                  className="p-2 rounded-full transition-colors text-white/60 hover:text-white hover:bg-white/10"
+                >
+                  <Palette className="w-5 h-5" />
+                </button>
+                {themeMenuOpen ? (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setThemeMenuOpen(false)} />
+                    <div className="absolute right-0 top-full mt-2 z-50 w-64 rounded-2xl border border-white/10 bg-[#0c3123] p-3 shadow-2xl">
+                      {[
+                        { title: "โทนเข้ม", dark: true },
+                        { title: "โทนสว่าง", dark: false },
+                      ].map((g) => (
+                        <div key={g.title} className="mb-2 last:mb-0">
+                          <div className="flex items-center gap-1.5 px-1 mb-1.5 text-[10px] font-bold uppercase tracking-wider text-white/40">
+                            {g.dark ? <Moon className="w-3 h-3" /> : <Sun className="w-3 h-3" />} {g.title}
+                          </div>
+                          <div className="grid grid-cols-1 gap-1">
+                            {THEMES.filter((t) => t.dark === g.dark).map((t) => (
+                              <button
+                                key={t.id}
+                                onClick={() => {
+                                  setTheme(t.id);
+                                  setThemeMenuOpen(false);
+                                }}
+                                className={`flex items-center gap-2.5 rounded-xl px-2 py-1.5 text-left text-[12px] transition-colors ${
+                                  theme === t.id ? "bg-white/15 text-white font-semibold" : "text-white/70 hover:bg-white/10"
+                                }`}
+                              >
+                                <span
+                                  className="w-6 h-6 rounded-full border border-white/20 shrink-0"
+                                  style={{ background: `linear-gradient(135deg, ${t.swatch[1]}, ${t.swatch[0]})` }}
+                                />
+                                <span className="flex-1">{t.label}</span>
+                                {theme === t.id ? <Check className="w-4 h-4 text-emerald-300" /> : null}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : null}
+              </div>
               <button
                 onClick={() => {
                   if (currentView === "staff") {
