@@ -521,6 +521,30 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
     );
   };
 
+  // แถวรวม: แสดงเฉพาะ % ตัวใหญ่
+  const renderTotalPct = (pct: number | null | undefined, scaledForColor?: number) => {
+    if (pct == null || !Number.isFinite(pct)) return <span className="text-white/25">—</span>;
+    return (
+      <span
+        className={`inline-block text-[13px] font-extrabold tabular-nums px-1.5 py-0.5 rounded-md ${achBadgeClass(
+          scaledForColor ?? pct,
+        )}`}
+      >
+        {fmtPct(pct)}
+      </span>
+    );
+  };
+  const totalCatPct = (c: CombinedCatCell | undefined) => (c && c.target > 0 ? c.achPercent : null);
+  const totalWonderPct = (w: CombinedWonderCell | undefined) => {
+    if (!w) return { pct: null as number | null, scaled: undefined as number | undefined };
+    const pctPreset = isPercentCalc(w.calcType);
+    if (!pctPreset && !(w.target > 0)) return { pct: null, scaled: undefined };
+    return {
+      pct: w.achPercent,
+      scaled: pctPreset && w.target > 0 ? (w.actual / w.target) * 100 : w.achPercent,
+    };
+  };
+
   return (
     <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-3 shadow-[0_8px_32px_rgba(0,0,0,0.12)] overflow-hidden">
       <div className="flex items-center gap-3 mb-3">
@@ -693,11 +717,11 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                       key={cat}
                       className={`py-1 px-1 text-right align-top ${i === 0 ? "border-l border-white/5" : ""}`}
                     >
-                      {renderCatCell(row.cats[cat])}
+                      {isTotal ? renderTotalPct(totalCatPct(row.cats[cat])) : renderCatCell(row.cats[cat])}
                     </td>
                   ))}
                   <td className="py-1 px-1 text-right align-top bg-emerald-500/5">
-                    {renderCatCell(row.catTotal, true)}
+                    {isTotal ? renderTotalPct(totalCatPct(row.catTotal)) : renderCatCell(row.catTotal, true)}
                   </td>
                   {presets.map((p, i) => {
                     const td = (
@@ -705,7 +729,12 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                         key={p.id}
                         className={`py-1 px-1 text-right align-top ${i === 0 ? "border-l border-white/5" : ""}`}
                       >
-                        {renderWonderCell(row.wonders[p.id])}
+                        {isTotal
+                          ? (() => {
+                              const t = totalWonderPct(row.wonders[p.id]);
+                              return renderTotalPct(t.pct, t.scaled);
+                            })()
+                          : renderWonderCell(row.wonders[p.id])}
                       </td>
                     );
                     if (!isSplit(p)) return td;
@@ -715,9 +744,19 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                         key={`${p.id}-appr`}
                         className="py-1 px-1 text-right align-top"
                       >
-                        {/ufund/i.test(p.name)
-                          ? renderUfundApprCell(row.wonders[p.id])
-                          : renderWonderCell(apprCell(row.wonders[p.id]))}
+                        {isTotal
+                          ? (() => {
+                              const w = row.wonders[p.id];
+                              if (/ufund/i.test(p.name)) {
+                                const tot = w?.appraisalB ?? 0;
+                                return renderTotalPct(tot > 0 ? ((w?.appraisalA ?? 0) / tot) * 100 : null);
+                              }
+                              const a = apprCell(w);
+                              return renderTotalPct(a ? a.achPercent : null, a && a.target > 0 ? (a.actual / a.target) * 100 : undefined);
+                            })()
+                          : /ufund/i.test(p.name)
+                            ? renderUfundApprCell(row.wonders[p.id])
+                            : renderWonderCell(apprCell(row.wonders[p.id]))}
                       </td>,
                     ];
                   })}
