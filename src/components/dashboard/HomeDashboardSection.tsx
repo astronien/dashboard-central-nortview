@@ -401,6 +401,68 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
   }, [rows, sort]);
   const arrow = (key: string) => (sort?.key === key ? (sort.dir === "asc" ? " ▲" : " ▼") : "");
 
+  // แถวรวมทั้งร้าน (บนสุด) — หมวด = ผลรวม · 7 Wonders = รวมจำนวนแนบ ÷ รวมฐาน
+  const totalRow = React.useMemo<CombinedOfficerRow>(() => {
+    const cats: Record<string, CombinedCatCell> = {};
+    const sumCat = (pick: (r: CombinedOfficerRow) => CombinedCatCell | undefined): CombinedCatCell => {
+      let actual = 0;
+      let target = 0;
+      for (const r of rows) {
+        const c = pick(r);
+        if (!c) continue;
+        actual += c.actual || 0;
+        target += c.target || 0;
+      }
+      return { actual, target, achPercent: target > 0 ? (actual / target) * 100 : 0 };
+    };
+    const catKeys = new Set<string>(categories);
+    rows.forEach((r) => Object.keys(r.cats).forEach((k) => catKeys.add(k)));
+    catKeys.forEach((k) => {
+      cats[k] = sumCat((r) => r.cats[k]);
+    });
+    const wonders: Record<string, CombinedWonderCell> = {};
+    for (const p of presets) {
+      const cells = rows.map((r) => r.wonders[p.id]).filter(Boolean) as CombinedWonderCell[];
+      if (!cells.length) continue;
+      const first = cells[0];
+      const hasAB = cells.some((c) => c.actualA !== undefined && c.actualB !== undefined);
+      const A = cells.reduce((s2, c) => s2 + (c.actualA ?? 0), 0);
+      const B = cells.reduce((s2, c) => s2 + (c.actualB ?? 0), 0);
+      const hasAppr = cells.some((c) => c.appraisalA !== undefined);
+      const apprA = cells.reduce((s2, c) => s2 + (c.appraisalA ?? 0), 0);
+      const apprBVals = cells.filter((c) => c.appraisalB !== undefined);
+      const apprB = apprBVals.reduce((s2, c) => s2 + (c.appraisalB ?? 0), 0);
+      if (isPercentCalc(first.calcType)) {
+        const rate = hasAB && B > 0 ? (A / B) * 100 : 0;
+        wonders[p.id] = {
+          actual: rate,
+          target: first.target,
+          achPercent: rate,
+          calcType: first.calcType,
+          ...(hasAB ? { actualA: A, actualB: B } : {}),
+          ...(hasAppr ? { appraisalA: apprA } : {}),
+          ...(apprBVals.length ? { appraisalB: apprB } : {}),
+        };
+      } else {
+        const actual = cells.reduce((s2, c) => s2 + (c.actual || 0), 0);
+        const target = cells.reduce((s2, c) => s2 + (c.target || 0), 0);
+        wonders[p.id] = {
+          actual,
+          target,
+          achPercent: target > 0 ? (actual / target) * 100 : 0,
+          calcType: first.calcType,
+          ...(hasAB ? { actualA: A, actualB: B } : {}),
+        };
+      }
+    }
+    return {
+      officer: { name: "รวมทั้งหมด", branch: `${rows.length} คน` },
+      cats,
+      catTotal: sumCat((r) => r.catTotal),
+      wonders,
+    };
+  }, [rows, categories, presets]);
+
   // ช่องยอดขายตามหมวด: เป้า / ยอดจริง / %ถึงเป้า (3 บรรทัดกะทัดรัด)
   const renderCatCell = (cell: CombinedCatCell | undefined, isTotal = false) => {
     if (!cell) return <span className="text-white/25">—</span>;
@@ -599,13 +661,17 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
               ) : null}
             </thead>
             <tbody>
-              {sortedRows.map((row, idx) => (
+              {[{ row: totalRow, isTotal: true }, ...sortedRows.map((r) => ({ row: r, isTotal: false }))].map(({ row, isTotal }, idx) => (
                 <tr
                   key={`${row.officer.name}-${idx}`}
-                  className="border-b border-white/5 hover:bg-white/5 transition-colors"
+                  className={
+                    isTotal
+                      ? "border-b-2 border-emerald-400/40 bg-emerald-500/10"
+                      : "border-b border-white/5 hover:bg-white/5 transition-colors"
+                  }
                 >
-                  <td className="py-1 px-1 sticky left-0 bg-[#0a1f17] z-10">
-                    <div className="font-medium text-white truncate max-w-[84px]">{row.officer.name}</div>
+                  <td className={`py-1 px-1 sticky left-0 z-10 ${isTotal ? "bg-[#0f4430]" : "bg-[#0a1f17]"}`}>
+                    <div className={`truncate max-w-[84px] ${isTotal ? "font-extrabold text-emerald-200" : "font-medium text-white"}`}>{row.officer.name}</div>
                     <div className="text-[8px] text-white/40 truncate max-w-[84px]">{row.officer.branch || "-"}</div>
                   </td>
                   {categories.map((cat, i) => (
