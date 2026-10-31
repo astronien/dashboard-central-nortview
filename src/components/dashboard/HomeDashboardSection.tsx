@@ -294,12 +294,20 @@ const achBadgeClass = (rate: number): string => {
  * ตารางรวมหน้า Home: ยอดขายแยกตามหมวด (เหมือน staff profile) + 7 Wonders
  * ทั้งหมดในตารางเดียว ลิสต์เป็นรายเจ้าหน้าที่
  */
+/** ตัดทศนิยมเหลือ 2 ตำแหน่งแบบไม่ปัดขึ้น (4,847,191 → 4.84) */
+const trunc2 = (n: number): string => {
+  const t = Math.trunc(n * 100) / 100;
+  return t.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+/** ย่อตัวเลข — ค่าจริงไม่ปัดขึ้น แสดง 2 ตำแหน่ง (4.84M, 273.82K) */
 const fmtCompact = (n: number): string => {
   const abs = Math.abs(n);
-  if (abs >= 1_000_000) return `${(n / 1_000_000).toFixed(abs >= 10_000_000 ? 1 : 2)}M`;
-  if (abs >= 10_000) return `${Math.round(n / 1000)}K`;
-  return Math.round(n).toLocaleString();
+  if (abs >= 1_000_000) return `${trunc2(n / 1_000_000)}M`;
+  if (abs >= 10_000) return `${trunc2(n / 1000)}K`;
+  return Math.trunc(n).toLocaleString();
 };
+/** % จริง 2 ตำแหน่ง ไม่ปัดขึ้น (87.59%) */
+const fmtPct = (n: number): string => `${trunc2(n)}%`;
 
 const isPercentCalc = (calcType: PresetCalcType | undefined): boolean =>
   calcType === "attach" ||
@@ -370,7 +378,7 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
           {Math.round(approved)}/{Math.round(total)}
         </span>
         {total > 0 ? (
-          <span className={`text-[8px] ${cls}`}>{rate.toFixed(0)}%</span>
+          <span className={`text-[8px] ${cls}`}>{fmtPct(rate)}</span>
         ) : (
           <span className="text-[8px] text-white/25">—</span>
         )}
@@ -476,7 +484,7 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
         </span>
         {cell.target > 0 ? (
           <span className={`text-[8px] ${achBadgeClass(cell.achPercent)}`}>
-            {cell.achPercent.toFixed(0)}%
+            {fmtPct(cell.achPercent)}
           </span>
         ) : (
           <span className="text-[8px] text-white/25">—</span>
@@ -504,7 +512,7 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
         <span className="font-mono font-semibold text-white tabular-nums">{actualText}</span>
         {cell.target > 0 ? (
           <span className={`text-[8px] ${achBadgeClass(scaled)}`}>
-            {cell.achPercent.toFixed(0)}%
+            {fmtPct(cell.achPercent)}
           </span>
         ) : (
           <span className="text-[8px] text-white/25">—</span>
