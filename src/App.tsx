@@ -564,6 +564,10 @@ const isNonIphoneCaseFilmLine = (li: RawRow): boolean => {
   const text = `${li["Sub Category"] ?? ""} ${li["Product (Name)"] ?? ""}`;
   return !/iphone/i.test(text);
 };
+/** ฟิล์มเลนส์กล้อง / ฐานกล้อง (ไม่นับเป็น ATT ฟิล์ม) */
+const isCameraFilmLine = (li: RawRow): boolean =>
+  /camera/i.test(String(li["Sub Category"] ?? "")) ||
+  /camera\s*lens|lens\s*frame|เลนส์|ฐานกล้อง/i.test(String(li["Product (Name)"] ?? ""));
 const iphoneAccOnlyBills = (bills: BillSummary[]): BillSummary[] =>
   bills.map((b) =>
     b.lineItems.some(isNonIphoneCaseFilmLine)
@@ -575,7 +579,18 @@ const iphoneAccOnlyBills = (bills: BillSummary[]): BillSummary[] =>
 const IPHONE_UNIT_FILTER = [{ ...emptyItemFilter(), categories: ["iPhone"] }];
 const calcPresetIphoneAcc: typeof calcPreset = (bills, preset, ctx) => {
   if (!isIphoneAccPreset(preset)) return calcPreset(bills, preset, ctx);
-  const r = calcPreset(iphoneAccOnlyBills(bills), preset, ctx);
+  // ฟิล์ม: นับเฉพาะฟิล์มหน้าจอ — ไม่นับฟิล์มเลนส์กล้อง (CAMERA FILM) และฐานกล้อง
+  // (CAMERA BASE FILM)
+  const isFilmPreset = /film|ฟิล์ม|ฟิม/i.test(String(preset.name ?? ""));
+  let scoped = iphoneAccOnlyBills(bills);
+  if (isFilmPreset) {
+    scoped = scoped.map((b) =>
+      b.lineItems.some(isCameraFilmLine)
+        ? { ...b, lineItems: b.lineItems.filter((li) => !isCameraFilmLine(li)) }
+        : b,
+    );
+  }
+  const r = calcPreset(scoped, preset, ctx);
   const ct = String(preset.calcType ?? "");
   if (ct !== "attach" && ct !== "catAttach") return r;
   const iphoneUnits = bills.reduce((s, b) => s + countItemQuantityAnyFilter(b, IPHONE_UNIT_FILTER), 0);
