@@ -571,8 +571,21 @@ const iphoneAccOnlyBills = (bills: BillSummary[]): BillSummary[] =>
       ? { ...b, lineItems: b.lineItems.filter((li) => !isNonIphoneCaseFilmLine(li)) }
       : b,
   );
-const calcPresetIphoneAcc: typeof calcPreset = (bills, preset, ctx) =>
-  calcPreset(isIphoneAccPreset(preset) ? iphoneAccOnlyBills(bills) : bills, preset, ctx);
+// เคส/ฟิล์ม: ตัวตั้ง = เฉพาะของ iPhone · ตัวหาร = จำนวน iPhone ที่ขาย (ไม่ใช่ฐาน B
+// ของ preset ซึ่งอาจรวม iPad/Mac/Watch หรือเป็นฐานอื่น)
+const IPHONE_UNIT_FILTER = [{ ...emptyItemFilter(), categories: ["iPhone"] }];
+const calcPresetIphoneAcc: typeof calcPreset = (bills, preset, ctx) => {
+  if (!isIphoneAccPreset(preset)) return calcPreset(bills, preset, ctx);
+  const r = calcPreset(iphoneAccOnlyBills(bills), preset, ctx);
+  const ct = String(preset.calcType ?? "");
+  if (ct !== "attach" && ct !== "catAttach") return r;
+  const iphoneUnits = bills.reduce((s, b) => s + countItemQuantityAnyFilter(b, IPHONE_UNIT_FILTER), 0);
+  return {
+    ...r,
+    billsWithB: iphoneUnits,
+    attachRate: iphoneUnits > 0 ? (r.billsWithAandB / iphoneUnits) * 100 : 0,
+  };
+};
 
 // ─── UFUND = บิลที่ Customer (Code) เป็น "UFUND PERSONAL" เท่านั้น ─────────────
 // (ตอนอัปโหลดคอลัมน์ถูกแปลงชื่อเป็น "Customer Code" — รองรับทั้งสองแบบ)
