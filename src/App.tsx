@@ -144,7 +144,7 @@ import {
   Legend,
 } from "recharts";
 import { HomeDashboardSection, type CombinedOfficerKpiData, type CombinedCatCell, type CombinedWonderCell } from "./components/dashboard/HomeDashboardSection";
-import { AnalysisSection } from "./components/dashboard/AnalysisSection";
+
 import {
   DailyKpiTable,
   type DailyKpiData,
@@ -152,7 +152,7 @@ import {
   type DailyWonderCell,
 } from "./components/dashboard/DailyKpiTable";
 import { AttachQuotaSection, type AttachQuotaData } from "./components/dashboard/AttachQuotaSection";
-import { CommissionSection } from "./components/dashboard/CommissionSection";
+
 import {
   COMMISSION_CATEGORIES,
   calcCategoryCommission,
@@ -163,16 +163,16 @@ import {
   type CommissionStaffRow,
   type CommissionSplit,
 } from "./lib/commissionScheme";
-import { TrendsSection } from "./components/dashboard/TrendsSection";
+
 import { saveTrendSnapshot } from "./lib/trendsApi";
-import { RunRateSection } from "./components/dashboard/RunRateSection";
+
 import { computeRunRate } from "./lib/runRate";
 import { fetchStock, type StockStatus } from "./lib/stockApi";
 
 import { StaffSection } from "./components/dashboard/StaffSection";
-import { ReportsSection } from "./components/dashboard/ReportsSection";
-import { SettingsSection } from "./components/dashboard/SettingsSection";
-import KpiPresetSection from "./components/dashboard/KpiPresetSection";
+
+
+
 import {
   getPresets as getKpiPresets,
   cleanupTestPresets as cleanupKpiPresets,
@@ -202,6 +202,15 @@ import {
 } from "./lib/categoryOverrideStorage";
 import { IphoneModelExcludePicker } from "./components/dashboard/IphoneModelExcludePicker";
 import { CategoryFallbackAlert } from "./components/dashboard/CategoryFallbackAlert";
+
+// ⚡ หน้าที่ไม่ใช่ Home/Staff โหลดโค้ดเฉพาะตอนเปิดหน้านั้น (ไฟล์ JS ตอนเปิดเว็บเล็กลง)
+const AnalysisSection = React.lazy(() => import("./components/dashboard/AnalysisSection").then((m) => ({ default: m.AnalysisSection })));
+const CommissionSection = React.lazy(() => import("./components/dashboard/CommissionSection").then((m) => ({ default: m.CommissionSection })));
+const TrendsSection = React.lazy(() => import("./components/dashboard/TrendsSection").then((m) => ({ default: m.TrendsSection })));
+const RunRateSection = React.lazy(() => import("./components/dashboard/RunRateSection").then((m) => ({ default: m.RunRateSection })));
+const ReportsSection = React.lazy(() => import("./components/dashboard/ReportsSection").then((m) => ({ default: m.ReportsSection })));
+const SettingsSection = React.lazy(() => import("./components/dashboard/SettingsSection").then((m) => ({ default: m.SettingsSection })));
+const KpiPresetSection = React.lazy(() => import("./components/dashboard/KpiPresetSection"));
 
 
 // Neutral placeholder shown before any data is uploaded — no demo profiles.
@@ -1568,6 +1577,25 @@ function AppInternal({
   // "latest day" so toggling the filter never changes which date is shown.
   const currentRowsAllModels = branchSalesRows.current;
 
+  // ⚡ แยกบิลจากยอดขายทั้งเดือน "ครั้งเดียว" แล้วให้ทุกตารางใช้ร่วมกัน
+  // (เดิมแต่ละตาราง enrich + parseBills เองซ้ำ ~10 รอบต่อการคำนวณ)
+  const catDailyLookupShared = useMemo(
+    () => buildCatDailyLookup(displayUploads.categoryMaster),
+    [displayUploads.categoryMaster],
+  );
+  const enrichedCurrentShared = useMemo(
+    () => enrichSalesRowsWithCatDaily(displayUploads.current, catDailyLookupShared),
+    [displayUploads.current, catDailyLookupShared],
+  );
+  const currentBillsShared = useMemo(() => parseBills(enrichedCurrentShared), [enrichedCurrentShared]);
+  /** วันที่ (YYYY-MM-DD) ของบิล — ใช้แถวแรกของบิล (ทุกแถวในบิลวันเดียวกัน) */
+  const billDayKey = React.useCallback((b: BillSummary): string => {
+    const p = parseDocDate(String(b.lineItems[0]?.["Doc Date"] ?? b.lineItems[0]?.["doc date"] ?? ""));
+    return p
+      ? `${p.getFullYear()}-${String(p.getMonth() + 1).padStart(2, "0")}-${String(p.getDate()).padStart(2, "0")}`
+      : "";
+  }, []);
+
   const categoryMap = useMemo(() => {
     const map = new Map<string, string>();
     if (displayUploads.categoryMaster) {
@@ -1580,7 +1608,20 @@ function AppInternal({
     return map;
   }, [displayUploads.categoryMaster]);
 
-  const getCategory = (row: RawRow): string => {
+  // ⚡ getCategory ต้องคงที่ (useCallback) — ถ้าสร้างใหม่ทุก render ทุก useMemo ที่
+  // ผูกกับมันจะคำนวณยอดขายทั้งเดือนใหม่ทุกครั้งที่กดแท็บ/เปลี่ยน state
+  // + cache ผลต่อแถว (แถวเดียวกันถูกถามซ้ำหลายสิบรอบจากหลายตาราง)
+  const categoryCache = useMemo(() => new WeakMap<RawRow, string>(), [categoryMap]);
+  const getCategory = React.useCallback((row: RawRow): string => {
+    const hit = categoryCache.get(row);
+    if (hit !== undefined) return hit;
+    const v = computeCategory(row);
+    categoryCache.set(row, v);
+    return v;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoryCache]);
+
+  function computeCategory(row: RawRow): string {
     const cat = String(row["Category (Name)"] ?? row.category_name ?? row.Category ?? "").trim();
     const sub = String(row["Sub Category"] ?? row.sub_category ?? row.SubCategory ?? "").trim();
     const prod = String(row["Product (Name)"] ?? row.product_name ?? row.Product ?? "").trim();
@@ -1629,7 +1670,7 @@ function AppInternal({
     const guessed = mapTargetCategoryKey(cat, sub, prod);
     if (cat && ["iPhone", "iPad", "Mac", "Apple Watch"].includes(guessed)) return "Accessories";
     return guessed;
-  };
+  }
 
   const todayRows = useMemo(() => {
     if (displayUploads.today.length) return displayUploads.today;
@@ -2242,9 +2283,8 @@ function AppInternal({
     // สำหรับนับ "Units" ด้วยวิธีเดียวกับ KPI preset (Cover Plus) คือ
     // countItemQuantityAnyFilter: เฉพาะ inventory item, dedupe ต่อบิล,
     // รวม quantity — ไม่ใช่การนับ raw row ตรงๆ ที่ให้เลขเกินจริง
-    const unitsCatDailyLookup = buildCatDailyLookup(displayUploads.categoryMaster);
-    const unitsEnriched = enrichSalesRowsWithCatDaily(displayUploads.current, unitsCatDailyLookup);
-    const officerBillsForUnits = parseBills(unitsEnriched).filter(
+    const unitsCatDailyLookup = catDailyLookupShared;
+    const officerBillsForUnits = currentBillsShared.filter(
       (b) =>
         matchesOfficer(b.officerName, activeOfficer.name) ||
         Boolean(officerId && normalizeId(b.officerId) === normalizeId(officerId)),
@@ -2852,9 +2892,7 @@ function AppInternal({
     if (branchPresets.length === 0) return { presets: [], rows: [] };
     if (displayUploads.current.length === 0) return { presets: branchPresets, rows: [] };
 
-    const lookup = buildCatDailyLookup(displayUploads.categoryMaster);
-    const enriched = enrichSalesRowsWithCatDaily(displayUploads.current, lookup);
-    const allBills = parseBills(enriched);
+    const allBills = currentBillsShared;
 
     const officerList = parsedReport.officers.length > 0
       ? parsedReport.officers
@@ -2928,9 +2966,7 @@ function AppInternal({
     const periodStart = `${periodYear}-${periodMonthStr}-01`;
     const periodEnd = `${periodYear}-${periodMonthStr}-${String(periodTotalDays).padStart(2, "0")}`;
 
-    const lookup = buildCatDailyLookup(displayUploads.categoryMaster);
-    const enriched = enrichSalesRowsWithCatDaily(displayUploads.current, lookup);
-    const allBills = parseBills(enriched);
+    const allBills = currentBillsShared;
 
     const officerList: Array<{ name: string; branch: string; staffId?: string; position?: string }> =
       parsedReport.officers.length > 0
@@ -3159,9 +3195,10 @@ function AppInternal({
       : [];
 
     const targetRecords = rawTargetRowsToRecords(displayUploads.target);
-    const lookup = buildCatDailyLookup(displayUploads.categoryMaster);
-    const latestBills = parseBills(enrichSalesRowsWithCatDaily(latestRows, lookup));
-    const prevBills = parseBills(enrichSalesRowsWithCatDaily(prevRows, lookup));
+    void latestRows;
+    void prevRows;
+    const latestBills = currentBillsShared.filter((b) => billDayKey(b) === latestDay);
+    const prevBills = prevDay ? currentBillsShared.filter((b) => billDayKey(b) === prevDay) : [];
 
     // Trade-in agreed trades carry document_date, so count per officer for a
     // specific day (matched by SALE_CODE digits or cleaned SALE_NAME).
@@ -3354,8 +3391,7 @@ function AppInternal({
     // 7 Wonders (preset engine: เฉพาะ inventory item, dedupe ต่อบิล, รวม qty)
     // เพื่อให้ยอด iPhone ตรงกับที่โชว์ใน COVERPLUS ไม่ใช่ rowMatchesKpiCategory
     // ที่นับเกิน (รวม non-inventory/ซ้ำ)
-    const quotaLookup = buildCatDailyLookup(displayUploads.categoryMaster);
-    const quotaBills = parseBills(enrichSalesRowsWithCatDaily(displayUploads.current, quotaLookup));
+    const quotaBills = currentBillsShared;
     const coverPlusPreset = kpiPresets.find((p) =>
       /cover\s*\+|cover\s*plus|coverplus/i.test(p.name),
     );
@@ -3591,9 +3627,10 @@ function AppInternal({
       return k.startsWith(monthPrefix) && k <= latestDay;
     });
 
-    const lookup = buildCatDailyLookup(displayUploads.categoryMaster);
     const build = (scopeRows: RawRow[]): DailyReportData => {
-    const allBills = parseBills(enrichSalesRowsWithCatDaily(scopeRows, lookup));
+    // ใช้บิลชุดกลาง กรองตามวันของแถวในขอบเขต (ไม่ต้อง parse ใหม่)
+    const scopeDays = new Set(scopeRows.map(dayKey));
+    const allBills = currentBillsShared.filter((b) => scopeDays.has(billDayKey(b)));
     const dummy = { tradeInCount: 0, iphoneUnits: 0 };
 
     // Trade-In is branch-level (not per-bill) → skip it as a column here.
@@ -4260,8 +4297,7 @@ function AppInternal({
   // rows into BTB / BTB(Apple) / COVER+ / AC+ / SIM.
   const enrichedCurrentRows = useMemo(() => {
     if (!displayUploads.categoryMaster?.length) return displayUploads.current;
-    const lookup = buildCatDailyLookup(displayUploads.categoryMaster);
-    return enrichSalesRowsWithCatDaily(displayUploads.current, lookup);
+    return enrichedCurrentShared;
   }, [displayUploads.current, displayUploads.categoryMaster]);
 
   const enrichedTodayRows = useMemo(() => {
@@ -4278,7 +4314,7 @@ function AppInternal({
       | { iphoneBase?: number; cover?: number; ac?: number; ufund?: number }
       | undefined;
     if (enrichedCurrentRows.length) {
-      const allBills = parseBills(enrichedCurrentRows);
+      const allBills = currentBillsShared;
       const dummy = { tradeInCount: 0, iphoneUnits: 0 };
       const coverPlusPreset = kpiPresets.find((p) =>
         /cover\s*\+|cover\s*plus|coverplus/i.test(p.name),
@@ -5751,6 +5787,14 @@ function AppInternal({
           ref={mainRef}
           className={`relative flex-1 flex flex-col px-4 md:px-8 pb-8 gap-6 z-20 overflow-x-hidden ${currentView === "home" ? "pt-28" : "pt-24"}`}
         >
+          <React.Suspense
+            fallback={
+              <div className="flex items-center justify-center py-24 text-white/50 text-sm gap-3">
+                <div className="w-6 h-6 border-[3px] border-white/20 border-t-emerald-400 rounded-full animate-spin" />
+                กำลังโหลดหน้า…
+              </div>
+            }
+          >
           <AnimatePresence mode="wait">
             {currentView === "home" && (
               <motion.div
@@ -6003,6 +6047,7 @@ function AppInternal({
               </motion.div>
             )}
           </AnimatePresence>
+          </React.Suspense>
         </main>
 
         {/* แจ้งเตือนหมวดย่อยใหม่ที่ Category Master ยังไม่มี — นอก <main> ไม่ติดไปกับรูปที่แคป */}
