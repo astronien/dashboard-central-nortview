@@ -551,19 +551,18 @@ const RAW_DEVICE_CATEGORY: Record<string, string> = {
 const OTHER_CAT = "อื่นๆ";
 
 // ─── Case / ฟิล์ม: นับเฉพาะของ iPhone ───────────────────────────────────────
-// preset ที่ชื่อมี case / film / เคส / ฟิล์ม จะตัดบรรทัดเคส/ฟิล์มของ iPad / Mac
-// / AirPods / Watch / AirTag ออกก่อนคำนวณ (ดูจาก Category / Sub Category / ชื่อสินค้า)
-const ACC_CASE_FILM_CAT_RE = /case|film|casing/i;
+// preset ที่ชื่อมี case / film / เคส / ฟิล์ม นับเฉพาะสินค้าที่ใช้กับ iPhone
+// (Sub Category / ชื่อสินค้ามีคำว่า iPhone) และหารด้วยจำนวน iPhone
 const isIphoneAccPreset = (p: { name?: string }) => /case|film|เคส|ฟิล์ม|ฟิม/i.test(String(p.name ?? ""));
 const isNonIphoneCaseFilmLine = (li: RawRow): boolean => {
   const cat = String(li["Category (Name)"] ?? "");
-  const sub = String(li["Sub Category"] ?? "");
-  if (!ACC_CASE_FILM_CAT_RE.test(`${cat} ${sub}`)) return false; // ไม่ใช่เคส/ฟิล์ม → ไม่ยุ่ง
-  if (/^iphone$/i.test(cat.trim())) return false; // ตัวเครื่อง
-  const text = `${sub} ${li["Product (Name)"] ?? ""}`;
-  if (/iphone/i.test(text)) return false;
-  // ตัดเฉพาะของอุปกรณ์อื่นชัดๆ — ที่เหลือ (MagSafe card holder, สายคล้อง) ถือเป็นของ iPhone
-  return /ipad|macbook|\bmac\b|computer|airpods|apple\s*watch|airtag/i.test(`${cat} ${text}`);
+  if (/^iphone$/i.test(cat.trim())) return false; // ตัวเครื่อง iPhone (ใช้เป็นฐาน)
+  // นับเฉพาะสินค้าที่ "ใช้กับ iPhone" จริง — Sub Category หรือชื่อสินค้าต้องมีคำว่า
+  // iPhone (เช่น FILM IPHONE, CASE IPHONE, CASING IPHONE 18 PRO, Camera Lens
+  // for iPhone 18 Pro) · อย่างอื่น (iPad/Mac/AirPods/Watch, ที่ใส่การ์ด, สายคล้อง
+  // ที่ไม่ระบุรุ่น) ไม่นับ
+  const text = `${li["Sub Category"] ?? ""} ${li["Product (Name)"] ?? ""}`;
+  return !/iphone/i.test(text);
 };
 const iphoneAccOnlyBills = (bills: BillSummary[]): BillSummary[] =>
   bills.map((b) =>
