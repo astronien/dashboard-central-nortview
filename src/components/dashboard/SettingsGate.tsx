@@ -1,6 +1,6 @@
 import React from "react";
 import { Lock, KeyRound, Loader2, ShieldCheck, LogOut } from "lucide-react";
-import { fetchHasPin, isUnlocked, lockSettings, markUnlocked, setPin, verifyPin } from "../../lib/settingsPin";
+import { fetchHasPin, lockSettings, setPin, verifyPin } from "../../lib/settingsPin";
 
 /** ช่องกรอกรหัสตัวเลข */
 function PinInput({
@@ -31,10 +31,11 @@ function PinInput({
 
 /**
  * ล็อกหน้าตั้งค่าด้วยรหัส — ครั้งแรก (ยังไม่มีรหัส) ให้ตั้งรหัสใหม่
- * ปลดล็อกแล้วใช้ได้ 30 นาที/ปิดแท็บแล้วต้องใส่ใหม่
+ * ปลดล็อกได้เฉพาะรอบที่อยู่ในหน้านี้ — ออกไปเมนูอื่นแล้วกลับมาต้องใส่ใหม่
  */
 export function SettingsGate({ updatedBy, children }: { updatedBy?: string; children: React.ReactNode }) {
-  const [unlocked, setUnlocked] = React.useState(isUnlocked);
+  // ล็อกใหม่ทุกครั้งที่เข้าหน้าตั้งค่า (ออกไปเมนูอื่นแล้วกลับมา = ต้องใส่รหัส)
+  const [unlocked, setUnlocked] = React.useState(false);
   const [hasPin, setHasPin] = React.useState<boolean | null | undefined>(undefined);
   const [pin, setPinValue] = React.useState("");
   const [pin2, setPin2] = React.useState("");
@@ -70,7 +71,6 @@ export function SettingsGate({ updatedBy, children }: { updatedBy?: string; chil
       const r = await setPin("", pin, updatedBy);
       setBusy(false);
       if (!r.ok) return setErr(r.error ?? "ตั้งรหัสไม่สำเร็จ");
-      markUnlocked();
       setUnlocked(true);
       return;
     }
@@ -83,7 +83,6 @@ export function SettingsGate({ updatedBy, children }: { updatedBy?: string; chil
       setPinValue("");
       return;
     }
-    markUnlocked();
     setUnlocked(true);
   };
 

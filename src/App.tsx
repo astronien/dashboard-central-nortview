@@ -208,17 +208,45 @@ import {
   setCategoryOverrides,
 } from "./lib/categoryOverrideStorage";
 import { SettingsGate } from "./components/dashboard/SettingsGate";
+import { ViewErrorBoundary } from "./components/ViewErrorBoundary";
 import { IphoneModelExcludePicker } from "./components/dashboard/IphoneModelExcludePicker";
 import { CategoryFallbackAlert } from "./components/dashboard/CategoryFallbackAlert";
 
 // ⚡ หน้าที่ไม่ใช่ Home/Staff โหลดโค้ดเฉพาะตอนเปิดหน้านั้น (ไฟล์ JS ตอนเปิดเว็บเล็กลง)
-const AnalysisSection = React.lazy(() => import("./components/dashboard/AnalysisSection").then((m) => ({ default: m.AnalysisSection })));
-const CommissionSection = React.lazy(() => import("./components/dashboard/CommissionSection").then((m) => ({ default: m.CommissionSection })));
-const TrendsSection = React.lazy(() => import("./components/dashboard/TrendsSection").then((m) => ({ default: m.TrendsSection })));
-const RunRateSection = React.lazy(() => import("./components/dashboard/RunRateSection").then((m) => ({ default: m.RunRateSection })));
-const ReportsSection = React.lazy(() => import("./components/dashboard/ReportsSection").then((m) => ({ default: m.ReportsSection })));
-const SettingsSection = React.lazy(() => import("./components/dashboard/SettingsSection").then((m) => ({ default: m.SettingsSection })));
-const KpiPresetSection = React.lazy(() => import("./components/dashboard/KpiPresetSection"));
+// ถ้าเปิดเว็บค้างไว้ข้าม deploy ไฟล์ชิ้นเก่าจะหายจาก server → import พัง (จอขาว)
+// → รีโหลดหน้าเอง 1 ครั้งเพื่อดึงเวอร์ชันใหม่
+const lazyRetry = <T extends React.ComponentType<any>>(load: () => Promise<{ default: T }>) =>
+  React.lazy(async () => {
+    try {
+      const m = await load();
+      try {
+        sessionStorage.removeItem("chunk-reloaded");
+      } catch {
+        /* ignore */
+      }
+      return m;
+    } catch (e) {
+      let reloaded = false;
+      try {
+        reloaded = sessionStorage.getItem("chunk-reloaded") === "1";
+        if (!reloaded) sessionStorage.setItem("chunk-reloaded", "1");
+      } catch {
+        /* ignore */
+      }
+      if (!reloaded) {
+        window.location.reload();
+        return new Promise<{ default: T }>(() => {});
+      }
+      throw e;
+    }
+  });
+const AnalysisSection = lazyRetry(() => import("./components/dashboard/AnalysisSection").then((m) => ({ default: m.AnalysisSection })));
+const CommissionSection = lazyRetry(() => import("./components/dashboard/CommissionSection").then((m) => ({ default: m.CommissionSection })));
+const TrendsSection = lazyRetry(() => import("./components/dashboard/TrendsSection").then((m) => ({ default: m.TrendsSection })));
+const RunRateSection = lazyRetry(() => import("./components/dashboard/RunRateSection").then((m) => ({ default: m.RunRateSection })));
+const ReportsSection = lazyRetry(() => import("./components/dashboard/ReportsSection").then((m) => ({ default: m.ReportsSection })));
+const SettingsSection = lazyRetry(() => import("./components/dashboard/SettingsSection").then((m) => ({ default: m.SettingsSection })));
+const KpiPresetSection = lazyRetry(() => import("./components/dashboard/KpiPresetSection"));
 
 
 // Neutral placeholder shown before any data is uploaded — no demo profiles.
@@ -5843,6 +5871,7 @@ function AppInternal({
           ref={mainRef}
           className={`relative flex-1 flex flex-col px-4 md:px-8 pb-8 gap-6 z-20 overflow-x-hidden ${currentView === "home" ? "pt-28" : "pt-24"}`}
         >
+          <ViewErrorBoundary label="หน้าหลัก">
           <React.Suspense
             fallback={
               <div className="flex items-center justify-center py-24 text-white/50 text-sm gap-3">
@@ -6073,6 +6102,7 @@ function AppInternal({
                 transition={{ duration: 0.4, ease: "easeOut" }}
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
+                <ViewErrorBoundary label="ตั้งค่า">
                 <SettingsGate updatedBy={user?.name ?? user?.username}>
                 <SettingsSection
                   selectedBranch={selectedBranch}
@@ -6103,10 +6133,12 @@ function AppInternal({
                   onTradeBranchMappingChange={setTradeBranchMapping}
                 />
                 </SettingsGate>
+                </ViewErrorBoundary>
               </motion.div>
             )}
           </AnimatePresence>
           </React.Suspense>
+          </ViewErrorBoundary>
         </main>
 
         {/* แจ้งเตือนหมวดย่อยใหม่ที่ Category Master ยังไม่มี — นอก <main> ไม่ติดไปกับรูปที่แคป */}
