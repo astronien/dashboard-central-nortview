@@ -5071,7 +5071,9 @@ function AppInternal({
     return () => {
       cancelled = true;
     };
-  }, [tradeInBranchCode, selectedBranchLoaded]);
+    // latestDataYmd ต้องอยู่ใน deps — ข้อมูลยอดขายมักโหลดเสร็จทีหลัง ถ้าไม่ดึงใหม่
+    // จะค้างเป็นเดือนผิด (เช่นดึงเดือนปัจจุบันที่ระบบเทรดยังไม่มีข้อมูล → ขึ้น 0)
+  }, [tradeInBranchCode, selectedBranchLoaded, latestDataYmd]);
 
   // CSAT (COM7 backoffice) — store + per-staff satisfaction. Uses the same
   // branch code as Trade In; the API falls back to the first branch the
