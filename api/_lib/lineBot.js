@@ -251,7 +251,7 @@ function boostNotice(snap) {
       margin: "sm",
       contents: [
         txt(`🔥 ${snap.boost}`, { size: "xs", weight: "bold", color: "#C2410C" }),
-        txt("ตัวที่เลือก = 2 เครดิต (iPhone 8 เครื่อง) · ตัวอื่น = 0.5 (2 เครื่อง)", { size: "xxs", color: "#C2410C" }),
+        txt("บิลที่แนบตัวที่เลือกได้เครดิตตามตัวคูณ · ตัวอื่นลดลงระหว่างช่วงโฟกัส", { size: "xxs", color: "#C2410C" }),
       ],
     },
   ];

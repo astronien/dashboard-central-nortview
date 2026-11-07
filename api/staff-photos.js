@@ -114,6 +114,8 @@ async function handleAttachBoost(req, res) {
       acc: Boolean(b.acc),
       from: day(b.from),
       to: day(b.to),
+      factor: Number.isFinite(Number(b.factor)) ? Math.max(1, Math.min(5, Number(b.factor))) : 2,
+      otherFactor: Number.isFinite(Number(b.otherFactor)) ? Math.max(0, Math.min(1, Number(b.otherFactor))) : 0.5,
     };
     await setAppConfig(ATTACH_BOOST_KEY, JSON.stringify(clean), req.body?.updatedBy ?? null);
     return res.status(200).json({ ok: true });

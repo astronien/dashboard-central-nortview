@@ -4,6 +4,7 @@ import {
   ATTACH_BOOST_TYPES,
   EMPTY_ATTACH_BOOST,
   anyBoostOn,
+  boostDescription,
   boostInRange,
   fetchAttachBoost,
   saveAttachBoost,
@@ -17,8 +18,7 @@ const todayYmd = () => {
 };
 
 /**
- * Admin: โหมด x2 — เลือก attach ที่ต้องการโฟกัสช่วงนี้
- * บิลที่แนบตัวนั้นในช่วงวันที่กำหนด = 2 เครดิต (ครอบคลุม iPhone 8 เครื่อง)
+ * Admin: โหมดโฟกัส Attach — เลือก attach ที่ต้องการโฟกัสช่วงนี้ + ตัวคูณ (x1.5 / x2 …)
  */
 export function AttachBoostManager({
   updatedBy,
@@ -82,7 +82,7 @@ export function AttachBoostManager({
         </div>
         <div className="flex-1">
           <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
-            โหมด x2 (โฟกัส Attach)
+            โหมดโฟกัส Attach (x{boost.factor})
             {anyBoostOn(boost) ? (
               <span
                 className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
@@ -94,7 +94,7 @@ export function AttachBoostManager({
             ) : null}
           </h2>
           <p className="text-sm text-white/60 mt-1">
-            ตัวที่เลือก = 2 เครดิต (ครอบคลุม iPhone 8 เครื่อง) · ตัวที่ไม่ได้เลือก = 0.5 เครดิต (2 เครื่อง) เพื่อ balance — มีผลเฉพาะบิลในช่วงวันที่ที่ตั้งไว้
+            {boostDescription(boost)} — มีผลเฉพาะบิลในช่วงวันที่ที่ตั้งไว้
           </p>
         </div>
         <button
@@ -104,6 +104,65 @@ export function AttachBoostManager({
         >
           <Save className="w-4 h-4" /> {saving ? "กำลังบันทึก…" : "บันทึก"}
         </button>
+      </div>
+
+      <div className="mb-4 flex flex-wrap items-end gap-4">
+        <div>
+          <div className="text-[11px] text-white/50 mb-1">ตัวคูณของตัวที่เลือก</div>
+          <div className="inline-flex rounded-xl border border-white/15 bg-black/20 p-0.5">
+            {[1.5, 2, 2.5, 3].map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => {
+                  setBoost((prev) => ({ ...prev, factor: f }));
+                  setMsg(null);
+                }}
+                className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-colors ${
+                  boost.factor === f ? "bg-orange-500 text-white" : "text-white/60 hover:text-white"
+                }`}
+              >
+                x{f}
+              </button>
+            ))}
+          </div>
+        </div>
+        <label className="flex flex-col gap-1">
+          <span className="text-[11px] text-white/50">หรือกำหนดเอง</span>
+          <input
+            type="number"
+            step={0.1}
+            min={1}
+            max={5}
+            value={boost.factor}
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              setBoost((prev) => ({ ...prev, factor: Number.isFinite(n) ? Math.max(1, Math.min(5, n)) : prev.factor }));
+              setMsg(null);
+            }}
+            className="w-20 bg-[#051710] border border-white/15 rounded-lg px-2 py-1.5 text-white text-sm focus:outline-none focus:border-orange-400"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-[11px] text-white/50">ตัวที่ไม่ได้เลือก (ระหว่างโฟกัส)</span>
+          <input
+            type="number"
+            step={0.1}
+            min={0}
+            max={1}
+            value={boost.otherFactor}
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              setBoost((prev) => ({
+                ...prev,
+                otherFactor: Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : prev.otherFactor,
+              }));
+              setMsg(null);
+            }}
+            className="w-20 bg-[#051710] border border-white/15 rounded-lg px-2 py-1.5 text-white text-sm focus:outline-none focus:border-orange-400"
+          />
+        </label>
+        <p className="text-[11px] text-white/45 pb-2">{boostDescription(boost)}</p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -126,7 +185,7 @@ export function AttachBoostManager({
                   on ? "bg-orange-500 text-white" : "bg-white/10 text-white/40"
                 }`}
               >
-                {on ? "x2" : anyBoostOn(boost) ? "x0.5" : "x1"}
+                {on ? `x${boost.factor}` : anyBoostOn(boost) ? `x${boost.otherFactor}` : "x1"}
               </span>
             </button>
           );

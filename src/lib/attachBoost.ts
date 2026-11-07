@@ -1,6 +1,6 @@
 /**
- * โหมด x2 (Attach Boost) — หัวหน้าร้านเลือกได้ว่าช่วงนี้จะโฟกัส attach ตัวไหน
- * บิลที่แนบตัวนั้น (ภายในช่วงวันที่ตั้งไว้) จะได้ 2 เครดิต แทน 1
+ * โหมดโฟกัส Attach (x1.5 / x2 …) — หัวหน้าร้านเลือกได้ว่าช่วงนี้จะโฟกัส attach ตัวไหน
+ * บิลที่แนบตัวนั้น (ภายในช่วงวันที่ตั้งไว้) จะได้เครดิตตามตัวคูณที่ตั้ง (ค่าเริ่มต้น 2) แทน 1
  * → ครอบคลุม iPhone 8 เครื่อง แทน 4 ในกติกา 1:4
  * ส่วนตัวที่ไม่ได้เลือก จะเหลือ 0.5 เครดิต (ครอบคลุม 2 เครื่อง) เพื่อ balance
  *
@@ -18,7 +18,15 @@ export type AttachBoost = {
   from: string;
   /** YYYY-MM-DD สิ้นสุด (ว่าง = จนกว่าจะปิด) */
   to: string;
+  /** ตัวคูณของตัวที่เลือก (เช่น 1.5 หรือ 2) */
+  factor: number;
+  /** ตัวคูณของตัวที่ไม่ได้เลือก ระหว่างช่วงโฟกัส (ค่าเริ่มต้น 0.5) */
+  otherFactor: number;
 };
+
+export const DEFAULT_BOOST_FACTOR = 2;
+export const DEFAULT_OTHER_FACTOR = 0.5;
+const fx = (n: number) => String(Math.round(n * 100) / 100);
 
 export const ATTACH_BOOST_TYPES: Array<{ key: AttachBoostType; label: string }> = [
   { key: "cover", label: "Cover+" },
@@ -34,6 +42,8 @@ export const EMPTY_ATTACH_BOOST: AttachBoost = {
   acc: false,
   from: "",
   to: "",
+  factor: DEFAULT_BOOST_FACTOR,
+  otherFactor: DEFAULT_OTHER_FACTOR,
 };
 
 const ymd = (d: Date) =>
@@ -61,7 +71,7 @@ export const boostMultiplier = (
   date: Date | string | null | undefined,
 ): number => {
   if (!boostInRange(b, date)) return 1;
-  return b[type] ? 2 : 0.5;
+  return b[type] ? b.factor || DEFAULT_BOOST_FACTOR : b.otherFactor ?? DEFAULT_OTHER_FACTOR;
 };
 
 /** แสดงเครดิตแบบอ่านง่าย: 1, 1.5, 0.5 */
@@ -78,7 +88,14 @@ export const boostLabel = (b: AttachBoost): string => {
   };
   const range = b.from && b.to ? ` (${fmt(b.from)}–${fmt(b.to)})` : b.to ? ` (ถึง ${fmt(b.to)})` : b.from ? ` (ตั้งแต่ ${fmt(b.from)})` : "";
   const allOn = ATTACH_BOOST_TYPES.every((t) => b[t.key]);
-  return `x2: ${names.join(", ")}${allOn ? "" : " · อื่นๆ x0.5"}${range}`;
+  return `x${fx(b.factor)}: ${names.join(", ")}${allOn ? "" : ` · อื่นๆ x${fx(b.otherFactor)}`}${range}`;
+};
+
+/** คำอธิบาย เช่น "ตัวที่เลือก = 1.5 เครดิต (iPhone 6 เครื่อง) · ตัวอื่น = 0.5 (2 เครื่อง)" */
+export const boostDescription = (b: AttachBoost): string => {
+  const f = b.factor || DEFAULT_BOOST_FACTOR;
+  const o = b.otherFactor ?? DEFAULT_OTHER_FACTOR;
+  return `ตัวที่เลือก = ${fx(f)} เครดิต (iPhone ${fx(f * 4)} เครื่อง) · ตัวอื่น = ${fx(o)} (${fx(o * 4)} เครื่อง)`;
 };
 
 const normalize = (raw: unknown): AttachBoost => {
@@ -91,8 +108,16 @@ const normalize = (raw: unknown): AttachBoost => {
     acc: Boolean(o.acc),
     from: day(o.from),
     to: day(o.to),
+    factor: clampNum(o.factor, 1, 5, DEFAULT_BOOST_FACTOR),
+    otherFactor: clampNum(o.otherFactor, 0, 1, DEFAULT_OTHER_FACTOR),
   };
 };
+
+function clampNum(v: unknown, min: number, max: number, def: number): number {
+  const n = Number(v);
+  if (v === undefined || v === null || v === "" || !Number.isFinite(n)) return def;
+  return Math.max(min, Math.min(max, n));
+}
 
 const API_URL = "/api/staff-photos?resource=attach-boost";
 

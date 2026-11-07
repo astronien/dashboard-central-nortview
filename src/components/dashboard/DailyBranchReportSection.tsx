@@ -168,7 +168,7 @@ export const DailyBranchReportSection: React.FC<{ data: DailyReportData; boost?:
           {isMonthly ? "รายงานยอดขาย + Attach รายเดือน (เดือนล่าสุด)" : "รายงานยอดขาย + Attach รายวัน (วันล่าสุด)"}
         </h3>
         {boost ? (
-          <span className="ml-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-orange-500 text-white" title="ตัวที่เลือก = 2 เครดิต (iPhone 8 เครื่อง) · ตัวอื่น = 0.5 (2 เครื่อง)">
+          <span className="ml-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-orange-500 text-white" title="บิลที่แนบตัวที่เลือกได้เครดิตตามตัวคูณ · ตัวอื่นลดลงระหว่างช่วงโฟกัส">
             🔥 {boost}
           </span>
         ) : null}
@@ -317,7 +317,7 @@ export const DailyBranchReportSection: React.FC<{ data: DailyReportData; boost?:
                   title={
                     r.isTotal
                       ? undefined
-                      : `เครดิตแนบ (Cover/UFUND/SIM/Acc≥3, โหมด x2 = 2 / ตัวอื่น 0.5): ${Math.round((r.creditedBills ?? 0) * 10) / 10} (ต้องมี ${r.requiredCredits ?? 0} — 1 ต่อ iPhone 4 เครื่อง)` +
+                      : `เครดิตแนบ (Cover/UFUND/SIM/Acc≥3, ตามโหมดโฟกัส): ${Math.round((r.creditedBills ?? 0) * 10) / 10} (ต้องมี ${r.requiredCredits ?? 0} — 1 ต่อ iPhone 4 เครื่อง)` +
                         (boost ? `\nโหมดตอนนี้: ${boost}` : "") +
                         (r.creditLog?.length ? `\n\nรายบิล:\n${r.creditLog.join("\n")}` : "")
                   }
