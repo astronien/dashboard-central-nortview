@@ -53,6 +53,8 @@ export type DailyReportData = {
   rows: DailyReportRow[];
   /** มีค่า = ตารางรายเดือน (YYYY-MM-01) */
   monthFrom?: string;
+  /** เวลาบิลล่าสุดในข้อมูลวันล่าสุด (HH:MM) */
+  lastBillTime?: string;
 };
 
 const fmtDay = (ymd: string): string => {
@@ -93,7 +95,11 @@ const num = (v: number) => (v ? v.toLocaleString() : "–");
 
 const ORDER_KEY = "daily-branch-report-col-order";
 
-export const DailyBranchReportSection: React.FC<{ data: DailyReportData; boost?: string }> = ({ data, boost }) => {
+export const DailyBranchReportSection: React.FC<{ data: DailyReportData; boost?: string; uploadedAt?: string }> = ({
+  data,
+  boost,
+  uploadedAt,
+}) => {
   const isMonthly = Boolean(data.monthFrom);
   // Column order (preset ids) — user can drag the group headers to reorder.
   // Persisted per browser so the layout sticks between visits.
@@ -156,7 +162,7 @@ export const DailyBranchReportSection: React.FC<{ data: DailyReportData; boost?:
 
   return (
     <div className="bg-white rounded-[2rem] border border-slate-200 p-5 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
-      <div className="flex items-center gap-2 mb-1">
+      <div className="flex flex-wrap items-center gap-2 mb-1">
         <LayoutGrid className="w-5 h-5 text-emerald-600" />
         <h3 className="text-lg font-bold tracking-tight text-slate-800">
           {isMonthly ? "รายงานยอดขาย + Attach รายเดือน (เดือนล่าสุด)" : "รายงานยอดขาย + Attach รายวัน (วันล่าสุด)"}
@@ -164,6 +170,25 @@ export const DailyBranchReportSection: React.FC<{ data: DailyReportData; boost?:
         {boost ? (
           <span className="ml-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-orange-500 text-white" title="ตัวที่เลือก = 2 เครดิต (iPhone 8 เครื่อง) · ตัวอื่น = 0.5 (2 เครื่อง)">
             🔥 {boost}
+          </span>
+        ) : null}
+        {data.lastBillTime || uploadedAt ? (
+          <span
+            className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold text-slate-600"
+            title="ช่วงเวลาของข้อมูลยอดขายที่ใช้คำนวณในตารางนี้"
+          >
+            🕒
+            {data.lastBillTime ? (
+              <span>
+                ยอดถึงบิลล่าสุด <span className="text-slate-900 font-bold">{fmtDay(data.latestDate)} {data.lastBillTime} น.</span>
+              </span>
+            ) : null}
+            {data.lastBillTime && uploadedAt ? <span className="text-slate-300">·</span> : null}
+            {uploadedAt ? (
+              <span>
+                อัปโหลดไฟล์เมื่อ <span className="text-slate-900 font-bold">{uploadedAt}</span>
+              </span>
+            ) : null}
           </span>
         ) : null}
       </div>

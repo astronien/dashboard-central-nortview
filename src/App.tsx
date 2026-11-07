@@ -52,6 +52,7 @@ import { parseTargetExcelFile } from "./lib/targetUpload";
 import {
   clearAllUploads,
   deleteUploadKind,
+  fetchTursoStats,
   fetchUploads,
   hasUploadData,
   saveUploads,
@@ -574,6 +575,18 @@ const ATTACH_PER_BILL_TARGET = 3;
 /** หมวดที่ถือว่าเป็น "ตัวเครื่อง" (ไม่นับเป็นชิ้น attach) */
 // ค่าคอลัมน์ Category (Name) ของตัวเครื่อง (ตัวพิมพ์เล็ก) — ห้ามใช้ getCategory
 // เพราะมันจับคำว่า iPhone ในชื่อฟิล์ม/เคสด้วย
+/** เวลาบิลล่าสุด (HH:MM) จาก Create Time / Doc Date ของแถวชุดนี้ — บอกว่ายอดครอบคลุมถึงกี่โมง */
+const lastBillTimeOf = (rows: RawRow[]): string => {
+  let best = "";
+  for (const r of rows) {
+    const raw = String(r["Create Time"] ?? r["Doc Date"] ?? r["doc date"] ?? "");
+    const m = /(\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(raw);
+    if (!m) continue;
+    const t = `${m[1].padStart(2, "0")}:${m[2]}:${(m[3] ?? "00").padStart(2, "0")}`;
+    if (t > best) best = t;
+  }
+  return best ? best.slice(0, 5) : "";
+};
 const RAW_DEVICE_CATS = new Set(["mac", "ipad", "iphone", "apple watch"]);
 /** ค่า Category (Name) ดิบของตัวเครื่อง → ชื่อหมวด KPI */
 const RAW_DEVICE_CATEGORY: Record<string, string> = {
@@ -1966,6 +1979,8 @@ function AppInternal({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
+  // เวลาที่อัปโหลดไฟล์ยอดขาย (current) เข้าระบบล่าสุด — โชว์ในตารางรายงานรายวัน
+  const [salesUploadedAt, setSalesUploadedAt] = useState<string>("");
   const [isUploadingFile, setIsUploadingFile] = useState<Record<UploadKind, boolean>>({
     target: false,
     current: false,
@@ -4038,8 +4053,12 @@ function AppInternal({
     };
     };
     return {
-      daily: build(latestRows),
-      monthly: { ...build(monthRows), monthFrom: `${monthPrefix}-01` },
+      daily: { ...build(latestRows), lastBillTime: lastBillTimeOf(latestRows) },
+      monthly: {
+        ...build(monthRows),
+        monthFrom: `${monthPrefix}-01`,
+        lastBillTime: lastBillTimeOf(latestRows),
+      },
     };
   }, [
     displayUploads.current,
@@ -4052,6 +4071,31 @@ function AppInternal({
   ]);
   const dailyBranchReport = branchReports.daily;
   const monthlyBranchReport = branchReports.monthly;
+
+  // เวลาอัปโหลดไฟล์ยอดขาย — ดึงใหม่ทุกครั้งที่ข้อมูลยอดขายเปลี่ยน (อัปไฟล์ใหม่)
+  useEffect(() => {
+    if (!uploadedFiles.current.length) return;
+    let cancelled = false;
+    void fetchTursoStats().then((r) => {
+      const raw = r?.stats.current.updatedAt;
+      if (cancelled || !raw) return;
+      // updated_at ใน Turso เป็น UTC "YYYY-MM-DD HH:MM:SS" → แสดงเวลาไทย
+      const d = new Date(String(raw).replace(" ", "T") + "Z");
+      if (Number.isNaN(d.getTime())) return;
+      setSalesUploadedAt(
+        new Intl.DateTimeFormat("th-TH", {
+          timeZone: "Asia/Bangkok",
+          day: "2-digit",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+        }).format(d),
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [uploadedFiles.current]);
 
   // ─── LINE bot snapshot ───────────────────────────────────────────────────
   // บันทึกผลตาราง "รายงานยอดขาย + Attach รายวัน" ไว้ที่ server ให้ LINE bot
@@ -5921,8 +5965,8 @@ function AppInternal({
                   categorySnapshotRef={categorySnapshotRef}
                 />
                 <DailyKpiTable data={dailyKpiData} />
-                <DailyBranchReportSection data={dailyBranchReport} boost={boostLabel(attachBoost)} />
-                <DailyBranchReportSection data={monthlyBranchReport} boost={boostLabel(attachBoost)} />
+                <DailyBranchReportSection data={dailyBranchReport} boost={boostLabel(attachBoost)} uploadedAt={salesUploadedAt} />
+                <DailyBranchReportSection data={monthlyBranchReport} boost={boostLabel(attachBoost)} uploadedAt={salesUploadedAt} />
                 <AttachQuotaSection data={attachQuotaData} boost={boostLabel(attachBoost)} />
               </motion.div>
             )}
