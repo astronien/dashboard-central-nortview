@@ -116,6 +116,17 @@ async function handleAttachBoost(req, res) {
       to: day(b.to),
       factor: Number.isFinite(Number(b.factor)) ? Math.max(1, Math.min(5, Number(b.factor))) : 2,
       otherFactor: Number.isFinite(Number(b.otherFactor)) ? Math.max(0, Math.min(1, Number(b.otherFactor))) : 0.5,
+      // ตัวคูณรายตัว (0–5, 1 = ปกติ)
+      ...(b.perType && typeof b.perType === "object"
+        ? {
+            perType: Object.fromEntries(
+              ["cover", "ufund", "sim", "acc"].map((k) => {
+                const n = Number(b.perType[k]);
+                return [k, Number.isFinite(n) ? Math.max(0, Math.min(5, n)) : 1];
+              }),
+            ),
+          }
+        : {}),
     };
     await setAppConfig(ATTACH_BOOST_KEY, JSON.stringify(clean), req.body?.updatedBy ?? null);
     return res.status(200).json({ ok: true });

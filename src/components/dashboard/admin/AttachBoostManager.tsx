@@ -2,6 +2,7 @@ import React from "react";
 import { Flame, Save, CheckCircle2, AlertCircle } from "lucide-react";
 import {
   ATTACH_BOOST_TYPES,
+  BOOST_FACTOR_OPTIONS,
   EMPTY_ATTACH_BOOST,
   anyBoostOn,
   boostDescription,
@@ -39,10 +40,12 @@ export function AttachBoostManager({
     });
   }, []);
 
-  const toggle = (key: AttachBoostType) => {
+  /** ตั้งตัวคูณของแต่ละตัว (0.5 / 1 / 1.5 / 2 หรือกำหนดเอง) */
+  const setFactor = (key: AttachBoostType, f: number) => {
     setBoost((prev) => {
-      const next = { ...prev, [key]: !prev[key] };
-      // เปิดตัวแรก → ตั้งวันเริ่มเป็นวันนี้ให้อัตโนมัติ
+      const v = Math.max(0, Math.min(5, Number.isFinite(f) ? f : 1));
+      const next: AttachBoost = { ...prev, perType: { ...prev.perType, [key]: v }, [key]: v !== 1 };
+      // เริ่มใช้ครั้งแรก → ตั้งวันเริ่มเป็นวันนี้ให้อัตโนมัติ
       if (!anyBoostOn(prev) && anyBoostOn(next) && !next.from) next.from = todayYmd();
       return next;
     });
@@ -82,7 +85,7 @@ export function AttachBoostManager({
         </div>
         <div className="flex-1">
           <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
-            โหมดโฟกัส Attach (x{boost.factor})
+            โหมดโฟกัส Attach (ตัวคูณรายตัว)
             {anyBoostOn(boost) ? (
               <span
                 className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
@@ -106,88 +109,55 @@ export function AttachBoostManager({
         </button>
       </div>
 
-      <div className="mb-4 flex flex-wrap items-end gap-4">
-        <div>
-          <div className="text-[11px] text-white/50 mb-1">ตัวคูณของตัวที่เลือก</div>
-          <div className="inline-flex rounded-xl border border-white/15 bg-black/20 p-0.5">
-            {[1.5, 2, 2.5, 3].map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => {
-                  setBoost((prev) => ({ ...prev, factor: f }));
-                  setMsg(null);
-                }}
-                className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-colors ${
-                  boost.factor === f ? "bg-orange-500 text-white" : "text-white/60 hover:text-white"
-                }`}
-              >
-                x{f}
-              </button>
-            ))}
-          </div>
-        </div>
-        <label className="flex flex-col gap-1">
-          <span className="text-[11px] text-white/50">หรือกำหนดเอง</span>
-          <input
-            type="number"
-            step={0.1}
-            min={1}
-            max={5}
-            value={boost.factor}
-            onChange={(e) => {
-              const n = Number(e.target.value);
-              setBoost((prev) => ({ ...prev, factor: Number.isFinite(n) ? Math.max(1, Math.min(5, n)) : prev.factor }));
-              setMsg(null);
-            }}
-            className="w-20 bg-[#051710] border border-white/15 rounded-lg px-2 py-1.5 text-white text-sm focus:outline-none focus:border-orange-400"
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-[11px] text-white/50">ตัวที่ไม่ได้เลือก (ระหว่างโฟกัส)</span>
-          <input
-            type="number"
-            step={0.1}
-            min={0}
-            max={1}
-            value={boost.otherFactor}
-            onChange={(e) => {
-              const n = Number(e.target.value);
-              setBoost((prev) => ({
-                ...prev,
-                otherFactor: Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : prev.otherFactor,
-              }));
-              setMsg(null);
-            }}
-            className="w-20 bg-[#051710] border border-white/15 rounded-lg px-2 py-1.5 text-white text-sm focus:outline-none focus:border-orange-400"
-          />
-        </label>
-        <p className="text-[11px] text-white/45 pb-2">{boostDescription(boost)}</p>
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
         {ATTACH_BOOST_TYPES.map((t) => {
-          const on = boost[t.key];
+          const f = boost.perType?.[t.key] ?? 1;
+          const tone =
+            f > 1
+              ? "border-orange-400/60 bg-orange-500/15"
+              : f < 1
+                ? "border-sky-400/50 bg-sky-500/10"
+                : "border-white/10 bg-black/20";
           return (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => toggle(t.key)}
-              className={`flex items-center justify-between rounded-xl border px-4 py-3 transition-colors ${
-                on
-                  ? "border-orange-400/60 bg-orange-500/20 text-white"
-                  : "border-white/10 bg-black/20 text-white/50"
-              }`}
-            >
-              <span className="text-sm font-semibold">{t.label}</span>
-              <span
-                className={`text-xs font-extrabold px-2 py-0.5 rounded-md ${
-                  on ? "bg-orange-500 text-white" : "bg-white/10 text-white/40"
-                }`}
-              >
-                {on ? `x${boost.factor}` : anyBoostOn(boost) ? `x${boost.otherFactor}` : "x1"}
-              </span>
-            </button>
+            <div key={t.key} className={`rounded-xl border px-3 py-3 transition-colors ${tone}`}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-semibold text-white">{t.label}</span>
+                <span
+                  className={`text-xs font-extrabold px-2 py-0.5 rounded-md ${
+                    f > 1 ? "bg-orange-500 text-white" : f < 1 ? "bg-sky-500 text-white" : "bg-white/10 text-white/50"
+                  }`}
+                >
+                  x{f}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                {BOOST_FACTOR_OPTIONS.map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => setFactor(t.key, opt)}
+                    className={`flex-1 rounded-lg py-1 text-xs font-bold transition-colors ${
+                      f === opt ? "bg-white text-slate-900" : "bg-white/10 text-white/60 hover:text-white"
+                    }`}
+                  >
+                    {opt}
+                  </button>
+                ))}
+                <input
+                  type="number"
+                  step={0.1}
+                  min={0}
+                  max={5}
+                  value={f}
+                  onChange={(e) => setFactor(t.key, Number(e.target.value))}
+                  title="กำหนดเอง"
+                  className="w-14 bg-[#051710] border border-white/15 rounded-lg px-1.5 py-1 text-white text-xs text-center focus:outline-none focus:border-orange-400"
+                />
+              </div>
+              <div className="mt-1.5 text-[10px] text-white/45">
+                = {f} เครดิต · ครอบคลุม iPhone {Math.round(f * 4 * 10) / 10} เครื่อง
+              </div>
+            </div>
           );
         })}
       </div>
@@ -216,7 +186,7 @@ export function AttachBoostManager({
           onClick={turnOffAll}
           className="text-xs text-white/40 underline hover:text-white/70 pb-2"
         >
-          ปิดทั้งหมด
+          รีเซ็ตทุกตัวเป็น x1
         </button>
       </div>
 
