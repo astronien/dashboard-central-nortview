@@ -85,8 +85,6 @@ import {
 import {
   EMPTY_ATTACH_BOOST,
   boostLabel,
-  boostInRange,
-  boostMultiplier,
   fetchAttachBoost,
   type AttachBoost,
 } from "./lib/attachBoost";
@@ -151,7 +149,7 @@ import {
   Bar,
   Legend,
 } from "recharts";
-import { HomeDashboardSection, type CombinedOfficerKpiData, type CombinedCatCell, type CombinedWonderCell } from "./components/dashboard/HomeDashboardSection";
+import { HomeDashboardSection } from "./components/dashboard/HomeDashboardSection";
 
 import {
   DailyKpiTable,
@@ -159,7 +157,7 @@ import {
   type DailyCatCell,
   type DailyWonderCell,
 } from "./components/dashboard/DailyKpiTable";
-import { AttachQuotaSection, type AttachQuotaData } from "./components/dashboard/AttachQuotaSection";
+import { AttachQuotaSection } from "./components/dashboard/AttachQuotaSection";
 
 import {
   COMMISSION_CATEGORIES,
@@ -506,10 +504,11 @@ const isUfundRow = (row: any): boolean => {
 /** Today's date in Asia/Bangkok as YYYY-MM-DD. */
 import { latestDayFromKeys } from "./lib/dateHelpers";
 import { useBranchReports } from "./hooks/useBranchReports";
+import { useCombinedOfficerKpi } from "./hooks/useCombinedOfficerKpi";
+import { useAttachQuota } from "./hooks/useAttachQuota";
 
 // Attach / Case / Film / UFUND helpers — ย้ายไป src/lib/attachHelpers.ts
 import {
-  OTHER_CAT,
   RAW_DEVICE_CATEGORY,
   calcPresetIphoneAcc,
   countUfundIphoneBills,
@@ -2873,224 +2872,18 @@ function AppInternal({
 
   // Home: ตารางรวมยอดขายแยกตามหมวด (เหมือน staff profile) + 7 Wonders
   // ในตารางเดียว ลิสต์เป็นรายเจ้าหน้าที่
-  const combinedOfficerKpiData = useMemo<CombinedOfficerKpiData>(() => {
-    const categoriesList: KpiCategoryKey[] = ["Mac", "iPad", "iPhone", "Apple Watch", "BTB", "BTB(Apple)"];
-    const wonderPresets = kpiPresets.filter((p) => p.showInStaffProfile);
-    if (displayUploads.current.length === 0) {
-      return { categories: categoriesList, presets: wonderPresets, rows: [] };
-    }
-
-    const targetRecords = rawTargetRowsToRecords(displayUploads.target);
-
-    // หา period จากวันที่ล่าสุดในข้อมูล (fallback = วันนี้) — ตรรกะเดียวกับ
-    // activeOfficerCategoryPerformance เพื่อให้เป้าตรงกับ staff profile
-    let periodYear = new Date().getFullYear();
-    let periodMonth = new Date().getMonth();
-    let bestTime = 0;
-    for (const row of displayUploads.current) {
-      const rawDate = String(row["Doc Date"] ?? row["doc date"] ?? "");
-      if (!rawDate) continue;
-      const parsed = parseDocDate(rawDate);
-      if (parsed && parsed.getTime() > bestTime) {
-        bestTime = parsed.getTime();
-        periodYear = parsed.getFullYear();
-        periodMonth = parsed.getMonth();
-      }
-    }
-    const periodTotalDays = new Date(periodYear, periodMonth + 1, 0).getDate();
-    const periodMonthStr = String(periodMonth + 1).padStart(2, "0");
-    const periodStart = `${periodYear}-${periodMonthStr}-01`;
-    const periodEnd = `${periodYear}-${periodMonthStr}-${String(periodTotalDays).padStart(2, "0")}`;
-
-    const allBills = currentBillsShared;
-
-    const officerList: Array<{ name: string; branch: string; staffId?: string; position?: string }> =
-      parsedReport.officers.length > 0
-        ? parsedReport.officers.map((o) => ({
-            name: o.name,
-            branch: o.branch,
-            staffId: o.staffId,
-            position: o.position,
-          }))
-        : Array.from(
-            new Map(
-              allBills
-                .filter((b) => b.officerName)
-                .map((b) => [b.officerName, { name: b.officerName, branch: b.branchName }]),
-            ).values(),
-          );
-
-    const rows = officerList
-      .map((officer) => {
-        const officerTargetRow = displayUploads.target.find((row) => {
-          const name = `${row.NAME ?? ""} ${row.SURNAME ?? ""}`.trim();
-          return matchesOfficer(name, officer.name);
-        });
-        // ใช้ resolveOfficerId แบบเดียวกับ staff profile — ห้ามใช้ staffId จาก
-        // parsedReport ตรงๆ เพราะถ้า id นั้นไม่ตรงกับคอลัมน์ STAFF ID ในไฟล์ขาย
-        // (หรือไฟล์ขายไม่มีคอลัมน์นี้) ตัวกรองรายคนจะไม่ทำงาน และยอดของทุกคน
-        // จะกลายเป็นยอดรวมทั้งสาขา (เท่ากันหมด)
-        const officerId = resolveOfficerId(
-          officer.name,
-          displayUploads.target,
-          targetRecords,
-          displayUploads.current,
-          matchesOfficer,
-        );
-
-        const cats: Record<string, CombinedCatCell> = {};
-        let catActualSum = 0;
-        let catTargetSum = 0;
-        categoriesList.forEach((catName) => {
-          const kpi = getOfficerCategoryKpi({
-            category: catName,
-            officerName: officer.name,
-            officerId,
-            officerTargetRow,
-            targetRecords,
-            currentRows: displayUploads.current,
-            lastMonthRows: [],
-            lastYearRows: [],
-            periodStart,
-            periodEnd,
-            getCategory,
-            matchesOfficer,
-          });
-          cats[catName] = {
-            actual: kpi.actual,
-            target: kpi.target,
-            achPercent: calcAchievementPct(kpi.actual, kpi.target),
-          };
-          catActualSum += kpi.actual;
-          catTargetSum += kpi.target;
-        });
-
-        // "อื่นๆ" — ยอดที่ไม่เข้า 6 หมวดหลัก (SIM/Smile/หมวดที่ไม่ได้จัดกลุ่ม)
-        // ต้องนับเข้ายอดรวมด้วย ไม่งั้น TOTAL ของตารางนี้จะน้อยกว่าที่แสดงใน
-        // staff profile (ซึ่งมีแถว "อื่นๆ" แล้ว) และไม่ตรงกับระบบหลังบ้าน
-        const nIdCat = normalizeId(officerId);
-        let officerAllActual = 0;
-        for (const row of displayUploads.current) {
-          const rowOfficerId = String(row["STAFF ID"] ?? row.emp_id ?? row["Officer (ID)"] ?? "").trim();
-          const oName = String(row["Officer (Name)"] ?? "").trim();
-          const isMine =
-            (Boolean(nIdCat) &&
-              Boolean(rowOfficerId) &&
-              normalizeId(rowOfficerId) === nIdCat) ||
-            matchesOfficer(oName, officer.name);
-          if (isMine) officerAllActual += getCategoryValue(row);
-        }
-        const otherActual = Math.max(0, officerAllActual - catActualSum);
-        if (otherActual > 0.5) {
-          cats[OTHER_CAT] = { actual: otherActual, target: 0, achPercent: 0 };
-          catActualSum += otherActual;
-        }
-
-        const officerBills = allBills.filter((b) => matchesOfficer(b.officerName, officer.name));
-        // ฐาน iPhone ให้ตรงกับตัวเลขที่โชว์ใน COVERPLUS เป๊ะ (ใช้ billsWithB —
-        // ฝั่ง iPhone — ของ preset Cover Plus ตัวเดียวกัน) เพื่อให้ทั้ง Trade-In
-        // และ UFUND นับ iPhone เท่ากับ COVERPLUS ไม่ใช้ iphoneUnitsFromBills
-        // ที่นับคนละแบบ
-        const coverPlusPreset = wonderPresets.find((pp) =>
-          /cover\s*\+|cover\s*plus|coverplus/i.test(pp.name),
-        );
-        const coverPlusIphoneBase = coverPlusPreset
-          ? calcPreset(officerBills, coverPlusPreset, {
-              tradeInCount: 0,
-              iphoneUnits: 0,
-            }).billsWithB
-          : iphoneUnitsFromBills(officerBills);
-        const ctx = {
-          tradeInCount: tradeCountForOfficer(officer.staffId, officer.name),
-          iphoneUnits: coverPlusIphoneBase,
-        };
-        const wonders: Record<string, CombinedWonderCell> = {};
-        wonderPresets.forEach((p) => {
-          const r = calcPresetIphoneAcc(officerBills, p, ctx);
-          const target = p.targetPercent ?? 0;
-          wonders[p.id] = {
-            actual: presetDisplayValue(r),
-            target,
-            achPercent: computePresetAchPercent(r, target),
-            actualA: r.billsWithAandB,
-            actualB: r.billsWithB,
-            calcType: p.calcType,
-            // Trade In: ยอดประเมิน (รายการเทรดทั้งหมด) ÷ iPhone — 2nd sub-column
-            ...(p.calcType === "tradeIn"
-              ? { appraisalA: tradeForOfficer(officer.staffId, officer.name).target }
-              : {}),
-            // UFUND: ยอดประเมิน (ยื่น/อนุมัติ) from the uFund API — 2nd sub-column
-            ...(/ufund/i.test(p.name)
-              ? (() => {
-                  const u = ufundForOfficer(officer.staffId, officer.name);
-                  return u ? { appraisalA: u.approved, appraisalB: u.total } : {};
-                })()
-              : {}),
-          };
-
-          // UFUND "ตกลง" = บิลที่ปิดการขายด้วย UFUND ÷ จำนวน iPhone ทั้งหมด
-          // ฐาน iPhone ใช้ "จำนวนเครื่อง (unit)" ตัวเดียวกับ Attach Cover Plus /
-          // Trade-In (iphoneUnitsFromBills → rowMatchesKpiCategory "iPhone")
-          // ไม่ใช่ "จำนวนบิลที่มี iPhone" เพราะบิลเดียวอาจมี iPhone หลายเครื่อง
-          if (/ufund/i.test(p.name)) {
-            const iphoneBase = coverPlusIphoneBase;
-            const ufundIphone = countUfundIphoneBills(officerBills);
-            const rate = iphoneBase > 0 ? (ufundIphone / iphoneBase) * 100 : 0;
-            wonders[p.id].actualA = ufundIphone;
-            wonders[p.id].actualB = iphoneBase;
-            wonders[p.id].actual = rate;
-            wonders[p.id].achPercent = rate;
-          }
-        });
-
-        const csatUser = csatForOfficer(officer.staffId, officer.name);
-
-        return {
-          officer,
-          cats,
-          catTotal: {
-            actual: catActualSum,
-            target: catTargetSum,
-            achPercent: catTargetSum > 0 ? (catActualSum / catTargetSum) * 100 : 0,
-          },
-          wonders,
-          csat: csatUser
-            ? {
-                score: csatUser.avgScore,
-                maxScore: csatUser.maxScore,
-                responseCount: csatUser.responseCount,
-                // จำนวนบิลทั้งหมดรายคน จาก CSAT โดยตรง (total_bill) — ตรงกับ
-                // หน้าเว็บ CSAT เมื่อเลือกพนักงานรายคน
-                billCount: csatUser.totalBill,
-              }
-            : undefined,
-        };
-      })
-      .filter(
-        (r) =>
-          r.catTotal.actual > 0 ||
-          Object.values(r.wonders).some((w) => w.actual > 0),
-      )
-      .sort((a, b) => b.catTotal.actual - a.catTotal.actual);
-
-    // โชว์คอลัมน์ "อื่นๆ" เฉพาะเมื่อมีใครมียอดตกนอก 6 หมวดจริงๆ
-    const hasOther = rows.some((r) => (r.cats[OTHER_CAT]?.actual ?? 0) > 0);
-    const cols = hasOther ? [...categoriesList, OTHER_CAT] : categoriesList;
-
-    return { categories: cols, presets: wonderPresets, rows };
-  }, [
+  const combinedOfficerKpiData = useCombinedOfficerKpi({
     kpiPresets,
-    displayUploads.current,
-    displayUploads.target,
-    displayUploads.categoryMaster,
-    parsedReport.officers,
+    displayUploads,
+    parsedReport,
     getCategory,
     tradeCountForOfficer,
     tradeForOfficer,
     ufundForOfficer,
     iphoneUnitsFromBills,
     csatForOfficer,
-  ]);
+    currentBillsShared,
+  });
 
   // Home: ตารางรายวัน — ยอดขายตามหมวด + 7 Wonders ต่อคน เทียบ "วันล่าสุด"
   // กับ "วันก่อนหน้า" (2 วันที่มีข้อมูลล่าสุด)
@@ -3295,170 +3088,14 @@ function AppInternal({
   // สะสมทั้งเดือน: สิทธิ์คงเหลือ = 4×Attach − iPhone.
   //   ≥0 ผ่าน · −1..−3 กำลังสะสม (ยังไม่ครบบล็อก 4) · ≤−4 ต้องส่งต่อ.
   // เช็ควันละครั้งตอนปิดร้าน → ใช้ยอดสะสมพอ ไม่ต้องเรียง create time ในวัน.
-  const attachQuotaData = useMemo<AttachQuotaData>(() => {
-    const empty: AttachQuotaData = {
-      rows: [],
-      fromDate: "",
-      toDate: "",
-      handoffCount: 0,
-      recipient: null,
-    };
-    if (displayUploads.current.length === 0) return empty;
-
-    // ช่วงวันที่ของข้อมูล (แรก–ล่าสุด)
-    const dayKey = (row: RawRow) => {
-      const p = parseDocDate(String(row["Doc Date"] ?? row["doc date"] ?? ""));
-      return p
-        ? `${p.getFullYear()}-${String(p.getMonth() + 1).padStart(2, "0")}-${String(p.getDate()).padStart(2, "0")}`
-        : "";
-    };
-    const daySet = new Set<string>();
-    displayUploads.current.forEach((r) => {
-      const k = dayKey(r);
-      if (k) daySet.add(k);
-    });
-    const days = Array.from(daySet).sort();
-    const fromDate = days[0] ?? "";
-    const toDate = days[days.length - 1] ?? "";
-
-    const targetRecords = rawTargetRowsToRecords(displayUploads.target);
-
-    // นับ iPhone / Cover / UFUND ด้วยวิธีเดียวกับ COVERPLUS/UFUND ในตาราง
-    // 7 Wonders (preset engine: เฉพาะ inventory item, dedupe ต่อบิล, รวม qty)
-    // เพื่อให้ยอด iPhone ตรงกับที่โชว์ใน COVERPLUS ไม่ใช่ rowMatchesKpiCategory
-    // ที่นับเกิน (รวม non-inventory/ซ้ำ)
-    const quotaBills = currentBillsShared;
-    const coverPlusPreset = kpiPresets.find((p) =>
-      /cover\s*\+|cover\s*plus|coverplus/i.test(p.name),
-    );
-    const dummyCtx = { tradeInCount: 0, iphoneUnits: 0 };
-
-    const officerList: Array<{ name: string; branch: string; staffId?: string; position?: string }> =
-      parsedReport.officers.length > 0
-        ? parsedReport.officers.map((o) => ({
-            name: o.name,
-            branch: o.branch,
-            staffId: o.staffId,
-            position: o.position,
-          }))
-        : Array.from(
-            new Map(
-              displayUploads.current
-                .filter((r) => r["Officer (Name)"])
-                .map((r) => {
-                  const n = String(r["Officer (Name)"]).trim();
-                  return [n, { name: n, branch: String(r["Branch (Name)"] ?? "") }];
-                }),
-            ).values(),
-          );
-
-    const rows = officerList
-      .map((officer) => {
-        const officerId = resolveOfficerId(
-          officer.name,
-          displayUploads.target,
-          targetRecords,
-          displayUploads.current,
-          matchesOfficer,
-        );
-        const nId = normalizeId(officerId);
-        const officerBills = quotaBills.filter(
-          (b) =>
-            matchesOfficer(b.officerName, officer.name) ||
-            Boolean(nId && normalizeId(b.officerId) === nId),
-        );
-        // iPhone = ฐาน iPhone ของ Cover Plus (billsWithB) · Cover = ยอดแนบ Cover
-        // Plus (billsWithAandB) · UFUND = ยอดแนบ UFUND (billsWithAandB)
-        const cpResult = coverPlusPreset
-          ? calcPreset(officerBills, coverPlusPreset, dummyCtx)
-          : null;
-        const iphone = cpResult
-          ? cpResult.billsWithB
-          : iphoneUnitsFromBills(officerBills);
-        const cover = cpResult ? cpResult.billsWithAandB : 0;
-        const ufund = countUfundIphoneBills(officerBills);
-        // โหมด x2: บิลในช่วงวันที่ boost คิดเครดิต "ต่อบิล" — ถ้าบิลมีตัวที่ x2
-        // ใช้ตัวนั้นก่อน (2 เครดิต) ไม่บวกตัวอื่นเพิ่ม · ไม่มีตัว x2 → ตัวอื่น 0.5
-        // บิลนอกช่วง boost คิดแบบเดิม (Cover + UFUND นับแยกกัน)
-        const boostBills = officerBills.filter((b) => boostInRange(attachBoost, b.docDate));
-        const normalBills = boostBills.length
-          ? officerBills.filter((b) => !boostInRange(attachBoost, b.docDate))
-          : officerBills;
-        const coverOut = boostBills.length
-          ? coverPlusPreset
-            ? calcPreset(normalBills, coverPlusPreset, dummyCtx).billsWithAandB
-            : 0
-          : cover;
-        const ufundOut = boostBills.length ? countUfundIphoneBills(normalBills) : ufund;
-        // บิลในช่วง boost คิดเครดิตต่อบิล = ตัวคูณสูงสุด (x2 มาก่อน)
-        // บิล UFUND + บิล Cover ที่เปิดแยก = นับเป็นบิลเดียวกัน
-        const coverInBill = (b: BillSummary) =>
-          (coverPlusPreset ? calcPreset([b], coverPlusPreset, dummyCtx).billsWithAandB > 0 : false) ||
-          b.lineItems.some((li) => {
-            const name = String(li["Product (Name)"] ?? "");
-            return /cover\s*\+|coverplus/i.test(`${name} ${li["Product (Code)"] ?? ""}`) && !/free|ฟรี/i.test(name);
-          });
-        const isIphoneBill = (b: BillSummary) =>
-          b.lineItems.some((li) => /^iphone$/i.test(String(li["Category (Name)"] ?? "").trim()));
-        const slots = boostBills.map((b) => ({
-          b,
-          iphone: isIphoneBill(b),
-          cov: coverInBill(b),
-          uf: countUfundIphoneBills([b]) > 0,
-        }));
-        for (const loose of slots.filter((x) => !x.iphone && x.cov)) {
-          const target = slots.find((x) => x.iphone && x.uf && !x.cov);
-          if (!target) continue;
-          target.cov = true;
-          loose.cov = false; // ย้ายไปนับในบิล UFUND แล้ว
-        }
-        let boostCredit = 0;
-        for (const x of slots) {
-          boostCredit += Math.max(
-            x.cov ? boostMultiplier(attachBoost, "cover", x.b.docDate) : 0,
-            x.uf ? boostMultiplier(attachBoost, "ufund", x.b.docDate) : 0,
-          );
-        }
-        const attach = coverOut + ufundOut + boostCredit;
-        const remaining = 4 * attach - iphone;
-        const status: "pass" | "accumulating" | "handoff" =
-          remaining >= 0 ? "pass" : remaining <= -4 ? "handoff" : "accumulating";
-
-        return {
-          name: officer.name,
-          branch: officer.branch,
-          iphone,
-          cover,
-          ufund,
-          attach,
-          remaining,
-          status,
-        };
-      })
-      .filter((r) => r.iphone > 0 || r.cover > 0 || r.ufund > 0)
-      .sort((a, b) => a.remaining - b.remaining); // แย่สุด (ติดลบมากสุด) ขึ้นก่อน
-
-    // ผู้รับช่วง = คนที่ผ่านเกณฑ์ + สิทธิ์คงเหลือมากสุด
-    let recipient: { name: string; remaining: number } | null = null;
-    for (const r of rows) {
-      if (r.status === "pass" && r.remaining > 0) {
-        if (!recipient || r.remaining > recipient.remaining) {
-          recipient = { name: r.name, remaining: r.remaining };
-        }
-      }
-    }
-    const handoffCount = rows.filter((r) => r.status === "handoff").length;
-
-    return { rows, fromDate, toDate, handoffCount, recipient };
-  }, [
-    displayUploads.current,
-    displayUploads.target,
-    displayUploads.categoryMaster,
-    parsedReport.officers,
+  const attachQuotaData = useAttachQuota({
+    displayUploads,
+    parsedReport,
     kpiPresets,
     iphoneUnitsFromBills,
     attachBoost,
-  ]);
+    currentBillsShared,
+  });
 
   // ─── ค่าคอมมิชชั่น (PIA Individual) ─────────────────────────────────────
   // "" = เลือกช่วงอัตโนมัติจากเป้ารวมของร้าน
