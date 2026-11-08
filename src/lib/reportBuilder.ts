@@ -38,6 +38,8 @@ export type ParsedReport = {
     yoyPercent?: number | string;
     targetPerDay?: number;
     diffPerDay?: number;
+    currentDay?: number;
+    totalDays?: number;
   }>;
   categories: Array<{ category: string; actual: number; target: number; share: number }>;
   officers: Array<OfficerPerformance>;

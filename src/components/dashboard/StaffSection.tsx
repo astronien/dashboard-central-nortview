@@ -91,7 +91,7 @@ function TelegramSendButton({
 }: {
   staffId: string;
   containerRef: React.RefObject<HTMLDivElement | null>;
-  onSetActiveStat: (stat: string) => void;
+  onSetActiveStat: (stat: "sales" | "csat" | "target") => void;
   onSetActiveStaffId: (id: string) => void;
   piaIndices: string[];
   homeCaptureRef: React.RefObject<HTMLDivElement | null>;
@@ -132,7 +132,7 @@ function TelegramSendButton({
     return () => document.removeEventListener("mousedown", handler);
   }, [menuOpen]);
 
-  const views: Array<{ stat: string; name: string }> = [
+  const views: Array<{ stat: "sales" | "csat" | "target"; name: string }> = [
     { stat: "sales", name: "KPI" },
     { stat: "csat", name: "7 Wonders" },
     { stat: "target", name: "Today" },
@@ -413,13 +413,14 @@ export function StaffSection({
   dynamicRadarData: RadarDatum[];
   renderCustomTick: (props: {
     payload?: { value?: string };
-    x?: number;
-    y?: number;
+    // recharts ส่ง x/y เป็น string | number — รับให้กว้างไว้เพื่อให้ assign เข้า tick ได้
+    x?: string | number;
+    y?: string | number;
     textAnchor?: string;
   }) => React.ReactElement | null;
   dynamicScore: number;
   activeStat: string;
-  onSetActiveStat: (stat: string) => void;
+  onSetActiveStat: (stat: "sales" | "csat" | "target") => void;
   sevenWondersScore: number;
   dynamicRole: string;
   dynamicExperience: string;

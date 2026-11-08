@@ -262,6 +262,7 @@ export function ReportsSection({
           {/* "Today" placeholder card — explains it falls back to current */}
           <FileUploadCard
             key="upload-today"
+            kind="today"
             fileName=""
             rowCount={stats.today}
             dateRange={null}
