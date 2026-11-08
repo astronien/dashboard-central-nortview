@@ -3335,7 +3335,7 @@ function AppInternal({
         // sum the Number (qty) column and the sale value per category.
         const nId = normalizeId(officerId);
         const sumCat = (dayRows: RawRow[], cat: string): { units: number; baht: number } =>
-          dayRows.reduce(
+          dayRows.reduce<{ units: number; baht: number }>(
             (acc, row) => {
               const officerName = String(row["Officer (Name)"] ?? "").trim();
               const rowId = normalizeId(row["STAFF ID"] ?? row.emp_id ?? "");

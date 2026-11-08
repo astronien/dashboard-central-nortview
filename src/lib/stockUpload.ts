@@ -96,13 +96,25 @@ export interface StockParseResult {
   sample: { key: string; qty: number }[];
 }
 
+/** ผลลัพธ์กรณีอ่านไฟล์ไม่สำเร็จ — ครบทุก field ตาม StockParseResult */
+const stockFail = (error: string): StockParseResult => ({
+  ok: false,
+  error,
+  itemCount: 0,
+  stockMap: {},
+  costMap: {},
+  items: [],
+  hasCost: false,
+  sample: [],
+});
+
 export async function parseStockExcelFile(file: File): Promise<StockParseResult> {
   try {
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, { type: "array" });
     const sheet = wb.Sheets[wb.SheetNames[0]];
     if (!sheet) {
-      return { ok: false, error: "ไม่พบชีตในไฟล์", itemCount: 0, stockMap: {}, sample: [] };
+      return stockFail("ไม่พบชีตในไฟล์");
     }
     // raw: true — อ่านค่าจริงของเซลล์ (รหัสสินค้า 13 หลักไม่กลายเป็น 1.95951E+11
     // และจำนวนไม่ถูกจัดรูปแบบ)
@@ -111,7 +123,7 @@ export async function parseStockExcelFile(file: File): Promise<StockParseResult>
       raw: true,
     });
     if (rows.length === 0) {
-      return { ok: false, error: "ไฟล์ว่างเปล่า", itemCount: 0, stockMap: {}, costMap: {}, hasCost: false, sample: [] };
+      return stockFail("ไฟล์ว่างเปล่า");
     }
 
     const headers = Object.keys(rows[0]);
@@ -121,15 +133,7 @@ export async function parseStockExcelFile(file: File): Promise<StockParseResult>
     const costH = findHeader(headers, COST_KEYS);
 
     if (!qtyH || (!nameH && !codeH)) {
-      return {
-        ok: false,
-        error: `หาคอลัมน์ไม่เจอ — ต้องมีคอลัมน์จำนวนคงเหลือ และชื่อ/รหัสสินค้า (คอลัมน์ที่พบ: ${headers.join(", ")})`,
-        itemCount: 0,
-        stockMap: {},
-        costMap: {},
-        hasCost: false,
-        sample: [],
-      };
+      return stockFail(`หาคอลัมน์ไม่เจอ — ต้องมีคอลัมน์จำนวนคงเหลือ และชื่อ/รหัสสินค้า (คอลัมน์ที่พบ: ${headers.join(", ")})`);
     }
 
     const stockMap: Record<string, number> = {};
@@ -174,14 +178,6 @@ export async function parseStockExcelFile(file: File): Promise<StockParseResult>
       sample,
     };
   } catch (e) {
-    return {
-      ok: false,
-      error: e instanceof Error ? e.message : String(e),
-      itemCount: 0,
-      stockMap: {},
-      costMap: {},
-      hasCost: false,
-      sample: [],
-    };
+    return stockFail(e instanceof Error ? e.message : String(e));
   }
 }
