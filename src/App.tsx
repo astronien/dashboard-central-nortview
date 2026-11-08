@@ -437,7 +437,7 @@ type OfficerPerformance = {
 };
 
 type ParsedReport = {
-  branches: Array<{ label: string; target: number; actual: number; lastMonth: number; lastYear: number; achPercent?: number; forecast?: number; forecastPercent?: number; momPercent?: number; yoyPercent?: number; targetPerDay?: number; diffPerDay?: number }>;
+  branches: Array<{ label: string; target: number; actual: number; lastMonth: number; lastYear: number; achPercent?: number; forecast?: number; forecastPercent?: number; momPercent?: number; yoyPercent?: number; targetPerDay?: number; diffPerDay?: number; currentDay?: number; totalDays?: number }>;
   categories: Array<{ category: string; actual: number; target: number; share: number }>;
   officers: Array<OfficerPerformance>;
   fileName: string;
