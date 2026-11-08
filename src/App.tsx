@@ -240,6 +240,10 @@ const RunRateSection = lazyRetry(() => import("./components/dashboard/RunRateSec
 const ReportsSection = lazyRetry(() => import("./components/dashboard/ReportsSection").then((m) => ({ default: m.ReportsSection })));
 const SettingsSection = lazyRetry(() => import("./components/dashboard/SettingsSection").then((m) => ({ default: m.SettingsSection })));
 const KpiPresetSection = lazyRetry(() => import("./components/dashboard/KpiPresetSection"));
+/** โหลดโค้ดหน้าตั้งค่าล่วงหน้าตอนเปิดเมนูตั้งค่า (ระหว่างที่กำลังพิมพ์รหัส) */
+const preloadSettingsSection = () => {
+  void import("./components/dashboard/SettingsSection").catch(() => {});
+};
 
 
 // Neutral placeholder shown before any data is uploaded — no demo profiles.
@@ -1300,6 +1304,9 @@ function AppInternal({
   const [currentView, setCurrentView] = useState<
     "home" | "staff" | "settings" | "reports" | "kpi_preset" | "analysis" | "trends" | "runrate" | "commission"
   >("home");
+  useEffect(() => {
+    if (currentView === "settings") preloadSettingsSection();
+  }, [currentView]);
 
   // Light / dark theme. Applied as a `theme-light` class on <html> so a
   // small set of CSS overrides (index.css) can re-map the dark palette.
@@ -4752,6 +4759,15 @@ function AppInternal({
               >
                 <ViewErrorBoundary label="ตั้งค่า">
                 <SettingsGate updatedBy={user?.name ?? user?.username}>
+                {/* Suspense เฉพาะจุด: ปลดล็อกครั้งแรกโค้ดหน้าตั้งค่ายังโหลดไม่เสร็จ — ถ้าไปให้
+                    Suspense ชั้นนอกจับ มันจะซ่อนทั้ง motion.div แล้วแอนิเมชันค้างที่ opacity 0 (จอขาว) */}
+                <React.Suspense
+                  fallback={
+                    <div className="flex justify-center py-16">
+                      <Loader2 className="w-6 h-6 animate-spin text-white/50" />
+                    </div>
+                  }
+                >
                 <SettingsSection
                   selectedBranch={selectedBranch}
                   onBranchChange={handleBranchChange}
@@ -4780,6 +4796,7 @@ function AppInternal({
                   tradeBranchMapping={tradeBranchMapping}
                   onTradeBranchMappingChange={setTradeBranchMapping}
                 />
+                </React.Suspense>
                 </SettingsGate>
                 </ViewErrorBoundary>
               </motion.div>
