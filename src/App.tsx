@@ -67,7 +67,7 @@ import {
   getBranchCodeFromTarget,
   type TradeInResult,
 } from "./lib/tradeInApi";
-import { fetchCsatData, type CsatResult, type CsatUser } from "./lib/csatApi";
+import { fetchCsatData, type CsatFetchResult, type CsatResult, type CsatUser } from "./lib/csatApi";
 import {
   beginLineReport,
   fetchLineReportMeta,
@@ -5132,8 +5132,10 @@ function AppInternal({
           setCsatData(result.data);
           setCsatError(undefined);
         } else {
+          // ใช้ Extract บังคับ type แทนการพึ่ง narrowing (กัน type error ที่เคยขึ้น)
+          const fail = result as Extract<CsatFetchResult, { ok: false }>;
           setCsatData(undefined);
-          setCsatError({ code: result.code, message: result.error });
+          setCsatError({ code: fail.code, message: fail.error });
         }
       })
       .catch((e) => {
