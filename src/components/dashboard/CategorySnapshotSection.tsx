@@ -73,12 +73,12 @@ export const CategorySnapshotSection = React.forwardRef<HTMLDivElement, { items:
   if (!visible.length) return null;
 
     return (
-      <div ref={ref} className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+      <div ref={ref} className="bg-white/10 rounded-2xl border border-white/10 p-6 ">
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h3 className="text-lg font-bold tracking-tight text-white">Category KPI Snapshot</h3>
+          <h3 className="text-lg font-semibold text-white">ยอดรายหมวด</h3>
           <p className="text-xs text-white/50 mt-1">
-            ยอดขายรายหมวด Mac / iPad / iPhone / Watch / BTB / COVER+ / AC+ / SIM / Trade In — วันนี้ vs เป้ารายวัน vs Forecast (Trade In = สิ้นสุดประมูล/ทั้งหมด)
+            สะสมเดือนนี้เทียบเป้า · ขีดขาวบนแถบ = ควรถึงวันนี้
           </p>
         </div>
       </div>
@@ -88,52 +88,65 @@ export const CategorySnapshotSection = React.forwardRef<HTMLDivElement, { items:
           const isCurrency = !isQuantityItem(item);
           const achColor =
             item.achieveRate >= 100
-              ? "text-emerald-400"
+              ? "text-emerald-300"
               : item.achieveRate >= 80
-                ? "text-amber-400"
-                : "text-rose-400";
-          const forecastColor =
-            item.forecastRate >= 100
-              ? "text-amber-400"
-              : item.forecastRate >= 80
-                ? "text-amber-400"
-                : "text-rose-400";
+                ? "text-white/80"
+                : "text-rose-300";
+          const forecastColor = item.forecastRate >= 100 ? "text-emerald-300" : "text-white/80";
+          // ขีด "ควรถึงวันนี้" = สัดส่วนวันที่ผ่านไป (achieve ÷ forecast)
+          const expectedPct =
+            item.forecastRate > 0 && item.achieveRate > 0 ? (item.achieveRate / item.forecastRate) * 100 : null;
+          const barTone =
+            expectedPct != null && item.achieveRate >= expectedPct
+              ? "bg-emerald-400"
+              : item.achieveRate >= 80
+                ? "bg-white/60"
+                : "bg-rose-400";
           return (
             <div
               key={item.category}
-              className="rounded-2xl border border-white/10 bg-white/5 p-4 flex flex-col gap-3 hover:bg-white/[0.08] transition-colors min-h-[260px]"
+              className="rounded-2xl border border-white/10 bg-white/5 p-4 flex flex-col gap-3 hover:bg-white/[0.08] transition-colors "
             >
               <div className="flex items-center gap-2">
                 <Icon className="w-4 h-4 text-white/60 shrink-0" />
-                <span className="text-xs font-bold text-white/70 uppercase tracking-wide truncate">
+                <span className="text-xs font-semibold text-white/70 truncate">
                   {item.category}
                 </span>
               </div>
 
-              <div className="text-2xl font-extrabold text-white leading-none">
+              <div className="text-2xl font-semibold text-white leading-none">
                 {formatValue(item)}
               </div>
               {item.category === "Trade In" ? (
-                <div className="text-[10px] text-white/50 -mt-2">
+                <div className="text-[11px] text-white/50 -mt-2">
                   สิ้นสุดประมูล / รายการเทรดทั้งหมด
                 </div>
               ) : (item.category === "AC+" || item.category === "COVER+" || item.category === "UFUND") && item.attachRateActual != null ? (
-                <div className="text-[10px] text-white/50 -mt-2">
+                <div className="text-[11px] text-white/50 -mt-2">
                   ขายจริง / iPhone ที่ขาย{item.targetPctOfIphone != null ? ` · เป้า ${item.targetPctOfIphone}%` : ""}
                 </div>
               ) : item.targetPctOfIphone != null ? (
-                <div className="text-[10px] text-white/50 -mt-2">
+                <div className="text-[11px] text-white/50 -mt-2">
                   Target {item.targetPctOfIphone}% ของ iPhone ({formatTarget(item)})
                 </div>
               ) : (
-                <div className="text-[10px] text-white/50 -mt-2">
+                <div className="text-[11px] text-white/50 -mt-2">
                   Target {formatTarget(item)}
                 </div>
               )}
 
+              <div className="relative mt-1">
+                <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                  <div className={`h-full rounded-full ${barTone}`} style={{ width: `${Math.min(Math.max(item.achieveRate, 0), 100)}%` }} />
+                </div>
+                {expectedPct != null ? (
+                  <div className="absolute -top-1 h-3.5 w-0.5 rounded bg-white" style={{ left: `calc(${Math.min(expectedPct, 100)}% - 1px)` }} />
+                ) : null}
+              </div>
+
               <div className="flex-1 flex flex-col gap-1.5 text-[11px] border-t border-white/5 pt-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-white/50">Today</span>
+                  <span className="text-white/50">วันนี้</span>
                   <span className="text-white/90 font-semibold">
                     {formatMetric(item.today, item.measureType, isCurrency)}
                   </span>
@@ -141,26 +154,26 @@ export const CategorySnapshotSection = React.forwardRef<HTMLDivElement, { items:
                 {item.category !== "Trade In" ? (
                   <>
                     <div className="flex items-center justify-between">
-                      <span className="text-white/50">Target per Day</span>
+                      <span className="text-white/50">เป้าต่อวัน</span>
                       <span className="text-white/90 font-semibold">
                         {formatMetric(item.targetDay, item.measureType, isCurrency)}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-white/50">Forecast</span>
+                      <span className="text-white/50">คาดจบเดือน</span>
                       <span className="text-white/90 font-semibold">
                         {formatMetric(item.forecast, item.measureType, isCurrency)}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-white/50">Achieve %</span>
-                      <span className={`font-bold ${achColor}`}>
+                      <span className="text-white/50">ถึงเป้า</span>
+                      <span className={`font-semibold ${achColor}`}>
                         {item.achieveRate.toFixed(2)}%
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-white/50">Forecast %</span>
-                      <span className={`font-bold ${forecastColor}`}>
+                      <span className="text-white/50">คาดจบ %</span>
+                      <span className={`font-semibold ${forecastColor}`}>
                         {item.forecastRate.toFixed(2)}%
                       </span>
                     </div>
@@ -172,7 +185,7 @@ export const CategorySnapshotSection = React.forwardRef<HTMLDivElement, { items:
                       Attach จริง (ขาย/iPhone){item.targetPctOfIphone != null ? ` เป้า ${item.targetPctOfIphone}%` : ""}
                     </span>
                     <span
-                      className={`font-bold ${
+                      className={`font-semibold ${
                         item.targetPctOfIphone == null
                           ? "text-white/90"
                           : item.attachRateActual >= item.targetPctOfIphone
@@ -188,7 +201,7 @@ export const CategorySnapshotSection = React.forwardRef<HTMLDivElement, { items:
                   <div className="flex items-center justify-between">
                     <span className="text-white/50">Trade In/iPhone (เป้า 20%)</span>
                     <span
-                      className={`font-bold ${item.tradeInPerIphonePct >= 20 ? "text-emerald-400" : "text-rose-400"}`}
+                      className={`font-semibold ${item.tradeInPerIphonePct >= 20 ? "text-emerald-400" : "text-rose-400"}`}
                     >
                       {item.tradeInPerIphonePct.toFixed(2)}%
                     </span>
@@ -198,7 +211,7 @@ export const CategorySnapshotSection = React.forwardRef<HTMLDivElement, { items:
                   <div className="flex items-center justify-between">
                     <span className="text-white/50">ยอดประเมิน (เป้า 50%)</span>
                     <span
-                      className={`font-bold ${item.tradeInAppraisalPct >= 50 ? "text-emerald-400" : "text-rose-400"}`}
+                      className={`font-semibold ${item.tradeInAppraisalPct >= 50 ? "text-emerald-400" : "text-rose-400"}`}
                     >
                       {item.tradeInAppraisalPct.toFixed(2)}%
                     </span>

@@ -1,5 +1,5 @@
 import React from "react";
-import { TrendingUp, TrendingDown, Building2, User, Smile, Gauge } from "lucide-react";
+import { TrendingDown, Building2, User, Smile } from "lucide-react";
 import type { CsatOverview, CsatLowScore } from "../../lib/csatApi";
 import type { CategorySnapshotItem } from "../../lib/categorySnapshotBuilder";
 import type { DerivedHomeStat } from "./dashboardTypes";
@@ -107,17 +107,15 @@ export function HomeDashboardSection({
         ) : null}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           {derivedHomeStats.map((stat, idx) => (
-            <div key={idx} className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 p-3.5 md:p-5 shadow-[0_8px_32px_rgba(0,0,0,0.12)] flex flex-col justify-between hover:bg-white/[0.15] transition-colors cursor-pointer">
-              <div className="flex justify-between items-start mb-2">
-                <div className="p-2.5 bg-white/5 rounded-xl border border-white/5"><stat.icon className="w-5 h-5 text-emerald-400" /></div>
-                <div className={`text-xs font-semibold px-2 py-1 rounded-lg ${stat.isUp ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"} flex items-center gap-1`}>
-                  {stat.isUp ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />} {stat.trend}
+            <div key={idx} className="bg-white/5 rounded-2xl border border-white/10 p-4 md:p-5 flex flex-col gap-1">
+              <div className="text-[13px] text-white/55">{stat.label}</div>
+              <div className="text-2xl md:text-[28px] leading-tight font-semibold text-white tabular-nums">{stat.value}</div>
+              {stat.trend ? (
+                <div className={`text-[12px] flex items-center gap-1 ${stat.isUp ? "text-white/50" : "text-rose-300"}`}>
+                  {stat.isUp ? null : <TrendingDown className="w-3.5 h-3.5" />}
+                  {stat.trend}
                 </div>
-              </div>
-              <div>
-                <div className="text-sm text-white/60 mb-1">{stat.label}</div>
-                <div className="text-xl md:text-3xl font-bold tracking-tight break-all">{stat.value}</div>
-              </div>
+              ) : null}
             </div>
           ))}
         </div>
@@ -204,13 +202,13 @@ function BranchOverviewKpiTable({ data }: { data: BranchOverviewKpiData }) {
   const { presets, rows } = data;
 
   return (
-    <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)] overflow-hidden">
+    <div className="bg-white/10 rounded-2xl border border-white/10 p-6  overflow-hidden">
       <div className="flex items-center gap-3 mb-4">
         <div className="p-2 bg-amber-500/20 rounded-xl border border-amber-500/20">
           <User className="w-5 h-5 text-amber-400" />
         </div>
         <div>
-          <h2 className="text-lg font-bold tracking-tight text-white">
+          <h2 className="text-lg font-semibold tracking-tight text-white">
             ตาราง KPI เจ้าหน้าที่ตามที่เลือก
           </h2>
           <p className="text-[11px] text-white/50">
@@ -228,23 +226,23 @@ function BranchOverviewKpiTable({ data }: { data: BranchOverviewKpiData }) {
           <table className="w-full text-left border-collapse text-[11px]">
             <thead>
               <tr className="bg-[#0c3123] border-b border-emerald-500/20 text-white/90">
-                <th className="py-3 px-3 font-bold uppercase tracking-wider sticky left-0 bg-[#0c3123] z-10 min-w-[110px] md:min-w-[160px]">
+                <th className="py-3 px-3 font-semibold sticky left-0 bg-[#0c3123] z-10 min-w-[110px] md:min-w-[160px]">
                   เจ้าหน้าที่
                 </th>
-                <th className="hidden md:table-cell py-3 px-3 font-bold uppercase tracking-wider min-w-[120px]">
+                <th className="hidden md:table-cell py-3 px-3 font-semibold min-w-[120px]">
                   สาขา
                 </th>
                 {presets.map((p) => (
                   <th
                     key={p.id}
-                    className="py-3 px-3 font-bold uppercase tracking-wider text-right min-w-[120px]"
+                    className="py-3 px-3 font-semibold text-right min-w-[120px]"
                     title={p.labelA + " → " + (p.labelB || "(ไม่มี)")}
                   >
                     <div className="flex items-center justify-end gap-1.5">
                       <span className={`w-2 h-2 rounded-full ${colorDotClass(p.color)}`} />
                       <span>{p.name}</span>
                     </div>
-                    <div className="text-[9px] text-white/40 font-normal normal-case mt-0.5">
+                    <div className="text-[11px] text-white/40 font-normal normal-case mt-0.5">
                       {calcTypeLabel(p.calcType)}
                     </div>
                   </th>
@@ -282,12 +280,11 @@ function BranchOverviewKpiTable({ data }: { data: BranchOverviewKpiData }) {
   );
 }
 
+// สีบอกสถานะแบบเงียบ: ไม่มีกรอบ/พื้น — ถึงเป้า = เขียว, ต่ำกว่า 80% = แดง, ที่เหลือ = ตัวอักษรปกติ
 const achBadgeClass = (rate: number): string => {
-  if (rate >= 100)
-    return "bg-green-500/20 text-green-400 font-bold px-1 py-0.5 rounded border border-green-500/20";
-  if (rate >= 80)
-    return "bg-amber-500/20 text-amber-400 font-bold px-1 py-0.5 rounded border border-amber-500/20";
-  return "bg-rose-500/20 text-rose-400 font-bold px-1 py-0.5 rounded border border-rose-500/20";
+  if (rate >= 100) return "text-emerald-300 font-semibold";
+  if (rate >= 80) return "text-white/70";
+  return "text-rose-300 font-semibold";
 };
 
 /**
@@ -368,19 +365,19 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
     const rate = total > 0 ? (approved / total) * 100 : 0;
     const cls =
       rate >= 50
-        ? "bg-green-500/20 text-green-400 font-bold px-1 py-0.5 rounded border border-green-500/20"
+        ? "bg-green-500/20 text-green-400 font-semibold px-1 py-0.5 rounded border border-green-500/20"
         : rate >= 25
-          ? "bg-amber-500/20 text-amber-400 font-bold px-1 py-0.5 rounded border border-amber-500/20"
-          : "bg-rose-500/20 text-rose-400 font-bold px-1 py-0.5 rounded border border-rose-500/20";
+          ? "bg-amber-500/20 text-amber-400 font-semibold px-1 py-0.5 rounded border border-amber-500/20"
+          : "bg-rose-500/20 text-rose-400 font-semibold px-1 py-0.5 rounded border border-rose-500/20";
     return (
       <div className="flex flex-col items-end gap-0.5 leading-none">
         <span className="font-mono font-semibold text-white tabular-nums">
           {Math.round(approved)}/{Math.round(total)}
         </span>
         {total > 0 ? (
-          <span className={`text-[8px] ${cls}`}>{fmtPct(rate)}</span>
+          <span className={`text-[11px] ${cls}`}>{fmtPct(rate)}</span>
         ) : (
-          <span className="text-[8px] text-white/25">—</span>
+          <span className="text-[11px] text-white/25">—</span>
         )}
       </div>
     );
@@ -476,18 +473,18 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
     if (!cell) return <span className="text-white/25">—</span>;
     return (
       <div className="flex flex-col items-end gap-0.5 leading-none">
-        <span className="text-[8px] text-white/35 tabular-nums">
+        <span className="text-[11px] text-white/35 tabular-nums">
           {cell.target > 0 ? fmtCompact(cell.target) : "—"}
         </span>
-        <span className={`font-mono tabular-nums ${isTotal ? "font-bold text-emerald-200" : "font-semibold text-white"}`}>
+        <span className={`font-mono tabular-nums ${isTotal ? "font-semibold text-emerald-200" : "font-semibold text-white"}`}>
           {fmtCompact(cell.actual)}
         </span>
         {cell.target > 0 ? (
-          <span className={`text-[8px] ${achBadgeClass(cell.achPercent)}`}>
+          <span className={`text-[11px] ${achBadgeClass(cell.achPercent)}`}>
             {fmtPct(cell.achPercent)}
           </span>
         ) : (
-          <span className="text-[8px] text-white/25">—</span>
+          <span className="text-[11px] text-white/25">—</span>
         )}
       </div>
     );
@@ -506,16 +503,16 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
         : formatKpiCell(cell.actual, cell.calcType);
     return (
       <div className="flex flex-col items-end gap-0.5 leading-none">
-        <span className="text-[8px] text-white/35 tabular-nums">
+        <span className="text-[11px] text-white/35 tabular-nums">
           {cell.target > 0 ? (percentPreset ? `${cell.target}%` : fmtCompact(cell.target)) : "—"}
         </span>
         <span className="font-mono font-semibold text-white tabular-nums">{actualText}</span>
         {cell.target > 0 ? (
-          <span className={`text-[8px] ${achBadgeClass(scaled)}`}>
+          <span className={`text-[11px] ${achBadgeClass(scaled)}`}>
             {fmtPct(cell.achPercent)}
           </span>
         ) : (
-          <span className="text-[8px] text-white/25">—</span>
+          <span className="text-[11px] text-white/25">—</span>
         )}
       </div>
     );
@@ -526,7 +523,7 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
     if (pct == null || !Number.isFinite(pct)) return <span className="text-white/25">—</span>;
     return (
       <span
-        className={`inline-block text-[13px] font-extrabold tabular-nums px-1.5 py-0.5 rounded-md ${achBadgeClass(
+        className={`inline-block text-[13px] font-semibold tabular-nums px-1.5 py-0.5 rounded-md ${achBadgeClass(
           scaledForColor ?? pct,
         )}`}
       >
@@ -546,16 +543,16 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
   };
 
   return (
-    <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-3 shadow-[0_8px_32px_rgba(0,0,0,0.12)] overflow-hidden">
+    <div className="bg-white/10 rounded-2xl border border-white/10 p-3  overflow-hidden">
       <div className="flex items-center gap-3 mb-3">
         <div className="p-2 bg-emerald-500/20 rounded-xl border border-emerald-500/20">
           <Building2 className="w-5 h-5 text-emerald-400" />
         </div>
         <div>
-          <h2 className="text-base font-bold tracking-tight text-white">
+          <h2 className="text-base font-semibold tracking-tight text-white">
             ยอดขายตามหมวด + 7 Wonders รายคน
           </h2>
-          <p className="text-[10px] text-white/45">
+          <p className="text-[11px] text-white/45">
             แต่ละช่อง: บนสุด = เป้า · กลาง = ยอดจริง (7 Wonders = จำนวนที่แนบ/ฐาน) · ล่าง = % ถึงเป้า
           </p>
         </div>
@@ -567,14 +564,14 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
         </p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-white/10">
-          <table className="w-full text-left border-collapse text-[9px]">
+          <table className="w-full text-left border-collapse text-[11px]">
             <thead>
               <tr className="bg-[#0c3123] border-b border-emerald-500/10 text-white/70">
                 <th className="py-1 px-1 sticky left-0 bg-[#0c3123] z-10" />
                 {categories.length > 0 ? (
                   <th
                     colSpan={categories.length + 1}
-                    className="py-1 px-1 text-center text-[9px] font-bold uppercase tracking-widest text-emerald-300/80 border-l border-white/10"
+                    className="py-1 px-1 text-center text-[11px] font-semibold text-emerald-300/80 border-l border-white/10"
                   >
                     ยอดขายตามหมวด
                   </th>
@@ -582,13 +579,13 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                 {presets.length > 0 ? (
                   <th
                     colSpan={presets.length + extraTradeCols}
-                    className="py-1 px-1 text-center text-[9px] font-bold uppercase tracking-widest text-amber-300/80 border-l border-white/10"
+                    className="py-1 px-1 text-center text-[11px] font-semibold text-amber-300/80 border-l border-white/10"
                   >
                     7 Wonders
                   </th>
                 ) : null}
                 {hasCsat ? (
-                  <th className="py-1 px-1 text-center text-[9px] font-bold uppercase tracking-widest text-sky-300/80 border-l border-white/10">
+                  <th className="py-1 px-1 text-center text-[11px] font-semibold text-sky-300/80 border-l border-white/10">
                     CSAT
                   </th>
                 ) : null}
@@ -597,7 +594,7 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                 <th
                   rowSpan={rs}
                   onClick={() => onSort("name")}
-                  className="py-1.5 px-1 font-bold uppercase tracking-wider sticky left-0 bg-[#0c3123] z-10 min-w-[84px] cursor-pointer select-none hover:text-white align-bottom"
+                  className="py-1.5 px-1 font-semibold sticky left-0 bg-[#0c3123] z-10 min-w-[84px] cursor-pointer select-none hover:text-white align-bottom"
                 >
                   เจ้าหน้าที่{arrow("name")}
                 </th>
@@ -606,7 +603,7 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                     key={cat}
                     rowSpan={rs}
                     onClick={() => onSort(`cat:${cat}`)}
-                    className={`py-1.5 px-1 font-bold uppercase tracking-wide text-right min-w-[42px] cursor-pointer select-none hover:text-white align-bottom ${i === 0 ? "border-l border-white/10" : ""}`}
+                    className={`py-1.5 px-1 font-semibold   text-right min-w-[42px] cursor-pointer select-none hover:text-white align-bottom ${i === 0 ? "border-l border-white/10" : ""}`}
                   >
                     {cat}{arrow(`cat:${cat}`)}
                   </th>
@@ -614,7 +611,7 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                 <th
                   rowSpan={rs}
                   onClick={() => onSort("total")}
-                  className="py-1.5 px-1 font-bold uppercase tracking-wide text-right min-w-[48px] text-emerald-300 bg-emerald-500/5 cursor-pointer select-none hover:text-emerald-200 align-bottom"
+                  className="py-1.5 px-1 font-semibold text-right min-w-[48px] text-emerald-300 bg-emerald-500/5 cursor-pointer select-none hover:text-emerald-200 align-bottom"
                 >
                   Total{arrow("total")}
                 </th>
@@ -624,7 +621,7 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                       <th
                         key={p.id}
                         colSpan={2}
-                        className={`py-1.5 px-1 font-bold uppercase tracking-wide text-center text-teal-300 ${i === 0 ? "border-l border-white/10" : ""}`}
+                        className={`py-1.5 px-1 font-semibold   text-center text-teal-300 ${i === 0 ? "border-l border-white/10" : ""}`}
                       >
                         {splitLabel(p).group}
                       </th>
@@ -635,7 +632,7 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                       key={p.id}
                       rowSpan={rs}
                       onClick={() => onSort(`w:${p.id}`)}
-                      className={`py-1.5 px-1 font-bold uppercase tracking-wide text-right min-w-[46px] cursor-pointer select-none hover:text-white align-bottom ${i === 0 ? "border-l border-white/10" : ""}`}
+                      className={`py-1.5 px-1 font-semibold   text-right min-w-[46px] cursor-pointer select-none hover:text-white align-bottom ${i === 0 ? "border-l border-white/10" : ""}`}
                       title={p.labelA + " → " + (p.labelB || "(ไม่มี)")}
                     >
                       <div className="flex items-center justify-end gap-1">
@@ -652,10 +649,10 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                   <th
                     rowSpan={rs}
                     onClick={() => onSort("csat")}
-                    className="py-1.5 px-1 font-bold uppercase tracking-wide text-right min-w-[58px] text-sky-300 border-l border-white/10 cursor-pointer select-none hover:text-sky-200 align-bottom"
+                    className="py-1.5 px-1 font-semibold text-right min-w-[58px] text-sky-300 border-l border-white/10 cursor-pointer select-none hover:text-sky-200 align-bottom"
                   >
                     <div>CSAT{arrow("csat")}</div>
-                    <div className="text-[8px] text-white/40 font-normal normal-case">
+                    <div className="text-[11px] text-white/40 font-normal normal-case">
                       (คะแนน · ตอบ/บิล)
                     </div>
                   </th>
@@ -669,7 +666,7 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                           <th
                             key={p.id}
                             onClick={() => onSort(`w:${p.id}`)}
-                            className="py-1 px-1 font-bold uppercase tracking-wide text-right min-w-[46px] cursor-pointer select-none hover:text-white border-l border-white/10"
+                            className="py-1 px-1 font-semibold text-right min-w-[46px] cursor-pointer select-none hover:text-white border-l border-white/10"
                             title={p.labelA + " → " + (p.labelB || "(ไม่มี)")}
                           >
                             {splitLabel(p).primary}{arrow(`w:${p.id}`)}
@@ -677,7 +674,7 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                           <th
                             key={`${p.id}-appr`}
                             onClick={() => onSort(`wA:${p.id}`)}
-                            className="py-1 px-1 font-bold uppercase tracking-wide text-right min-w-[46px] cursor-pointer select-none hover:text-white"
+                            className="py-1 px-1 font-semibold text-right min-w-[46px] cursor-pointer select-none hover:text-white"
                             title={
                               /ufund/i.test(p.name)
                                 ? "ยอดยื่น/อนุมัติ (uFund) — อนุมัติ ÷ ยอดยื่น"
@@ -698,19 +695,19 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                   key={`${row.officer.name}-${idx}`}
                   className={
                     isTotal
-                      ? "total-row border-y-2 border-amber-400/70 bg-amber-400/20 shadow-[inset_4px_0_0_0_rgba(251,191,36,0.9)]"
+                      ? "total-row border-y-2 border-amber-400/70 bg-amber-400/20 "
                       : "border-b border-white/5 hover:bg-white/5 transition-colors"
                   }
                 >
                   <td
                     className={`py-1 px-1 sticky left-0 z-10 ${
-                      isTotal ? "total-sticky bg-[#4a3c10] shadow-[inset_4px_0_0_0_rgba(251,191,36,0.9)]" : "bg-[#0a1f17]"
+                      isTotal ? "total-sticky bg-[#4a3c10] " : "bg-[#0a1f17]"
                     }`}
                   >
-                    <div className={`truncate max-w-[84px] ${isTotal ? "text-[11px] font-extrabold text-amber-200" : "font-medium text-white"}`}>
+                    <div className={`truncate max-w-[84px] ${isTotal ? "text-[11px] font-semibold text-amber-200" : "font-medium text-white"}`}>
                       {isTotal ? "Σ " : ""}{row.officer.name}
                     </div>
-                    <div className="text-[8px] text-white/40 truncate max-w-[84px]">{row.officer.branch || "-"}</div>
+                    <div className="text-[11px] text-white/40 truncate max-w-[84px]">{row.officer.branch || "-"}</div>
                   </td>
                   {categories.map((cat, i) => (
                     <td
@@ -776,7 +773,7 @@ function CombinedOfficerKpiTable({ data }: { data: CombinedOfficerKpiData }) {
                             {row.csat.score.toFixed(2)}
                             <span className="text-white/30 font-normal">/{row.csat.maxScore}</span>
                           </span>
-                          <span className="text-[8px] text-white/40 tabular-nums">
+                          <span className="text-[11px] text-white/40 tabular-nums">
                             ตอบ {row.csat.responseCount}
                             {row.csat.billCount > 0
                               ? `/${row.csat.billCount} (${((row.csat.responseCount / row.csat.billCount) * 100).toFixed(0)}%)`
@@ -811,56 +808,56 @@ function CsatStoreCard({ overview }: { overview: CsatOverview }) {
       ? "text-green-400"
       : "text-amber-400";
   return (
-    <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-4 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+    <div className="bg-white/10 rounded-2xl border border-white/10 p-4 ">
       <div className="flex items-center gap-3 mb-3">
         <div className="p-2 bg-sky-500/20 rounded-xl border border-sky-500/20">
           <Smile className="w-5 h-5 text-sky-400" />
         </div>
         <div>
-          <h2 className="text-base font-bold tracking-tight text-white">
+          <h2 className="text-base font-semibold tracking-tight text-white">
             CSAT ทั้งร้าน
           </h2>
-          <p className="text-[10px] text-white/45">
+          <p className="text-[11px] text-white/45">
             ผลสำรวจความพึงพอใจของลูกค้า (COM7 CSAT) — เดือนปัจจุบัน
           </p>
         </div>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-black/20 rounded-xl border border-white/5 p-3 text-center">
-          <div className="text-[10px] text-white/50 mb-1">NPS</div>
-          <div className={`text-2xl font-bold tabular-nums ${npsClass}`}>
+          <div className="text-[11px] text-white/50 mb-1">NPS</div>
+          <div className={`text-2xl font-semibold tabular-nums ${npsClass}`}>
             {overview.npsScore.toFixed(2)}
           </div>
-          <div className="text-[9px] text-white/40 mt-1">
+          <div className="text-[11px] text-white/40 mt-1">
             P {overview.promoters.count} · Pa {overview.passives.count} · D{" "}
             {overview.detractors.count}
           </div>
         </div>
         <div className="bg-black/20 rounded-xl border border-white/5 p-3 text-center">
-          <div className="text-[10px] text-white/50 mb-1">คะแนนเฉลี่ย</div>
-          <div className="text-2xl font-bold tabular-nums text-white">
+          <div className="text-[11px] text-white/50 mb-1">คะแนนเฉลี่ย</div>
+          <div className="text-2xl font-semibold tabular-nums text-white">
             {overview.avgScore.toFixed(1)}
             <span className="text-sm text-white/40">/{overview.maxScore}</span>
           </div>
         </div>
         <div className="bg-black/20 rounded-xl border border-white/5 p-3 text-center">
-          <div className="text-[10px] text-white/50 mb-1">อัตราการตอบ</div>
-          <div className={`text-2xl font-bold tabular-nums ${respClass}`}>
+          <div className="text-[11px] text-white/50 mb-1">อัตราการตอบ</div>
+          <div className={`text-2xl font-semibold tabular-nums ${respClass}`}>
             {overview.submitBillPercent.toFixed(1)}%
           </div>
-          <div className="text-[9px] text-white/40 mt-1">
+          <div className="text-[11px] text-white/40 mt-1">
             เป้า {overview.targetBillPercent}%
           </div>
         </div>
         <div className="bg-black/20 rounded-xl border border-white/5 p-3 text-center">
-          <div className="text-[10px] text-white/50 mb-1">
+          <div className="text-[11px] text-white/50 mb-1">
             จำนวนตอบ / บิลทั้งหมด
           </div>
-          <div className="text-2xl font-bold tabular-nums text-white">
+          <div className="text-2xl font-semibold tabular-nums text-white">
             {overview.submitBill}
             <span className="text-sm text-white/40">/{overview.totalBill}</span>
           </div>
-          <div className="text-[9px] text-white/40 mt-1">
+          <div className="text-[11px] text-white/40 mt-1">
             เป้า {overview.targetBill} ครั้ง
           </div>
         </div>
@@ -887,16 +884,16 @@ function CsatLowScoresCard({ items }: { items: CsatLowScore[] }) {
   };
 
   return (
-    <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-amber-400/20 p-4 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+    <div className="bg-white/10 rounded-2xl border border-amber-400/20 p-4 ">
       <div className="flex items-center gap-3 mb-3">
         <div className="p-2 bg-amber-500/20 rounded-xl border border-amber-500/20">
           <TrendingDown className="w-5 h-5 text-amber-400" />
         </div>
         <div>
-          <h2 className="text-base font-bold tracking-tight text-white">
+          <h2 className="text-base font-semibold tracking-tight text-white">
             CSAT คะแนนไม่เต็ม ({items.length})
           </h2>
-          <p className="text-[10px] text-white/45">
+          <p className="text-[11px] text-white/45">
             บิลที่ลูกค้าให้คะแนนต่ำกว่าเต็ม — ดูจุดบริการที่ควรปรับ เพื่อโค้ชรายคน
           </p>
         </div>
@@ -906,11 +903,11 @@ function CsatLowScoresCard({ items }: { items: CsatLowScore[] }) {
         <table className="w-full text-left border-collapse text-[11px]">
           <thead>
             <tr className="bg-[#0c3123] border-b border-emerald-500/20 text-white/80">
-              <th className="py-2 px-3 font-bold uppercase tracking-wide min-w-[120px]">วันที่</th>
-              <th className="py-2 px-3 font-bold uppercase tracking-wide min-w-[130px]">พนักงาน</th>
-              <th className="py-2 px-3 font-bold uppercase tracking-wide text-center">คะแนน</th>
-              <th className="py-2 px-3 font-bold uppercase tracking-wide min-w-[200px]">จุดที่ควรปรับ</th>
-              <th className="py-2 px-3 font-bold uppercase tracking-wide min-w-[90px]">บิล</th>
+              <th className="py-2 px-3 font-semibold min-w-[120px]">วันที่</th>
+              <th className="py-2 px-3 font-semibold min-w-[130px]">พนักงาน</th>
+              <th className="py-2 px-3 font-semibold text-center">คะแนน</th>
+              <th className="py-2 px-3 font-semibold min-w-[200px]">จุดที่ควรปรับ</th>
+              <th className="py-2 px-3 font-semibold min-w-[90px]">บิล</th>
             </tr>
           </thead>
           <tbody>
@@ -919,7 +916,7 @@ function CsatLowScoresCard({ items }: { items: CsatLowScore[] }) {
                 <td className="py-2 px-3 text-white/70 whitespace-nowrap">{fmtDate(s.submittedAt)}</td>
                 <td className="py-2 px-3 font-medium text-white">{s.staffName || "-"}</td>
                 <td className="py-2 px-3 text-center">
-                  <span className="font-mono font-bold text-amber-300">
+                  <span className="font-mono font-semibold text-amber-300">
                     {s.score}
                     <span className="text-white/30 font-normal">/{s.maxScore}</span>
                   </span>
@@ -927,7 +924,7 @@ function CsatLowScoresCard({ items }: { items: CsatLowScore[] }) {
                 <td className="py-2 px-3 text-white/80">
                   {s.weakAspects.length > 0 ? s.weakAspects.join(", ") : "—"}
                 </td>
-                <td className="py-2 px-3 text-white/40 font-mono text-[10px]">{s.billId}</td>
+                <td className="py-2 px-3 text-white/40 font-mono text-[11px]">{s.billId}</td>
               </tr>
             ))}
           </tbody>
@@ -974,53 +971,64 @@ function PaceBanner({
 
   const fmt = (n: number) => `฿${Math.round(n).toLocaleString()}`;
 
+  const achPct = target > 0 ? (actual / target) * 100 : 0;
+  const expectedPct = (day / totalDays) * 100;
   const tone = onTrack
-    ? { bar: "border-emerald-400/30 bg-emerald-500/10", head: "text-emerald-300", icon: "text-emerald-400" }
+    ? { fill: "bg-emerald-400", head: "text-emerald-300" }
     : diffPct > -10
-      ? { bar: "border-amber-400/30 bg-amber-500/10", head: "text-amber-300", icon: "text-amber-400" }
-      : { bar: "border-rose-400/30 bg-rose-500/10", head: "text-rose-300", icon: "text-rose-400" };
+      ? { fill: "bg-amber-400", head: "text-amber-300" }
+      : { fill: "bg-rose-400", head: "text-rose-300" };
 
   return (
-    <div className={`rounded-2xl border p-4 shadow-[0_8px_32px_rgba(0,0,0,0.12)] ${tone.bar}`}>
-      <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-        <div className="flex items-center gap-3 lg:min-w-[280px]">
-          <div className="p-2.5 bg-white/10 rounded-xl border border-white/10">
-            <Gauge className={`w-6 h-6 ${tone.icon}`} />
-          </div>
-          <div>
-            <div className={`text-lg font-bold tracking-tight ${tone.head}`}>
-              {onTrack
-                ? `ตามเป้าอยู่ (+${Math.abs(diffPct).toFixed(0)}%)`
-                : `ช้ากว่าเป้า ${Math.abs(diffPct).toFixed(0)}%`}
-            </div>
-            <div className="text-[11px] text-white/50">
-              วันที่ {day}/{totalDays} ของเดือน · ควรทำได้ถึง {fmt(expectedByNow)} แล้ว
-            </div>
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-5 md:p-6">
+      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+        <div>
+          <div className="text-[13px] text-white/55">ยอดสะสมเดือนนี้ · วันที่ {day} จาก {totalDays}</div>
+          <div className="mt-1 flex items-baseline gap-2 tabular-nums">
+            <span className="text-4xl md:text-5xl font-semibold text-white">{fmt(actual)}</span>
+            <span className="text-lg text-white/40">/ {fmt(target)}</span>
           </div>
         </div>
+        <div className="text-right">
+          <div className={`text-2xl md:text-3xl font-semibold tabular-nums ${tone.head}`}>{achPct.toFixed(0)}%</div>
+          <div className={`text-[13px] ${tone.head}`}>
+            {onTrack ? `นำเป้า ${Math.abs(diffPct).toFixed(0)}%` : `ช้ากว่าเป้า ${Math.abs(diffPct).toFixed(0)}%`}
+          </div>
+        </div>
+      </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 flex-1">
-          <div className="bg-black/20 rounded-xl border border-white/5 px-3 py-2">
-            <div className="text-[10px] text-white/50">ยอดสะสม / เป้า</div>
-            <div className="text-sm font-bold text-white tabular-nums">
-              {fmt(actual)}<span className="text-white/40 font-normal"> / {fmt(target)}</span>
-            </div>
+      {/* แถบความคืบหน้า + ขีด "ควรถึงวันนี้" */}
+      <div className="relative mt-4 mb-6">
+        <div className="h-3 rounded-full bg-white/10 overflow-hidden">
+          <div className={`h-full rounded-full ${tone.fill}`} style={{ width: `${Math.min(achPct, 100)}%` }} />
+        </div>
+        <div className="absolute -top-1 h-5 w-0.5 rounded bg-white" style={{ left: `calc(${Math.min(expectedPct, 100)}% - 1px)` }} />
+        <div
+          className="absolute top-5 text-[11px] text-white/55 whitespace-nowrap -translate-x-1/2"
+          style={{ left: `${Math.min(Math.max(expectedPct, 8), 92)}%` }}
+        >
+          ควรถึงวันนี้ {fmt(expectedByNow)}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 pt-3 border-t border-white/10">
+        <div>
+          <div className="text-[12px] text-white/50">
+            ต้องทำต่อวัน {remainingDays > 0 ? `· เหลือ ${remainingDays} วัน` : "· วันสุดท้าย"}
           </div>
-          <div className="bg-black/20 rounded-xl border border-white/5 px-3 py-2">
-            <div className="text-[10px] text-white/50">
-              ต้องทำอีกวันละ {remainingDays > 0 ? `(เหลือ ${remainingDays} วัน)` : "(วันสุดท้าย)"}
-            </div>
-            <div className={`text-sm font-bold tabular-nums ${tone.head}`}>
-              {remainingAmount > 0 ? fmt(neededPerDay) : "ถึงเป้าแล้ว 🎉"}
-            </div>
+          <div className="text-base font-semibold text-white tabular-nums">
+            {remainingAmount > 0 ? fmt(neededPerDay) : "ถึงเป้าแล้ว"}
           </div>
-          <div className="bg-black/20 rounded-xl border border-white/5 px-3 py-2 col-span-2 sm:col-span-1">
-            <div className="text-[10px] text-white/50">คาดว่าจะจบเดือนที่</div>
-            <div className="text-sm font-bold text-white tabular-nums">
-              {projectedPct.toFixed(0)}%
-              <span className="text-white/40 font-normal"> ({fmt(projected)})</span>
-            </div>
+        </div>
+        <div>
+          <div className="text-[12px] text-white/50">คาดจบเดือน</div>
+          <div className="text-base font-semibold text-white tabular-nums">
+            {projectedPct.toFixed(0)}% <span className="text-white/40 font-normal text-[13px]">({fmt(projected)})</span>
           </div>
+        </div>
+        <div className="col-span-2 sm:col-span-1">
+          <div className="text-[12px] text-white/50">ยังขาดอีก</div>
+          <div className="text-base font-semibold text-white tabular-nums">{fmt(remainingAmount)}</div>
         </div>
       </div>
     </div>

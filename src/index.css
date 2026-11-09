@@ -13,36 +13,36 @@
   --capture-bg: #1c2722;
 }
 html.theme-light {
-  --capture-bg: #eaf1ed;
+  --capture-bg: #eeede9;
 }
 
 /* Structural backgrounds (marker classes added in JSX) */
 html.theme-light .app-root {
-  background-color: #e7edea !important;
+  background-color: #eeede9 !important;
 }
 html.theme-light .app-panel {
-  background: linear-gradient(to bottom right, #ffffff, #e8f1ec) !important;
+  background: #fbfaf8 !important;
 }
 html.theme-light .staff-hero {
-  background: linear-gradient(to bottom right, #ffffff, #eef4f0) !important;
+  background: #ffffff !important;
 }
 
 /* Text: white → dark green-gray, preserving the muted alpha steps */
-html.theme-light .text-white { color: #14261e; }
-html.theme-light .text-white\/95 { color: rgb(20 38 30 / 0.95); }
-html.theme-light .text-white\/90 { color: rgb(20 38 30 / 0.92); }
-html.theme-light .text-white\/85 { color: rgb(20 38 30 / 0.86); }
-html.theme-light .text-white\/80 { color: rgb(20 38 30 / 0.80); }
-html.theme-light .text-white\/70 { color: rgb(20 38 30 / 0.70); }
-html.theme-light .text-white\/60 { color: rgb(20 38 30 / 0.62); }
-html.theme-light .text-white\/55 { color: rgb(20 38 30 / 0.58); }
-html.theme-light .text-white\/50 { color: rgb(20 38 30 / 0.52); }
-html.theme-light .text-white\/45 { color: rgb(20 38 30 / 0.48); }
-html.theme-light .text-white\/40 { color: rgb(20 38 30 / 0.44); }
-html.theme-light .text-white\/35 { color: rgb(20 38 30 / 0.40); }
-html.theme-light .text-white\/30 { color: rgb(20 38 30 / 0.36); }
-html.theme-light .text-white\/25 { color: rgb(20 38 30 / 0.32); }
-html.theme-light .text-white\/20 { color: rgb(20 38 30 / 0.28); }
+html.theme-light .text-white { color: #1f1e1b; }
+html.theme-light .text-white\/95 { color: rgb(31 30 27 / 0.95); }
+html.theme-light .text-white\/90 { color: rgb(31 30 27 / 0.92); }
+html.theme-light .text-white\/85 { color: rgb(31 30 27 / 0.86); }
+html.theme-light .text-white\/80 { color: rgb(31 30 27 / 0.80); }
+html.theme-light .text-white\/70 { color: rgb(31 30 27 / 0.70); }
+html.theme-light .text-white\/60 { color: rgb(31 30 27 / 0.62); }
+html.theme-light .text-white\/55 { color: rgb(31 30 27 / 0.58); }
+html.theme-light .text-white\/50 { color: rgb(31 30 27 / 0.52); }
+html.theme-light .text-white\/45 { color: rgb(31 30 27 / 0.48); }
+html.theme-light .text-white\/40 { color: rgb(31 30 27 / 0.44); }
+html.theme-light .text-white\/35 { color: rgb(31 30 27 / 0.40); }
+html.theme-light .text-white\/30 { color: rgb(31 30 27 / 0.36); }
+html.theme-light .text-white\/25 { color: rgb(31 30 27 / 0.32); }
+html.theme-light .text-white\/20 { color: rgb(31 30 27 / 0.28); }
 
 /* Surfaces: translucent white overlays → raised white cards on the
    light panel */
@@ -58,33 +58,33 @@ html.theme-light .hover\:bg-white\/\[0\.15\]:hover { background-color: rgb(255 2
 html.theme-light .hover\:bg-white\/20:hover { background-color: rgb(255 255 255 / 0.98); }
 
 /* Recessed black overlays → faint tinted panels on white cards */
-html.theme-light .bg-black\/20 { background-color: rgb(15 45 32 / 0.05); }
-html.theme-light .hover\:bg-black\/30:hover { background-color: rgb(15 45 32 / 0.08); }
+html.theme-light .bg-black\/20 { background-color: rgb(31 30 27 / 0.05); }
+html.theme-light .hover\:bg-black\/30:hover { background-color: rgb(31 30 27 / 0.08); }
 
 /* Borders: white → dark translucent */
-html.theme-light .border-white\/5 { border-color: rgb(15 45 32 / 0.07); }
-html.theme-light .border-white\/10 { border-color: rgb(15 45 32 / 0.12); }
-html.theme-light .border-white\/15 { border-color: rgb(15 45 32 / 0.16); }
-html.theme-light .border-white\/20 { border-color: rgb(15 45 32 / 0.20); }
-html.theme-light .border-white\/25 { border-color: rgb(15 45 32 / 0.24); }
-html.theme-light .border-white\/30 { border-color: rgb(15 45 32 / 0.28); }
-html.theme-light .border-white\/40 { border-color: rgb(15 45 32 / 0.34); }
-html.theme-light .hover\:border-white\/25:hover { border-color: rgb(15 45 32 / 0.24); }
-html.theme-light .hover\:border-white\/40:hover { border-color: rgb(15 45 32 / 0.34); }
+html.theme-light .border-white\/5 { border-color: rgb(31 30 27 / 0.07); }
+html.theme-light .border-white\/10 { border-color: rgb(31 30 27 / 0.12); }
+html.theme-light .border-white\/15 { border-color: rgb(31 30 27 / 0.16); }
+html.theme-light .border-white\/20 { border-color: rgb(31 30 27 / 0.20); }
+html.theme-light .border-white\/25 { border-color: rgb(31 30 27 / 0.24); }
+html.theme-light .border-white\/30 { border-color: rgb(31 30 27 / 0.28); }
+html.theme-light .border-white\/40 { border-color: rgb(31 30 27 / 0.34); }
+html.theme-light .hover\:border-white\/25:hover { border-color: rgb(31 30 27 / 0.24); }
+html.theme-light .hover\:border-white\/40:hover { border-color: rgb(31 30 27 / 0.34); }
 
 /* Dark-green hex backgrounds → light greens */
-html.theme-light .bg-\[\#1c2722\] { background-color: #e7edea; }
-html.theme-light .bg-\[\#0c3123\] { background-color: #dde9e2; }
+html.theme-light .bg-\[\#1c2722\] { background-color: #eeede9; }
+html.theme-light .bg-\[\#0c3123\] { background-color: #e9e8e3; }
 html.theme-light .bg-\[\#051710\] { background-color: #ffffff; }
-html.theme-light .bg-\[\#0a1f17\] { background-color: #f1f6f3; }
-html.theme-light .bg-\[\#052b20\] { background-color: #eef4f0; }
-html.theme-light .bg-\[\#032e1f\] { background-color: #eef4f0; }
-html.theme-light .bg-\[\#043d29\] { background-color: #e6f0ea; }
-html.theme-light .bg-\[\#0c291d\] { background-color: #eaf2ee; }
-html.theme-light .bg-\[\#0f4430\] { background-color: #d6e9df; }
-html.theme-light .bg-\[\#1b3a2c\] { background-color: #e6f0ea; }
-html.theme-light .bg-\[\#052b20\]\/60 { background-color: rgb(238 244 240 / 0.6); }
-html.theme-light .bg-\[\#0c3123\]\/90 { background-color: rgb(221 233 226 / 0.95); }
+html.theme-light .bg-\[\#0a1f17\] { background-color: #f8f7f4; }
+html.theme-light .bg-\[\#052b20\] { background-color: #f7f6f3; }
+html.theme-light .bg-\[\#032e1f\] { background-color: #f7f6f3; }
+html.theme-light .bg-\[\#043d29\] { background-color: #efeee9; }
+html.theme-light .bg-\[\#0c291d\] { background-color: #f1f0ec; }
+html.theme-light .bg-\[\#0f4430\] { background-color: #e3e2dc; }
+html.theme-light .bg-\[\#1b3a2c\] { background-color: #efeee9; }
+html.theme-light .bg-\[\#052b20\]\/60 { background-color: rgb(247 246 243 / 0.6); }
+html.theme-light .bg-\[\#0c3123\]\/90 { background-color: rgb(233 232 227 / 0.95); }
 
 /* Accent text: brighten-on-dark shades are too pale on white → deepen */
 html.theme-light .text-emerald-200,
@@ -149,7 +149,7 @@ html.theme-light .text-red-300,
 html.theme-light .text-rose-200,
 html.theme-light .text-rose-100\/90,
 html.theme-light .text-rose-300\/80 { color: #be123c; }
-html.theme-light .text-slate-50 { color: #14261e; }
+html.theme-light .text-slate-50 { color: #1f1e1b; }
 html.theme-light .text-slate-300 { color: #475569; }
 html.theme-light .fill-emerald-200 { fill: #047857; }
 
@@ -159,10 +159,10 @@ html.theme-light svg text[fill="#ffffff"],
 html.theme-light svg text[fill="white"],
 html.theme-light svg text[fill^="rgba(255,255,255"],
 html.theme-light svg text[fill^="rgba(255, 255, 255"],
-html.theme-light svg tspan[fill^="rgba(255,255,255"] { fill: #14261e; }
+html.theme-light svg tspan[fill^="rgba(255,255,255"] { fill: #1f1e1b; }
 html.theme-light svg text[fill="#34d399"] { fill: #047857; }
 html.theme-light svg [stroke^="rgba(255,255,255"],
-html.theme-light svg [stroke^="rgba(255, 255, 255"] { stroke: rgb(15 45 32 / 0.18); }
+html.theme-light svg [stroke^="rgba(255, 255, 255"] { stroke: rgb(31 30 27 / 0.18); }
 /* ป้ายแกน Recharts ที่เป็นสีเทาอ่อน */
 html.theme-light .recharts-cartesian-axis-tick-value,
 html.theme-light .recharts-polar-angle-axis-tick-value { fill: #475569; }
@@ -172,97 +172,11 @@ html.theme-light .recharts-legend-item-text { color: #334155 !important; }
    THEMES (โทนสีเข้มเพิ่มเติม) — แทนสีเขียวเข้มที่ฝังใน className
    ด้วยโทนของแต่ละธีม · class บน <html>: theme-<id>
    ============================================================ */
-html.theme-ocean { --capture-bg: #121c2b; }
-html.theme-ocean .app-root { background-color: #121c2b !important; }
-html.theme-ocean .app-panel { background: linear-gradient(to bottom right, #1b3f66, #0f2440) !important; }
-html.theme-ocean .staff-hero { background: linear-gradient(to bottom right, #1b3f66, #0f2440) !important; }
-html.theme-ocean .bg-\[\#0c3123\] { background-color: #0d2238; }
-html.theme-ocean .bg-\[\#051710\] { background-color: #06111f; }
-html.theme-ocean .bg-\[\#0f4430\] { background-color: #173a5e; }
-html.theme-ocean .bg-\[\#1b3a2c\] { background-color: #18304a; }
-html.theme-ocean .bg-\[\#052b20\] { background-color: #0a1a2c; }
-html.theme-ocean .bg-\[\#0a1f17\] { background-color: #0b1726; }
-html.theme-ocean .bg-\[\#0c291d\] { background-color: #0c1d30; }
-html.theme-ocean .bg-\[\#032e1f\] { background-color: #0a1f35; }
-html.theme-ocean .bg-\[\#043d29\] { background-color: #0f2a47; }
-html.theme-ocean .bg-\[\#1c2722\] { background-color: #121c2b; }
-html.theme-ocean .bg-\[\#0c3123\]\/90 { background-color: color-mix(in srgb, #0d2238 90%, transparent); }
-html.theme-ocean .bg-\[\#052b20\]\/60 { background-color: color-mix(in srgb, #0a1a2c 60%, transparent); }
-html.theme-ocean option { background-color: #06111f; }
-html.theme-graphite { --capture-bg: #1a1b1e; }
-html.theme-graphite .app-root { background-color: #1a1b1e !important; }
-html.theme-graphite .app-panel { background: linear-gradient(to bottom right, #3a3d44, #232529) !important; }
-html.theme-graphite .staff-hero { background: linear-gradient(to bottom right, #3a3d44, #232529) !important; }
-html.theme-graphite .bg-\[\#0c3123\] { background-color: #26282d; }
-html.theme-graphite .bg-\[\#051710\] { background-color: #121315; }
-html.theme-graphite .bg-\[\#0f4430\] { background-color: #3a3d44; }
-html.theme-graphite .bg-\[\#1b3a2c\] { background-color: #2e3036; }
-html.theme-graphite .bg-\[\#052b20\] { background-color: #1e2023; }
-html.theme-graphite .bg-\[\#0a1f17\] { background-color: #18191c; }
-html.theme-graphite .bg-\[\#0c291d\] { background-color: #1c1e21; }
-html.theme-graphite .bg-\[\#032e1f\] { background-color: #202226; }
-html.theme-graphite .bg-\[\#043d29\] { background-color: #2a2c31; }
-html.theme-graphite .bg-\[\#1c2722\] { background-color: #1a1b1e; }
-html.theme-graphite .bg-\[\#0c3123\]\/90 { background-color: color-mix(in srgb, #26282d 90%, transparent); }
-html.theme-graphite .bg-\[\#052b20\]\/60 { background-color: color-mix(in srgb, #1e2023 60%, transparent); }
-html.theme-graphite option { background-color: #121315; }
-html.theme-plum { --capture-bg: #1e1626; }
-html.theme-plum .app-root { background-color: #1e1626 !important; }
-html.theme-plum .app-panel { background: linear-gradient(to bottom right, #4a2a63, #2a183a) !important; }
-html.theme-plum .staff-hero { background: linear-gradient(to bottom right, #4a2a63, #2a183a) !important; }
-html.theme-plum .bg-\[\#0c3123\] { background-color: #2b1a3b; }
-html.theme-plum .bg-\[\#051710\] { background-color: #140b1c; }
-html.theme-plum .bg-\[\#0f4430\] { background-color: #4a2a63; }
-html.theme-plum .bg-\[\#1b3a2c\] { background-color: #33224a; }
-html.theme-plum .bg-\[\#052b20\] { background-color: #21142e; }
-html.theme-plum .bg-\[\#0a1f17\] { background-color: #1a1023; }
-html.theme-plum .bg-\[\#0c291d\] { background-color: #1e1229; }
-html.theme-plum .bg-\[\#032e1f\] { background-color: #24152f; }
-html.theme-plum .bg-\[\#043d29\] { background-color: #33204a; }
-html.theme-plum .bg-\[\#1c2722\] { background-color: #1e1626; }
-html.theme-plum .bg-\[\#0c3123\]\/90 { background-color: color-mix(in srgb, #2b1a3b 90%, transparent); }
-html.theme-plum .bg-\[\#052b20\]\/60 { background-color: color-mix(in srgb, #21142e 60%, transparent); }
-html.theme-plum option { background-color: #140b1c; }
-html.theme-wine { --capture-bg: #241417; }
-html.theme-wine .app-root { background-color: #241417 !important; }
-html.theme-wine .app-panel { background: linear-gradient(to bottom right, #6a2430, #3a141b) !important; }
-html.theme-wine .staff-hero { background: linear-gradient(to bottom right, #6a2430, #3a141b) !important; }
-html.theme-wine .bg-\[\#0c3123\] { background-color: #3a1a20; }
-html.theme-wine .bg-\[\#051710\] { background-color: #1a0a0d; }
-html.theme-wine .bg-\[\#0f4430\] { background-color: #6a2430; }
-html.theme-wine .bg-\[\#1b3a2c\] { background-color: #45222a; }
-html.theme-wine .bg-\[\#052b20\] { background-color: #2c1015; }
-html.theme-wine .bg-\[\#0a1f17\] { background-color: #200d11; }
-html.theme-wine .bg-\[\#0c291d\] { background-color: #251015; }
-html.theme-wine .bg-\[\#032e1f\] { background-color: #2c1218; }
-html.theme-wine .bg-\[\#043d29\] { background-color: #401a22; }
-html.theme-wine .bg-\[\#1c2722\] { background-color: #241417; }
-html.theme-wine .bg-\[\#0c3123\]\/90 { background-color: color-mix(in srgb, #3a1a20 90%, transparent); }
-html.theme-wine .bg-\[\#052b20\]\/60 { background-color: color-mix(in srgb, #2c1015 60%, transparent); }
-html.theme-wine option { background-color: #1a0a0d; }
 
-/* ธีมสว่างโทนฟ้า (ใช้คู่กับ theme-light) */
-html.theme-light.theme-sky { --capture-bg: #e8eef6; }
-html.theme-light.theme-sky .app-root { background-color: #e6edf6 !important; }
-html.theme-light.theme-sky .app-panel { background: linear-gradient(to bottom right, #ffffff, #e5eef9) !important; }
-html.theme-light.theme-sky .staff-hero { background: linear-gradient(to bottom right, #ffffff, #eaf1fa) !important; }
-html.theme-light.theme-sky .bg-\[\#0c3123\] { background-color: #dde7f3; }
-html.theme-light.theme-sky .bg-\[\#0f4430\] { background-color: #d3e1f2; }
-html.theme-light.theme-sky .bg-\[\#1b3a2c\] { background-color: #e3ebf6; }
-html.theme-light.theme-sky .bg-\[\#052b20\] { background-color: #eef3fa; }
-/* ธีมสว่างโทนครีม */
-html.theme-light.theme-sand { --capture-bg: #f3eee6; }
-html.theme-light.theme-sand .app-root { background-color: #efe9df !important; }
-html.theme-light.theme-sand .app-panel { background: linear-gradient(to bottom right, #fffdf9, #f3ecdf) !important; }
-html.theme-light.theme-sand .staff-hero { background: linear-gradient(to bottom right, #fffdf9, #f5eee3) !important; }
-html.theme-light.theme-sand .bg-\[\#0c3123\] { background-color: #ece3d4; }
-html.theme-light.theme-sand .bg-\[\#0f4430\] { background-color: #e6dac6; }
-html.theme-light.theme-sand .bg-\[\#1b3a2c\] { background-color: #efe6d8; }
-html.theme-light.theme-sand .bg-\[\#052b20\] { background-color: #f6f0e6; }
 
 /* แถว "รวมทั้งหมด" ในตารางยอดขายตามหมวด + 7 Wonders — เด่นทุกธีม */
-.total-row td { font-weight: 700; }
-.total-row td .font-mono { color: #fde68a; font-weight: 800; }
+.total-row td { font-weight: 600; }
+.total-row td .font-mono { color: #fde68a; font-weight: 600; }
 html.theme-light .total-row { background-color: #fdecb5 !important; }
 html.theme-light .total-row td .font-mono { color: #7c4a03; }
 html.theme-light .total-sticky { background-color: #fbe08a !important; }
@@ -289,19 +203,44 @@ html.theme-light .total-sticky .text-amber-200 { color: #7c4a03; }
 /* คอลัมน์แรกของตารางค้างไว้ตอนเลื่อนแนวนอน (เฉพาะมือถือ) */
 @media (max-width: 767px) {
   .mobile-sticky-col { position: sticky; left: 0; z-index: 10; background-color: #0a1f17; }
-  html.theme-light .mobile-sticky-col { background-color: #f1f6f3; }
-  html.theme-ocean .mobile-sticky-col { background-color: #0b1726; }
-  html.theme-graphite .mobile-sticky-col { background-color: #18191c; }
-  html.theme-plum .mobile-sticky-col { background-color: #1a1023; }
-  html.theme-wine .mobile-sticky-col { background-color: #200d11; }
+  html.theme-light .mobile-sticky-col { background-color: #f8f7f4; }
 }
 @media (max-width: 767px) {
   th.mobile-sticky-col { background-color: #0c3123; }
-  html.theme-light th.mobile-sticky-col { background-color: #dde9e2; }
-  html.theme-light.theme-sky th.mobile-sticky-col { background-color: #dde7f3; }
-  html.theme-light.theme-sand th.mobile-sticky-col { background-color: #ece3d4; }
-  html.theme-ocean th.mobile-sticky-col { background-color: #0d2238; }
-  html.theme-graphite th.mobile-sticky-col { background-color: #26282d; }
-  html.theme-plum th.mobile-sticky-col { background-color: #2b1a3b; }
-  html.theme-wine th.mobile-sticky-col { background-color: #3a1a20; }
+  html.theme-light th.mobile-sticky-col { background-color: #e9e8e3; }
 }
+
+
+/* ============================================================
+   ธีมมืด (ค่าเริ่มต้น) — เทาถ่านอมอุ่น พื้นเรียบ ไม่ไล่สี
+   สีเขียวเข้มที่ฝังใน className → ขั้นของเทาถ่านชุดเดียว
+   ============================================================ */
+html.theme-dark { --capture-bg: #161614; }
+html.theme-dark .app-root { background-color: #121211 !important; }
+html.theme-dark .app-panel { background: #191917 !important; }
+html.theme-dark .staff-hero { background: #1f1f1d !important; }
+html.theme-dark .bg-\[\#1c2722\] { background-color: #121211; }
+html.theme-dark .bg-\[\#0c3123\] { background-color: #262623; }
+html.theme-dark .bg-\[\#0c3123\]\/90 { background-color: rgb(38 38 35 / 0.95); }
+html.theme-dark .bg-\[\#051710\] { background-color: #121211; }
+html.theme-dark .bg-\[\#0f4430\] { background-color: #33332f; }
+html.theme-dark .bg-\[\#1b3a2c\] { background-color: #2b2b28; }
+html.theme-dark .bg-\[\#052b20\] { background-color: #1d1d1b; }
+html.theme-dark .bg-\[\#052b20\]\/60 { background-color: rgb(29 29 27 / 0.6); }
+html.theme-dark .bg-\[\#0a1f17\] { background-color: #1f1f1d; }
+html.theme-dark .bg-\[\#0c291d\] { background-color: #222220; }
+html.theme-dark .bg-\[\#032e1f\] { background-color: #20201e; }
+html.theme-dark .bg-\[\#043d29\] { background-color: #2a2a27; }
+html.theme-dark option { background-color: #121211; }
+@media (max-width: 767px) {
+  html.theme-dark .mobile-sticky-col { background-color: #1f1f1d; }
+  html.theme-dark th.mobile-sticky-col { background-color: #262623; }
+}
+
+/* ============================================================
+   unslop: พื้นผิวเรียบ — ไม่มีกระจกเบลอ แสงเรือง หรือเงาสี
+   ============================================================ */
+.app-root [class*="backdrop-blur"] { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+.app-root [class*="shadow-[0_0_"],
+.app-root [class*="shadow-[0_8px_32px"],
+.app-root [class*="shadow-[0_16px_48px"] { box-shadow: none !important; }

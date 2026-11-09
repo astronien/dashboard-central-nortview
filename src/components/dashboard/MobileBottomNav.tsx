@@ -22,7 +22,7 @@ export function MobileBottomNav<V extends string>({
   const many = items.length > 5;
   return (
     <nav
-      className="mobile-bottom-nav md:hidden fixed bottom-0 inset-x-0 z-[60] bg-[#0c3123]/90 backdrop-blur-xl border-t border-white/10"
+      className="mobile-bottom-nav md:hidden fixed bottom-0 inset-x-0 z-[60] bg-[#0c3123]/90 border-t border-white/10"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <div className={`flex ${many ? "overflow-x-auto no-scrollbar" : "justify-around"} px-1`}>
@@ -40,7 +40,7 @@ export function MobileBottomNav<V extends string>({
               <span className={`p-1.5 rounded-full ${active ? "bg-white/10" : ""}`}>
                 <Icon className="w-5 h-5" />
               </span>
-              <span className="text-[10px] leading-none whitespace-nowrap">{label}</span>
+              <span className="text-[11px] leading-none whitespace-nowrap">{label}</span>
             </button>
           );
         })}

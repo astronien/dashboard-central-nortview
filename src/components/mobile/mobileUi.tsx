@@ -37,12 +37,18 @@ const PILL: Record<Tone, string> = {
   none: "bg-white/10 text-white/60 border-white/10",
 };
 
-export function Bar({ pct, tone }: { pct: number; tone?: Tone }) {
+/** แถบความคืบหน้า — mark = ขีด "ควรถึงวันนี้" (%) */
+export function Bar({ pct, tone, mark }: { pct: number; tone?: Tone; mark?: number | null }) {
   const t = tone ?? toneOf(pct);
   const w = Math.max(0, Math.min(100, Number.isFinite(pct) ? pct : 0));
   return (
-    <div className="h-1.5 rounded-full bg-white/10 overflow-hidden mt-1">
-      <div className={`h-full rounded-full ${BAR[t]}`} style={{ width: `${w}%` }} />
+    <div className="relative mt-1">
+      <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+        <div className={`h-full rounded-full ${BAR[t]}`} style={{ width: `${w}%` }} />
+      </div>
+      {mark != null && Number.isFinite(mark) ? (
+        <div className="absolute -top-0.5 h-2.5 w-0.5 rounded bg-white" style={{ left: `calc(${Math.min(Math.max(mark, 0), 100)}% - 1px)` }} />
+      ) : null}
     </div>
   );
 }
@@ -50,7 +56,7 @@ export function Bar({ pct, tone }: { pct: number; tone?: Tone }) {
 export function Pill({ pct, tone, text }: { pct?: number; tone?: Tone; text?: string }) {
   const t = tone ?? toneOf(pct);
   return (
-    <span className={`shrink-0 inline-flex items-center justify-center min-w-[52px] px-2 py-0.5 rounded-md border text-[12px] font-bold tabular-nums ${PILL[t]}`}>
+    <span className={`shrink-0 inline-flex items-center justify-center min-w-[52px] px-2 py-0.5 rounded-md border text-[12px] font-semibold tabular-nums ${PILL[t]}`}>
       {text ?? (pct == null ? "—" : fmtPctShort(pct))}
     </span>
   );
@@ -79,7 +85,7 @@ export function Segmented<K extends string>({
         >
           {o.label}
           {o.badge ? (
-            <span className="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold align-middle">
+            <span className="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[11px] font-semibold align-middle">
               {o.badge}
             </span>
           ) : null}
@@ -93,7 +99,7 @@ export function Avatar({ src, name, size = 36 }: { src?: string; name: string; s
   const initials = name.replace(/\s+/g, "").slice(0, 2);
   return (
     <div
-      className="shrink-0 rounded-full overflow-hidden bg-emerald-500/20 border border-white/15 flex items-center justify-center text-[12px] font-bold text-emerald-200"
+      className="shrink-0 rounded-full overflow-hidden bg-emerald-500/20 border border-white/15 flex items-center justify-center text-[12px] font-semibold text-emerald-200"
       style={{ width: size, height: size }}
     >
       {src ? <img src={src} alt={name} className="w-full h-full object-cover object-top" /> : initials}

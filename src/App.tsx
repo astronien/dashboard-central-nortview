@@ -17,9 +17,9 @@ import {
   TrendingUp,
   User,
   Users,
-  Check,
   Settings,
   Target,
+  AlertTriangle,
   SlidersHorizontal,
   ImagePlus,
   Trash2,
@@ -36,7 +36,6 @@ import {
   LogOut,
   Loader2,
   Sun,
-  Palette,
   Moon,
   Gauge,
 } from "lucide-react";
@@ -73,7 +72,7 @@ import {
   finishLineReport,
   uploadLineReportImage,
 } from "./lib/lineReport";
-import { THEMES, applyTheme, findTheme, type ThemeId } from "./lib/themes";
+import { applyTheme, findTheme, type ThemeId } from "./lib/themes";
 import {
   EMPTY_TARGET_UPLIFT,
   applyTargetUplift,
@@ -1307,12 +1306,11 @@ function AppInternal({
     try {
       const saved = localStorage.getItem("theme");
       // ค่าเดิม "dark" / "light" ยังใช้ได้
-      return findTheme(saved === "dark" ? "forest" : saved).id;
+      return findTheme(saved).id;
     } catch {
-      return "forest";
+      return "dark";
     }
   });
-  const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   useEffect(() => {
     applyTheme(theme);
     try {
@@ -2661,36 +2659,35 @@ function AppInternal({
       ? parsedReport.officers.reduce((sum, officer) => sum + officer.rate, 0) / parsedReport.officers.length
       : 0;
     const totalOfficers = parsedReport.officers.length;
-    const totalBranches = parsedReport.branches.length;
     const lastMonthTotal = parsedReport.branches.reduce((sum, branch) => sum + branch.lastMonth, 0);
     const trendPercent = lastMonthTotal ? ((totalSales - lastMonthTotal) / lastMonthTotal) * 100 : 0;
 
     return [
       {
-        label: "Total Sales",
+        label: "ยอดขายเดือนนี้",
         value: `฿${Math.round(totalSales).toLocaleString()}`,
-        trend: `${trendPercent >= 0 ? "+" : ""}${Math.round(trendPercent)}%`,
+        trend: lastMonthTotal ? `${trendPercent >= 0 ? "+" : ""}${Math.round(trendPercent)}% เทียบทั้งเดือนก่อน` : "",
         icon: DollarSign,
         isUp: trendPercent >= 0,
       },
       {
-        label: "Store Target",
+        label: "ถึงเป้าร้าน",
         value: `${Math.round(avgAch)}%`,
-        trend: `${avgAch >= 100 ? "+" : ""}${Math.round(avgAch - 100)}%`,
+        trend: avgAch >= 100 ? "ถึงเป้าแล้ว" : `ขาดอีก ${Math.round(100 - avgAch)}%`,
         icon: Star,
         isUp: avgAch >= 100,
       },
       {
-        label: "Avg Staff Ach %",
+        label: "เฉลี่ยรายคน",
         value: `${Math.round(avgRate)}%`,
-        trend: `${avgRate >= 100 ? "+" : ""}${Math.round(avgRate)}%`,
+        trend: "ถึงเป้าเฉลี่ยของพนักงาน",
         icon: Smile,
         isUp: true,
       },
       {
-        label: "Active Staff",
-        value: `${totalOfficers.toLocaleString()}`,
-        trend: `${totalBranches.toLocaleString()} branches`,
+        label: "พนักงานขาย",
+        value: `${totalOfficers.toLocaleString()} คน`,
+        trend: "",
         icon: Users,
         isUp: true,
       },
@@ -3670,9 +3667,12 @@ function AppInternal({
                 padding: `${pad}px`,
                 // พื้นหลังรูปแคปตามธีมที่เลือก
                 background:
-                  (document.querySelector(".app-panel") &&
-                    getComputedStyle(document.querySelector(".app-panel") as Element).backgroundImage) ||
-                  "linear-gradient(to bottom right, #1b5d44, #123627)",
+                  (() => {
+                    const el = document.querySelector(".app-panel");
+                    if (!el) return "#191917";
+                    const cs = getComputedStyle(el);
+                    return cs.backgroundImage && cs.backgroundImage !== "none" ? cs.backgroundImage : cs.backgroundColor;
+                  })(),
               }
             : {}),
         },
@@ -3992,6 +3992,17 @@ function AppInternal({
   })();
   const homeFullSections = (
     <>
+      <div className="hidden md:flex items-baseline justify-between gap-4 -mt-2">
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold text-white truncate">{parsedStoreHeader.name}</h1>
+          <div className="text-[13px] text-white/50">
+            Store ID {parsedStoreHeader.id}
+            {dailyBranchReport.latestDate
+              ? ` · ข้อมูลถึง ${dailyBranchReport.latestDate.split("-").reverse().join("/")}${dailyBranchReport.lastBillTime ? ` ${dailyBranchReport.lastBillTime} น.` : ""}`
+              : ""}
+          </div>
+        </div>
+      </div>
                 <HomeDashboardSection
                   derivedHomeStats={derivedHomeStats}
                   monthlyPerformance={monthlyPerformance}
@@ -4068,28 +4079,18 @@ function AppInternal({
         {/* Logo (Absolute Left) */}
         <div className="absolute top-4 left-4 md:top-6 md:left-8 z-50 flex items-center gap-4 pointer-events-auto">
           <img src="/site-logo.09b5daa.svg" alt="Logo" className="h-6 md:h-8" />
-          {currentView === "home" && (
-            <div className="hidden lg:flex flex-col ml-4">
-              <h1 className="text-xl font-bold tracking-tight drop-shadow-md">
-                {parsedStoreHeader.name}
-              </h1>
-              <span className="text-xs text-white/80 drop-shadow-md">
-                Store ID: {parsedStoreHeader.id} • Opening Hours: 10:00 - 22:00
-              </span>
-            </div>
-          )}
         </div>
 
         {/* Top Navigation (Floating Right) */}
-        <header className="absolute top-2.5 right-3 md:top-6 md:right-8 md:w-1/2 flex justify-end items-center z-50 pointer-events-none">
-          <div className="flex items-center gap-2 md:gap-6 pointer-events-auto">
+        <header className="absolute top-2.5 right-3 md:top-6 md:right-8 flex justify-end items-center z-50 pointer-events-none">
+          <div className="flex items-center gap-2 md:gap-3 pointer-events-auto">
             {/* ป้ายเตือนว่ากำลังใช้เป้าที่ปรับเพิ่ม (ตั้งใน Settings) */}
             {upliftLabel(targetUplift) ? (
               <span
                 title="กำลังใช้เป้าที่ปรับเพิ่มจากเป้าจริง — ปิดได้ที่ Settings → ปรับเป้าเพิ่ม"
-                className="hidden md:inline-flex items-center gap-1.5 px-3 py-2 rounded-full border text-xs font-bold backdrop-blur-md shadow-xl bg-sky-500/25 border-sky-400/50 text-sky-100"
+                className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold whitespace-nowrap bg-sky-500/10 border-sky-400/30 text-sky-200"
               >
-                🎯 {upliftLabel(targetUplift)}
+                <Target className="w-3.5 h-3.5" /> {upliftLabel(targetUplift)}
               </span>
             ) : null}
             {/* ส่งรีพอท (Home + Staff Profile) ให้ LINE bot — กดวันละครั้งตอนปิดร้าน */}
@@ -4100,13 +4101,13 @@ function AppInternal({
                   onClick={() => void sendLineReportNow()}
                   disabled={!!lineReportProgress || !dailyBranchReport.latestDate}
                   title="แคปหน้า Home + Staff Profile ทุกคน แล้วเก็บไว้ให้ LINE bot (พิมพ์ report ในกลุ่มเพื่อดูรูป)"
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full border text-xs font-semibold backdrop-blur-md shadow-xl transition-colors bg-[#06c755]/20 border-[#06c755]/50 text-white hover:bg-[#06c755]/30 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold whitespace-nowrap transition-colors bg-[#06c755]/15 border-[#06c755]/40 text-white hover:bg-[#06c755]/25 disabled:opacity-50"
                 >
                   <Send className="w-4 h-4" />
-                  {lineReportProgress ? "กำลังส่ง…" : "ส่งรีพอทเข้า LINE"}
+                  {lineReportProgress ? "กำลังส่ง…" : "ส่ง LINE"}
                 </button>
                 {lineReportDone ? (
-                  <div className="absolute right-0 top-full mt-2 whitespace-nowrap rounded-lg bg-[#0c3123] border border-emerald-400/30 px-3 py-1.5 text-[11px] text-emerald-200 shadow-xl">
+                  <div className="absolute right-0 top-full mt-2 whitespace-nowrap rounded-lg bg-[#0c3123] border border-emerald-400/30 px-3 py-1.5 text-[11px] text-emerald-200 ">
                     {lineReportDone}
                   </div>
                 ) : null}
@@ -4120,17 +4121,17 @@ function AppInternal({
                 onChange={updateExcludedIphoneModels}
               />
             </div>
-            <nav className="flex items-center space-x-2 lg:space-x-4 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/5 shadow-xl hidden md:flex">
+            <nav className="flex items-center space-x-2 lg:space-x-4 bg-white/10  px-4 py-2 rounded-full border border-white/5  hidden md:flex">
               <button
                 onClick={() => setCurrentView("home")}
-                className={`p-2 rounded-full transition-colors ${currentView === "home" ? "bg-[#0f4430] shadow-inner text-white" : "text-white/60 hover:text-white"}`}
+                className={`p-2 rounded-full transition-colors ${currentView === "home" ? "bg-[#0f4430]  text-white" : "text-white/60 hover:text-white"}`}
                 title="Home"
               >
                 <Home className="w-5 h-5" />
               </button>
               <button
                 onClick={() => setCurrentView("staff")}
-                className={`p-2 rounded-full transition-colors ${currentView === "staff" ? "bg-[#0f4430] shadow-inner text-white" : "text-white/60 hover:text-white"}`}
+                className={`p-2 rounded-full transition-colors ${currentView === "staff" ? "bg-[#0f4430]  text-white" : "text-white/60 hover:text-white"}`}
                 title="Staff Profile"
               >
                 <User className="w-5 h-5" />
@@ -4139,49 +4140,49 @@ function AppInternal({
                 <>
                   <button
                     onClick={() => setCurrentView("reports")}
-                    className={`p-2 rounded-full transition-colors ${currentView === "reports" ? "bg-[#0f4430] shadow-inner text-white" : "text-white/60 hover:text-white"}`}
+                    className={`p-2 rounded-full transition-colors ${currentView === "reports" ? "bg-[#0f4430]  text-white" : "text-white/60 hover:text-white"}`}
                     title="Reports"
                   >
                     <PieChart className="w-5 h-5" />
                   </button>
                   <button
                     onClick={() => setCurrentView("commission")}
-                    className={`p-2 rounded-full transition-colors ${currentView === "commission" ? "bg-[#0f4430] shadow-inner text-white" : "text-white/60 hover:text-white"}`}
+                    className={`p-2 rounded-full transition-colors ${currentView === "commission" ? "bg-[#0f4430]  text-white" : "text-white/60 hover:text-white"}`}
                     title="ค่าคอมมิชชั่น (PIA)"
                   >
                     <Wallet className="w-5 h-5" />
                   </button>
                   <button
                     onClick={() => setCurrentView("kpi_preset")}
-                    className={`p-2 rounded-full transition-colors ${currentView === "kpi_preset" ? "bg-[#0f4430] shadow-inner text-white" : "text-white/60 hover:text-white"}`}
+                    className={`p-2 rounded-full transition-colors ${currentView === "kpi_preset" ? "bg-[#0f4430]  text-white" : "text-white/60 hover:text-white"}`}
                     title="KPI Preset"
                   >
                     <SlidersHorizontal className="w-5 h-5" />
                   </button>
                   <button
                     onClick={() => setCurrentView("analysis")}
-                    className={`p-2 rounded-full transition-colors ${currentView === "analysis" ? "bg-[#0f4430] shadow-inner text-white" : "text-white/60 hover:text-white"}`}
+                    className={`p-2 rounded-full transition-colors ${currentView === "analysis" ? "bg-[#0f4430]  text-white" : "text-white/60 hover:text-white"}`}
                     title="บทวิเคราะห์รายวัน"
                   >
                     <Activity className="w-5 h-5" />
                   </button>
                   <button
                     onClick={() => setCurrentView("trends")}
-                    className={`p-2 rounded-full transition-colors ${currentView === "trends" ? "bg-[#0f4430] shadow-inner text-white" : "text-white/60 hover:text-white"}`}
+                    className={`p-2 rounded-full transition-colors ${currentView === "trends" ? "bg-[#0f4430]  text-white" : "text-white/60 hover:text-white"}`}
                     title="แนวโน้มย้อนหลัง"
                   >
                     <TrendingUp className="w-5 h-5" />
                   </button>
                   <button
                     onClick={() => setCurrentView("runrate")}
-                    className={`p-2 rounded-full transition-colors ${currentView === "runrate" ? "bg-[#0f4430] shadow-inner text-white" : "text-white/60 hover:text-white"}`}
+                    className={`p-2 rounded-full transition-colors ${currentView === "runrate" ? "bg-[#0f4430]  text-white" : "text-white/60 hover:text-white"}`}
                     title="Run Rate อัตราการขาย"
                   >
                     <Gauge className="w-5 h-5" />
                   </button>
                   <button
                     onClick={() => setCurrentView("settings")}
-                    className={`p-2 rounded-full transition-colors ${currentView === "settings" ? "bg-[#0f4430] shadow-inner text-white" : "text-white/60 hover:text-white"}`}
+                    className={`p-2 rounded-full transition-colors ${currentView === "settings" ? "bg-[#0f4430]  text-white" : "text-white/60 hover:text-white"}`}
                     title="Settings"
                   >
                     <Settings className="w-5 h-5" />
@@ -4192,53 +4193,13 @@ function AppInternal({
 
             {/* Screenshot capture button */}
             <div className="pointer-events-auto hidden md:flex items-center gap-2 pl-2 ml-2 border-l border-white/10">
-              <div className="relative">
-                <button
-                  onClick={() => setThemeMenuOpen((v) => !v)}
-                  title="เลือกธีมสี"
-                  className="p-2 rounded-full transition-colors text-white/60 hover:text-white hover:bg-white/10"
-                >
-                  <Palette className="w-5 h-5" />
-                </button>
-                {themeMenuOpen ? (
-                  <>
-                    <div className="fixed inset-0 z-40" onClick={() => setThemeMenuOpen(false)} />
-                    <div className="absolute right-0 top-full mt-2 z-50 w-64 rounded-2xl border border-white/10 bg-[#0c3123] p-3 shadow-2xl">
-                      {[
-                        { title: "โทนเข้ม", dark: true },
-                        { title: "โทนสว่าง", dark: false },
-                      ].map((g) => (
-                        <div key={g.title} className="mb-2 last:mb-0">
-                          <div className="flex items-center gap-1.5 px-1 mb-1.5 text-[10px] font-bold uppercase tracking-wider text-white/40">
-                            {g.dark ? <Moon className="w-3 h-3" /> : <Sun className="w-3 h-3" />} {g.title}
-                          </div>
-                          <div className="grid grid-cols-1 gap-1">
-                            {THEMES.filter((t) => t.dark === g.dark).map((t) => (
-                              <button
-                                key={t.id}
-                                onClick={() => {
-                                  setTheme(t.id);
-                                  setThemeMenuOpen(false);
-                                }}
-                                className={`flex items-center gap-2.5 rounded-xl px-2 py-1.5 text-left text-[12px] transition-colors ${
-                                  theme === t.id ? "bg-white/15 text-white font-semibold" : "text-white/70 hover:bg-white/10"
-                                }`}
-                              >
-                                <span
-                                  className="w-6 h-6 rounded-full border border-white/20 shrink-0"
-                                  style={{ background: `linear-gradient(135deg, ${t.swatch[1]}, ${t.swatch[0]})` }}
-                                />
-                                <span className="flex-1">{t.label}</span>
-                                {theme === t.id ? <Check className="w-4 h-4 text-emerald-300" /> : null}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                ) : null}
-              </div>
+              <button
+                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                title={theme === "dark" ? "เปลี่ยนเป็นธีมสว่าง" : "เปลี่ยนเป็นธีมมืด"}
+                className="p-2 rounded-full transition-colors text-white/60 hover:text-white hover:bg-white/10"
+              >
+                {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+              </button>
               <button
                 onClick={() => {
                   if (currentView === "staff") {
@@ -4270,13 +4231,16 @@ function AppInternal({
 
             {/* User info + logout */}
             <div className="pointer-events-auto flex items-center gap-3 md:pl-2 md:ml-2 md:border-l border-white/10">
-              <div className="hidden md:flex flex-col items-end">
+              <div className="hidden xl:flex flex-col items-end whitespace-nowrap">
                 <span className="text-xs text-white/90 font-medium leading-tight">
                   {user?.name ?? "Guest"}
                 </span>
-                <span className="text-[10px] text-emerald-300 leading-tight">
-                  {user?.role === "admin" ? "Branch Sales Manager" : "PIA"}
-                </span>
+                {(() => {
+                  const roleLabel = user?.role === "admin" ? "Branch Sales Manager" : "PIA";
+                  return roleLabel !== (user?.name ?? "") ? (
+                    <span className="text-[11px] text-white/50 leading-tight">{roleLabel}</span>
+                  ) : null;
+                })()}
               </div>
               <button
                 onClick={logout}
@@ -4312,7 +4276,7 @@ function AppInternal({
                         initial={{ opacity: 0, y: 10, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                        className="absolute right-0 top-12 w-48 bg-[#0c3123]/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 flex flex-col"
+                        className="absolute right-0 top-12 w-48 bg-[#0c3123]/90  border border-white/10 rounded-2xl  overflow-hidden z-50 flex flex-col"
                       >
                         {parsedReport.officers
                           .map((officer, idx) => ({ officer, idx }))
@@ -4337,7 +4301,7 @@ function AppInternal({
                               <div className="text-sm text-white font-medium truncate">
                                 {officer.name}
                               </div>
-                              <div className="text-[10px] text-white/60 truncate">
+                              <div className="text-[11px] text-white/60 truncate">
                                 {officer.branch}
                               </div>
                             </div>
@@ -4370,10 +4334,10 @@ function AppInternal({
             {currentView === "home" && (
               <motion.div
                 key="home"
-                initial={{ opacity: 0, scale: 0.96, filter: "blur(8px)" }}
-                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-                exit={{ opacity: 0, scale: 1.04, filter: "blur(8px)" }}
-                transition={{ duration: 0.4, ease: "easeOut" }}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
                 {role === "admin" && csatError && (csatError.code === "auth" || csatError.code === "no_token") ? (
@@ -4381,7 +4345,7 @@ function AppInternal({
                     onClick={() => setCurrentView("settings")}
                     className="flex items-center gap-3 text-left rounded-2xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 hover:bg-amber-500/15 transition-colors"
                   >
-                    <span className="text-amber-300 text-lg shrink-0">⚠️</span>
+                    <AlertTriangle className="w-5 h-5 text-amber-300 shrink-0" />
                     <span className="text-sm text-amber-100/90">
                       {csatError.message}{" "}
                       <span className="underline font-semibold">ไปที่ Settings →</span>
@@ -4440,10 +4404,10 @@ function AppInternal({
             {!isPia && currentView === "reports" && (
               <motion.div
                 key="reports"
-                initial={{ opacity: 0, scale: 0.96, filter: "blur(8px)" }}
-                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-                exit={{ opacity: 0, scale: 1.04, filter: "blur(8px)" }}
-                transition={{ duration: 0.4, ease: "easeOut" }}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
                 <ReportsSection
@@ -4464,10 +4428,10 @@ function AppInternal({
             {!isPia && currentView === "trends" && (
               <motion.div
                 key="trends"
-                initial={{ opacity: 0, scale: 0.96, filter: "blur(8px)" }}
-                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-                exit={{ opacity: 0, scale: 1.04, filter: "blur(8px)" }}
-                transition={{ duration: 0.4, ease: "easeOut" }}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
                 <TrendsSection branch={selectedBranch} />
@@ -4476,10 +4440,10 @@ function AppInternal({
             {!isPia && currentView === "commission" && (
               <motion.div
                 key="commission"
-                initial={{ opacity: 0, scale: 0.96, filter: "blur(8px)" }}
-                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-                exit={{ opacity: 0, scale: 1.04, filter: "blur(8px)" }}
-                transition={{ duration: 0.4, ease: "easeOut" }}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
                 <CommissionSection
@@ -4511,10 +4475,10 @@ function AppInternal({
             {!isPia && currentView === "runrate" && (
               <motion.div
                 key="runrate"
-                initial={{ opacity: 0, scale: 0.96, filter: "blur(8px)" }}
-                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-                exit={{ opacity: 0, scale: 1.04, filter: "blur(8px)" }}
-                transition={{ duration: 0.4, ease: "easeOut" }}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
                 <RunRateSection
@@ -4531,10 +4495,10 @@ function AppInternal({
             {!isPia && currentView === "analysis" && (
               <motion.div
                 key="analysis"
-                initial={{ opacity: 0, scale: 0.96, filter: "blur(8px)" }}
-                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-                exit={{ opacity: 0, scale: 1.04, filter: "blur(8px)" }}
-                transition={{ duration: 0.4, ease: "easeOut" }}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
                 <AnalysisSection
@@ -4561,10 +4525,10 @@ function AppInternal({
             {!isPia && currentView === "kpi_preset" && (
               <motion.div
                 key="kpi_preset"
-                initial={{ opacity: 0, scale: 0.96, filter: "blur(8px)" }}
-                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-                exit={{ opacity: 0, scale: 1.04, filter: "blur(8px)" }}
-                transition={{ duration: 0.4, ease: "easeOut" }}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
                 <KpiPresetSection
@@ -4579,10 +4543,10 @@ function AppInternal({
             {!isPia && currentView === "settings" && (
               <motion.div
                 key="settings"
-                initial={{ opacity: 0, scale: 0.96, filter: "blur(8px)" }}
-                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-                exit={{ opacity: 0, scale: 1.04, filter: "blur(8px)" }}
-                transition={{ duration: 0.4, ease: "easeOut" }}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
                 <ViewErrorBoundary label="ตั้งค่า">

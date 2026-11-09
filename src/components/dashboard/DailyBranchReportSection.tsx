@@ -1,5 +1,5 @@
 import React from "react";
-import { LayoutGrid } from "lucide-react";
+import { Clock, Flame, LayoutGrid } from "lucide-react";
 
 export type DailyReportCellKind = "att" | "unit" | "baht";
 
@@ -181,10 +181,10 @@ export const DailyBranchReportSection: React.FC<{
   if (!data.rows.length) return null;
 
   return (
-    <div className="bg-white rounded-[2rem] border border-slate-200 p-5 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+    <div className="bg-white rounded-2xl border border-slate-200 p-5 ">
       <div className="flex flex-wrap items-center gap-2 mb-1">
         <LayoutGrid className="w-5 h-5 text-emerald-600" />
-        <h3 className="text-lg font-bold tracking-tight text-slate-800">
+        <h3 className="text-lg font-semibold tracking-tight text-slate-800">
           {isMonthly
             ? data.rangeActive
               ? `รายงานยอดขาย + Attach ช่วง ${fmtDay(data.rangeFrom ?? "")} – ${fmtDay(data.rangeTo ?? "")}`
@@ -192,8 +192,8 @@ export const DailyBranchReportSection: React.FC<{
             : "รายงานยอดขาย + Attach รายวัน (วันล่าสุด)"}
         </h3>
         {boost ? (
-          <span className="ml-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-orange-500 text-white" title="บิลที่แนบตัวที่เลือกได้เครดิตตามตัวคูณ · ตัวอื่นลดลงระหว่างช่วงโฟกัส">
-            🔥 {boost}
+          <span className="ml-1 inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md bg-orange-100 text-orange-800" title="บิลที่แนบตัวที่เลือกได้เครดิตตามตัวคูณ · ตัวอื่นลดลงระหว่างช่วงโฟกัส">
+            <Flame className="w-3.5 h-3.5" /> {boost}
           </span>
         ) : null}
         {data.lastBillTime || uploadedAt ? (
@@ -201,16 +201,16 @@ export const DailyBranchReportSection: React.FC<{
             className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold text-slate-600"
             title="ช่วงเวลาของข้อมูลยอดขายที่ใช้คำนวณในตารางนี้"
           >
-            🕒
+            <Clock className="w-3.5 h-3.5 text-slate-400" />
             {data.lastBillTime ? (
               <span>
-                ยอดถึงบิลล่าสุด <span className="text-slate-900 font-bold">{fmtDay(data.latestDate)} {data.lastBillTime} น.</span>
+                ยอดถึงบิลล่าสุด <span className="text-slate-900 font-semibold">{fmtDay(data.latestDate)} {data.lastBillTime} น.</span>
               </span>
             ) : null}
             {data.lastBillTime && uploadedAt ? <span className="text-slate-300">·</span> : null}
             {uploadedAt ? (
               <span>
-                อัปโหลดไฟล์เมื่อ <span className="text-slate-900 font-bold">{uploadedAt}</span>
+                อัปโหลดไฟล์เมื่อ <span className="text-slate-900 font-semibold">{uploadedAt}</span>
               </span>
             ) : null}
           </span>
@@ -255,27 +255,27 @@ export const DailyBranchReportSection: React.FC<{
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-slate-200">
-        <table className="w-full text-left border-collapse text-[10px] whitespace-nowrap text-slate-700">
+        <table className="w-full text-left border-collapse text-[11px] whitespace-nowrap text-slate-700">
           <thead>
             {/* Row 1 — groups */}
             <tr className="border-b border-slate-200">
               <th
                 rowSpan={2}
-                className="py-2 px-2 font-bold text-slate-500 sticky left-0 bg-white border-r border-slate-200 text-[11px]"
+                className="py-2 px-2 font-semibold text-slate-500 sticky left-0 bg-white border-r border-slate-200 text-[11px]"
               >
                 พนักงาน
               </th>
-              <th rowSpan={2} className="py-2 px-2 font-bold text-slate-500 text-right bg-slate-50">Total ฿</th>
-              <th rowSpan={2} className="py-2 px-2 font-bold text-slate-500 text-right">Device</th>
-              <th colSpan={2} className="py-1.5 px-2 font-bold text-center bg-slate-100 text-slate-600 border-l border-slate-200">
+              <th rowSpan={2} className="py-2 px-2 font-semibold text-slate-500 text-right bg-slate-50">Total ฿</th>
+              <th rowSpan={2} className="py-2 px-2 font-semibold text-slate-500 text-right">Device</th>
+              <th colSpan={2} className="py-1.5 px-2 font-semibold text-center bg-slate-100 text-slate-600 border-l border-slate-200">
                 iPhone
               </th>
-              <th colSpan={2} className="py-1.5 px-2 font-bold text-center bg-slate-50 text-slate-600 border-l border-slate-200">
+              <th colSpan={2} className="py-1.5 px-2 font-semibold text-center bg-slate-50 text-slate-600 border-l border-slate-200">
                 iPad
               </th>
               <th
                 colSpan={3}
-                className="py-1.5 px-2 font-bold text-center bg-emerald-100 text-emerald-800 border-l border-slate-200"
+                className="py-1.5 px-2 font-semibold text-center bg-emerald-100 text-emerald-800 border-l border-slate-200"
                 title="บิลที่มี UFUND / Cover / SIM / Accessories รวมอย่างน้อย 3 ชิ้น ถึงจะนับว่าผ่าน"
               >
                 บิล Attach ≥{ATTACH_PER_BILL_TARGET} ชิ้น
@@ -295,7 +295,7 @@ export const DailyBranchReportSection: React.FC<{
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={() => onDrop(p.id)}
                     title="ลากเพื่อสลับตำแหน่งคอลัมน์"
-                    className={`py-1.5 px-2 font-bold text-center border-l border-slate-200 cursor-grab active:cursor-grabbing select-none ${color}`}
+                    className={`py-1.5 px-2 font-semibold text-center border-l border-slate-200 cursor-grab active:cursor-grabbing select-none ${color}`}
                   >
                     {p.name}
                   </th>
@@ -303,7 +303,7 @@ export const DailyBranchReportSection: React.FC<{
               })}
             </tr>
             {/* Row 2 — sub labels */}
-            <tr className="border-b border-slate-200 text-[9px] text-slate-400 uppercase">
+            <tr className="border-b border-slate-200 text-[11px] text-slate-400 ">
               <th className="py-1 px-2 text-right bg-slate-100 border-l border-slate-200">จำนวน</th>
               <th className="py-1 px-2 text-right bg-slate-100">฿</th>
               <th className="py-1 px-2 text-right bg-slate-50 border-l border-slate-200">จำนวน</th>
@@ -327,14 +327,14 @@ export const DailyBranchReportSection: React.FC<{
                 key={idx}
                 className={
                   r.isTotal
-                    ? "bg-emerald-50 font-bold border-b-2 border-emerald-200"
+                    ? "bg-emerald-50 font-semibold border-b-2 border-emerald-200"
                     : idx % 2 === 0
                       ? "bg-white border-b border-slate-100"
                       : "bg-slate-50/60 border-b border-slate-100"
                 }
               >
                 <td
-                  className={`py-1.5 px-2 font-bold sticky left-0 border-r border-slate-200 ${
+                  className={`py-1.5 px-2 font-semibold sticky left-0 border-r border-slate-200 ${
                     r.isTotal ? "bg-emerald-50" : idx % 2 === 0 ? "bg-white" : "bg-slate-50"
                   }`}
                 >
@@ -345,9 +345,9 @@ export const DailyBranchReportSection: React.FC<{
                 <td
                   className={`py-1.5 px-2 text-right border-l border-slate-200 ${
                     r.iphoneAttachAlert
-                      ? "bg-rose-500 text-white font-extrabold"
+                      ? "bg-rose-500 text-white font-semibold"
                       : r.iphoneAttachWarn
-                        ? "bg-amber-300 text-amber-900 font-extrabold"
+                        ? "bg-amber-300 text-amber-900 font-semibold"
                         : ""
                   }`}
                   title={
@@ -376,7 +376,7 @@ export const DailyBranchReportSection: React.FC<{
                 <td className="py-1.5 px-2 text-right border-l border-slate-200">{num(r.billCount ?? 0)}</td>
                 <td className="py-1.5 px-2 text-right font-semibold">{num(r.qualifiedBills ?? 0)}</td>
                 <td
-                  className={`py-1.5 px-2 text-center font-bold ${
+                  className={`py-1.5 px-2 text-center font-semibold ${
                     (r.attachPerBill ?? 0) >= 50
                       ? "bg-emerald-100 text-emerald-700"
                       : (r.attachPerBill ?? 0) >= 25
@@ -411,10 +411,10 @@ export const DailyBranchReportSection: React.FC<{
                       <td className="py-1.5 px-2 text-right border-l border-slate-200">
                         <div>{num(c?.unit ?? 0)}</div>
                         {c?.unit18 != null && c.unit18 > 0 ? (
-                          <div className="text-[9px] font-bold text-amber-600">+{c.unit18} (ตัด)</div>
+                          <div className="text-[11px] font-semibold text-amber-600">+{c.unit18} (ตัด)</div>
                         ) : null}
                       </td>
-                      <td className={`py-1.5 px-2 text-center font-bold ${attFill(att)}`}>
+                      <td className={`py-1.5 px-2 text-center font-semibold ${attFill(att)}`}>
                         {c?.unit || att > 0 ? `${att.toFixed(1)}%` : "–"}
                       </td>
                     </React.Fragment>

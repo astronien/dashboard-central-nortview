@@ -100,12 +100,12 @@ export function MobileStaff({
         ) : null}
         <Avatar src={avatarOf(name, staffId)} name={name} size={52} />
         <div className="flex-1 min-w-0">
-          <div className="text-[17px] font-extrabold text-white truncate">{name}</div>
+          <div className="text-[17px] font-semibold text-white truncate">{name}</div>
           <div className="text-[11px] text-white/55 truncate">
             {rank ? `อันดับ ${rank.pos} จาก ${rank.of}` : ""}
             {staffId ? `${rank ? " · " : ""}ID ${staffId}` : ""}
           </div>
-          {branch ? <div className="text-[10px] text-white/40 truncate">{branch}</div> : null}
+          {branch ? <div className="text-[11px] text-white/40 truncate">{branch}</div> : null}
         </div>
         {canSwitch ? (
           <button type="button" aria-label="คนถัดไป" onClick={() => go(1)} className="p-1.5 -mr-1 text-white/60">
@@ -121,7 +121,7 @@ export function MobileStaff({
               type="button"
               aria-label={o.name}
               onClick={() => onSelect(o.index)}
-              className={`h-1.5 rounded-full transition-all ${o.index === activeIndex ? "w-4 bg-emerald-300" : "w-1.5 bg-white/25"}`}
+              className={`h-1.5 rounded-full transition-colors ${o.index === activeIndex ? "w-4 bg-emerald-300" : "w-1.5 bg-white/25"}`}
             />
           ))}
         </div>
@@ -131,23 +131,23 @@ export function MobileStaff({
       <div className="grid grid-cols-3 gap-2">
         <button type="button" onClick={() => setTab("cat")} className="rounded-xl bg-white/10 border border-white/10 p-2.5 text-left">
           <div className="text-[11px] text-white/55">เดือนนี้</div>
-          <div className="text-[18px] font-extrabold text-white tabular-nums">{monthPct == null ? "—" : fmtPctShort(monthPct)}</div>
-          <div className="text-[10px] text-white/50 tabular-nums truncate">
+          <div className="text-[18px] font-semibold text-white tabular-nums">{monthPct == null ? "—" : fmtPctShort(monthPct)}</div>
+          <div className="text-[11px] text-white/50 tabular-nums truncate">
             ฿{fmtShort(total?.actual ?? 0)} / {fmtShort(total?.target ?? 0)}
           </div>
         </button>
         <button type="button" onClick={() => setTab("today")} className="rounded-xl bg-white/10 border border-white/10 p-2.5 text-left">
           <div className="text-[11px] text-white/55">วันนี้</div>
-          <div className="text-[18px] font-extrabold text-white tabular-nums">฿{fmtShort(total?.actualDay ?? 0)}</div>
-          <div className="text-[10px] text-white/50 tabular-nums truncate">
+          <div className="text-[18px] font-semibold text-white tabular-nums">฿{fmtShort(total?.actualDay ?? 0)}</div>
+          <div className="text-[11px] text-white/50 tabular-nums truncate">
             เป้า {fmtShort(total?.targetDay ?? 0)}
             {todayPct != null ? ` · ${fmtPctShort(todayPct)}` : ""}
           </div>
         </button>
         <button type="button" onClick={() => setTab("wonder")} className="rounded-xl bg-white/10 border border-white/10 p-2.5 text-left">
           <div className="text-[11px] text-white/55">7 Wonders</div>
-          <div className="text-[18px] font-extrabold text-white tabular-nums">{Math.round(sevenWondersScore)}%</div>
-          <div className="text-[10px] text-white/50">คะแนนเฉลี่ย</div>
+          <div className="text-[18px] font-semibold text-white tabular-nums">{Math.round(sevenWondersScore)}%</div>
+          <div className="text-[11px] text-white/50">คะแนนเฉลี่ย</div>
         </button>
       </div>
 
@@ -200,7 +200,11 @@ export function MobileStaff({
                           <b className="text-white">{fmtShort(r.actual)}</b> / {fmtShort(r.target)}
                         </span>
                       </div>
-                      <Bar pct={p ?? 0} tone={toneOf(p)} />
+                      <Bar
+                        pct={p ?? 0}
+                        tone={toneOf(p)}
+                        mark={p != null && r.forecastPercent > 0 && p > 0 ? (p / r.forecastPercent) * 100 : null}
+                      />
                     </div>
                     <Pill pct={p ?? undefined} />
                     <ChevronDown className={`w-4 h-4 text-white/40 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
@@ -292,7 +296,7 @@ function Mini({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg bg-black/20 px-2 py-1.5 min-w-0">
       <div className="text-white/45 truncate">{label}</div>
-      <div className="font-bold text-white tabular-nums truncate">{value}</div>
+      <div className="font-semibold text-white tabular-nums truncate">{value}</div>
     </div>
   );
 }
