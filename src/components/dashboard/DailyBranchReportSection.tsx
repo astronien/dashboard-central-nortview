@@ -181,7 +181,7 @@ export const DailyBranchReportSection: React.FC<{
   if (!data.rows.length) return null;
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-5 ">
+    <div className="report-card bg-white rounded-2xl border border-slate-200 p-5 ">
       <div className="flex flex-wrap items-center gap-2 mb-1">
         <LayoutGrid className="w-5 h-5 text-emerald-600" />
         <h3 className="text-lg font-semibold tracking-tight text-slate-800">

@@ -250,3 +250,47 @@ html.theme-light .pace-track { background-color: rgb(31 30 27 / 0.1); }
 html.theme-light .pace-tick { background-color: #1f1e1b; }
 html.theme-light .pace-track .bg-white\/60,
 html.theme-light .pace-track .bg-white\/30 { background-color: rgb(31 30 27 / 0.45); }
+
+/* ============================================================
+   การ์ดรายงานยอดขาย + Attach (เขียนเป็นพื้นขาว) → ตามธีมมืด
+   ============================================================ */
+html.theme-dark .report-card { color-scheme: dark; }
+html.theme-dark .report-card .bg-white { background-color: #1f1f1d; }
+html.theme-dark .report-card .bg-slate-50,
+html.theme-dark .report-card.bg-white { background-color: #1f1f1d; }
+html.theme-dark .report-card .bg-slate-50 { background-color: #232321; }
+html.theme-dark .report-card .bg-slate-50\/60 { background-color: rgb(255 255 255 / 0.03); }
+html.theme-dark .report-card .bg-slate-50\/40 { background-color: rgb(255 255 255 / 0.02); }
+html.theme-dark .report-card .bg-slate-100 { background-color: #2a2a27; }
+html.theme-dark .report-card.border-slate-200,
+html.theme-dark .report-card .border-slate-200 { border-color: rgb(255 255 255 / 0.1); }
+html.theme-dark .report-card .border-slate-100 { border-color: rgb(255 255 255 / 0.06); }
+html.theme-dark .report-card .text-slate-900 { color: #f4f3f0; }
+html.theme-dark .report-card .text-slate-800 { color: #ebeae6; }
+html.theme-dark .report-card .text-slate-700 { color: #dcdbd6; }
+html.theme-dark .report-card .text-slate-600 { color: rgb(255 255 255 / 0.68); }
+html.theme-dark .report-card .text-slate-500 { color: rgb(255 255 255 / 0.56); }
+html.theme-dark .report-card .text-slate-400 { color: rgb(255 255 255 / 0.45); }
+html.theme-dark .report-card .text-slate-300 { color: rgb(255 255 255 / 0.32); }
+html.theme-dark .report-card .bg-emerald-50 { background-color: rgb(52 211 153 / 0.07); }
+html.theme-dark .report-card .bg-emerald-100 { background-color: rgb(52 211 153 / 0.14); }
+html.theme-dark .report-card .border-emerald-200 { border-color: rgb(52 211 153 / 0.3); }
+html.theme-dark .report-card .text-emerald-600,
+html.theme-dark .report-card .text-emerald-700,
+html.theme-dark .report-card .text-emerald-800 { color: #6ee7b7; }
+html.theme-dark .report-card .bg-rose-100 { background-color: rgb(251 113 133 / 0.15); }
+html.theme-dark .report-card .text-rose-700,
+html.theme-dark .report-card .text-rose-800 { color: #fda4af; }
+html.theme-dark .report-card .bg-amber-100 { background-color: rgb(251 191 36 / 0.14); }
+html.theme-dark .report-card .text-amber-600,
+html.theme-dark .report-card .text-amber-700,
+html.theme-dark .report-card .text-amber-800 { color: #fcd34d; }
+html.theme-dark .report-card .bg-orange-100 { background-color: rgb(251 146 60 / 0.15); }
+html.theme-dark .report-card .text-orange-800 { color: #fdba74; }
+html.theme-dark .report-card .bg-sky-100 { background-color: rgb(56 189 248 / 0.14); }
+html.theme-dark .report-card .text-sky-800 { color: #7dd3fc; }
+html.theme-dark .report-card input[type="date"] { background-color: #121211; color: #ebeae6; }
+@media (max-width: 767px) {
+  html.theme-dark .report-card .mobile-sticky-col { background-color: #1f1f1d; }
+}
+html.theme-dark .report-card .hover\:bg-slate-50:hover { background-color: #2a2a27; }
