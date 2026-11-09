@@ -339,10 +339,11 @@ export function RunRateSection({
     onClick?: () => void;
   }) => {
     const toneCls = {
-      emerald: "border-emerald-400/25 text-emerald-300",
-      rose: "border-rose-400/30 text-rose-300",
-      amber: "border-amber-400/30 text-amber-300",
-      sky: "border-sky-400/25 text-sky-300",
+      // สีเตือนเฉพาะการ์ดที่ต้องลงมือ (สั่งเพิ่ม / ของค้าง) — ที่เหลือเป็นตัวเลขปกติ
+      emerald: "border-white/10 text-white",
+      rose: "border-white/10 text-rose-300",
+      amber: "border-white/10 text-amber-300",
+      sky: "border-white/10 text-white",
     }[tone];
     return (
       <button
