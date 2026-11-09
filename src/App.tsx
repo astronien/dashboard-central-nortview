@@ -1301,6 +1301,10 @@ function AppInternal({
   useEffect(() => {
     if (currentView === "settings") preloadSettingsSection();
   }, [currentView]);
+  // มือถือ: ใช้ได้แค่หน้าหลัก + หน้าพนักงาน (หน้าอื่นเปิดบนคอม)
+  useEffect(() => {
+    if (isMobile && currentView !== "home" && currentView !== "staff") setCurrentView("home");
+  }, [isMobile, currentView]);
 
   // Light / dark theme. Applied as a `theme-light` class on <html> so a
   // small set of CSS overrides (index.css) can re-map the dark palette.
@@ -4636,24 +4640,10 @@ function AppInternal({
             setCurrentView(v);
             window.scrollTo({ top: 0 });
           }}
-          items={
-            isPia
-              ? [
-                  { view: "home", label: "หน้าหลัก", icon: Home },
-                  { view: "staff", label: "ของฉัน", icon: User },
-                ]
-              : [
-                  { view: "home", label: "หน้าหลัก", icon: Home },
-                  { view: "staff", label: "พนักงาน", icon: User },
-                  { view: "runrate", label: "Run Rate", icon: Gauge },
-                  { view: "reports", label: "รายงาน", icon: PieChart },
-                  { view: "trends", label: "แนวโน้ม", icon: TrendingUp },
-                  { view: "analysis", label: "วิเคราะห์", icon: Activity },
-                  { view: "commission", label: "คอมมิชชั่น", icon: Wallet },
-                  { view: "kpi_preset", label: "KPI", icon: SlidersHorizontal },
-                  { view: "settings", label: "ตั้งค่า", icon: Settings },
-                ]
-          }
+          items={[
+            { view: "home", label: "หน้าหลัก", icon: Home },
+            { view: "staff", label: isPia ? "ของฉัน" : "พนักงาน", icon: User },
+          ]}
         />
 
         {/* Hidden home view for Telegram screenshot capture (always rendered,
