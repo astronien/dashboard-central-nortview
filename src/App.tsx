@@ -185,7 +185,7 @@ import LoginPage from "./components/LoginPage";
 import ChangePasswordGate from "./components/ChangePasswordGate";
 import { syncPiaFromOfficers } from "./lib/auth/piSync";
 import { presetDisplayValue, computePresetAchPercent } from "./lib/presetEngine";
-import { DailyBranchReportSection, type DailyReportData } from "./components/dashboard/DailyBranchReportSection";
+import { DailyBranchReportSection, type DailyReportData, type ReportRange } from "./components/dashboard/DailyBranchReportSection";
 import { parseBills, type BillSummary } from "./lib/presetBills";
 import { enrichSalesRowsWithCatDaily, buildCatDailyLookup } from "./lib/presetCatDaily";
 import {
@@ -2712,7 +2712,10 @@ function AppInternal({
 
   // ─── รายงานยอดขาย + Attach รายวัน (วันล่าสุด) — รวมสาขา + รายคน ──────────
   // ตาราง "รายงานยอดขาย + Attach" — คำนวณ 2 ชุด: วันล่าสุด / ทั้งเดือนล่าสุด
+  // ช่วงวันของตาราง "รายงานยอดขาย + Attach รายเดือน" (null = ทั้งเดือน)
+  const [monthReportRange, setMonthReportRange] = useState<ReportRange>(null);
   const branchReports = useBranchReports({
+    monthRange: monthReportRange,
     displayUploads,
     parsedReport,
     kpiPresets,
@@ -4270,7 +4273,7 @@ function AppInternal({
                 />
                 <DailyKpiTable data={dailyKpiData} />
                 <DailyBranchReportSection data={dailyBranchReport} boost={boostLabel(attachBoost)} uploadedAt={salesUploadedAt} />
-                <DailyBranchReportSection data={monthlyBranchReport} boost={boostLabel(attachBoost)} uploadedAt={salesUploadedAt} />
+                <DailyBranchReportSection data={monthlyBranchReport} boost={boostLabel(attachBoost)} uploadedAt={salesUploadedAt} range={monthReportRange} onRangeChange={setMonthReportRange} />
                 <AttachQuotaSection data={attachQuotaData} boost={boostLabel(attachBoost)} />
     </>
   );

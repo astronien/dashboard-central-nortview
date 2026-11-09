@@ -36,6 +36,8 @@ export type BranchReportsInput = {
   attachBoost: AttachBoost;
   currentBillsShared: BillSummary[];
   billDayKey: (b: BillSummary) => string;
+  /** ช่วงวันของตารางรายเดือน (YYYY-MM-DD) — null = ทั้งเดือนล่าสุด */
+  monthRange?: { from: string; to: string } | null;
 };
 
 export function useBranchReports(input: BranchReportsInput): { daily: DailyReportData; monthly: DailyReportData } {
@@ -49,7 +51,10 @@ export function useBranchReports(input: BranchReportsInput): { daily: DailyRepor
     attachBoost,
     currentBillsShared,
     billDayKey,
+    monthRange,
   } = input;
+  const rangeFrom = monthRange?.from ?? "";
+  const rangeTo = monthRange?.to ?? "";
   return useMemo<{ daily: DailyReportData; monthly: DailyReportData }>(() => {
     const empty0: DailyReportData = { latestDate: "", presets: [], rows: [] };
     const empty = { daily: empty0, monthly: empty0 };
@@ -73,10 +78,23 @@ export function useBranchReports(input: BranchReportsInput): { daily: DailyRepor
     const latestRows = displayUploads.current.filter((r) => dayKey(r) === latestDay);
     // เดือนล่าสุด = ทุกวันในเดือนเดียวกับวันล่าสุด (ถึงวันล่าสุด)
     const monthPrefix = latestDay.slice(0, 7);
+    // เลือกช่วงวันเอง (เช่น รายสัปดาห์) — ถ้าไม่เลือก = ทั้งเดือนล่าสุดเหมือนเดิม
+    // ช่วงที่ไม่ทับข้อมูลเลย (เช่น อัปโหลดเดือนใหม่แล้ว) → กลับไปทั้งเดือน
+    const firstDay = Array.from(daySet).sort()[0] ?? "";
+    const rangeActive = Boolean(
+      rangeFrom && rangeTo && rangeFrom <= rangeTo && rangeTo >= firstDay && rangeFrom <= latestDay,
+    );
     const monthRows = displayUploads.current.filter((r) => {
       const k = dayKey(r);
+      if (rangeActive) return Boolean(k) && k >= rangeFrom && k <= rangeTo;
       return k.startsWith(monthPrefix) && k <= latestDay;
     });
+    const allDays = Array.from(daySet).sort();
+    const monthDaysInScope = Array.from(new Set(monthRows.map(dayKey).filter(Boolean))).sort();
+    const scopeLastDay = monthDaysInScope[monthDaysInScope.length - 1] ?? "";
+    const scopeLastRows = rangeActive
+      ? monthRows.filter((r) => dayKey(r) === scopeLastDay)
+      : latestRows;
 
     const build = (scopeRows: RawRow[]): DailyReportData => {
     // ใช้บิลชุดกลาง กรองตามวันของแถวในขอบเขต (ไม่ต้อง parse ใหม่)
@@ -417,8 +435,14 @@ export function useBranchReports(input: BranchReportsInput): { daily: DailyRepor
       daily: { ...build(latestRows), lastBillTime: lastBillTimeOf(latestRows) },
       monthly: {
         ...build(monthRows),
-        monthFrom: `${monthPrefix}-01`,
-        lastBillTime: lastBillTimeOf(latestRows),
+        ...(rangeActive ? { latestDate: scopeLastDay || rangeTo } : {}),
+        monthFrom: rangeActive ? rangeFrom : `${monthPrefix}-01`,
+        lastBillTime: lastBillTimeOf(scopeLastRows),
+        rangeActive,
+        rangeFrom: rangeActive ? rangeFrom : undefined,
+        rangeTo: rangeActive ? rangeTo : undefined,
+        dataFrom: allDays[0],
+        dataTo: latestDay,
       },
     };
   // deps เหมือนเดิมทุกตัว (ไม่เปลี่ยนความถี่การคำนวณ)
@@ -431,5 +455,7 @@ export function useBranchReports(input: BranchReportsInput): { daily: DailyRepor
     currentRowsAllModels,
     excludedIphoneModelSet,
     attachBoost,
+    rangeFrom,
+    rangeTo,
   ]);
 }

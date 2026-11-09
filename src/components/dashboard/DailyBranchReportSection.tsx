@@ -55,6 +55,13 @@ export type DailyReportData = {
   monthFrom?: string;
   /** เวลาบิลล่าสุดในข้อมูลวันล่าสุด (HH:MM) */
   lastBillTime?: string;
+  /** รายเดือน: กำลังกรองช่วงวันเอง (เช่น รายสัปดาห์) */
+  rangeActive?: boolean;
+  rangeFrom?: string;
+  rangeTo?: string;
+  /** วันแรก / วันล่าสุดที่มีข้อมูล (ไว้ทำตัวเลือกช่วงวัน) */
+  dataFrom?: string;
+  dataTo?: string;
 };
 
 const fmtDay = (ymd: string): string => {
@@ -95,10 +102,21 @@ const num = (v: number) => (v ? v.toLocaleString() : "–");
 
 const ORDER_KEY = "daily-branch-report-col-order";
 
-export const DailyBranchReportSection: React.FC<{ data: DailyReportData; boost?: string; uploadedAt?: string }> = ({
+export type ReportRange = { from: string; to: string } | null;
+
+export const DailyBranchReportSection: React.FC<{
+  data: DailyReportData;
+  boost?: string;
+  uploadedAt?: string;
+  /** ตารางรายเดือน: ช่วงวันที่เลือก + ตัวเปลี่ยน (ไม่ส่ง = ไม่มีตัวเลือก) */
+  range?: ReportRange;
+  onRangeChange?: (r: ReportRange) => void;
+}> = ({
   data,
   boost,
   uploadedAt,
+  range,
+  onRangeChange,
 }) => {
   const isMonthly = Boolean(data.monthFrom);
   // Column order (preset ids) — user can drag the group headers to reorder.
@@ -167,7 +185,11 @@ export const DailyBranchReportSection: React.FC<{ data: DailyReportData; boost?:
       <div className="flex flex-wrap items-center gap-2 mb-1">
         <LayoutGrid className="w-5 h-5 text-emerald-600" />
         <h3 className="text-lg font-bold tracking-tight text-slate-800">
-          {isMonthly ? "รายงานยอดขาย + Attach รายเดือน (เดือนล่าสุด)" : "รายงานยอดขาย + Attach รายวัน (วันล่าสุด)"}
+          {isMonthly
+            ? data.rangeActive
+              ? `รายงานยอดขาย + Attach ช่วง ${fmtDay(data.rangeFrom ?? "")} – ${fmtDay(data.rangeTo ?? "")}`
+              : "รายงานยอดขาย + Attach รายเดือน (เดือนล่าสุด)"
+            : "รายงานยอดขาย + Attach รายวัน (วันล่าสุด)"}
         </h3>
         {boost ? (
           <span className="ml-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-orange-500 text-white" title="บิลที่แนบตัวที่เลือกได้เครดิตตามตัวคูณ · ตัวอื่นลดลงระหว่างช่วงโฟกัส">
@@ -194,11 +216,14 @@ export const DailyBranchReportSection: React.FC<{ data: DailyReportData; boost?:
           </span>
         ) : null}
       </div>
+      {isMonthly && onRangeChange && data.dataTo ? (
+        <RangePicker data={data} range={range ?? null} onChange={onRangeChange} />
+      ) : null}
       <div className="flex items-start justify-between gap-3 mb-4">
         <div className="min-w-0">
         <p className={`text-xs text-slate-400 ${legendOpen ? "" : "max-md:line-clamp-2"}`}>
           {isMonthly
-            ? `สะสมทั้งเดือน ${fmtDay(data.monthFrom ?? "")} – ${fmtDay(data.latestDate)}`
+            ? `${data.rangeActive ? "สะสมช่วง" : "สะสมทั้งเดือน"} ${fmtDay(data.monthFrom ?? "")} – ${fmtDay(data.latestDate)}`
             : `ข้อมูลวันล่าสุด ${fmtDay(data.latestDate)}`} · ATT% = จำนวน ÷ ฐาน (ส่วนใหญ่ ÷ iPhone, AC+ ÷ iPhone+iPad,
           Pencil/iPad Acc ÷ iPad) · <span className="text-emerald-700 font-semibold">บิลผ่าน = บิลที่มี iPhone และมี UFUND+Cover+SIM+Acc ≥ 3 ชิ้น</span>
           {" · "}<span className="px-1 rounded bg-rose-500 text-white font-semibold">iPhone สีแดง</span>{" "}
@@ -403,3 +428,108 @@ export const DailyBranchReportSection: React.FC<{ data: DailyReportData; boost?:
     </div>
   );
 };
+
+// ─── ตัวเลือกช่วงวัน (ทั้งเดือน / รายสัปดาห์ จันทร์–อาทิตย์ / กำหนดเอง) ─────────
+const ymdOf = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const dateOf = (ymd: string) => {
+  const [y, m, d] = ymd.split("-").map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+};
+const shortDay = (ymd: string) => {
+  const [, m, d] = ymd.split("-");
+  return `${Number(d)}/${Number(m)}`;
+};
+
+/** สัปดาห์ (จันทร์–อาทิตย์) ของเดือนล่าสุด ตัดให้อยู่ในเดือน และไม่เกินวันล่าสุดที่มีข้อมูล */
+function monthWeeks(latest: string): Array<{ from: string; to: string; label: string }> {
+  const last = dateOf(latest);
+  const start = new Date(last.getFullYear(), last.getMonth(), 1);
+  const out: Array<{ from: string; to: string; label: string }> = [];
+  let cur = new Date(start);
+  let n = 1;
+  while (cur <= last) {
+    const dow = (cur.getDay() + 6) % 7; // จันทร์ = 0
+    const end = new Date(cur);
+    end.setDate(cur.getDate() + (6 - dow));
+    const to = end > last ? last : end;
+    const from = ymdOf(cur);
+    const toY = ymdOf(to);
+    out.push({ from, to: toY, label: `W${n} · ${shortDay(from)}${from === toY ? "" : `–${shortDay(toY)}`}` });
+    cur = new Date(to);
+    cur.setDate(cur.getDate() + 1);
+    n++;
+  }
+  return out;
+}
+
+function RangePicker({
+  data,
+  range,
+  onChange,
+}: {
+  data: DailyReportData;
+  range: ReportRange;
+  onChange: (r: ReportRange) => void;
+}) {
+  const latest = data.dataTo ?? data.latestDate;
+  const weeks = React.useMemo(() => monthWeeks(latest), [latest]);
+  const [custom, setCustom] = React.useState(false);
+  const isWeek = (w: { from: string; to: string }) => range?.from === w.from && range?.to === w.to;
+  const customActive = Boolean(range) && !weeks.some(isWeek);
+  const chip = (active: boolean) =>
+    `shrink-0 px-3 py-1.5 rounded-full border text-[12px] font-semibold transition-colors ${
+      active
+        ? "bg-emerald-600 border-emerald-600 text-white"
+        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+    }`;
+  return (
+    <div className="mb-3 flex flex-col gap-2">
+      <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-1 px-1 pb-0.5">
+        <button type="button" className={chip(!range && !custom)} onClick={() => { setCustom(false); onChange(null); }}>
+          ทั้งเดือน
+        </button>
+        {weeks.map((w) => (
+          <button key={w.from} type="button" className={chip(isWeek(w))} onClick={() => { setCustom(false); onChange({ from: w.from, to: w.to }); }}>
+            {w.label}
+          </button>
+        ))}
+        <button type="button" className={chip(custom || customActive)} onClick={() => setCustom((v) => !v)}>
+          กำหนดเอง
+        </button>
+      </div>
+      {custom || customActive ? (
+        <div className="flex flex-wrap items-center gap-2 text-[12px] text-slate-600">
+          <span>จาก</span>
+          <input
+            type="date"
+            value={range?.from ?? ""}
+            min={data.dataFrom}
+            max={latest}
+            onChange={(e) => {
+              const from = e.target.value;
+              if (!from) return;
+              const to = range?.to && range.to >= from ? range.to : latest;
+              onChange({ from, to });
+            }}
+            className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-slate-800"
+          />
+          <span>ถึง</span>
+          <input
+            type="date"
+            value={range?.to ?? ""}
+            min={range?.from ?? data.dataFrom}
+            max={latest}
+            onChange={(e) => {
+              const to = e.target.value;
+              if (!to) return;
+              const from = range?.from && range.from <= to ? range.from : (data.dataFrom ?? to);
+              onChange({ from, to });
+            }}
+            className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-slate-800"
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
