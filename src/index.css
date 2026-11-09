@@ -294,3 +294,19 @@ html.theme-dark .report-card input[type="date"] { background-color: #121211; col
   html.theme-dark .report-card .mobile-sticky-col { background-color: #1f1f1d; }
 }
 html.theme-dark .report-card .hover\:bg-slate-50:hover { background-color: #2a2a27; }
+
+/* หัวกลุ่มสีพาสเทลของตารางรายงาน → โทนหม่นในธีมมืด (ยังแยกกลุ่มได้) */
+html.theme-dark .report-card .bg-violet-100 { background-color: rgb(139 92 246 / 0.14); }
+html.theme-dark .report-card .text-violet-800 { color: #c4b5fd; }
+html.theme-dark .report-card .bg-teal-100 { background-color: rgb(20 184 166 / 0.14); }
+html.theme-dark .report-card .text-teal-800 { color: #5eead4; }
+html.theme-dark .report-card .bg-fuchsia-100 { background-color: rgb(217 70 239 / 0.14); }
+html.theme-dark .report-card .text-fuchsia-800 { color: #f0abfc; }
+html.theme-dark .report-card .bg-cyan-100 { background-color: rgb(6 182 212 / 0.14); }
+html.theme-dark .report-card .text-cyan-800 { color: #67e8f9; }
+html.theme-dark .report-card .bg-lime-100 { background-color: rgb(132 204 22 / 0.14); }
+html.theme-dark .report-card .text-lime-800 { color: #bef264; }
+html.theme-dark .report-card .bg-indigo-100 { background-color: rgb(99 102 241 / 0.14); }
+html.theme-dark .report-card .text-indigo-800 { color: #a5b4fc; }
+html.theme-dark .report-card .bg-pink-100 { background-color: rgb(236 72 153 / 0.14); }
+html.theme-dark .report-card .text-pink-800 { color: #f9a8d4; }
