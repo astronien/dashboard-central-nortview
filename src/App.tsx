@@ -205,6 +205,9 @@ import { ViewErrorBoundary } from "./components/ViewErrorBoundary";
 import { IphoneModelExcludePicker } from "./components/dashboard/IphoneModelExcludePicker";
 import { CategoryFallbackAlert } from "./components/dashboard/CategoryFallbackAlert";
 import { MobileBottomNav } from "./components/dashboard/MobileBottomNav";
+import { MobileHome } from "./components/mobile/MobileHome";
+import { MobileStaff } from "./components/mobile/MobileStaff";
+import { useIsMobile } from "./hooks/useIsMobile";
 
 // ⚡ หน้าที่ไม่ใช่ Home/Staff โหลดโค้ดเฉพาะตอนเปิดหน้านั้น (ไฟล์ JS ตอนเปิดเว็บเล็กลง)
 // ถ้าเปิดเว็บค้างไว้ข้าม deploy ไฟล์ชิ้นเก่าจะหายจาก server → import พัง (จอขาว)
@@ -1302,6 +1305,7 @@ function AppInternal({
   userOfficerId: string | null;
 }) {
   const { user, logout, isPia } = useAuth();
+  const isMobile = useIsMobile();
   const [currentView, setCurrentView] = useState<
     "home" | "staff" | "settings" | "reports" | "kpi_preset" | "analysis" | "trends" | "runrate" | "commission"
   >("home");
@@ -4219,6 +4223,88 @@ function AppInternal({
     window.setTimeout(() => setLineReportDone(""), 8000);
   };
 
+  // ── มือถือ: layout แยก (การ์ด/แถบ) — บนคอมใช้หน้าเดิม ───────────────
+  const homePace = {
+    actual: monthlyPerformance.actualSales.actual,
+    target: monthlyPerformance.actualSales.target,
+    currentDay: paceInfo.currentDay,
+    totalDays: paceInfo.totalDays,
+  };
+  const mobileAvatarOf = (name: string, staffId?: string): string | undefined => {
+    const sid =
+      staffId ?? parsedReport.officers.find((o) => matchesOfficer(o.name ?? "", name))?.staffId;
+    return getStaffPhotoUrl(reconciledStaffPhotos, { staffId: sid, officerKey: cleanOfficerName(name) }) || undefined;
+  };
+  const openStaffByName = (name: string) => {
+    const idx = parsedReport.officers.findIndex((o) => matchesOfficer(o.name ?? "", name));
+    if (idx >= 0) setActiveStaffId(String(idx + 1));
+    setCurrentView("staff");
+    window.scrollTo({ top: 0 });
+  };
+  const mobileStaffList = parsedReport.officers
+    .map((o, index) => ({ name: o.name, staffId: o.staffId, index, ach: o.achPercent }))
+    .filter((o) => !isStaffHidden(o));
+  const mobileStaffRank = (() => {
+    if (!activeOfficer) return undefined;
+    const sorted = [...mobileStaffList].sort((a, b) => (b.ach || 0) - (a.ach || 0));
+    const pos = sorted.findIndex((o) => o.index === activeOfficerIndex);
+    return pos >= 0 ? { pos: pos + 1, of: sorted.length } : undefined;
+  })();
+  const homeFullSections = (
+    <>
+                <HomeDashboardSection
+                  derivedHomeStats={derivedHomeStats}
+                  monthlyPerformance={monthlyPerformance}
+                  categorySnapshots={categorySnapshotData}
+                  branchOverviewKpiData={branchOverviewKpiData}
+                  combinedOfficerKpiData={combinedOfficerKpiData}
+                  csatOverview={csatData?.overview}
+                  csatLowScores={csatData?.lowScores}
+                  pace={{
+                    actual: monthlyPerformance.actualSales.actual,
+                    target: monthlyPerformance.actualSales.target,
+                    currentDay: paceInfo.currentDay,
+                    totalDays: paceInfo.totalDays,
+                  }}
+                  categorySnapshotRef={categorySnapshotRef}
+                />
+                <DailyKpiTable data={dailyKpiData} />
+                <DailyBranchReportSection data={dailyBranchReport} boost={boostLabel(attachBoost)} uploadedAt={salesUploadedAt} />
+                <DailyBranchReportSection data={monthlyBranchReport} boost={boostLabel(attachBoost)} uploadedAt={salesUploadedAt} />
+                <AttachQuotaSection data={attachQuotaData} boost={boostLabel(attachBoost)} />
+    </>
+  );
+  const staffFullView = (
+              <StaffSection
+                displayStaffAvatar={displayStaffAvatar}
+                activeOfficer={activeOfficer}
+                currentStaff={currentStaff}
+                dynamicRadarData={dynamicRadarData}
+                renderCustomTick={renderCustomTick}
+                dynamicScore={dynamicScore}
+                activeStat={activeStat}
+                onSetActiveStat={setActiveStat}
+                sevenWondersScore={sevenWondersScore}
+                dynamicRole={dynamicRole}
+                dynamicExperience={dynamicExperience}
+                dynamicExpertise={dynamicExpertise}
+                dynamicLanguages={dynamicLanguages}
+                focusDevice={focusDevice}
+                focusWonder={focusWonder}
+                csatUser={csatForOfficer(activeOfficer?.staffId, activeOfficer?.name)}
+                csatBillCount={csatForOfficer(activeOfficer?.staffId, activeOfficer?.name)?.totalBill}
+                activeOfficer7WondersPerformance={activeOfficer7WondersPerformance}
+                activeOfficerCategoryPerformance={activeOfficerCategoryPerformance}
+                todaySalesTotal={activeOfficerTodaySales}
+                todayDateLabel={todayStats.dateStr}
+                 categoryPerformanceHint={categoryPerformanceHint}
+                 onSetActiveStaffId={setActiveStaffId}
+                 piaIndices={piaIndices}
+                 homeCaptureRef={homeCaptureRef}
+                 profileCaptureRef={staffProfileCaptureRef}
+              />
+  );
+
   return (
     <div className="app-root min-h-screen bg-[#1c2722] p-0 sm:p-4 font-sans text-white md:p-8 flex flex-col items-center">
       {isInitialLoading && (
@@ -4564,57 +4650,55 @@ function AppInternal({
                     </span>
                   </button>
                 ) : null}
-                <HomeDashboardSection
-                  derivedHomeStats={derivedHomeStats}
-                  monthlyPerformance={monthlyPerformance}
-                  categorySnapshots={categorySnapshotData}
-                  branchOverviewKpiData={branchOverviewKpiData}
-                  combinedOfficerKpiData={combinedOfficerKpiData}
-                  csatOverview={csatData?.overview}
-                  csatLowScores={csatData?.lowScores}
-                  pace={{
-                    actual: monthlyPerformance.actualSales.actual,
-                    target: monthlyPerformance.actualSales.target,
-                    currentDay: paceInfo.currentDay,
-                    totalDays: paceInfo.totalDays,
-                  }}
-                  categorySnapshotRef={categorySnapshotRef}
-                />
-                <DailyKpiTable data={dailyKpiData} />
-                <DailyBranchReportSection data={dailyBranchReport} boost={boostLabel(attachBoost)} uploadedAt={salesUploadedAt} />
-                <DailyBranchReportSection data={monthlyBranchReport} boost={boostLabel(attachBoost)} uploadedAt={salesUploadedAt} />
-                <AttachQuotaSection data={attachQuotaData} boost={boostLabel(attachBoost)} />
+                {isMobile ? (
+                  <MobileHome
+                    storeName={parsedStoreHeader.name}
+                    pace={homePace}
+                    categories={categorySnapshotData}
+                    combined={combinedOfficerKpiData}
+                    daily={dailyBranchReport}
+                    attach={attachQuotaData}
+                    avatarOf={mobileAvatarOf}
+                    onOpenStaff={openStaffByName}
+                    fullView={homeFullSections}
+                  />
+                ) : (
+                  homeFullSections
+                )}
               </motion.div>
             )}
             {currentView === "staff" && (
-              <StaffSection
-                displayStaffAvatar={displayStaffAvatar}
-                activeOfficer={activeOfficer}
-                currentStaff={currentStaff}
-                dynamicRadarData={dynamicRadarData}
-                renderCustomTick={renderCustomTick}
-                dynamicScore={dynamicScore}
-                activeStat={activeStat}
-                onSetActiveStat={setActiveStat}
-                sevenWondersScore={sevenWondersScore}
-                dynamicRole={dynamicRole}
-                dynamicExperience={dynamicExperience}
-                dynamicExpertise={dynamicExpertise}
-                dynamicLanguages={dynamicLanguages}
-                focusDevice={focusDevice}
-                focusWonder={focusWonder}
-                csatUser={csatForOfficer(activeOfficer?.staffId, activeOfficer?.name)}
-                csatBillCount={csatForOfficer(activeOfficer?.staffId, activeOfficer?.name)?.totalBill}
-                activeOfficer7WondersPerformance={activeOfficer7WondersPerformance}
-                activeOfficerCategoryPerformance={activeOfficerCategoryPerformance}
-                todaySalesTotal={activeOfficerTodaySales}
-                todayDateLabel={todayStats.dateStr}
-                 categoryPerformanceHint={categoryPerformanceHint}
-                 onSetActiveStaffId={setActiveStaffId}
-                 piaIndices={piaIndices}
-                 homeCaptureRef={homeCaptureRef}
-                 profileCaptureRef={staffProfileCaptureRef}
-              />
+              isMobile ? (
+                <motion.div
+                  key="staff-mobile"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="w-full"
+                >
+                  <MobileStaff
+                    officers={mobileStaffList}
+                    activeIndex={activeOfficerIndex}
+                    onSelect={(idx) => setActiveStaffId(String(idx + 1))}
+                    canSwitch={!isPia}
+                    avatarOf={mobileAvatarOf}
+                    name={activeOfficer?.name ?? "-"}
+                    staffId={activeOfficer?.staffId}
+                    branch={activeOfficer?.branch}
+                    rank={mobileStaffRank}
+                    categoryRows={activeOfficerCategoryPerformance}
+                    wonderRows={activeOfficer7WondersPerformance}
+                    sevenWondersScore={sevenWondersScore}
+                    focusDevice={focusDevice}
+                    focusWonder={focusWonder}
+                    todayDateLabel={todayStats.dateStr}
+                    fullView={staffFullView}
+                  />
+                </motion.div>
+              ) : (
+                staffFullView
+              )
             )}
             {!isPia && currentView === "reports" && (
               <motion.div
