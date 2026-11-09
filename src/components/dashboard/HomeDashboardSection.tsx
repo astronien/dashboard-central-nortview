@@ -231,7 +231,7 @@ function BranchOverviewKpiTable({ data }: { data: BranchOverviewKpiData }) {
                 <th className="py-3 px-3 font-bold uppercase tracking-wider sticky left-0 bg-[#0c3123] z-10 min-w-[110px] md:min-w-[160px]">
                   เจ้าหน้าที่
                 </th>
-                <th className="py-3 px-3 font-bold uppercase tracking-wider min-w-[120px]">
+                <th className="hidden md:table-cell py-3 px-3 font-bold uppercase tracking-wider min-w-[120px]">
                   สาขา
                 </th>
                 {presets.map((p) => (
@@ -260,7 +260,7 @@ function BranchOverviewKpiTable({ data }: { data: BranchOverviewKpiData }) {
                   <td className="py-2.5 px-3 font-medium text-white sticky left-0 bg-[#0a1f17] z-10">
                     {row.officer.name}
                   </td>
-                  <td className="py-2.5 px-3 text-white/70">{row.officer.branch || "-"}</td>
+                  <td className="hidden md:table-cell py-2.5 px-3 text-white/70">{row.officer.branch || "-"}</td>
                   {presets.map((p) => {
                     const val = row.results[p.id] ?? 0;
                     return (

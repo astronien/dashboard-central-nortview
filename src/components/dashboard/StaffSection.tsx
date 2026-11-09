@@ -554,14 +554,14 @@ export function StaffSection({
                   </div>
 
                   {/* Center Column - Radar Chart */}
-                  <div className="lg:w-[28%] relative flex items-center justify-center py-4 lg:py-0 z-40 overflow-visible">
+                  <div className="lg:w-[28%] relative flex items-center justify-center -mt-4 sm:mt-0 sm:py-4 lg:py-0 z-40 overflow-visible">
                     <motion.div
                       initial={{ opacity: 0, scale: 0.8, rotate: -10 }}
                       animate={{ opacity: 1, scale: 1, rotate: 0 }}
                       transition={{ duration: 0.65, type: "spring", bounce: 0.25, delay: 0.15 }}
-                      className="w-full max-w-[300px] h-[300px] min-h-[300px] relative text-xs overflow-visible [&_.recharts-wrapper]:!overflow-visible [&_svg]:!overflow-visible"
+                      className="w-full max-w-[300px] h-[260px] min-h-[260px] sm:h-[300px] sm:min-h-[300px] relative text-xs overflow-visible [&_.recharts-wrapper]:!overflow-visible [&_svg]:!overflow-visible"
                     >
-                      <ResponsiveContainer width="100%" height={300} minWidth={0}>
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <RadarChart
                           cx="50%"
                           cy="50%"
@@ -671,7 +671,7 @@ export function StaffSection({
                     </motion.div>
 
                     {/* Top 3 Stats */}
-                    <div className="flex justify-center lg:justify-end gap-3 mb-3">
+                    <div className="grid grid-cols-[1.5fr_1fr_1fr] gap-2 sm:flex sm:justify-center lg:justify-end sm:gap-3 mb-3">
                       <motion.button
                         onClick={() => onSetActiveStat("sales")}
                         initial={{ opacity: 0, y: 15 }}
@@ -679,7 +679,7 @@ export function StaffSection({
                         transition={{ type: "spring", stiffness: 120, damping: 14, delay: 0.1 }}
                         whileHover={{ scale: 1.05, y: -4, boxShadow: "0px 10px 25px rgba(16, 185, 129, 0.2)" }}
                         whileTap={{ scale: 0.95 }}
-                        className={`rounded-2xl px-2 py-3 w-28 sm:w-32 min-h-[104px] text-center border shadow-lg transition-all duration-200 overflow-visible ${activeStat === "sales" ? "bg-[#0c3123] border-white/30 ring-1 ring-emerald-500/50" : "bg-black/20 border-white/5 hover:bg-black/30"}`}
+                        className={`rounded-2xl px-2 py-3 w-full sm:w-32 min-h-[104px] text-center border shadow-lg transition-all duration-200 overflow-visible ${activeStat === "sales" ? "bg-[#0c3123] border-white/30 ring-1 ring-emerald-500/50" : "bg-black/20 border-white/5 hover:bg-black/30"}`}
                       >
                         <ShoppingBag
                           className={`w-5 h-5 mx-auto mb-1.5 shrink-0 ${activeStat === "sales" ? "text-white" : "text-white/60"}`}
@@ -725,7 +725,7 @@ export function StaffSection({
                         transition={{ type: "spring", stiffness: 120, damping: 14, delay: 0.15 }}
                         whileHover={{ scale: 1.05, y: -4, boxShadow: "0px 10px 25px rgba(16, 185, 129, 0.2)" }}
                         whileTap={{ scale: 0.95 }}
-                        className={`backdrop-blur-md rounded-2xl px-2 py-4 w-28 sm:w-32 text-center border shadow-inner transition-all duration-200 ${activeStat === "csat" ? "bg-white/[0.15] border-white/30 ring-1 ring-emerald-500/50" : "bg-white/5 border-white/10 hover:bg-white/10"}`}
+                        className={`backdrop-blur-md rounded-2xl px-2 py-4 w-full sm:w-32 text-center border shadow-inner transition-all duration-200 ${activeStat === "csat" ? "bg-white/[0.15] border-white/30 ring-1 ring-emerald-500/50" : "bg-white/5 border-white/10 hover:bg-white/10"}`}
                       >
                         <Award
                           className={`w-5 h-5 mx-auto mb-2 ${activeStat === "csat" ? "text-emerald-300 fill-emerald-300/20" : "text-white/60"}`}
@@ -752,7 +752,7 @@ export function StaffSection({
                         transition={{ type: "spring", stiffness: 120, damping: 14, delay: 0.2 }}
                         whileHover={{ scale: 1.05, y: -4, boxShadow: "0px 10px 25px rgba(16, 185, 129, 0.2)" }}
                         whileTap={{ scale: 0.95 }}
-                        className={`backdrop-blur-xl rounded-2xl px-2 py-4 w-28 sm:w-32 text-center border shadow-xl relative overflow-hidden transition-all duration-200 ${activeStat === "target" ? "bg-white/20 border-white/40 ring-1 ring-emerald-500/50" : "bg-white/5 border-white/10 hover:bg-white/10"}`}
+                        className={`backdrop-blur-xl rounded-2xl px-2 py-4 w-full sm:w-32 text-center border shadow-xl relative overflow-hidden transition-all duration-200 ${activeStat === "target" ? "bg-white/20 border-white/40 ring-1 ring-emerald-500/50" : "bg-white/5 border-white/10 hover:bg-white/10"}`}
                       >
                         {activeStat === "target" && (
                           <div className="absolute inset-0 bg-emerald-400/20 mix-blend-overlay"></div>

@@ -104,6 +104,8 @@ export const DailyBranchReportSection: React.FC<{ data: DailyReportData; boost?:
   // Column order (preset ids) — user can drag the group headers to reorder.
   // Persisted per browser so the layout sticks between visits.
   const [order, setOrder] = React.useState<string[]>([]);
+  // มือถือ: คำอธิบายยาว ย่อไว้ 2 บรรทัด กดอ่านต่อได้
+  const [legendOpen, setLegendOpen] = React.useState(false);
   const dragId = React.useRef<string | null>(null);
 
   React.useEffect(() => {
@@ -193,7 +195,8 @@ export const DailyBranchReportSection: React.FC<{ data: DailyReportData; boost?:
         ) : null}
       </div>
       <div className="flex items-start justify-between gap-3 mb-4">
-        <p className="text-xs text-slate-400">
+        <div className="min-w-0">
+        <p className={`text-xs text-slate-400 ${legendOpen ? "" : "max-md:line-clamp-2"}`}>
           {isMonthly
             ? `สะสมทั้งเดือน ${fmtDay(data.monthFrom ?? "")} – ${fmtDay(data.latestDate)}`
             : `ข้อมูลวันล่าสุด ${fmtDay(data.latestDate)}`} · ATT% = จำนวน ÷ ฐาน (ส่วนใหญ่ ÷ iPhone, AC+ ÷ iPhone+iPad,
@@ -211,8 +214,16 @@ export const DailyBranchReportSection: React.FC<{ data: DailyReportData; boost?:
         </p>
         <button
           type="button"
+          onClick={() => setLegendOpen((v) => !v)}
+          className="md:hidden mt-1 text-[11px] font-semibold text-emerald-700 underline"
+        >
+          {legendOpen ? "ย่อคำอธิบาย" : "อ่านคำอธิบาย"}
+        </button>
+        </div>
+        <button
+          type="button"
           onClick={resetOrder}
-          className="shrink-0 text-[11px] text-slate-400 underline hover:text-slate-600"
+          className="hidden md:inline shrink-0 text-[11px] text-slate-400 underline hover:text-slate-600"
         >
           รีเซ็ตลำดับคอลัมน์
         </button>
