@@ -56,7 +56,7 @@ export const AttachQuotaSection: React.FC<{ data: AttachQuotaData; boost?: strin
         <table className="w-full text-left border-collapse text-[11px]">
           <thead>
             <tr className="bg-[#0c3123] border-b border-emerald-500/20 text-white/90">
-              <th className="py-2.5 px-3 font-bold uppercase tracking-wider">พนักงาน</th>
+              <th className="py-2.5 px-3 font-bold uppercase tracking-wider sticky left-0 bg-[#0c3123] z-10">พนักงาน</th>
               <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">iPhone สะสม</th>
               <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">Cover</th>
               <th className="py-2.5 px-3 font-bold uppercase tracking-wider text-right">UFUND</th>
@@ -71,7 +71,7 @@ export const AttachQuotaSection: React.FC<{ data: AttachQuotaData; boost?: strin
                 r.remaining > 0 ? "text-emerald-400" : r.remaining >= -3 ? "text-amber-300" : "text-rose-400";
               return (
                 <tr key={idx} className="hover:bg-white/5 transition-colors duration-150 text-white/90">
-                  <td className="py-2 px-3 font-bold whitespace-nowrap">{r.name}</td>
+                  <td className="py-2 px-3 font-bold whitespace-nowrap sticky left-0 bg-[#0a1f17] z-10">{r.name}</td>
                   <td className="py-2 px-3 text-right font-semibold">{r.iphone.toLocaleString()}</td>
                   <td className="py-2 px-3 text-right text-white/70">{r.cover.toLocaleString()}</td>
                   <td className="py-2 px-3 text-right text-white/70">{r.ufund.toLocaleString()}</td>

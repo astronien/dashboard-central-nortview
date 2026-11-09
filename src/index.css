@@ -267,3 +267,41 @@ html.theme-light .total-row { background-color: #fdecb5 !important; }
 html.theme-light .total-row td .font-mono { color: #7c4a03; }
 html.theme-light .total-sticky { background-color: #fbe08a !important; }
 html.theme-light .total-sticky .text-amber-200 { color: #7c4a03; }
+
+/* ─── Mobile ─────────────────────────────────────────────────────────── */
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+@media (max-width: 767px) {
+  /* ตารางกว้าง: เลื่อนแนวนอนด้วยนิ้วได้ลื่น */
+  .overflow-x-auto { -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
+}
+@media (max-width: 767px) {
+  /* การ์ดในเนื้อหา: ขอบ/มุมเล็กลงให้มีที่ให้ตารางมากขึ้น */
+  .app-panel main .rounded-\[2rem\],
+  .app-panel main .rounded-\[2\.5rem\] { border-radius: 1.25rem; }
+  .app-panel main .p-8 { padding: 1rem; }
+  .app-panel main .p-6 { padding: 0.875rem; }
+  .app-panel main .p-5 { padding: 0.75rem; }
+  .app-panel main .text-lg { font-size: 1rem; line-height: 1.4rem; }
+  /* หัวข้อ/คำอธิบายยาว ห้ามดันจอให้กว้างเกิน */
+  .app-panel main h2, .app-panel main h3, .app-panel main p { overflow-wrap: anywhere; }
+}
+/* คอลัมน์แรกของตารางค้างไว้ตอนเลื่อนแนวนอน (เฉพาะมือถือ) */
+@media (max-width: 767px) {
+  .mobile-sticky-col { position: sticky; left: 0; z-index: 10; background-color: #0a1f17; }
+  html.theme-light .mobile-sticky-col { background-color: #f1f6f3; }
+  html.theme-ocean .mobile-sticky-col { background-color: #0b1726; }
+  html.theme-graphite .mobile-sticky-col { background-color: #18191c; }
+  html.theme-plum .mobile-sticky-col { background-color: #1a1023; }
+  html.theme-wine .mobile-sticky-col { background-color: #200d11; }
+}
+@media (max-width: 767px) {
+  th.mobile-sticky-col { background-color: #0c3123; }
+  html.theme-light th.mobile-sticky-col { background-color: #dde9e2; }
+  html.theme-light.theme-sky th.mobile-sticky-col { background-color: #dde7f3; }
+  html.theme-light.theme-sand th.mobile-sticky-col { background-color: #ece3d4; }
+  html.theme-ocean th.mobile-sticky-col { background-color: #0d2238; }
+  html.theme-graphite th.mobile-sticky-col { background-color: #26282d; }
+  html.theme-plum th.mobile-sticky-col { background-color: #2b1a3b; }
+  html.theme-wine th.mobile-sticky-col { background-color: #3a1a20; }
+}

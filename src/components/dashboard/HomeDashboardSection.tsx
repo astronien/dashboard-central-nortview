@@ -105,9 +105,9 @@ export function HomeDashboardSection({
         {pace && pace.target > 0 && pace.totalDays > 0 ? (
           <PaceBanner {...pace} />
         ) : null}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           {derivedHomeStats.map((stat, idx) => (
-            <div key={idx} className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 p-5 shadow-[0_8px_32px_rgba(0,0,0,0.12)] flex flex-col justify-between hover:bg-white/[0.15] transition-colors cursor-pointer">
+            <div key={idx} className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 p-3.5 md:p-5 shadow-[0_8px_32px_rgba(0,0,0,0.12)] flex flex-col justify-between hover:bg-white/[0.15] transition-colors cursor-pointer">
               <div className="flex justify-between items-start mb-2">
                 <div className="p-2.5 bg-white/5 rounded-xl border border-white/5"><stat.icon className="w-5 h-5 text-emerald-400" /></div>
                 <div className={`text-xs font-semibold px-2 py-1 rounded-lg ${stat.isUp ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"} flex items-center gap-1`}>
@@ -116,7 +116,7 @@ export function HomeDashboardSection({
               </div>
               <div>
                 <div className="text-sm text-white/60 mb-1">{stat.label}</div>
-                <div className="text-3xl font-bold tracking-tight">{stat.value}</div>
+                <div className="text-xl md:text-3xl font-bold tracking-tight break-all">{stat.value}</div>
               </div>
             </div>
           ))}
@@ -228,7 +228,7 @@ function BranchOverviewKpiTable({ data }: { data: BranchOverviewKpiData }) {
           <table className="w-full text-left border-collapse text-[11px]">
             <thead>
               <tr className="bg-[#0c3123] border-b border-emerald-500/20 text-white/90">
-                <th className="py-3 px-3 font-bold uppercase tracking-wider sticky left-0 bg-[#0c3123] z-10 min-w-[160px]">
+                <th className="py-3 px-3 font-bold uppercase tracking-wider sticky left-0 bg-[#0c3123] z-10 min-w-[110px] md:min-w-[160px]">
                   เจ้าหน้าที่
                 </th>
                 <th className="py-3 px-3 font-bold uppercase tracking-wider min-w-[120px]">

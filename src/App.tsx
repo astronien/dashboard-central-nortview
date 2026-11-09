@@ -204,6 +204,7 @@ import { SettingsGate } from "./components/dashboard/SettingsGate";
 import { ViewErrorBoundary } from "./components/ViewErrorBoundary";
 import { IphoneModelExcludePicker } from "./components/dashboard/IphoneModelExcludePicker";
 import { CategoryFallbackAlert } from "./components/dashboard/CategoryFallbackAlert";
+import { MobileBottomNav } from "./components/dashboard/MobileBottomNav";
 
 // ⚡ หน้าที่ไม่ใช่ Home/Staff โหลดโค้ดเฉพาะตอนเปิดหน้านั้น (ไฟล์ JS ตอนเปิดเว็บเล็กลง)
 // ถ้าเปิดเว็บค้างไว้ข้าม deploy ไฟล์ชิ้นเก่าจะหายจาก server → import พัง (จอขาว)
@@ -4215,7 +4216,7 @@ function AppInternal({
   };
 
   return (
-    <div className="app-root min-h-screen bg-[#1c2722] p-4 font-sans text-white md:p-8 flex flex-col items-center">
+    <div className="app-root min-h-screen bg-[#1c2722] p-0 sm:p-4 font-sans text-white md:p-8 flex flex-col items-center">
       {isInitialLoading && (
         <div className="fixed inset-0 z-[999] bg-[#1c2722] flex items-center justify-center">
           <div className="flex flex-col items-center gap-4">
@@ -4235,10 +4236,10 @@ function AppInternal({
           </div>
         </div>
       ) : null}
-      <div className="app-panel w-full max-w-[1440px] h-auto min-h-[90vh] bg-gradient-to-br from-[#1b5d44] to-[#123627] rounded-[2rem] border border-white/10 shadow-2xl flex flex-col relative overflow-x-hidden">
+      <div className="app-panel w-full max-w-[1440px] h-auto min-h-screen sm:min-h-[90vh] bg-gradient-to-br from-[#1b5d44] to-[#123627] rounded-none sm:rounded-[2rem] border-0 sm:border border-white/10 shadow-2xl flex flex-col relative overflow-x-hidden">
         {/* Logo (Absolute Left) */}
-        <div className="absolute top-6 left-8 z-50 flex items-center gap-4 pointer-events-auto">
-          <img src="/site-logo.09b5daa.svg" alt="Logo" className="h-8" />
+        <div className="absolute top-4 left-4 md:top-6 md:left-8 z-50 flex items-center gap-4 pointer-events-auto">
+          <img src="/site-logo.09b5daa.svg" alt="Logo" className="h-6 md:h-8" />
           {currentView === "home" && (
             <div className="hidden lg:flex flex-col ml-4">
               <h1 className="text-xl font-bold tracking-tight drop-shadow-md">
@@ -4252,8 +4253,8 @@ function AppInternal({
         </div>
 
         {/* Top Navigation (Floating Right) */}
-        <header className="absolute top-6 right-8 w-1/2 flex justify-end items-center z-50 pointer-events-none">
-          <div className="flex items-center gap-6 pointer-events-auto">
+        <header className="absolute top-2.5 right-3 md:top-6 md:right-8 md:w-1/2 flex justify-end items-center z-50 pointer-events-none">
+          <div className="flex items-center gap-2 md:gap-6 pointer-events-auto">
             {/* ป้ายเตือนว่ากำลังใช้เป้าที่ปรับเพิ่ม (ตั้งใน Settings) */}
             {upliftLabel(targetUplift) ? (
               <span
@@ -4284,11 +4285,13 @@ function AppInternal({
               </div>
             ) : null}
             {/* ติ๊กเลือกรุ่น iPhone ที่ไม่นับยอด (ตัดออกจากการคำนวณทุกตาราง) */}
-            <IphoneModelExcludePicker
-              options={iphoneModelOptions}
-              selected={excludedIphoneModels}
-              onChange={updateExcludedIphoneModels}
-            />
+            <div className="hidden md:block">
+              <IphoneModelExcludePicker
+                options={iphoneModelOptions}
+                selected={excludedIphoneModels}
+                onChange={updateExcludedIphoneModels}
+              />
+            </div>
             <nav className="flex items-center space-x-2 lg:space-x-4 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/5 shadow-xl hidden md:flex">
               <button
                 onClick={() => setCurrentView("home")}
@@ -4438,7 +4441,7 @@ function AppInternal({
             </div>
 
             {/* User info + logout */}
-            <div className="pointer-events-auto flex items-center gap-3 pl-2 ml-2 border-l border-white/10">
+            <div className="pointer-events-auto flex items-center gap-3 md:pl-2 md:ml-2 md:border-l border-white/10">
               <div className="hidden md:flex flex-col items-end">
                 <span className="text-xs text-white/90 font-medium leading-tight">
                   {user?.name ?? "Guest"}
@@ -4524,7 +4527,7 @@ function AppInternal({
         {/* Main Content */}
         <main
           ref={mainRef}
-          className={`relative flex-1 flex flex-col px-4 md:px-8 pb-8 gap-6 z-20 overflow-x-hidden ${currentView === "home" ? "pt-28" : "pt-24"}`}
+          className={`relative flex-1 flex flex-col px-3 md:px-8 pb-24 md:pb-8 gap-4 md:gap-6 z-20 overflow-x-hidden ${currentView === "home" ? "pt-16 md:pt-28" : "pt-16 md:pt-24"}`}
         >
           <ViewErrorBoundary label="หน้าหลัก">
           <React.Suspense
@@ -4815,6 +4818,33 @@ function AppInternal({
             showManage={currentView === "settings"}
           />
         ) : null}
+
+        {/* เมนูล่างสำหรับมือถือ (เมนูบนซ่อนตอนจอเล็ก) */}
+        <MobileBottomNav
+          current={currentView}
+          onChange={(v) => {
+            setCurrentView(v);
+            window.scrollTo({ top: 0 });
+          }}
+          items={
+            isPia
+              ? [
+                  { view: "home", label: "หน้าหลัก", icon: Home },
+                  { view: "staff", label: "ของฉัน", icon: User },
+                ]
+              : [
+                  { view: "home", label: "หน้าหลัก", icon: Home },
+                  { view: "staff", label: "พนักงาน", icon: User },
+                  { view: "runrate", label: "Run Rate", icon: Gauge },
+                  { view: "reports", label: "รายงาน", icon: PieChart },
+                  { view: "trends", label: "แนวโน้ม", icon: TrendingUp },
+                  { view: "analysis", label: "วิเคราะห์", icon: Activity },
+                  { view: "commission", label: "คอมมิชชั่น", icon: Wallet },
+                  { view: "kpi_preset", label: "KPI", icon: SlidersHorizontal },
+                  { view: "settings", label: "ตั้งค่า", icon: Settings },
+                ]
+          }
+        />
 
         {/* Hidden home view for Telegram screenshot capture (always rendered,
             visible in DOM but invisible via opacity:0 so charts render).

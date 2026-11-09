@@ -123,7 +123,7 @@ export function CategoryFallbackAlert({
         <button
           type="button"
           onClick={openModal}
-          className="fixed bottom-4 left-4 z-[60] flex items-center gap-2 max-w-[calc(100vw-2rem)] rounded-full bg-amber-500 text-slate-900 px-4 py-2 text-xs font-semibold shadow-2xl hover:bg-amber-400"
+          className="fixed bottom-20 md:bottom-4 left-4 z-[60] flex items-center gap-2 max-w-[calc(100vw-2rem)] rounded-full bg-amber-500 text-slate-900 px-4 py-2 text-xs font-semibold shadow-2xl hover:bg-amber-400"
         >
           <AlertTriangle className="w-4 h-4 shrink-0" />
           <span className="truncate">
@@ -134,7 +134,7 @@ export function CategoryFallbackAlert({
         <button
           type="button"
           onClick={openModal}
-          className="fixed bottom-4 left-4 z-[60] rounded-full bg-white/15 border border-white/20 text-white px-4 py-2 text-xs font-semibold shadow-2xl backdrop-blur-md hover:bg-white/25"
+          className="fixed bottom-20 md:bottom-4 left-4 z-[60] rounded-full bg-white/15 border border-white/20 text-white px-4 py-2 text-xs font-semibold shadow-2xl backdrop-blur-md hover:bg-white/25"
         >
           หมวดย่อยที่เลือกเอง {decided.length} รายการ — แก้ไข
         </button>

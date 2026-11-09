@@ -518,9 +518,9 @@ export function StaffSection({
                 className="flex flex-col w-full h-full gap-6 relative"
               >
                 {/* TOP HALF: Person | Radar | Stats */}
-                <div className="staff-hero flex-1 bg-gradient-to-br from-[#113a29]/80 via-[#0c291d]/85 to-[#051710]/95 backdrop-blur-xl border border-white/10 shadow-[0_16px_48px_rgba(0,0,0,0.35)] rounded-[2.5rem] p-6 lg:p-8 lg:pb-6 flex flex-col lg:flex-row min-h-[360px] lg:min-h-[460px] shrink-0 relative overflow-visible gap-6 lg:gap-0">
+                <div className="staff-hero flex-1 bg-gradient-to-br from-[#113a29]/80 via-[#0c291d]/85 to-[#051710]/95 backdrop-blur-xl border border-white/10 shadow-[0_16px_48px_rgba(0,0,0,0.35)] rounded-[2.5rem] p-4 sm:p-6 lg:p-8 lg:pb-6 flex flex-col lg:flex-row min-h-[300px] sm:min-h-[360px] lg:min-h-[460px] shrink-0 relative overflow-visible gap-6 lg:gap-0">
                   {/* Left Column - Image */}
-                  <div className="lg:w-[38%] relative self-stretch flex items-end justify-center z-30 min-h-[320px] sm:min-h-[360px] lg:min-h-0 pointer-events-none -mb-6 lg:-ml-8 lg:-mt-20 xl:-mt-28">
+                  <div className="lg:w-[38%] relative self-stretch flex items-end justify-center z-30 min-h-[260px] sm:min-h-[360px] lg:min-h-0 pointer-events-none -mb-6 lg:-ml-8 lg:-mt-20 xl:-mt-28">
                     <motion.div
                       animate={{
                         scale: [1, 1.12, 1],
@@ -629,7 +629,7 @@ export function StaffSection({
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -10 }}
-                          className="text-4xl lg:text-5xl font-bold mb-2 tracking-tight text-white"
+                          className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-2 tracking-tight text-white"
                         >
                           {(activeOfficer?.name ?? currentStaff.name).split(" ")[0]}
                           <br className="hidden lg:block" />{" "}
@@ -940,7 +940,7 @@ export function StaffSection({
                       <table className="w-full text-left border-collapse text-[11px]">
                         <thead>
                           <tr className="bg-[#0c3123] border-b border-emerald-500/20 text-white/90">
-                            <th className="py-2.5 px-3 font-bold uppercase tracking-wider">
+                            <th className="py-2.5 px-3 font-bold uppercase tracking-wider mobile-sticky-col">
                               {activeStat === "csat" ? "Attach Category" : "Group Category"}
                             </th>
                             {isCsatView ? (
@@ -1042,7 +1042,7 @@ export function StaffSection({
                                     key={idx}
                                     className={`hover:bg-white/5 transition-colors duration-150 text-white/90 ${isTotal ? "bg-[#0c3123]/90 font-bold border-t border-emerald-500/30" : ""}`}
                                   >
-                                    <td className="py-2.5 px-3 font-bold">{row.category}</td>
+                                    <td className="py-2.5 px-3 font-bold mobile-sticky-col whitespace-nowrap">{row.category}</td>
                                     <td className={`py-2.5 px-3 text-right ${isTotal ? "text-white" : "text-white/60"}`}>
                                       {row.target > 0 ? `${row.target}%` : "—"}
                                     </td>
@@ -1064,7 +1064,7 @@ export function StaffSection({
                                     key={idx}
                                     className={`hover:bg-white/5 transition-colors duration-150 text-white/90 ${isTotal ? "bg-[#0c3123]/90 font-bold border-t border-emerald-500/30" : ""}`}
                                   >
-                                    <td className="py-2.5 px-3 font-bold">{row.category}</td>
+                                    <td className="py-2.5 px-3 font-bold mobile-sticky-col whitespace-nowrap">{row.category}</td>
                                     <td className={`py-2.5 px-3 text-right ${isTotal ? "text-white" : "text-white/60"}`}>
                                       {fmtNum(row.targetDay)}
                                     </td>
@@ -1091,7 +1091,7 @@ export function StaffSection({
                                   key={idx} 
                                   className={`hover:bg-white/5 transition-colors duration-150 text-white/90 ${isTotal ? "bg-[#0c3123]/90 font-bold border-t border-emerald-500/30" : ""}`}
                                 >
-                                  <td className="py-2.5 px-3 font-bold">{row.category}</td>
+                                  <td className="py-2.5 px-3 font-bold mobile-sticky-col whitespace-nowrap">{row.category}</td>
                                   <td className={`py-2.5 px-3 text-right ${isTotal ? "text-white" : "text-white/60"}`}>{fmtNum(row.target)}</td>
                                   <td className="py-2.5 px-3 text-right font-bold">{fmtNum(row.actual)}</td>
                                   <td className="py-2.5 px-3 text-right text-emerald-300/90 font-semibold">
