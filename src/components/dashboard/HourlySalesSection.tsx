@@ -94,21 +94,19 @@ export function HourlySalesSection({ data, compact = false }: { data: HourlySale
               tickFormatter={(v: number) => (metric === "baht" ? fmtBaht(v) : String(Math.round(v * 10) / 10))}
             />
             <Tooltip
-              cursor={{ fill: "rgba(255,255,255,0.05)" }}
-              contentStyle={{
-                background: "#1f1f1d",
-                border: "1px solid rgba(255,255,255,0.12)",
-                borderRadius: 10,
-                fontSize: 12,
-                color: "#ebeae6",
-              }}
-              labelFormatter={(l) => `${l}:00–${String(Number(l) + 1).padStart(2, "0")}:00`}
-              formatter={(_v, _n, item) => {
-                const p = item.payload as (typeof chartData)[number];
-                return [
-                  `฿${Math.round(p.avgBaht).toLocaleString()} · ${p.avgBills.toFixed(1)} บิล (เฉลี่ยต่อวัน)`,
-                  "",
-                ];
+              cursor={{ fill: "rgba(127,127,127,0.12)" }}
+              content={({ active, payload }) => {
+                if (!active || !payload?.length) return null;
+                const p = payload[0].payload as (typeof chartData)[number];
+                return (
+                  <div className="rounded-lg border border-white/15 bg-[#0c3123] px-3 py-2 text-[12px] text-white">
+                    <div className="font-semibold">
+                      {hourLabel(p.hour)}–{hourLabel(p.hour + 1)}
+                    </div>
+                    <div className="tabular-nums">฿{Math.round(p.avgBaht).toLocaleString()} ต่อวัน</div>
+                    <div className="tabular-nums text-white/70">{p.avgBills.toFixed(1)} บิลต่อวัน</div>
+                  </div>
+                );
               }}
             />
             <Bar dataKey="v" radius={[4, 4, 0, 0]} isAnimationActive={false}>
