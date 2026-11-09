@@ -4649,10 +4649,16 @@ function AppInternal({
         {/* Hidden home view for Telegram screenshot capture (always rendered,
             visible in DOM but invisible via opacity:0 so charts render).
             Placed outside <main> so main content capture doesn't include it. */}
+        {/* กล่องครอบขนาด 0 + overflow:hidden — ไม่ให้สำเนากว้าง 1200px ดันหน้าจอมือถือ
+            (iPhone ซูมออกให้พอดีกับสิ่งที่กว้างที่สุดในหน้า แม้จะโปร่งใส) */}
+        <div
+          aria-hidden
+          style={{ position: "fixed", top: 0, left: 0, width: 0, height: 0, overflow: "hidden", pointerEvents: "none", zIndex: -1 }}
+        >
         <div
           ref={homeCaptureRef}
           style={{
-            position: "fixed",
+            position: "absolute",
             top: 0,
             left: 0,
             width: "1200px",
@@ -4682,6 +4688,7 @@ function AppInternal({
               combinedTableRef={combinedTableCaptureRef}
             />
           </div>
+        </div>
         </div>
       </div>
     </div>
