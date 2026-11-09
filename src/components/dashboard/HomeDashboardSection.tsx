@@ -105,7 +105,7 @@ export function HomeDashboardSection({
         {pace && pace.target > 0 && pace.totalDays > 0 ? (
           <PaceBanner {...pace} />
         ) : null}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+        <div className={`grid grid-cols-2 ${derivedHomeStats.length === 3 ? "lg:grid-cols-3" : "lg:grid-cols-4"} gap-3 md:gap-4`}>
           {derivedHomeStats.map((stat, idx) => (
             <div key={idx} className="bg-white/5 rounded-2xl border border-white/10 p-4 md:p-5 flex flex-col gap-1">
               <div className="text-[13px] text-white/55">{stat.label}</div>
@@ -999,10 +999,10 @@ function PaceBanner({
 
       {/* แถบความคืบหน้า + ขีด "ควรถึงวันนี้" */}
       <div className="relative mt-4 mb-6">
-        <div className="h-3 rounded-full bg-white/10 overflow-hidden">
+        <div className="h-3 rounded-full pace-track bg-white/10 overflow-hidden">
           <div className={`h-full rounded-full ${tone.fill}`} style={{ width: `${Math.min(achPct, 100)}%` }} />
         </div>
-        <div className="absolute -top-1 h-5 w-0.5 rounded bg-white" style={{ left: `calc(${Math.min(expectedPct, 100)}% - 1px)` }} />
+        <div className="absolute -top-1 h-5 w-0.5 rounded pace-tick bg-white" style={{ left: `calc(${Math.min(expectedPct, 100)}% - 1px)` }} />
         <div
           className="absolute top-5 text-[11px] text-white/55 whitespace-nowrap -translate-x-1/2"
           style={{ left: `${Math.min(Math.max(expectedPct, 8), 92)}%` }}

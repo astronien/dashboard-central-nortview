@@ -51,7 +51,9 @@ export function MobileHome({
   const { actual, target, currentDay, totalDays } = pace;
   const ach = target > 0 ? (actual / target) * 100 : 0;
   const expectedPct = totalDays > 0 ? (currentDay / totalDays) * 100 : 0;
-  const gap = ach - expectedPct;
+  // เทียบกับยอดที่ควรถึงวันนี้ (สูตรเดียวกับการ์ดบนคอม)
+  const expectedAmt = target * (expectedPct / 100);
+  const gap = expectedAmt > 0 ? (actual / expectedAmt) * 100 - 100 : 0;
   const daysLeft = Math.max(totalDays - currentDay, 0);
   const perDay = daysLeft > 0 ? Math.max(target - actual, 0) / daysLeft : 0;
   const forecastPct = currentDay > 0 && target > 0 ? ((actual / currentDay) * totalDays / target) * 100 : 0;
@@ -86,7 +88,7 @@ export function MobileHome({
         <div className={`rounded-2xl border p-3.5 ${paceCls}`}>
           <div className={`flex items-center gap-1.5 text-[12px] font-semibold ${paceText}`}>
             <Gauge className="w-4 h-4" />
-            {gap >= 0 ? `เร็วกว่าเป้า ${fmtPctShort(gap)}` : `ช้ากว่าเป้า ${fmtPctShort(-gap)}`}
+            {gap >= 0 ? `นำเป้า ${Math.round(gap)}%` : `ช้ากว่าเป้า ${Math.round(-gap)}%`}
           </div>
           <div className="mt-1 flex items-baseline gap-1.5">
             <span className="text-[26px] font-semibold text-white tabular-nums">฿{fmtShort(actual)}</span>

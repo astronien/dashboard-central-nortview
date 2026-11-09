@@ -3963,6 +3963,19 @@ function AppInternal({
     window.setTimeout(() => setLineReportDone(""), 8000);
   };
 
+  // การ์ดสรุปใต้การ์ดยอด/เป้า — ไม่ซ้ำกับการ์ดใหญ่: ยอดวันล่าสุด + เฉลี่ยรายคน + จำนวนพนักงาน
+  const homeStatCards: DerivedHomeStat[] = (() => {
+    const t = dailyBranchReport.rows.find((r) => r.isTotal);
+    const d = dailyBranchReport.latestDate ? dailyBranchReport.latestDate.split("-").reverse().slice(0, 2).join("/") : "";
+    const today: DerivedHomeStat = {
+      label: d ? `ยอดวันล่าสุด (${d})` : "ยอดวันล่าสุด",
+      value: `฿${Math.round(t?.totalBaht ?? 0).toLocaleString()}`,
+      trend: t ? `${t.totalDevice} เครื่อง · iPhone ${t.iphoneUnit}` : "",
+      icon: DollarSign,
+      isUp: true,
+    };
+    return [today, ...derivedHomeStats.slice(2)];
+  })();
   // ── มือถือ: layout แยก (การ์ด/แถบ) — บนคอมใช้หน้าเดิม ───────────────
   const homePace = {
     actual: monthlyPerformance.actualSales.actual,
@@ -4004,7 +4017,7 @@ function AppInternal({
         </div>
       </div>
                 <HomeDashboardSection
-                  derivedHomeStats={derivedHomeStats}
+                  derivedHomeStats={homeStatCards}
                   monthlyPerformance={monthlyPerformance}
                   categorySnapshots={categorySnapshotData}
                   branchOverviewKpiData={branchOverviewKpiData}
@@ -4653,7 +4666,7 @@ function AppInternal({
         >
           <div style={{ width: "1200px", minHeight: "900px", padding: "24px" }}>
             <HomeDashboardSection
-              derivedHomeStats={derivedHomeStats}
+              derivedHomeStats={homeStatCards}
               monthlyPerformance={monthlyPerformance}
               categorySnapshots={categorySnapshotData}
               branchOverviewKpiData={branchOverviewKpiData}

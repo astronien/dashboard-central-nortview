@@ -136,11 +136,11 @@ export const CategorySnapshotSection = React.forwardRef<HTMLDivElement, { items:
               )}
 
               <div className="relative mt-1">
-                <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                <div className="h-1.5 rounded-full pace-track bg-white/10 overflow-hidden">
                   <div className={`h-full rounded-full ${barTone}`} style={{ width: `${Math.min(Math.max(item.achieveRate, 0), 100)}%` }} />
                 </div>
                 {expectedPct != null ? (
-                  <div className="absolute -top-1 h-3.5 w-0.5 rounded bg-white" style={{ left: `calc(${Math.min(expectedPct, 100)}% - 1px)` }} />
+                  <div className="absolute -top-1 h-3.5 w-0.5 rounded pace-tick bg-white" style={{ left: `calc(${Math.min(expectedPct, 100)}% - 1px)` }} />
                 ) : null}
               </div>
 

@@ -244,3 +244,9 @@ html.theme-dark option { background-color: #121211; }
 .app-root [class*="shadow-[0_0_"],
 .app-root [class*="shadow-[0_8px_32px"],
 .app-root [class*="shadow-[0_16px_48px"] { box-shadow: none !important; }
+
+/* แถบความคืบหน้า + ขีด "ควรถึงวันนี้" ให้เห็นทั้งสองธีม */
+html.theme-light .pace-track { background-color: rgb(31 30 27 / 0.1); }
+html.theme-light .pace-tick { background-color: #1f1e1b; }
+html.theme-light .pace-track .bg-white\/60,
+html.theme-light .pace-track .bg-white\/30 { background-color: rgb(31 30 27 / 0.45); }

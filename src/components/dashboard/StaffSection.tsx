@@ -1005,9 +1005,9 @@ export function StaffSection({
                               };
 
                               const getBadgeClass = (rate: number) => {
-                                if (rate >= 100) return "bg-green-500/20 text-green-400 font-semibold px-1.5 py-0.5 rounded border border-green-500/20";
-                                if (rate >= 80) return "bg-amber-500/20 text-amber-400 font-semibold px-1.5 py-0.5 rounded border border-amber-500/20";
-                                return "bg-rose-500/20 text-rose-400 font-semibold px-1.5 py-0.5 rounded border border-rose-500/20";
+                                if (rate >= 100) return "text-emerald-300 font-semibold";
+                                if (rate >= 80) return "text-white/70";
+                                return "text-rose-300 font-semibold";
                               };
 
                               const getDiffClass = (diff: number) => {

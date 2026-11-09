@@ -26,15 +26,15 @@ export const toneOf = (pct: number | null | undefined): Tone => {
 };
 const BAR: Record<Tone, string> = {
   good: "bg-emerald-400",
-  warn: "bg-amber-400",
+  warn: "bg-white/60",
   bad: "bg-rose-400",
   none: "bg-white/30",
 };
 const PILL: Record<Tone, string> = {
-  good: "bg-emerald-500/20 text-emerald-300 border-emerald-400/30",
-  warn: "bg-amber-500/20 text-amber-300 border-amber-400/30",
-  bad: "bg-rose-500/20 text-rose-300 border-rose-400/30",
-  none: "bg-white/10 text-white/60 border-white/10",
+  good: "border-transparent text-emerald-300",
+  warn: "border-transparent text-white/80",
+  bad: "border-transparent text-rose-300",
+  none: "border-transparent text-white/50",
 };
 
 /** แถบความคืบหน้า — mark = ขีด "ควรถึงวันนี้" (%) */
@@ -43,11 +43,11 @@ export function Bar({ pct, tone, mark }: { pct: number; tone?: Tone; mark?: numb
   const w = Math.max(0, Math.min(100, Number.isFinite(pct) ? pct : 0));
   return (
     <div className="relative mt-1">
-      <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+      <div className="h-1.5 rounded-full pace-track bg-white/10 overflow-hidden">
         <div className={`h-full rounded-full ${BAR[t]}`} style={{ width: `${w}%` }} />
       </div>
       {mark != null && Number.isFinite(mark) ? (
-        <div className="absolute -top-0.5 h-2.5 w-0.5 rounded bg-white" style={{ left: `calc(${Math.min(Math.max(mark, 0), 100)}% - 1px)` }} />
+        <div className="absolute -top-0.5 h-2.5 w-0.5 rounded pace-tick bg-white" style={{ left: `calc(${Math.min(Math.max(mark, 0), 100)}% - 1px)` }} />
       ) : null}
     </div>
   );
