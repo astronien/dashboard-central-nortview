@@ -87,21 +87,17 @@ import {
   fetchAttachBoost,
   type AttachBoost,
 } from "./lib/attachBoost";
-import { fetchUfundData, fetchUfundDay, fetchUfundMonth, type UfundResult } from "./lib/ufundApi";
+import { fetchUfundData, fetchUfundMonth, type UfundResult } from "./lib/ufundApi";
 import {
   fetchTradeBranchMappingFromCloud,
   getTradeBranchMapping,
 } from "./lib/tradeInBranchStorage";
-import { rowMatchesKpiCategory, type KpiCategoryKey } from "./lib/kpiCategoryAdapter";
-import {
-  resolveOfficerId,
-} from "./lib/officerCategoryKpi";
+import { rowMatchesKpiCategory } from "./lib/kpiCategoryAdapter";
 import {
   calcAchievementPct,
   calcForecastByDays,
   calculateMetrics,
   normalizeId,
-  rawTargetRowsToRecords,
   toNumber,
 } from "./lib/targetAggregations";
 import {
@@ -147,13 +143,6 @@ import {
 } from "recharts";
 import { HomeDashboardSection } from "./components/dashboard/HomeDashboardSection";
 
-import {
-  DailyKpiTable,
-  type DailyKpiData,
-  type DailyCatCell,
-  type DailyWonderCell,
-} from "./components/dashboard/DailyKpiTable";
-import { AttachQuotaSection } from "./components/dashboard/AttachQuotaSection";
 
 import {
   COMMISSION_CATEGORIES,
@@ -508,7 +497,6 @@ const isUfundRow = (row: any): boolean => {
 import { latestDayFromKeys } from "./lib/dateHelpers";
 import { useBranchReports } from "./hooks/useBranchReports";
 import { useCombinedOfficerKpi } from "./hooks/useCombinedOfficerKpi";
-import { useAttachQuota } from "./hooks/useAttachQuota";
 import { useOfficerCategoryPerformance } from "./hooks/useOfficerCategoryPerformance";
 import { useCategorySnapshots } from "./hooks/useCategorySnapshots";
 import { useTodayStats } from "./hooks/useTodayStats";
@@ -1363,7 +1351,6 @@ function AppInternal({
   );
   const [csatData, setCsatData] = useState<CsatResult | undefined>(undefined);
   const [ufundData, setUfundData] = useState<UfundResult | undefined>(undefined);
-  const [ufundDailyData, setUfundDailyData] = useState<UfundResult | undefined>(undefined);
   const [csatError, setCsatError] = useState<
     { code: "auth" | "no_token" | "error"; message: string } | undefined
   >(undefined);
@@ -2143,18 +2130,6 @@ function AppInternal({
     return { byCode, byName };
   }, [ufundData]);
 
-  const ufundDailyByOfficer = useMemo(() => {
-    const byCode = new Map<string, { total: number; approved: number }>();
-    const byName = new Map<string, { total: number; approved: number }>();
-    for (const s of ufundDailyData?.perStaff ?? []) {
-      const val = { total: s.total, approved: s.approved };
-      const code = String(s.empCode ?? "").replace(/[^0-9]/g, "");
-      if (code) byCode.set(code, val);
-      const nm = cleanOfficerName(s.name ?? "");
-      if (nm) byName.set(nm, val);
-    }
-    return { byCode, byName };
-  }, [ufundDailyData]);
 
   const matchUfund = (
     lut: { byCode: Map<string, { total: number; approved: number }>; byName: Map<string, { total: number; approved: number }> },
@@ -2173,10 +2148,6 @@ function AppInternal({
   const ufundForOfficer = React.useCallback(
     (staffId?: string, name?: string) => matchUfund(ufundByOfficer, staffId, name),
     [ufundByOfficer],
-  );
-  const ufundDailyForOfficer = React.useCallback(
-    (staffId?: string, name?: string) => matchUfund(ufundDailyByOfficer, staffId, name),
-    [ufundDailyByOfficer],
   );
 
   // Per-officer CSAT lookup (emp_code = STAFF ID, fallback = name match)
@@ -2425,217 +2396,7 @@ function AppInternal({
     currentBillsShared,
   });
 
-  // Home: ตารางรายวัน — ยอดขายตามหมวด + 7 Wonders ต่อคน เทียบ "วันล่าสุด"
-  // กับ "วันก่อนหน้า" (2 วันที่มีข้อมูลล่าสุด)
-  const dailyKpiData = useMemo<DailyKpiData>(() => {
-    const categoriesList: KpiCategoryKey[] = ["Mac", "iPad", "iPhone", "Apple Watch", "BTB", "BTB(Apple)"];
-    const wonderPresets = kpiPresets.filter((p) => p.showInStaffProfile);
-    const empty: DailyKpiData = {
-      categories: categoriesList,
-      presets: wonderPresets,
-      rows: [],
-      latestDate: "",
-      prevDate: "",
-    };
-    if (displayUploads.current.length === 0) return empty;
 
-    // Two most recent distinct data dates
-    const dayKey = (row: RawRow) => {
-      const p = parseDocDate(String(row["Doc Date"] ?? row["doc date"] ?? ""));
-      return p ? `${p.getFullYear()}-${String(p.getMonth() + 1).padStart(2, "0")}-${String(p.getDate()).padStart(2, "0")}` : "";
-    };
-    const daySet = new Set<string>();
-    displayUploads.current.forEach((r) => {
-      const k = dayKey(r);
-      if (k) daySet.add(k);
-    });
-    // ไม่เอาวันในอนาคต (พรีออเดอร์) มาเป็น "วันล่าสุด"
-    const latestDay = latestDayFromKeys(daySet);
-    if (!latestDay) return empty;
-    const days = Array.from(daySet)
-      .filter((d) => d && d <= latestDay)
-      .sort()
-      .reverse();
-    const prevDay = days[1] ?? null;
-
-    const latestRows = displayUploads.current.filter((r) => dayKey(r) === latestDay);
-    const prevRows = prevDay
-      ? displayUploads.current.filter((r) => dayKey(r) === prevDay)
-      : [];
-
-    const targetRecords = rawTargetRowsToRecords(displayUploads.target);
-    void latestRows;
-    void prevRows;
-    const latestBills = currentBillsShared.filter((b) => billDayKey(b) === latestDay);
-    const prevBills = prevDay ? currentBillsShared.filter((b) => billDayKey(b) === prevDay) : [];
-
-    // Trade-in agreed trades carry document_date, so count per officer for a
-    // specific day (matched by SALE_CODE digits or cleaned SALE_NAME).
-    const agreedTrades = tradeInData?.agreed ?? [];
-    const tradeCountOnDay = (staffId: string | undefined, name: string, ymd: string): number => {
-      if (!ymd) return 0;
-      const code = String(staffId ?? "").replace(/[^0-9]/g, "");
-      const nm = cleanOfficerName(name ?? "");
-      let n = 0;
-      for (const t of agreedTrades) {
-        if (t.date !== ymd) continue;
-        const tc = String(t.code).replace(/[^0-9]/g, "");
-        if ((code && tc && tc === code) || (nm && cleanOfficerName(t.name) === nm)) n += 1;
-      }
-      return n;
-    };
-
-    const officerList: Array<{ name: string; branch: string; staffId?: string; position?: string }> =
-      parsedReport.officers.length > 0
-        ? parsedReport.officers.map((o) => ({
-            name: o.name,
-            branch: o.branch,
-            staffId: o.staffId,
-            position: o.position,
-          }))
-        : Array.from(
-            new Map(
-              latestBills
-                .filter((b) => b.officerName)
-                .map((b) => [b.officerName, { name: b.officerName, branch: b.branchName }]),
-            ).values(),
-          );
-
-    const rows = officerList
-      .map((officer) => {
-        const officerId = resolveOfficerId(
-          officer.name,
-          displayUploads.target,
-          targetRecords,
-          displayUploads.current,
-          matchesOfficer,
-        );
-        // Daily table shows category UNITS (จำนวนเครื่อง) + BAHT together —
-        // sum the Number (qty) column and the sale value per category.
-        const nId = normalizeId(officerId);
-        const sumCat = (dayRows: RawRow[], cat: string): { units: number; baht: number } =>
-          dayRows.reduce<{ units: number; baht: number }>(
-            (acc, row) => {
-              const officerName = String(row["Officer (Name)"] ?? "").trim();
-              const rowId = normalizeId(row["STAFF ID"] ?? row.emp_id ?? "");
-              const match =
-                matchesOfficer(officerName, officer.name) ||
-                Boolean(nId && rowId && rowId === nId);
-              if (!match) return acc;
-              if (getCategory(row) !== cat) return acc;
-              acc.units += toNumber(row.Number ?? row.number ?? row.qty ?? 0);
-              acc.baht += getCategoryValue(row);
-              return acc;
-            },
-            { units: 0, baht: 0 },
-          );
-
-        const cats: Record<string, DailyCatCell> = {};
-        let latestUnits = 0;
-        let prevUnits = 0;
-        let latestBaht = 0;
-        let prevBaht = 0;
-        categoriesList.forEach((cat) => {
-          const latest = sumCat(latestRows, cat);
-          const prev = sumCat(prevRows, cat);
-          cats[cat] = {
-            units: latest.units,
-            prevUnits: prev.units,
-            baht: latest.baht,
-            prevBaht: prev.baht,
-          };
-          latestUnits += latest.units;
-          prevUnits += prev.units;
-          latestBaht += latest.baht;
-          prevBaht += prev.baht;
-        });
-
-        const latestOfficerBills = latestBills.filter((b) => matchesOfficer(b.officerName, officer.name));
-        const prevOfficerBills = prevBills.filter((b) => matchesOfficer(b.officerName, officer.name));
-        const wonders: Record<string, DailyWonderCell> = {};
-        wonderPresets.forEach((p) => {
-          const ctxL = {
-            tradeInCount: tradeCountOnDay(officer.staffId, officer.name, latestDay),
-            iphoneUnits: iphoneUnitsFromBills(latestOfficerBills),
-          };
-          const ctxP = {
-            tradeInCount: tradeCountOnDay(officer.staffId, officer.name, prevDay ?? ""),
-            iphoneUnits: iphoneUnitsFromBills(prevOfficerBills),
-          };
-          const rL = calcPresetIphoneAcc(latestOfficerBills, p, ctxL);
-          const rP = calcPresetIphoneAcc(prevOfficerBills, p, ctxP);
-          wonders[p.id] = {
-            latest: presetDisplayValue(rL),
-            prev: presetDisplayValue(rP),
-            latestA: rL.billsWithAandB,
-            latestB: rL.billsWithB,
-            prevA: rP.billsWithAandB,
-            calcType: p.calcType,
-          };
-
-          // UFUND รายวัน: ดึง อนุมัติ/ยื่น จาก uFund API ของวันล่าสุด (ตรงกับระบบ
-          // UFUND จริง) แทน attach จากไฟล์ขาย
-          if (/ufund/i.test(p.name)) {
-            const u = ufundDailyForOfficer(officer.staffId, officer.name);
-            if (u) {
-              wonders[p.id].latestA = u.approved;
-              wonders[p.id].latestB = u.total;
-              wonders[p.id].latest = u.total > 0 ? (u.approved / u.total) * 100 : 0;
-            }
-          }
-        });
-
-        return {
-          officer,
-          cats,
-          catTotal: {
-            units: latestUnits,
-            prevUnits,
-            baht: latestBaht,
-            prevBaht,
-          },
-          wonders,
-        };
-      })
-      .filter(
-        (r) =>
-          r.catTotal.units > 0 ||
-          r.catTotal.prevUnits > 0 ||
-          Object.values(r.wonders).some((w) => w.latest > 0 || w.prev > 0),
-      )
-      .sort((a, b) => b.catTotal.baht - a.catTotal.baht);
-
-    return {
-      categories: categoriesList,
-      presets: wonderPresets,
-      rows,
-      latestDate: latestDay,
-      prevDate: prevDay ?? "",
-    };
-  }, [
-    kpiPresets,
-    displayUploads.current,
-    displayUploads.target,
-    displayUploads.categoryMaster,
-    parsedReport.officers,
-    getCategory,
-    iphoneUnitsFromBills,
-    tradeInData,
-    ufundDailyForOfficer,
-  ]);
-
-  // ─── โควตา Attach สะสม (Cover/UFUND ต่อ iPhone 1:4) ──────────────────────
-  // สะสมทั้งเดือน: สิทธิ์คงเหลือ = 4×Attach − iPhone.
-  //   ≥0 ผ่าน · −1..−3 กำลังสะสม (ยังไม่ครบบล็อก 4) · ≤−4 ต้องส่งต่อ.
-  // เช็ควันละครั้งตอนปิดร้าน → ใช้ยอดสะสมพอ ไม่ต้องเรียง create time ในวัน.
-  const attachQuotaData = useAttachQuota({
-    displayUploads,
-    parsedReport,
-    kpiPresets,
-    iphoneUnitsFromBills,
-    attachBoost,
-    currentBillsShared,
-  });
 
   // ─── ค่าคอมมิชชั่น (PIA Individual) ─────────────────────────────────────
   // "" = เลือกช่วงอัตโนมัติจากเป้ารวมของร้าน
@@ -3190,30 +2951,6 @@ function AppInternal({
     return latestDayFromKeys(keys);
   }, [displayUploads.current]);
 
-  // uFund per-staff for the latest data day (daily table uses the real API,
-  // not the sales-file attach)
-  useEffect(() => {
-    if (!selectedBranchLoaded || !latestDataYmd) return;
-    const code =
-      csatData?.branch?.refId ||
-      getBranchCodeFromTarget(displayUploads.target) ||
-      getBranchCodeFromString(selectedBranch);
-    if (!code) {
-      setUfundDailyData(undefined);
-      return;
-    }
-    let cancelled = false;
-    fetchUfundDay(code, latestDataYmd)
-      .then((r) => {
-        if (!cancelled) setUfundDailyData(r);
-      })
-      .catch(() => {
-        if (!cancelled) setUfundDailyData(undefined);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [csatData?.branch?.refId, displayUploads.target, selectedBranch, selectedBranchLoaded, latestDataYmd]);
 
   const [stockStatus, setStockStatus] = useState<StockStatus | undefined>(undefined);
   const loadStock = React.useCallback(() => {
@@ -4271,10 +4008,8 @@ function AppInternal({
                   }}
                   categorySnapshotRef={categorySnapshotRef}
                 />
-                <DailyKpiTable data={dailyKpiData} />
                 <DailyBranchReportSection data={dailyBranchReport} boost={boostLabel(attachBoost)} uploadedAt={salesUploadedAt} />
                 <DailyBranchReportSection data={monthlyBranchReport} boost={boostLabel(attachBoost)} uploadedAt={salesUploadedAt} range={monthReportRange} onRangeChange={setMonthReportRange} />
-                <AttachQuotaSection data={attachQuotaData} boost={boostLabel(attachBoost)} />
     </>
   );
   const staffFullView = (
@@ -4660,7 +4395,6 @@ function AppInternal({
                     categories={categorySnapshotData}
                     combined={combinedOfficerKpiData}
                     daily={dailyBranchReport}
-                    attach={attachQuotaData}
                     avatarOf={mobileAvatarOf}
                     onOpenStaff={openStaffByName}
                     fullView={homeFullSections}

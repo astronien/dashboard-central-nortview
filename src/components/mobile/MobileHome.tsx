@@ -7,7 +7,6 @@ import type {
   CombinedWonderCell,
 } from "../dashboard/HomeDashboardSection";
 import type { DailyReportData } from "../dashboard/DailyBranchReportSection";
-import type { AttachQuotaData } from "../dashboard/AttachQuotaSection";
 import { Avatar, Bar, Card, Pill, Segmented, fmtPctShort, fmtShort, toneOf } from "./mobileUi";
 
 const isPctCalc = (c?: string) => c === "attach" || c === "bahtRate" || c === "catAttach" || c === "tradeIn";
@@ -22,7 +21,7 @@ const fmtDay = (ymd: string) => {
   return `${d}/${m}`;
 };
 
-type Tab = "month" | "today" | "attach";
+type Tab = "month" | "today";
 
 export function MobileHome({
   storeName,
@@ -30,7 +29,6 @@ export function MobileHome({
   categories,
   combined,
   daily,
-  attach,
   avatarOf,
   onOpenStaff,
   fullView,
@@ -40,7 +38,6 @@ export function MobileHome({
   categories: CategorySnapshotItem[];
   combined: CombinedOfficerKpiData;
   daily: DailyReportData;
-  attach: AttachQuotaData;
   avatarOf: (name: string, staffId?: string) => string | undefined;
   onOpenStaff: (name: string) => void;
   /** ตารางเต็มแบบบนคอม (เปิดด้วยปุ่ม) */
@@ -152,7 +149,6 @@ export function MobileHome({
           options={[
             { key: "month", label: "เดือนนี้" },
             { key: "today", label: "วันนี้", badge: alertCount },
-            { key: "attach", label: "Attach", badge: attach.handoffCount },
           ]}
         />
 
@@ -220,43 +216,6 @@ export function MobileHome({
           </>
         ) : null}
 
-        {tab === "attach" ? (
-          <>
-            <ul className="mt-1 divide-y divide-white/10">
-              {[...attach.rows]
-                .sort((a, b) => a.remaining - b.remaining)
-                .map((r) => {
-                  const tone = r.status === "pass" ? "good" : r.status === "accumulating" ? "warn" : "bad";
-                  const label =
-                    r.status === "pass" ? "ผ่าน" : r.status === "accumulating" ? `อีก ${4 + r.remaining}` : "ส่งต่อ";
-                  return (
-                    <li key={r.name} className="py-2.5 flex items-center gap-2.5">
-                      <Avatar src={avatarOf(r.name)} name={r.name} size={34} />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[13px] font-semibold text-white truncate">{r.name}</div>
-                        <div className="text-[11px] text-white/60 tabular-nums">
-                          iPhone {r.iphone} · Cover {r.cover} · UFUND {r.ufund}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div
-                          className={`text-[15px] font-extrabold tabular-nums ${
-                            r.remaining > 0 ? "text-emerald-300" : r.remaining >= -3 ? "text-amber-300" : "text-rose-300"
-                          }`}
-                        >
-                          {r.remaining > 0 ? `+${r.remaining}` : r.remaining}
-                        </div>
-                        <Pill tone={tone} text={label} />
-                      </div>
-                    </li>
-                  );
-                })}
-            </ul>
-            <p className="mt-2 text-[11px] text-white/45">
-              สิทธิ์คงเหลือ = 4×Attach − iPhone · แนบ Cover/UFUND 1 ชิ้น = ได้สิทธิ์ 4 เครื่อง
-            </p>
-          </>
-        ) : null}
       </Card>
 
       {/* ตารางเต็มแบบบนคอม */}
