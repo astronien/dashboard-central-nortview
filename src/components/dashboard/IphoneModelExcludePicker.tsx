@@ -64,7 +64,7 @@ export function IphoneModelExcludePicker({
         type="button"
         onClick={() => setOpen((v) => !v)}
         title="เลือกรุ่น iPhone ที่ไม่นับยอด (ตัดตัวเครื่องออกจากการคำนวณทั้งหมด)"
-        className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-full border text-xs font-semibold backdrop-blur-md shadow-xl transition-colors ${
+        className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-full border text-xs font-semibold   transition-colors ${
           active
             ? "bg-amber-500/25 border-amber-400/50 text-amber-100 hover:bg-amber-500/35"
             : "bg-white/10 border-white/10 text-white/60 hover:text-white hover:bg-white/15"
@@ -75,7 +75,7 @@ export function IphoneModelExcludePicker({
         <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open ? (
-        <div className="absolute right-0 top-full mt-2 w-72 max-h-[70vh] overflow-y-auto rounded-xl bg-[#0c3123] border border-white/15 shadow-2xl p-3 text-white z-50">
+        <div className="absolute right-0 top-full mt-2 w-72 max-h-[70vh] overflow-y-auto rounded-xl bg-[#0c3123] border border-white/15 p-3 text-white z-50">
           <div className="flex items-center justify-between mb-2">
             <div className="text-xs font-semibold">ไม่นับยอด iPhone รุ่น…</div>
             {active ? (

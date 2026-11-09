@@ -62,11 +62,11 @@ export function SettingsSection({
 }) {
   return (
     <>
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 bg-white/10 rounded-2xl p-6 border border-white/10 ">
         <div className="flex items-center gap-4">
           <div className="p-3 bg-emerald-500/20 rounded-xl text-emerald-400"><Building2 className="w-6 h-6" /></div>
           <div>
-            <h2 className="text-xl font-bold tracking-tight">เลือกสาขาประจำแดชบอร์ด</h2>
+            <h2 className="text-xl font-semibold tracking-tight">เลือกสาขาประจำแดชบอร์ด</h2>
             <p className="text-sm text-white/60 mt-1">เลือกสาขาที่ต้องการดูบนแดชบอร์ด รายชื่อสาขาดึงจากไฟล์ที่อัปโหลด — หากยังไม่มีข้อมูล กรุณาอัปโหลดไฟล์ Target/Current ที่หน้ารายงานเพื่อแสดงผล</p>
           </div>
         </div>
@@ -74,7 +74,7 @@ export function SettingsSection({
           <select
             value={selectedBranch}
             onChange={(e) => onBranchChange(e.target.value)}
-            className="w-full bg-[#051710] border border-white/15 rounded-xl px-4 py-3 text-white text-sm font-semibold focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400 transition-all cursor-pointer shadow-lg"
+            className="w-full bg-[#051710] border border-white/15 rounded-xl px-4 py-3 text-white text-sm font-semibold focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400 transition-colors cursor-pointer "
           >
             {sheetBranches.length === 0 ? (
               <option value="" disabled className="bg-[#051710] text-white/60">
@@ -93,11 +93,11 @@ export function SettingsSection({
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white/10 rounded-2xl p-6 border border-white/10 ">
         <div className="flex items-center gap-4">
           <div className="p-3 bg-emerald-500/20 rounded-xl text-emerald-400"><ImagePlus className="w-6 h-6" /></div>
           <div>
-            <h2 className="text-xl font-bold tracking-tight">รูปประจำตัวพนักงาน</h2>
+            <h2 className="text-xl font-semibold tracking-tight">รูปประจำตัวพนักงาน</h2>
             <p className="text-sm text-white/60 mt-1">รูปภาพจะแสดงในหน้าข้อมูลพนักงาน บอร์ดจัดอันดับ และตารางการขายร่วม (Attach) จำเป็นต้องอัปโหลดข้อมูลเป้าหมาย (Target) ในส่วนรายงานก่อน จึงจะแสดงรายชื่อพนักงาน</p>
           </div>
         </div>
@@ -136,7 +136,7 @@ export function SettingsSection({
         />
       ) : null}
 
-      <div className="flex-1 bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)] relative z-10 w-full min-h-[400px] overflow-hidden flex flex-col">
+      <div className="flex-1 bg-white/10 rounded-2xl border border-white/10 p-6  relative z-10 w-full min-h-[400px] overflow-hidden flex flex-col">
         {staffRoster.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center py-12">
             <Users className="w-14 h-14 text-white/20 mb-4" />

@@ -87,13 +87,13 @@ export function CsatTokenManager({ updatedBy }: { updatedBy?: string }) {
   };
 
   return (
-    <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+    <div className="bg-white/10 rounded-2xl p-6 border border-white/10 ">
       <div className="flex items-center gap-4 mb-4">
         <div className="p-3 bg-sky-500/20 rounded-xl text-sky-400">
           <Smile className="w-6 h-6" />
         </div>
         <div>
-          <h2 className="text-xl font-bold tracking-tight">CSAT Token</h2>
+          <h2 className="text-xl font-semibold tracking-tight">CSAT Token</h2>
           <p className="text-sm text-white/60 mt-1">
             ใช้ดึงคะแนนความพึงพอใจ (COM7 CSAT) — อัปเดตที่นี่เมื่อ token หมดอายุ
           </p>
@@ -169,7 +169,7 @@ export function CsatTokenManager({ updatedBy }: { updatedBy?: string }) {
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-100 font-semibold cursor-grab active:cursor-grabbing select-none"
             title="ลากปุ่มนี้ไปวางที่แถบ Bookmarks ของเบราว์เซอร์"
           >
-            📌 ดึง CSAT Token
+            ดึง CSAT Token
           </a>
           <button
             type="button"
@@ -180,7 +180,7 @@ export function CsatTokenManager({ updatedBy }: { updatedBy?: string }) {
           </button>
         </div>
         <ol className="list-decimal ml-5 text-[12px] text-white/60 space-y-0.5">
-          <li>ลากปุ่ม "📌 ดึง CSAT Token" ไปวางที่แถบ Bookmarks (ทำครั้งเดียว)</li>
+          <li>ลากปุ่ม "ดึง CSAT Token" ไปวางที่แถบ Bookmarks (ทำครั้งเดียว)</li>
           <li>
             เปิด{" "}
             <a
@@ -193,7 +193,7 @@ export function CsatTokenManager({ updatedBy }: { updatedBy?: string }) {
             </a>{" "}
             แล้ว login (ผ่าน OTP)
           </li>
-          <li>กด bookmark ที่เพิ่งวาง → ระบบจะดึง token มาบันทึกให้อัตโนมัติ ✅</li>
+          <li>กด bookmark ที่เพิ่งวาง → ระบบจะดึง token มาบันทึกให้อัตโนมัติ</li>
         </ol>
       </div>
 
@@ -205,7 +205,7 @@ export function CsatTokenManager({ updatedBy }: { updatedBy?: string }) {
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder="วาง CSAT token ที่นี่ (เช่น 21573|abcd...)"
-            className="w-full bg-[#051710] border border-white/15 rounded-xl pl-9 pr-4 py-3 text-white text-sm font-mono focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400 transition-all"
+            className="w-full bg-[#051710] border border-white/15 rounded-xl pl-9 pr-4 py-3 text-white text-sm font-mono focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400 transition-colors"
           />
         </div>
         <button

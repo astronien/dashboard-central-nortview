@@ -36,13 +36,13 @@ function ChartCard({
   children: React.ReactElement;
 }) {
   return (
-    <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-5 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+    <div className="bg-white/10 rounded-2xl border border-white/10 p-5 ">
       <div className="flex items-center gap-3 mb-4">
         <div className="p-2 bg-emerald-500/20 rounded-xl border border-emerald-500/20">
           <Icon className="w-5 h-5 text-emerald-400" />
         </div>
         <div>
-          <h2 className="text-base font-bold tracking-tight text-white">{title}</h2>
+          <h2 className="text-base font-semibold tracking-tight text-white">{title}</h2>
           <p className="text-[11px] text-white/50">{subtitle}</p>
         </div>
       </div>
@@ -89,14 +89,14 @@ export function TrendsSection({ branch }: { branch: string }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+      <div className="bg-white/10 rounded-2xl border border-white/10 p-6 ">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-emerald-500/20 rounded-xl border border-emerald-500/20">
               <TrendingUp className="w-5 h-5 text-emerald-400" />
             </div>
             <div>
-              <h2 className="text-lg font-bold tracking-tight text-white">
+              <h2 className="text-lg font-semibold tracking-tight text-white">
                 แนวโน้มย้อนหลัง
               </h2>
               <p className="text-[11px] text-white/50">
@@ -117,7 +117,7 @@ export function TrendsSection({ branch }: { branch: string }) {
       <ProgressTracker snaps={snaps} />
 
       {data.length < 2 ? (
-        <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-10 text-center">
+        <div className="bg-white/10 rounded-2xl border border-white/10 p-10 text-center">
           <TrendingUp className="w-12 h-12 text-white/20 mx-auto mb-3" />
           <p className="text-white/60">
             ยังมีข้อมูลย้อนหลังไม่พอ ({data.length} วัน) — ระบบจะเก็บ snapshot
@@ -275,12 +275,12 @@ function ProgressTracker({ snaps }: { snaps: TrendSnapshot[] }) {
 
   if (withStaff.length < 2) {
     return (
-      <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+      <div className="bg-white/10 rounded-2xl border border-white/10 p-6 ">
         <div className="flex items-center gap-3 mb-2">
           <div className="p-2 bg-sky-500/20 rounded-xl border border-sky-500/20">
             <Users className="w-5 h-5 text-sky-400" />
           </div>
-          <h2 className="text-base font-bold tracking-tight text-white">
+          <h2 className="text-base font-semibold tracking-tight text-white">
             พัฒนาการรายคน
           </h2>
         </div>
@@ -327,13 +327,13 @@ function ProgressTracker({ snaps }: { snaps: TrendSnapshot[] }) {
     if (d === null) return <span className="text-white/40 text-[11px]">ใหม่</span>;
     if (d > 0)
       return (
-        <span className="inline-flex items-center gap-0.5 text-emerald-400 text-[12px] font-bold">
+        <span className="inline-flex items-center gap-0.5 text-emerald-400 text-[12px] font-semibold">
           <ArrowUp className="w-3 h-3" />+{d}
         </span>
       );
     if (d < 0)
       return (
-        <span className="inline-flex items-center gap-0.5 text-rose-400 text-[12px] font-bold">
+        <span className="inline-flex items-center gap-0.5 text-rose-400 text-[12px] font-semibold">
           <ArrowDown className="w-3 h-3" />{d}
         </span>
       );
@@ -341,13 +341,13 @@ function ProgressTracker({ snaps }: { snaps: TrendSnapshot[] }) {
   };
 
   return (
-    <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+    <div className="bg-white/10 rounded-2xl border border-white/10 p-6 ">
       <div className="flex items-center gap-3 mb-1">
         <div className="p-2 bg-sky-500/20 rounded-xl border border-sky-500/20">
           <Users className="w-5 h-5 text-sky-400" />
         </div>
         <div>
-          <h2 className="text-base font-bold tracking-tight text-white">
+          <h2 className="text-base font-semibold tracking-tight text-white">
             พัฒนาการรายคน
           </h2>
           <p className="text-[11px] text-white/50">
@@ -363,7 +363,7 @@ function ProgressTracker({ snaps }: { snaps: TrendSnapshot[] }) {
             className="rounded-2xl border border-white/10 bg-white/5 p-4"
           >
             <div className="flex items-center justify-between gap-2 mb-2">
-              <span className="font-bold text-white truncate">{r.name}</span>
+              <span className="font-semibold text-white truncate">{r.name}</span>
               <span className="flex items-center gap-2 shrink-0">
                 <span className="text-[11px] text-white/50">ยอดรวม {r.overallPct}%</span>
                 {deltaChip(r.overallDelta)}
@@ -372,11 +372,11 @@ function ProgressTracker({ snaps }: { snaps: TrendSnapshot[] }) {
 
             {r.improved.length > 0 ? (
               <div className="mb-1.5">
-                <span className="text-[10px] text-emerald-300/80 mr-1">ดีขึ้น:</span>
+                <span className="text-[11px] text-emerald-300/80 mr-1">ดีขึ้น:</span>
                 {r.improved.map((d) => (
                   <span
                     key={d.label}
-                    className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 mr-1 mb-1"
+                    className="inline-flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 mr-1 mb-1"
                   >
                     {d.label} {d.from}→{d.to}%
                   </span>
@@ -386,11 +386,11 @@ function ProgressTracker({ snaps }: { snaps: TrendSnapshot[] }) {
 
             {r.declined.length > 0 ? (
               <div>
-                <span className="text-[10px] text-rose-300/80 mr-1">แย่ลง:</span>
+                <span className="text-[11px] text-rose-300/80 mr-1">แย่ลง:</span>
                 {r.declined.map((d) => (
                   <span
                     key={d.label}
-                    className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/20 mr-1 mb-1"
+                    className="inline-flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/20 mr-1 mb-1"
                   >
                     {d.label} {d.from}→{d.to}%
                   </span>

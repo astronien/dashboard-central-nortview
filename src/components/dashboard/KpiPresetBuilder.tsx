@@ -210,8 +210,8 @@ export default function KpiPresetBuilder({
                 className={`${span} py-1.5 text-sm font-medium rounded-md transition-colors ${
                   calcType === key
                     ? isCat
-                      ? "bg-white/10 shadow-sm text-amber-300"
-                      : "bg-white/10 shadow-sm text-emerald-300"
+                      ? "bg-white/10  text-amber-300"
+                      : "bg-white/10  text-emerald-300"
                     : isCat
                       ? "text-amber-200/70 hover:text-amber-200"
                       : "text-emerald-200/70 hover:text-emerald-200"
@@ -281,7 +281,7 @@ export default function KpiPresetBuilder({
           <div className="space-y-3">
             {filtersB.map((filter, idx) => (
               <div key={idx} className="border border-white/10 rounded-lg p-3 bg-white/5 relative">
-                <span className="text-xs text-emerald-400 font-bold absolute top-2 right-2">
+                <span className="text-xs text-emerald-400 font-semibold absolute top-2 right-2">
                   เงื่อนไข B{idx + 1}
                 </span>
                 <CategoryPicker
@@ -341,7 +341,7 @@ export default function KpiPresetBuilder({
           <div className="space-y-3">
             {filtersA.map((filter, idx) => (
               <div key={idx} className="border border-white/10 rounded-lg p-3 bg-white/5 relative">
-                <span className="text-xs text-emerald-400 font-bold absolute top-2 right-2">
+                <span className="text-xs text-emerald-400 font-semibold absolute top-2 right-2">
                   เงื่อนไข A{idx + 1}
                 </span>
                 <CategoryPicker
@@ -386,7 +386,7 @@ export default function KpiPresetBuilder({
               key={c}
               type="button"
               onClick={() => setColor(c)}
-              className={`w-10 h-10 rounded-full border-2 transition-all ${colorBgClass[c]} ${
+              className={`w-10 h-10 rounded-full border-2 transition-colors ${colorBgClass[c]} ${
                 color === c ? "border-white scale-110" : "border-white/20"
               }`}
             />
@@ -464,7 +464,7 @@ export default function KpiPresetBuilder({
       </div>
 
       <div className="bg-white/5 rounded-lg p-3 border border-white/10">
-        <p className="text-xs text-emerald-400 font-bold mb-1">Preview:</p>
+        <p className="text-xs text-emerald-400 font-semibold mb-1">Preview:</p>
         {calcType === "attach" ? (
           <>
             <p className="text-sm text-white/80">
@@ -472,7 +472,7 @@ export default function KpiPresetBuilder({
               <br />
               <span className="ml-16">÷ จำนวนชิ้น <strong className="text-purple-300">{labelB || descB}</strong> ทั้งหมด</span>
             </p>
-            <p className="text-xs text-emerald-400 font-bold mt-2">
+            <p className="text-xs text-emerald-400 font-semibold mt-2">
               ตัวอย่าง: Mac 3 ชิ้น ÷ iPhone 10 ชิ้น = 30%
             </p>
           </>
@@ -483,7 +483,7 @@ export default function KpiPresetBuilder({
               <br />
               <span className="ml-24">÷ ยอดขาย <strong className="text-purple-300">{labelB || descB}</strong> (บาท)</span>
             </p>
-            <p className="text-xs text-emerald-400 font-bold mt-2">
+            <p className="text-xs text-emerald-400 font-semibold mt-2">
               ตัวอย่าง: 3rd Party 2M ÷ iPhone 10M = 20%
             </p>
           </>
@@ -492,7 +492,7 @@ export default function KpiPresetBuilder({
             <p className="text-sm text-white/80">
               แสดงยอดจำนวนที่ขายได้ของ <strong className="text-emerald-300">{labelA || descA}</strong>
             </p>
-            <p className="text-xs text-emerald-400 font-bold mt-2">
+            <p className="text-xs text-emerald-400 font-semibold mt-2">
               ตัวอย่าง: แสดงจำนวน Mac ที่ขายได้ทั้งหมด โดยไม่เอาไปหารกับสินค้าอื่น
             </p>
           </>
@@ -501,7 +501,7 @@ export default function KpiPresetBuilder({
             <p className="text-sm text-white/80">
               ยอดขายรวม (฿) ของ catDaily = <strong className="text-amber-300">{catDailyFilter || "ทุกหมวด"}</strong>
             </p>
-            <p className="text-xs text-amber-200/80 font-bold mt-2">
+            <p className="text-xs text-amber-200/80 font-semibold mt-2">
               ดึงยอดจาก totalPrice ทุก line item ที่ catDaily ตรงกัน (Inventory Item)
             </p>
           </>
@@ -510,7 +510,7 @@ export default function KpiPresetBuilder({
             <p className="text-sm text-white/80">
               ยอดจำนวน (ชิ้น) ของ catDaily = <strong className="text-amber-300">{catDailyFilter || "ทุกหมวด"}</strong>
             </p>
-            <p className="text-xs text-amber-200/80 font-bold mt-2">
+            <p className="text-xs text-amber-200/80 font-semibold mt-2">
               นับจำนวนชิ้นทุก line item ที่ catDaily ตรงกัน (Inventory Item)
             </p>
           </>
@@ -521,7 +521,7 @@ export default function KpiPresetBuilder({
               {" ÷ "}
               จำนวน <strong className="text-purple-300">{catDailyFilterB || "ทุกหมวด"}</strong> × 100%
             </p>
-            <p className="text-xs text-amber-200/80 font-bold mt-2">
+            <p className="text-xs text-amber-200/80 font-semibold mt-2">
               คำนวณ Attach Rate โดยใช้ catDaily จาก CatMaster แทนการเลือก filter แบบปกติ
             </p>
           </>
@@ -532,7 +532,7 @@ export default function KpiPresetBuilder({
               {" ÷ "}
               <strong className="text-purple-300">iPhone ที่ขายได้</strong> × 100%
             </p>
-            <p className="text-xs text-sky-200/80 font-bold mt-2">
+            <p className="text-xs text-sky-200/80 font-semibold mt-2">
               ตัวอย่าง: เทรดที่ตก 21 ÷ iPhone 100 ชิ้น = 21% (เป้า {targetPercent || 20}%)
             </p>
           </>
@@ -541,7 +541,7 @@ export default function KpiPresetBuilder({
             <p className="text-sm text-white/80">
               แสดงยอดขายรวมเป็นบาท (฿) ของ <strong className="text-emerald-300">{labelA || descA}</strong>
             </p>
-            <p className="text-xs text-emerald-400 font-bold mt-2">
+            <p className="text-xs text-emerald-400 font-semibold mt-2">
               ตัวอย่าง: แสดงยอดขายรวม (Total Price) ของสินค้า Mac จากบิลที่เลือกทั้งหมด
             </p>
           </>

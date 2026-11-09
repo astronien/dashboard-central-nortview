@@ -59,13 +59,13 @@ export function StaffVisibilityManager({
   const shownCount = staffRoster.length - staffRoster.filter((s) => hidden.has(s.staffId)).length;
 
   return (
-    <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+    <div className="bg-white/10 rounded-2xl p-6 border border-white/10 ">
       <div className="flex items-center gap-4 mb-4">
         <div className="p-3 bg-emerald-500/20 rounded-xl text-emerald-400">
           <Users className="w-6 h-6" />
         </div>
         <div className="flex-1">
-          <h2 className="text-xl font-bold tracking-tight">แสดงพนักงานในหน้า Staff Profile</h2>
+          <h2 className="text-xl font-semibold tracking-tight">แสดงพนักงานในหน้า Staff Profile</h2>
           <p className="text-sm text-white/60 mt-1">
             ติ๊กออกเพื่อซ่อนคนที่ไม่ใช่ฝ่ายขาย (เช่น ผู้จัดการ/ซัพพอร์ต) — แสดงอยู่ {shownCount}/{staffRoster.length} คน
           </p>
@@ -100,9 +100,9 @@ export function StaffVisibilityManager({
               )}
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium truncate">{entry.name}</div>
-                <div className="text-[10px] text-white/40 truncate">ID {entry.staffId}</div>
+                <div className="text-[11px] text-white/40 truncate">ID {entry.staffId}</div>
               </div>
-              <span className={`text-[10px] font-bold ${isHidden ? "text-white/30" : "text-emerald-300"}`}>
+              <span className={`text-[11px] font-semibold ${isHidden ? "text-white/30" : "text-emerald-300"}`}>
                 {isHidden ? "ซ่อน" : "แสดง"}
               </span>
             </button>

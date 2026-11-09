@@ -59,31 +59,31 @@ const formatDisplayDate = (dateStr: string): string => {
 const inputClass =
   "text-sm border border-white/10 bg-white/5 text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none";
 
-const labelClass = "text-sm text-emerald-400 font-bold";
+const labelClass = "text-sm text-emerald-400 font-semibold";
 
 const colorMap: Record<string, { active: string; inactive: string }> = {
   green: {
-    active: "bg-emerald-500 text-white border-emerald-400 shadow-sm",
+    active: "bg-emerald-500 text-white border-emerald-400 ",
     inactive: "bg-emerald-500/10 text-emerald-300 border-white/10",
   },
   amber: {
-    active: "bg-amber-500 text-white border-amber-400 shadow-sm",
+    active: "bg-amber-500 text-white border-amber-400 ",
     inactive: "bg-amber-500/10 text-amber-300 border-white/10",
   },
   blue: {
-    active: "bg-blue-500 text-white border-blue-400 shadow-sm",
+    active: "bg-blue-500 text-white border-blue-400 ",
     inactive: "bg-blue-500/10 text-blue-300 border-white/10",
   },
   teal: {
-    active: "bg-teal-500 text-white border-teal-400 shadow-sm",
+    active: "bg-teal-500 text-white border-teal-400 ",
     inactive: "bg-teal-500/10 text-teal-300 border-white/10",
   },
   purple: {
-    active: "bg-purple-500 text-white border-purple-400 shadow-sm",
+    active: "bg-purple-500 text-white border-purple-400 ",
     inactive: "bg-purple-500/10 text-purple-300 border-white/10",
   },
   coral: {
-    active: "bg-orange-500 text-white border-orange-400 shadow-sm",
+    active: "bg-orange-500 text-white border-orange-400 ",
     inactive: "bg-orange-500/10 text-orange-300 border-white/10",
   },
 };
@@ -219,7 +219,7 @@ export default function KpiDateFilterBar({
   };
 
   return (
-    <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 p-5 shadow-[0_8px_32px_rgba(0,0,0,0.12)] space-y-4">
+    <div className="bg-white/10 rounded-2xl border border-white/10 p-5  space-y-4">
       {/* Filter Controls */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
@@ -309,7 +309,7 @@ export default function KpiDateFilterBar({
       </div>
 
       {/* Summary */}
-      <div className="text-sm text-emerald-300 font-bold">
+      <div className="text-sm text-emerald-300 font-semibold">
         แสดงข้อมูล{" "}
         <span className="font-semibold text-white">
           {formatDisplayDate(filters.startDate)}
@@ -342,14 +342,14 @@ export default function KpiDateFilterBar({
                 className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30 transition-colors"
                 title="เลือก KPI ทั้งหมด"
               >
-                ✅ เลือกทั้งหมด
+                เลือกทั้งหมด
               </button>
               <button
                 onClick={onDeselectAllPresets}
                 className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-white/5 text-white/70 hover:bg-white/10 border border-white/10 transition-colors"
                 title="ยกเลิก KPI ทั้งหมด"
               >
-                ❌ ยกเลิกทั้งหมด
+                ยกเลิกทั้งหมด
               </button>
             </div>
             {presets.map((preset) => {
@@ -363,7 +363,7 @@ export default function KpiDateFilterBar({
                   onDragOver={(e) => handleDragOver(e, preset.id)}
                   onDragEnd={() => setDraggedPresetId(null)}
                   onClick={() => onTogglePreset(preset.id)}
-                  className={`cursor-pointer px-3 py-1.5 text-sm font-medium rounded-lg border-2 transition-all ${
+                  className={`cursor-pointer px-3 py-1.5 text-sm font-medium rounded-lg border-2 transition-colors ${
                     isActive ? colors.active : colors.inactive
                   } hover:shadow-sm ${
                     draggedPresetId === preset.id ? "opacity-40 scale-95" : ""

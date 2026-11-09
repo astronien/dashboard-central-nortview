@@ -37,7 +37,7 @@ function CoverBadge({ coverDays, reorder }: { coverDays?: number | null; reorder
         ? ["bg-white/10 text-white/50 border-white/15", "ค้าง"]
         : ["bg-emerald-500/15 text-emerald-300 border-emerald-400/30", "พอขาย"];
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-bold ${cls}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${cls}`}>
       {label} · {d} วัน
     </span>
   );
@@ -76,10 +76,10 @@ function RunRateTable({
             <tr key={`${r.key}-${i}`} className="border-b border-white/5 hover:bg-white/5 transition-colors">
               <td className="py-2 px-3">
                 <div className="font-medium text-white truncate max-w-[300px]">{r.label}</div>
-                {showSub && r.sub ? <div className="text-[10px] text-white/40">{r.sub}</div> : null}
+                {showSub && r.sub ? <div className="text-[11px] text-white/40">{r.sub}</div> : null}
               </td>
               <td className="py-2 px-3 text-right font-mono text-white/80 tabular-nums">{fmt(r.units)}</td>
-              <td className="py-2 px-3 text-right font-mono font-bold text-emerald-300 tabular-nums">
+              <td className="py-2 px-3 text-right font-mono font-semibold text-emerald-300 tabular-nums">
                 {fmt1(r.unitsPerDay)}
               </td>
               <td className="py-2 px-3 text-right font-mono text-white/70 tabular-nums">{fmt(r.projectedUnits)}</td>
@@ -152,14 +152,14 @@ function StockUploadPanel({
   };
 
   return (
-    <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+    <div className="bg-white/10 rounded-2xl border border-white/10 p-6 ">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-sky-500/20 rounded-xl border border-sky-500/20">
             <Package className="w-5 h-5 text-sky-400" />
           </div>
           <div>
-            <h2 className="text-base font-bold tracking-tight text-white">อัปโหลดสต็อกคงเหลือ</h2>
+            <h2 className="text-base font-semibold tracking-tight text-white">อัปโหลดสต็อกคงเหลือ</h2>
             <p className="text-[11px] text-white/50">
               ไฟล์ Excel/CSV ที่มีคอลัมน์ ชื่อ/รหัสสินค้า + จำนวนคงเหลือ — เพื่อคำนวณ "ขายหมดในกี่วัน"
             </p>
@@ -248,7 +248,7 @@ export function RunRateSection({
 
   if (!data || data.categories.length === 0) {
     return (
-      <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-10 text-center">
+      <div className="bg-white/10 rounded-2xl border border-white/10 p-10 text-center">
         <Gauge className="w-12 h-12 text-white/20 mx-auto mb-3" />
         <p className="text-white/60">
           ยังไม่มีข้อมูลพอสำหรับ Run Rate — กรุณาอัปโหลดไฟล์ Current ที่หน้ารายงาน
@@ -356,8 +356,8 @@ export function RunRateSection({
           {icon}
           {label}
         </div>
-        <div className="mt-1 text-2xl font-extrabold tabular-nums">{value}</div>
-        {hint ? <div className="text-[10px] text-white/45 mt-0.5">{hint}</div> : null}
+        <div className="mt-1 text-2xl font-semibold tabular-nums">{value}</div>
+        {hint ? <div className="text-[11px] text-white/45 mt-0.5">{hint}</div> : null}
       </button>
     );
   };
@@ -365,14 +365,14 @@ export function RunRateSection({
   return (
     <div className="flex flex-col gap-6">
       {/* Header + สรุป */}
-      <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+      <div className="bg-white/10 rounded-2xl border border-white/10 p-6 ">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-emerald-500/20 rounded-xl border border-emerald-500/20">
               <Gauge className="w-5 h-5 text-emerald-400" />
             </div>
             <div>
-              <h2 className="text-lg font-bold tracking-tight text-white">Run Rate — ขายได้วันละเท่าไหร่</h2>
+              <h2 className="text-lg font-semibold tracking-tight text-white">Run Rate — ขายได้วันละเท่าไหร่</h2>
               <p className="text-[11px] text-white/50">
                 ดูว่าแต่ละสินค้าขายเร็วแค่ไหน ของพอขายอีกกี่วัน และควรสั่งเพิ่มอะไร · คิดจาก {data.windowLabel}
               </p>
@@ -461,7 +461,7 @@ export function RunRateSection({
             {t.label}
             {t.count != null ? (
               <span
-                className={`rounded-full px-1.5 text-[10px] font-bold ${
+                className={`rounded-full px-1.5 text-[11px] font-semibold ${
                   t.count === 0
                     ? "bg-white/10 text-white/50"
                     : t.tone === "rose"
@@ -477,10 +477,10 @@ export function RunRateSection({
       </div>
 
       {tab === "overview" ? (
-        <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+        <div className="bg-white/10 rounded-2xl border border-white/10 p-6 ">
           <div className="flex items-center gap-3 mb-1">
             <Package className="w-5 h-5 text-emerald-400" />
-            <h2 className="text-base font-bold tracking-tight text-white">ขายได้วันละเท่าไหร่ — รายหมวด</h2>
+            <h2 className="text-base font-semibold tracking-tight text-white">ขายได้วันละเท่าไหร่ — รายหมวด</h2>
           </div>
           <p className="text-[11px] text-white/45 mb-4">
             "วันละ" = ขายเฉลี่ยต่อวัน · "ถึงสิ้นเดือน ≈" = ถ้าขายเท่านี้ต่อไปจะได้ประมาณเท่าไหร่
@@ -494,9 +494,9 @@ export function RunRateSection({
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                 {valueByCat.map((v) => (
                   <div key={v.cat} className="bg-black/20 rounded-xl border border-white/5 px-3 py-2">
-                    <div className="text-[10px] text-white/50 truncate">{v.cat}</div>
-                    <div className="text-sm font-bold text-white tabular-nums">{fmtBaht(v.value)}</div>
-                    <div className="text-[9px] text-white/40">
+                    <div className="text-[11px] text-white/50 truncate">{v.cat}</div>
+                    <div className="text-sm font-semibold text-white tabular-nums">{fmtBaht(v.value)}</div>
+                    <div className="text-[11px] text-white/40">
                       {((v.value / (totalStockValue || 1)) * 100).toFixed(0)}% ของสต็อก
                     </div>
                   </div>
@@ -509,12 +509,12 @@ export function RunRateSection({
 
       {tab === "fast" ? (
         <>
-          <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+          <div className="bg-white/10 rounded-2xl border border-white/10 p-6 ">
             <div className="flex items-center justify-between gap-3 mb-4">
               <div className="flex items-center gap-3">
                 <Zap className="w-5 h-5 text-amber-400" />
                 <div>
-                  <h2 className="text-base font-bold tracking-tight text-white">ขายดี — Top {products.length}</h2>
+                  <h2 className="text-base font-semibold tracking-tight text-white">ขายดี — Top {products.length}</h2>
                   <p className="text-[11px] text-white/45">เรียงจากขายได้ต่อวันมากสุด</p>
                 </div>
               </div>
@@ -533,11 +533,11 @@ export function RunRateSection({
             <RunRateTable rows={products} hasStock={hasStock} showSub />
           </div>
           {slow.length > 0 ? (
-            <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+            <div className="bg-white/10 rounded-2xl border border-white/10 p-6 ">
               <div className="flex items-center gap-3 mb-4">
                 <Snail className="w-5 h-5 text-white/60" />
                 <div>
-                  <h2 className="text-base font-bold tracking-tight text-white">
+                  <h2 className="text-base font-semibold tracking-tight text-white">
                     ขายช้า{catFilter !== "all" ? ` · ${catFilter}` : ""}
                   </h2>
                   <p className="text-[11px] text-white/45">ขายได้น้อยที่สุดต่อวัน — ระวังของค้าง</p>
@@ -550,12 +550,12 @@ export function RunRateSection({
       ) : null}
 
       {tab === "reorder" && hasStock ? (
-        <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-rose-400/20 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+        <div className="bg-white/10 rounded-2xl border border-rose-400/20 p-6 ">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div className="flex items-center gap-3">
               <ShoppingCart className="w-5 h-5 text-rose-400" />
               <div>
-                <h2 className="text-base font-bold tracking-tight text-white">ต้องสั่งเพิ่ม ({reorderList.length})</h2>
+                <h2 className="text-base font-semibold tracking-tight text-white">ต้องสั่งเพิ่ม ({reorderList.length})</h2>
                 <p className="text-[11px] text-white/45">
                   ของจะหมดก่อนของใหม่มาถึง — "ควรสั่ง" = จำนวนที่ทำให้พอขายอีก {targetCover} วัน
                 </p>
@@ -585,7 +585,7 @@ export function RunRateSection({
             </div>
           </div>
           {reorderList.length === 0 ? (
-            <p className="text-[13px] text-emerald-300/90">✅ ยังไม่มีอะไรต้องสั่งด่วน — ทุกตัวพอขายเกิน {leadDays} วัน</p>
+            <p className="text-[13px] text-emerald-300/90">ยังไม่มีอะไรต้องสั่งด่วน — ทุกตัวพอขายเกิน {leadDays} วัน</p>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-white/10">
               <table className="w-full text-left border-collapse text-[12px]">
@@ -603,7 +603,7 @@ export function RunRateSection({
                     <tr key={`${r.label}-${i}`} className="border-b border-white/5 hover:bg-white/5">
                       <td className="py-2 px-3">
                         <div className="font-medium text-white truncate max-w-[300px]">{r.label}</div>
-                        {r.sub ? <div className="text-[10px] text-white/40">{r.sub}</div> : null}
+                        {r.sub ? <div className="text-[11px] text-white/40">{r.sub}</div> : null}
                       </td>
                       <td className="py-2 px-3 text-right font-mono text-white/80 tabular-nums">{fmt(r.stock)}</td>
                       <td className="py-2 px-3 text-right font-mono text-emerald-300 tabular-nums">{fmt1(r.unitsPerDay)}</td>
@@ -611,7 +611,7 @@ export function RunRateSection({
                         <CoverBadge coverDays={r.coverDays} reorder />
                       </td>
                       <td className="py-2 px-3 text-right">
-                        <span className="inline-block rounded-lg bg-rose-500/20 border border-rose-400/40 px-2.5 py-0.5 font-mono font-extrabold text-rose-200 tabular-nums">
+                        <span className="inline-block rounded-lg bg-rose-500/20 border border-rose-400/40 px-2.5 py-0.5 font-mono font-semibold text-rose-200 tabular-nums">
                           +{fmt(r.suggestQty)}
                         </span>
                       </td>
@@ -625,12 +625,12 @@ export function RunRateSection({
       ) : null}
 
       {tab === "dead" && hasStock ? (
-        <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+        <div className="bg-white/10 rounded-2xl border border-white/10 p-6 ">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div className="flex items-center gap-3">
               <Snail className="w-5 h-5 text-amber-300" />
               <div>
-                <h2 className="text-base font-bold tracking-tight text-white">ของค้าง ({deadStock.length})</h2>
+                <h2 className="text-base font-semibold tracking-tight text-white">ของค้าง ({deadStock.length})</h2>
                 <p className="text-[11px] text-white/45">
                   มีของแต่ขายช้ามาก (พอขายเกิน {deadCover} วัน หรือไม่ขายเลย) — พิจารณาจัดโปรระบาย
                 </p>
@@ -648,7 +648,7 @@ export function RunRateSection({
             </label>
           </div>
           {deadStock.length === 0 ? (
-            <p className="text-[13px] text-emerald-300/90">✅ ไม่มีของค้างเกินเกณฑ์</p>
+            <p className="text-[13px] text-emerald-300/90">ไม่มีของค้างเกินเกณฑ์</p>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-white/10">
               <table className="w-full text-left border-collapse text-[12px]">
@@ -666,13 +666,13 @@ export function RunRateSection({
                     <tr key={`${d.label}-${i}`} className="border-b border-white/5 hover:bg-white/5">
                       <td className="py-2 px-3">
                         <div className="font-medium text-white truncate max-w-[300px]">{d.label}</div>
-                        {d.sub ? <div className="text-[10px] text-white/40">{d.sub}</div> : null}
+                        {d.sub ? <div className="text-[11px] text-white/40">{d.sub}</div> : null}
                       </td>
                       <td className="py-2 px-3 text-right font-mono text-white/80 tabular-nums">{fmt(d.stock)}</td>
                       <td className="py-2 px-3 text-right font-mono text-white/50 tabular-nums">{fmt1(d.unitsPerDay)}</td>
                       <td className="py-2 px-3">
                         {d.coverDays == null ? (
-                          <span className="inline-flex rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-[10px] font-bold text-white/50">
+                          <span className="inline-flex rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-white/50">
                             ไม่ขายเลย
                           </span>
                         ) : (

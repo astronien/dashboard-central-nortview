@@ -94,7 +94,7 @@ export default function AttachTargetGroupEditor({
           return (
             <div
               key={mainCat}
-              className={`border rounded-xl transition-all ${
+              className={`border rounded-xl transition-colors ${
                 isMainGroup
                   ? "bg-teal-500/15 border-teal-400/50"
                   : "bg-white/5 border-white/10"
@@ -119,7 +119,7 @@ export default function AttachTargetGroupEditor({
                     {mainCat}
                   </span>
                   {hasSub && (
-                    <span className="text-[9px] bg-white/10 text-white/50 px-1.5 py-0.5 rounded-full border border-white/10 shrink-0">
+                    <span className="text-[11px] bg-white/10 text-white/50 px-1.5 py-0.5 rounded-full border border-white/10 shrink-0">
                       {subCats.size}
                     </span>
                   )}
@@ -177,14 +177,14 @@ export default function AttachTargetGroupEditor({
 
       {pendingSubs.length > 0 && (
         <div className="rounded-xl border border-teal-400/30 bg-teal-500/10 p-2.5 space-y-2">
-          <div className="text-[10px] font-bold text-teal-300 uppercase tracking-wider">
+          <div className="text-[11px] font-semibold text-teal-300 ">
             Sub ที่เลือก ({pendingSubs.length})
           </div>
           <div className="flex flex-wrap gap-1">
             {pendingSubs.map((sub) => (
               <span
                 key={sub}
-                className="text-[10px] bg-white/10 text-white/80 px-2 py-0.5 rounded-full border border-white/10"
+                className="text-[11px] bg-white/10 text-white/80 px-2 py-0.5 rounded-full border border-white/10"
               >
                 {sub}
               </span>
@@ -213,7 +213,7 @@ export default function AttachTargetGroupEditor({
 
       {groups.length > 0 && (
         <div className="space-y-2">
-          <div className="text-[10px] font-bold text-white/50 uppercase tracking-wider flex items-center gap-1">
+          <div className="text-[11px] font-semibold text-white/50 flex items-center gap-1">
             <Layers className="w-3 h-3" />
             กลุ่ม Attach ({groups.length})
           </div>
@@ -237,7 +237,7 @@ export default function AttachTargetGroupEditor({
                 {group.members.map((member) => (
                   <span
                     key={`${group.id}-${member}`}
-                    className="inline-flex items-center gap-0.5 text-[10px] bg-teal-500/15 text-white/80 px-1.5 py-0.5 rounded-full border border-teal-500/20"
+                    className="inline-flex items-center gap-0.5 text-[11px] bg-teal-500/15 text-white/80 px-1.5 py-0.5 rounded-full border border-teal-500/20"
                   >
                     {member}
                     <button

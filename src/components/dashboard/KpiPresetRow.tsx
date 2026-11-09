@@ -25,30 +25,30 @@ function PresetValue({
   if (ct === "baht" || ct === "catBaht") {
     return (
       <>
-        <p className={`text-2xl font-bold ${colors.text} mb-1`}>
+        <p className={`text-2xl font-semibold ${colors.text} mb-1`}>
           ฿{Math.round(result.totalBaht || 0).toLocaleString("th-TH")}
         </p>
-        <p className="text-xs text-emerald-400 font-bold">บาท</p>
+        <p className="text-xs text-emerald-400 font-semibold">บาท</p>
       </>
     );
   }
   if (ct === "unit" || ct === "catQty") {
     return (
       <>
-        <p className={`text-2xl font-bold ${colors.text} mb-1`}>
+        <p className={`text-2xl font-semibold ${colors.text} mb-1`}>
           {(result.billsWithAandB || 0).toLocaleString("th-TH")}
         </p>
-        <p className="text-xs text-emerald-400 font-bold">ชิ้น</p>
+        <p className="text-xs text-emerald-400 font-semibold">ชิ้น</p>
       </>
     );
   }
   if (ct === "bahtRate") {
     return (
       <>
-        <p className={`text-2xl font-bold ${colors.text} mb-1`}>
+        <p className={`text-2xl font-semibold ${colors.text} mb-1`}>
           {result.totalBahtB === 0 ? "ไม่มีข้อมูล" : `${result.bahtRate.toFixed(1)}%`}
         </p>
-        <p className="text-xs text-emerald-400 font-bold">
+        <p className="text-xs text-emerald-400 font-semibold">
           ฿{Math.round(result.totalBaht || 0).toLocaleString("th-TH")}
           {" / "}
           ฿{Math.round(result.totalBahtB || 0).toLocaleString("th-TH")}
@@ -58,10 +58,10 @@ function PresetValue({
   }
   return (
     <>
-      <p className={`text-2xl font-bold ${colors.text} mb-1`}>
+      <p className={`text-2xl font-semibold ${colors.text} mb-1`}>
         {result.billsWithB === 0 ? "ไม่มีข้อมูล" : `${result.attachRate.toFixed(1)}%`}
       </p>
-      <p className="text-xs text-emerald-400 font-bold">
+      <p className="text-xs text-emerald-400 font-semibold">
         {result.billsWithAandB}/{result.billsWithB} ชิ้น
       </p>
     </>
@@ -78,11 +78,11 @@ export default function KpiPresetRow({ results }: KpiPresetRowProps) {
         return (
           <div
             key={result.presetId}
-            className={`${colors.bg} rounded-2xl border-l-4 ${colors.border} border border-white/10 p-4 shadow-lg min-w-[200px] hover:bg-white/10 transition`}
+            className={`${colors.bg} rounded-2xl border-l-4 ${colors.border} border border-white/10 p-4  min-w-[200px] hover:bg-white/10 transition`}
           >
             <p className="text-sm font-medium text-white/80 mb-1">{result.presetName}</p>
             <PresetValue result={result} colors={colors} />
-            <p className="text-[10px] text-white/40 mt-1">
+            <p className="text-[11px] text-white/40 mt-1">
               {formatPresetValue(result)}
             </p>
           </div>

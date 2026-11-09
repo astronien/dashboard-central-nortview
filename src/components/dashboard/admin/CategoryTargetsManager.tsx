@@ -113,14 +113,14 @@ export function CategoryTargetsManager({ selectedBranch, onChanged }: { selected
   };
 
   return (
-    <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+    <div className="bg-white/10 rounded-2xl border border-white/10 p-6 ">
       <div className="flex items-start justify-between gap-4 mb-4">
         <div className="flex items-center gap-4">
           <div className="p-3 bg-emerald-500/20 rounded-xl text-emerald-400">
             <Target className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-xl font-bold tracking-tight">ตั้งเป้าหมาย Category</h2>
+            <h2 className="text-xl font-semibold tracking-tight">ตั้งเป้าหมาย Category</h2>
             <p className="text-sm text-white/60 mt-1">
               กำหนด target เองสำหรับหมวดที่ target Excel ไม่มี column เฉพาะ — AC+ / COVER+ ตั้งเป็น{" "}
               <span className="text-emerald-300">% ของ iPhone</span> · SIM / Trade In ตั้งเป็นจำนวนชิ้น —
@@ -158,20 +158,20 @@ export function CategoryTargetsManager({ selectedBranch, onChanged }: { selected
           return (
             <div key={key} className="rounded-2xl border border-white/10 bg-white/5 p-4 flex flex-col gap-2">
               <div className="flex items-baseline justify-between gap-2">
-                <span className="text-sm font-bold text-white">{label}</span>
+                <span className="text-sm font-semibold text-white">{label}</span>
                 {ov ? (
-                  <span className="text-[10px] text-emerald-300/80">
+                  <span className="text-[11px] text-emerald-300/80">
                     override · {new Date(ov.updated_at).toLocaleDateString("th-TH")}
                   </span>
                 ) : (
-                  <span className="text-[10px] text-white/40">ใช้ค่าจาก Excel</span>
+                  <span className="text-[11px] text-white/40">ใช้ค่าจาก Excel</span>
                 )}
               </div>
               <p className="text-[11px] text-white/50 leading-snug">{desc}</p>
               {ov ? (
                 <div className="flex items-center gap-2 text-sm">
                   <span className="text-white/60">ปัจจุบัน:</span>
-                  <span className="font-bold text-emerald-300 tabular-nums">
+                  <span className="font-semibold text-emerald-300 tabular-nums">
                     {unit === "%" ? `${ov.target}%` : ov.target.toLocaleString()}
                   </span>
                   {unit !== "%" ? <span className="text-white/40 text-xs">{unit}</span> : null}

@@ -180,9 +180,9 @@ export default function KpiResultsTable({
   };
 
   return (
-    <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)] overflow-hidden">
+    <div className="bg-white/10 rounded-2xl border border-white/10  overflow-hidden">
       <div className="px-5 py-3 border-b border-white/10 flex items-center justify-between">
-        <h3 className="text-base font-bold text-white">
+        <h3 className="text-base font-semibold text-white">
           ตารางผลลัพธ์ {mode === "branch" ? "รายสาขา" : "รายพนักงาน"} ({sorted.length})
         </h3>
         <span className="text-xs text-white/50">
@@ -192,8 +192,8 @@ export default function KpiResultsTable({
       <div>
         <table className="w-full table-fixed text-left text-sm">
           <thead>
-            <tr className="bg-white/5 text-white/60 text-[11px] uppercase">
-              <th className="py-2 px-2 font-bold align-bottom">
+            <tr className="bg-white/5 text-white/60 text-[11px] ">
+              <th className="py-2 px-2 font-semibold align-bottom">
                 <button
                   type="button"
                   onClick={() => handleSort("name")}
@@ -203,7 +203,7 @@ export default function KpiResultsTable({
                   <SortIcon field="name" />
                 </button>
               </th>
-              <th className="py-2 px-1 font-bold text-center align-bottom w-12">
+              <th className="py-2 px-1 font-semibold text-center align-bottom w-12">
                 <button
                   type="button"
                   onClick={() => handleSort("billCount")}
@@ -216,7 +216,7 @@ export default function KpiResultsTable({
               {activePresets.map((preset) => (
                 <th
                   key={preset.id}
-                  className="py-2 px-1 font-bold text-center align-bottom"
+                  className="py-2 px-1 font-semibold text-center align-bottom"
                 >
                   <button
                     type="button"
@@ -228,7 +228,7 @@ export default function KpiResultsTable({
                   </button>
                 </th>
               ))}
-              <th className="py-2 px-1 font-bold text-right align-bottom">
+              <th className="py-2 px-1 font-semibold text-right align-bottom">
                 <button
                   type="button"
                   onClick={() => handleSort("totalBaht")}
@@ -238,7 +238,7 @@ export default function KpiResultsTable({
                   <SortIcon field="totalBaht" />
                 </button>
               </th>
-              <th className="py-2 px-1 font-bold text-center align-bottom">
+              <th className="py-2 px-1 font-semibold text-center align-bottom">
                 <button
                   type="button"
                   onClick={() => handleSort("totalAchRate")}
@@ -277,12 +277,12 @@ export default function KpiResultsTable({
                     return (
                       <td key={preset.id} className="py-2 px-1 text-center">
                         <span
-                          className={`px-1.5 py-0.5 rounded font-bold text-xs border ${achBg(r.attachRate)}`}
+                          className={`px-1.5 py-0.5 rounded font-semibold text-xs border ${achBg(r.attachRate)}`}
                         >
                           {v.text}
                         </span>
                         {v.suffix && (
-                          <div className="text-[10px] text-white/40 mt-0.5 break-words">
+                          <div className="text-[11px] text-white/40 mt-0.5 break-words">
                             {v.suffix.trim()}
                           </div>
                         )}
@@ -298,7 +298,7 @@ export default function KpiResultsTable({
                     >
                       {v.text}
                       {v.suffix && (
-                        <div className="text-[10px] text-white/40 mt-0.5 break-words">{v.suffix.trim()}</div>
+                        <div className="text-[11px] text-white/40 mt-0.5 break-words">{v.suffix.trim()}</div>
                       )}
                     </td>
                   );
@@ -308,7 +308,7 @@ export default function KpiResultsTable({
                 </td>
                 <td className="py-2 px-1 text-center">
                   <span
-                    className={`px-1.5 py-0.5 rounded font-bold text-xs border ${achBg(row.totalAchRate)}`}
+                    className={`px-1.5 py-0.5 rounded font-semibold text-xs border ${achBg(row.totalAchRate)}`}
                   >
                     {row.totalAchRate.toFixed(1)}%
                   </span>

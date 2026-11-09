@@ -54,7 +54,7 @@ export default function CategoryTreePicker({
         return (
           <div
             key={mainCat}
-            className={`border rounded-xl transition-all ${
+            className={`border rounded-xl transition-colors ${
               isMainSelected ? theme.selected : "bg-white/5 border-white/10"
             }`}
           >
@@ -77,7 +77,7 @@ export default function CategoryTreePicker({
                   {mainCat}
                 </span>
                 {hasSub && (
-                  <span className="text-[9px] bg-white/10 text-white/50 px-1.5 py-0.5 rounded-full border border-white/10 shrink-0">
+                  <span className="text-[11px] bg-white/10 text-white/50 px-1.5 py-0.5 rounded-full border border-white/10 shrink-0">
                     {subCats.size}
                   </span>
                 )}

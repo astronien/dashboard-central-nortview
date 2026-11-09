@@ -78,17 +78,17 @@ export function AttachBoostManager({
   const activeToday = boostInRange(boost, todayYmd());
 
   return (
-    <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+    <div className="bg-white/10 rounded-2xl p-6 border border-white/10 ">
       <div className="flex items-center gap-4 mb-4">
         <div className="p-3 bg-orange-500/20 rounded-xl text-orange-300">
           <Flame className="w-6 h-6" />
         </div>
         <div className="flex-1">
-          <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
+          <h2 className="text-xl font-semibold tracking-tight flex items-center gap-2">
             โหมดโฟกัส Attach (ตัวคูณรายตัว)
             {anyBoostOn(boost) ? (
               <span
-                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
                   activeToday ? "bg-orange-500 text-white" : "bg-white/10 text-white/50"
                 }`}
               >
@@ -123,7 +123,7 @@ export function AttachBoostManager({
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-semibold text-white">{t.label}</span>
                 <span
-                  className={`text-xs font-extrabold px-2 py-0.5 rounded-md ${
+                  className={`text-xs font-semibold px-2 py-0.5 rounded-md ${
                     f > 1 ? "bg-orange-500 text-white" : f < 1 ? "bg-sky-500 text-white" : "bg-white/10 text-white/50"
                   }`}
                 >
@@ -136,7 +136,7 @@ export function AttachBoostManager({
                     key={opt}
                     type="button"
                     onClick={() => setFactor(t.key, opt)}
-                    className={`flex-1 rounded-lg py-1 text-xs font-bold transition-colors ${
+                    className={`flex-1 rounded-lg py-1 text-xs font-semibold transition-colors ${
                       f === opt ? "bg-white text-slate-900" : "bg-white/10 text-white/60 hover:text-white"
                     }`}
                   >
@@ -154,7 +154,7 @@ export function AttachBoostManager({
                   className="w-14 bg-[#051710] border border-white/15 rounded-lg px-1.5 py-1 text-white text-xs text-center focus:outline-none focus:border-orange-400"
                 />
               </div>
-              <div className="mt-1.5 text-[10px] text-white/45">
+              <div className="mt-1.5 text-[11px] text-white/45">
                 = {f} เครดิต · ครอบคลุม iPhone {Math.round(f * 4 * 10) / 10} เครื่อง
               </div>
             </div>

@@ -76,13 +76,13 @@ export function AiSettingsManager({ updatedBy }: { updatedBy?: string }) {
   };
 
   return (
-    <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+    <div className="bg-white/10 rounded-2xl p-6 border border-white/10 ">
       <div className="flex items-center gap-4 mb-4">
         <div className="p-3 bg-purple-500/20 rounded-xl text-purple-300">
           <Sparkles className="w-6 h-6" />
         </div>
         <div>
-          <h2 className="text-xl font-bold tracking-tight">AI สำหรับบทวิเคราะห์</h2>
+          <h2 className="text-xl font-semibold tracking-tight">AI สำหรับบทวิเคราะห์</h2>
           <p className="text-sm text-white/60 mt-1">
             เลือกค่าย AI และใส่ API key — ใช้เขียนบทวิเคราะห์รายวันเป็นภาษาธรรมชาติ
           </p>

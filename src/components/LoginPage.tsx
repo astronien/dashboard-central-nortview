@@ -29,10 +29,8 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-[#0a1f17] via-[#051710] to-black p-4 relative overflow-hidden">
+    <div className="min-h-screen w-full flex items-center justify-center bg-[#121211] p-4 relative overflow-hidden">
       {/* Decorative glow */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/20 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-teal-500/15 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="w-full max-w-md relative z-10">
         {/* Brand */}
@@ -119,7 +117,7 @@ export default function LoginPage() {
 
           {!isTursoConfigured() && (
             <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">
-              ⚠️ Turso ยังไม่ได้ตั้งค่า — ใส่ VITE_TURSO_DATABASE_URL และ VITE_TURSO_AUTH_TOKEN ใน .env
+              Turso ยังไม่ได้ตั้งค่า — ใส่ VITE_TURSO_DATABASE_URL และ VITE_TURSO_AUTH_TOKEN ใน .env
             </div>
           )}
 

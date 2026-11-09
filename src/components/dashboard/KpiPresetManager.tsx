@@ -198,12 +198,12 @@ export default function KpiPresetManager({
   };
 
   return (
-    <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+    <div className="bg-white/10 rounded-2xl border border-white/10 ">
       <div
         className="flex items-center justify-between p-4 cursor-pointer hover:bg-white/5 rounded-t-2xl transition-colors"
         onClick={() => setIsOpen(!isOpen)}
       >
-        <h2 className="text-lg font-bold text-white">⚙️ จัดการ KPI Preset ({presets.length})</h2>
+        <h2 className="text-lg font-semibold text-white">จัดการ KPI Preset ({presets.length})</h2>
 
         <div
           className="flex gap-2 overflow-x-auto px-2 py-1 max-w-[60%]"
@@ -232,7 +232,7 @@ export default function KpiPresetManager({
           </button>
         </div>
 
-        <button className="text-emerald-400 font-bold ml-2 transition-colors">
+        <button className="text-emerald-400 font-semibold ml-2 transition-colors">
           {isOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
         </button>
       </div>
@@ -322,7 +322,7 @@ export default function KpiPresetManager({
                     <div className={`w-3 h-3 rounded-full shrink-0 ${colorDotClass(preset.color)}`} />
                     <div className="min-w-0 flex-1">
                       <p className="font-medium text-white truncate">{preset.name}</p>
-                      <p className="text-xs text-emerald-400 font-bold truncate">
+                      <p className="text-xs text-emerald-400 font-semibold truncate">
                         {preset.labelA} → {preset.labelB || "(ไม่มี)"}
                       </p>
                     </div>

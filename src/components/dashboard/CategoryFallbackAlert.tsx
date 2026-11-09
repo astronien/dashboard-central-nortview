@@ -74,7 +74,7 @@ export function CategoryFallbackAlert({
           <div className="text-[11px] text-slate-500 mt-0.5">
             {p.brands
               .slice(0, 3)
-              .map((b) => `${/^apple$/i.test(b.brand) ? "🍎 " : ""}${b.brand} ${fmtBaht(b.revenue)}`)
+              .map((b) => `${b.brand} ${fmtBaht(b.revenue)}`)
               .join(" · ")}
           </div>
         </td>
@@ -123,7 +123,7 @@ export function CategoryFallbackAlert({
         <button
           type="button"
           onClick={openModal}
-          className="fixed bottom-20 md:bottom-4 left-4 z-[60] flex items-center gap-2 max-w-[calc(100vw-2rem)] rounded-full bg-amber-500 text-slate-900 px-4 py-2 text-xs font-semibold shadow-2xl hover:bg-amber-400"
+          className="fixed bottom-20 md:bottom-4 left-4 z-[60] flex items-center gap-2 max-w-[calc(100vw-2rem)] rounded-full bg-amber-500 text-slate-900 px-4 py-2 text-xs font-semibold hover:bg-amber-400"
         >
           <AlertTriangle className="w-4 h-4 shrink-0" />
           <span className="truncate">
@@ -134,7 +134,7 @@ export function CategoryFallbackAlert({
         <button
           type="button"
           onClick={openModal}
-          className="fixed bottom-20 md:bottom-4 left-4 z-[60] rounded-full bg-white/15 border border-white/20 text-white px-4 py-2 text-xs font-semibold shadow-2xl backdrop-blur-md hover:bg-white/25"
+          className="fixed bottom-20 md:bottom-4 left-4 z-[60] rounded-full bg-white/15 border border-white/20 text-white px-4 py-2 text-xs font-semibold hover:bg-white/25"
         >
           หมวดย่อยที่เลือกเอง {decided.length} รายการ — แก้ไข
         </button>
@@ -147,10 +147,10 @@ export function CategoryFallbackAlert({
             if (e.target === e.currentTarget) setOpen(false);
           }}
         >
-          <div className="bg-white text-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col">
+          <div className="bg-white text-slate-800 rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col">
             <div className="flex items-start justify-between gap-4 p-4 border-b border-slate-200">
               <div>
-                <div className="font-bold">หมวดย่อยใหม่ที่ Category Master ยังไม่มี</div>
+                <div className="font-semibold">หมวดย่อยใหม่ที่ Category Master ยังไม่มี</div>
                 <div className="text-xs text-slate-500 mt-0.5">
                   เลือกว่าแต่ละหมวดย่อยควรนับเข้า BTB / BTB(Apple) หรือให้อยู่ในอื่นๆ — บันทึกแล้วใช้กับทุกเครื่อง
                   (ถ้า Category Master เดือนใหม่มีหมวดนี้แล้ว ระบบจะยึดตาม master)

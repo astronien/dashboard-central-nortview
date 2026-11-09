@@ -40,7 +40,7 @@ export default function ChangePasswordGate() {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-[#0a1f17] via-[#051710] to-black p-4">
+    <div className="min-h-screen w-full flex items-center justify-center bg-[#121211] p-4">
       <div className="w-full max-w-md">
         <div className="bg-white/10 backdrop-blur-xl rounded-3xl border border-white/10 p-8 shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
           <div className="text-center mb-6">

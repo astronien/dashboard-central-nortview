@@ -24,7 +24,7 @@ function PinInput({
       placeholder={placeholder ?? "••••"}
       value={value}
       onChange={(e) => onChange(e.target.value.replace(/\D/g, ""))}
-      className="w-full text-center tracking-[0.5em] text-2xl font-bold bg-[#051710] border border-white/15 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-400"
+      className="w-full text-center tracking-[0.5em] text-2xl font-semibold bg-[#051710] border border-white/15 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-400"
     />
   );
 }
@@ -90,13 +90,13 @@ export function SettingsGate({ updatedBy, children }: { updatedBy?: string; chil
     <div className="flex justify-center py-16">
       <form
         onSubmit={(e) => void submit(e)}
-        className="w-full max-w-sm bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-8 shadow-[0_8px_32px_rgba(0,0,0,0.2)] flex flex-col items-center gap-4"
+        className="w-full max-w-sm bg-white/10 rounded-2xl border border-white/10 p-8  flex flex-col items-center gap-4"
       >
         <div className="p-4 rounded-2xl bg-emerald-500/20 text-emerald-300">
           {hasPin === false ? <KeyRound className="w-8 h-8" /> : <Lock className="w-8 h-8" />}
         </div>
         <div className="text-center">
-          <h2 className="text-xl font-bold text-white">
+          <h2 className="text-xl font-semibold text-white">
             {hasPin === false ? "ตั้งรหัสหน้าตั้งค่า" : "หน้าตั้งค่าถูกล็อก"}
           </h2>
           <p className="text-sm text-white/55 mt-1">
@@ -119,7 +119,7 @@ export function SettingsGate({ updatedBy, children }: { updatedBy?: string; chil
             <button
               type="submit"
               disabled={busy}
-              className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-emerald-500/30 border border-emerald-400/50 text-white font-bold hover:bg-emerald-500/40 disabled:opacity-50"
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-emerald-500/30 border border-emerald-400/50 text-white font-semibold hover:bg-emerald-500/40 disabled:opacity-50"
             >
               {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
               {hasPin === false ? "ตั้งรหัสและเข้าใช้งาน" : "ปลดล็อก"}
@@ -152,13 +152,13 @@ function ChangePinPanel({ updatedBy, onLock }: { updatedBy?: string; onLock: () 
   };
 
   return (
-    <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10 flex flex-col md:flex-row md:items-end gap-4">
+    <div className="bg-white/10 rounded-2xl p-6 border border-white/10 flex flex-col md:flex-row md:items-end gap-4">
       <div className="flex items-center gap-4 flex-1">
         <div className="p-3 bg-emerald-500/20 rounded-xl text-emerald-300">
           <KeyRound className="w-6 h-6" />
         </div>
         <div>
-          <h2 className="text-xl font-bold tracking-tight">รหัสหน้าตั้งค่า</h2>
+          <h2 className="text-xl font-semibold tracking-tight">รหัสหน้าตั้งค่า</h2>
           <p className="text-sm text-white/60 mt-1">เปลี่ยนรหัส หรือกดล็อกเมื่อใช้งานเสร็จ</p>
         </div>
       </div>

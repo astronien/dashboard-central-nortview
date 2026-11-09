@@ -66,13 +66,13 @@ export function TargetUpliftManager({
   const examplePct = pctFor(cfg, "iPhone");
 
   return (
-    <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+    <div className="bg-white/10 rounded-2xl p-6 border border-white/10 ">
       <div className="flex items-center gap-4 mb-4">
         <div className="p-3 bg-sky-500/20 rounded-xl text-sky-300">
           <TrendingUp className="w-6 h-6" />
         </div>
         <div className="flex-1">
-          <h2 className="text-xl font-bold tracking-tight">ปรับเป้าเพิ่ม (Stretch Target)</h2>
+          <h2 className="text-xl font-semibold tracking-tight">ปรับเป้าเพิ่ม (Stretch Target)</h2>
           <p className="text-sm text-white/60 mt-1">
             เพิ่มเป้าเป็น % จากเป้าจริงในไฟล์ Target — มีผลทุกหน้า (Home, Staff Profile, Commission ฯลฯ) · ปิดเมื่อไหร่ก็กลับเป็นเป้าจริง
           </p>
@@ -111,7 +111,7 @@ export function TargetUpliftManager({
                 step={0.5}
                 value={cfg.pct}
                 onChange={(e) => update({ pct: Number(e.target.value) || 0 })}
-                className="w-28 bg-[#051710] border border-white/15 rounded-lg pl-3 pr-7 py-2 text-white text-lg font-bold focus:outline-none focus:border-sky-400"
+                className="w-28 bg-[#051710] border border-white/15 rounded-lg pl-3 pr-7 py-2 text-white text-lg font-semibold focus:outline-none focus:border-sky-400"
               />
               <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/40 text-sm">%</span>
             </div>
@@ -140,13 +140,13 @@ export function TargetUpliftManager({
                       onChange={(e) => setCat(cat, e.target.value)}
                       className="w-full bg-[#051710] border border-white/15 rounded-lg pl-2 pr-6 py-1 text-white text-sm focus:outline-none focus:border-sky-400"
                     />
-                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-white/30">%</span>
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-white/30">%</span>
                   </div>
                 </label>
               );
             })}
           </div>
-          <p className="text-[10px] text-white/40 mt-2">
+          <p className="text-[11px] text-white/40 mt-2">
             เป้ารวม (Total) = เป้าเดิม + ส่วนที่เพิ่มของแต่ละหมวด · SIM เป็นจำนวนชิ้น ไม่บวกเข้าเป้ารวม
           </p>
         </div>

@@ -108,50 +108,50 @@ const FileUploadCard: React.FC<FileUploadCardProps> = (props) => {
   const isLoaded = rowCount > 0;
   return (
     <div
-      className={`rounded-2xl border p-4 flex flex-col gap-2 min-h-[150px] transition-all ${
+      className={`rounded-2xl border p-4 flex flex-col gap-2 min-h-[150px] transition-colors ${
         isLoaded
-          ? "border-teal-500/30 bg-teal-500/[0.04] shadow-[inset_0_1px_0_rgba(45,212,191,0.1)]"
+          ? "border-teal-500/30 bg-teal-500/[0.04] "
           : "border-white/10 bg-white/5"
       }`}
     >
       <div className="flex justify-between items-start">
         <div className="flex items-center gap-2">
           <FileSpreadsheet className="w-3.5 h-3.5 text-white/50" />
-          <span className="text-[10px] font-bold text-white/70 uppercase tracking-wider">
+          <span className="text-[11px] font-semibold text-white/70 ">
             {KIND_LABELS[kind]}
           </span>
         </div>
         {isLoaded ? (
-          <span className="text-[9px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/20 px-2 py-0.5 rounded">
-            ✓ {rowCount.toLocaleString()}
+          <span className="text-[11px] font-semibold text-emerald-300 bg-emerald-500/15 border border-emerald-500/20 px-2 py-0.5 rounded">
+            {rowCount.toLocaleString()}
           </span>
         ) : (
-          <span className="text-[9px] text-white/30 bg-white/5 px-2 py-0.5 rounded">empty</span>
+          <span className="text-[11px] text-white/30 bg-white/5 px-2 py-0.5 rounded">empty</span>
         )}
       </div>
 
-      <div className="text-[10px] text-white/40 leading-tight min-h-[2.4em]">
+      <div className="text-[11px] text-white/40 leading-tight min-h-[2.4em]">
         {KIND_DESCRIPTIONS[kind]}
       </div>
 
       {isLoaded && fileName && (
         <div
-          className="text-[10px] text-teal-300/80 font-medium truncate"
+          className="text-[11px] text-teal-300/80 font-medium truncate"
           title={fileName}
         >
-          📎 {fileName}
+          {fileName}
         </div>
       )}
 
       {isLoaded && dateRange && (
-        <div className="text-[9px] text-white/50 font-medium tracking-wide">
-          📅 {dateRange}
+        <div className="text-[11px] text-white/50 font-medium ">
+          {dateRange}
         </div>
       )}
 
       {isAvailable ? (
         <label
-          className={`mt-auto flex items-center justify-center gap-2 cursor-pointer text-[10px] rounded-lg px-3 py-2 border transition-colors ${
+          className={`mt-auto flex items-center justify-center gap-2 cursor-pointer text-[11px] rounded-lg px-3 py-2 border transition-colors ${
             isLoading
               ? "border-white/10 bg-white/5 text-white/40 cursor-not-allowed"
               : isLoaded
@@ -183,7 +183,7 @@ const FileUploadCard: React.FC<FileUploadCardProps> = (props) => {
           />
         </label>
       ) : (
-        <div className="mt-auto text-[10px] text-white/30 italic text-center px-3 py-2 bg-white/5 rounded-lg border border-white/5 border-dashed">
+        <div className="mt-auto text-[11px] text-white/30 italic text-center px-3 py-2 bg-white/5 rounded-lg border border-white/5 border-dashed">
           ไม่ต้องอัปโหลด (ใช้ Current แทน)
         </div>
       )}
@@ -218,17 +218,17 @@ export function ReportsSection({
   return (
     <>
       {/* Section: File upload */}
-      <div className="text-xs font-semibold tracking-wider text-teal-400/80 uppercase mb-1">
+      <div className="text-xs font-semibold text-teal-400/80  mb-1">
         File Upload
       </div>
-      <div className="bg-white/10 backdrop-blur-md rounded-[2rem] p-6 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+      <div className="bg-white/10 rounded-2xl p-6 border border-white/10 ">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-5">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-teal-500/20 rounded-xl text-teal-400 shrink-0">
               <Upload className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="text-lg font-bold tracking-tight text-white">
+              <h3 className="text-lg font-semibold tracking-tight text-white">
                 อัปโหลดข้อมูลจากไฟล์ Excel
               </h3>
               <p className="text-xs text-white/60 mt-0.5">
@@ -318,7 +318,7 @@ export function ReportsSection({
         <div className="font-semibold text-white mb-3 flex items-center justify-between">
           <span>สถานะข้อมูล</span>
           {hasAny && (
-            <span className="text-[10px] font-mono text-emerald-300">
+            <span className="text-[11px] font-mono text-emerald-300">
               รวม {totalRows.toLocaleString()} แถว
             </span>
           )}
@@ -340,13 +340,13 @@ export function ReportsSection({
       </div>
 
       {/* Report preview header */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white/10 rounded-2xl p-6 border border-white/10 ">
         <div className="flex items-center gap-4">
           <div className="p-3 bg-emerald-500/20 rounded-xl text-emerald-400">
             <FileSpreadsheet className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-xl font-bold tracking-tight">สรุปผลรายงาน</h2>
+            <h2 className="text-xl font-semibold tracking-tight">สรุปผลรายงาน</h2>
             <p className="text-sm text-white/60 mt-1">
               Branch / Category / Officer summary คำนวณจากข้อมูลที่อัปโหลด
             </p>
@@ -397,7 +397,7 @@ export function ReportsSection({
 
       {/* Branch summary table */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+        <div className="lg:col-span-2 bg-white/10 rounded-2xl border border-white/10 p-6 ">
           <div className="flex items-center justify-between mb-5">
             <h3 className="text-lg font-semibold tracking-tight">Branch Summary</h3>
             <span className="text-xs text-white/50">Target, actual, achievement, MoM, YoY</span>
@@ -452,7 +452,7 @@ export function ReportsSection({
           </div>
         </div>
 
-        <div className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+        <div className="bg-white/10 rounded-2xl border border-white/10 p-6 ">
           <h3 className="text-lg font-semibold tracking-tight mb-5">Report Logic Rules</h3>
           <div className="space-y-4 text-sm text-white/80">
             <div className="rounded-2xl bg-white/5 border border-white/5 p-4">
@@ -481,7 +481,7 @@ export function ReportsSection({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+        <div className="bg-white/10 rounded-2xl border border-white/10 p-6 ">
           <div className="flex items-center justify-between mb-5">
             <h3 className="text-lg font-semibold tracking-tight">Category Summary</h3>
             <span className="text-xs text-white/50">Main category totals</span>
@@ -515,7 +515,7 @@ export function ReportsSection({
           </div>
         </div>
 
-        <div className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+        <div className="bg-white/10 rounded-2xl border border-white/10 p-6 ">
           <div className="flex items-center justify-between mb-5">
             <h3 className="text-lg font-semibold tracking-tight">Officer Summary</h3>
             <span className="text-xs text-white/50">Name matching + target alignment</span>

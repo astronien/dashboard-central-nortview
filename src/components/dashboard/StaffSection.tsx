@@ -975,9 +975,9 @@ export function StaffSection({
                         <AnimatePresence mode="wait">
                           <motion.tbody
                             key={activeStat}
-                            initial={{ opacity: 0, y: 10, filter: "blur(4px)" }}
-                            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                            exit={{ opacity: 0, y: -10, filter: "blur(4px)" }}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
                             transition={{ duration: 0.25 }}
                             className="divide-y divide-emerald-500/10 bg-[#052b20]/60"
                           >

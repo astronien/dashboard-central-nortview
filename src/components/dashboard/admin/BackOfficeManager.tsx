@@ -80,13 +80,13 @@ export function BackOfficeManager({
   };
 
   return (
-    <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+    <div className="bg-white/10 rounded-2xl p-6 border border-white/10 ">
       <div className="flex items-center gap-4 mb-4">
         <div className="p-3 bg-amber-500/20 rounded-xl text-amber-300">
           <Users2 className="w-6 h-6" />
         </div>
         <div className="flex-1">
-          <h2 className="text-xl font-bold tracking-tight">พนักงานหลังบ้าน (ส่วนแบ่งค่าคอม)</h2>
+          <h2 className="text-xl font-semibold tracking-tight">พนักงานหลังบ้าน (ส่วนแบ่งค่าคอม)</h2>
           <p className="text-sm text-white/60 mt-1">
             กรอกจำนวนคนแต่ละตำแหน่ง — ระบบจะหักส่วนนี้จากก้อนค่าคอมก่อน แล้วที่เหลือแบ่งให้เซล
           </p>
@@ -104,7 +104,7 @@ export function BackOfficeManager({
         {BACK_OFFICE_POSITIONS.map((pos) => (
           <div key={pos} className="rounded-xl border border-white/10 bg-black/20 p-3">
             <div className="text-sm font-semibold text-white mb-2">{LABEL[pos] ?? pos}</div>
-            <label className="block text-[10px] text-white/40 mb-1">จำนวนคน</label>
+            <label className="block text-[11px] text-white/40 mb-1">จำนวนคน</label>
             <input
               type="number"
               min={0}
@@ -113,7 +113,7 @@ export function BackOfficeManager({
               onChange={(e) => setOne(pos, e.target.value)}
               className="w-full bg-[#051710] border border-white/15 rounded-lg px-2 py-1.5 text-white text-sm focus:outline-none focus:border-amber-400"
             />
-            <label className="block text-[10px] text-white/40 mt-2 mb-1">% ต่อคน</label>
+            <label className="block text-[11px] text-white/40 mt-2 mb-1">% ต่อคน</label>
             <div className="relative">
               <input
                 type="number"
@@ -123,10 +123,10 @@ export function BackOfficeManager({
                 onChange={(e) => setRate(pos, e.target.value)}
                 className="w-full bg-[#051710] border border-white/15 rounded-lg pl-2 pr-6 py-1.5 text-white text-sm focus:outline-none focus:border-amber-400"
               />
-              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-white/30">%</span>
+              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-white/30">%</span>
             </div>
             {(rates[pos] ?? 0) !== (BACK_OFFICE_RATES[pos] ?? 0) ? (
-              <div className="text-[9px] text-amber-300/70 mt-1">
+              <div className="text-[11px] text-amber-300/70 mt-1">
                 เดิม {(BACK_OFFICE_RATES[pos] ?? 0).toFixed(2)}%
               </div>
             ) : null}
@@ -137,13 +137,13 @@ export function BackOfficeManager({
       <div className="mt-4 flex flex-wrap items-center gap-4 text-sm">
         <span className="text-white/50">
           รวมหลังบ้าน:{" "}
-          <span className={`font-extrabold ${totalPct > 100 ? "text-rose-300" : "text-amber-300"}`}>
+          <span className={`font-semibold ${totalPct > 100 ? "text-rose-300" : "text-amber-300"}`}>
             {totalPct.toFixed(2)}%
           </span>
         </span>
         <span className="text-white/50">
           เหลือให้เซล:{" "}
-          <span className="font-extrabold text-emerald-300">
+          <span className="font-semibold text-emerald-300">
             {Math.max(0, 100 - totalPct).toFixed(2)}%
           </span>
         </span>

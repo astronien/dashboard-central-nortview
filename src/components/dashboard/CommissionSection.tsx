@@ -41,17 +41,17 @@ export const CommissionSection: React.FC<{
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+      <div className="bg-white/10 rounded-2xl border border-white/10 p-6 ">
         <div className="flex items-start justify-between gap-4 mb-1">
           <div className="flex items-center gap-2">
             <Wallet className="w-5 h-5 text-emerald-300" />
-            <h3 className="text-lg font-bold tracking-tight text-white">
+            <h3 className="text-lg font-semibold tracking-tight text-white">
               ค่าคอมมิชชั่น (PIA Individual)
             </h3>
           </div>
           <div className="text-right shrink-0">
             <div className="text-[11px] text-white/50">ก้อนใหญ่ (ค่าคอมรวม)</div>
-            <div className="text-2xl font-extrabold text-emerald-300">฿{fmtBaht(grandTotal)}</div>
+            <div className="text-2xl font-semibold text-emerald-300">฿{fmtBaht(grandTotal)}</div>
           </div>
         </div>
         <p className="text-xs text-white/50 mb-3">
@@ -98,17 +98,17 @@ export const CommissionSection: React.FC<{
               <div key={staff.staffId ?? staff.name} className="rounded-2xl border border-white/10 bg-black/20 p-4">
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <div>
-                    <div className="font-bold text-white">{staff.name}</div>
-                    <div className="text-[10px] text-white/40">
+                    <div className="font-semibold text-white">{staff.name}</div>
+                    <div className="text-[11px] text-white/40">
                       {staff.staffId ? `ID ${staff.staffId}` : ""} {staff.branch ?? ""}
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-[10px] text-white/40">ได้จริง (หลังแบ่งหลังบ้าน)</div>
-                    <div className="text-xl font-extrabold text-emerald-300">
+                    <div className="text-[11px] text-white/40">ได้จริง (หลังแบ่งหลังบ้าน)</div>
+                    <div className="text-xl font-semibold text-emerald-300">
                       ฿{fmtBaht2(staff.netCommission ?? staff.totalCommission)}
                     </div>
-                    <div className="text-[10px] text-white/30">
+                    <div className="text-[11px] text-white/30">
                       ตามสูตร ฿{fmtBaht2(staff.totalCommission)}
                     </div>
                   </div>
@@ -118,34 +118,34 @@ export const CommissionSection: React.FC<{
                   <table className="w-full text-left border-collapse text-[11px]">
                     <thead>
                       <tr className="bg-[#0c3123] border-b border-emerald-500/20 text-white/90">
-                        <th className="py-2 px-3 font-bold uppercase tracking-wider">หมวด</th>
-                        <th className="py-2 px-3 font-bold uppercase tracking-wider text-right">เป้า</th>
-                        <th className="py-2 px-3 font-bold uppercase tracking-wider text-right">ยอดขาย</th>
-                        <th className="py-2 px-3 font-bold uppercase tracking-wider text-center">% Ach</th>
-                        <th className="py-2 px-3 font-bold uppercase tracking-wider text-center">ขั้น</th>
-                        <th className="py-2 px-3 font-bold uppercase tracking-wider text-right">อัตรา</th>
-                        <th className="py-2 px-3 font-bold uppercase tracking-wider text-right">ค่าคอม</th>
+                        <th className="py-2 px-3 font-semibold ">หมวด</th>
+                        <th className="py-2 px-3 font-semibold text-right">เป้า</th>
+                        <th className="py-2 px-3 font-semibold text-right">ยอดขาย</th>
+                        <th className="py-2 px-3 font-semibold text-center">% Ach</th>
+                        <th className="py-2 px-3 font-semibold text-center">ขั้น</th>
+                        <th className="py-2 px-3 font-semibold text-right">อัตรา</th>
+                        <th className="py-2 px-3 font-semibold text-right">ค่าคอม</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-emerald-500/10 bg-[#052b20]/60">
                       {staff.categories.map((c) => (
                         <tr key={c.category} className="text-white/90 hover:bg-white/5 transition-colors">
-                          <td className="py-1.5 px-3 font-bold">{c.category}</td>
+                          <td className="py-1.5 px-3 font-semibold">{c.category}</td>
                           <td className="py-1.5 px-3 text-right text-white/50">{fmtBaht(c.target)}</td>
                           <td className="py-1.5 px-3 text-right font-semibold">{fmtBaht(c.actual)}</td>
-                          <td className="py-1.5 px-3 text-center font-bold">{c.achPercent.toFixed(2)}%</td>
+                          <td className="py-1.5 px-3 text-center font-semibold">{c.achPercent.toFixed(2)}%</td>
                           <td className="py-1.5 px-3 text-center">
-                            <span className={`px-1.5 py-0.5 rounded font-bold ${tierColor(c.tierIndex)}`}>
+                            <span className={`px-1.5 py-0.5 rounded font-semibold ${tierColor(c.tierIndex)}`}>
                               {c.tierLabel}
                             </span>
                           </td>
                           <td className="py-1.5 px-3 text-right text-white/70">{c.ratePct.toFixed(2)}%</td>
-                          <td className="py-1.5 px-3 text-right font-extrabold text-emerald-300">
+                          <td className="py-1.5 px-3 text-right font-semibold text-emerald-300">
                             {c.commission > 0 ? fmtBaht2(c.commission) : "–"}
                           </td>
                         </tr>
                       ))}
-                      <tr className="bg-[#0c3123]/90 font-bold text-white border-t border-emerald-500/30">
+                      <tr className="bg-[#0c3123]/90 font-semibold text-white border-t border-emerald-500/30">
                         <td className="py-2 px-3">รวม</td>
                         <td className="py-2 px-3" />
                         <td className="py-2 px-3 text-right">{fmtBaht(staff.totalActual)}</td>
@@ -166,8 +166,8 @@ export const CommissionSection: React.FC<{
       </div>
 
       {/* การแบ่งก้อน: เซล vs หลังบ้าน */}
-      <div className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
-        <h3 className="text-base font-bold tracking-tight text-white mb-1">
+      <div className="bg-white/10 rounded-2xl border border-white/10 p-6 ">
+        <h3 className="text-base font-semibold tracking-tight text-white mb-1">
           การแบ่งก้อนค่าคอม — เซล vs หลังบ้าน
         </h3>
         <p className="text-xs text-white/50 mb-4">
@@ -176,18 +176,18 @@ export const CommissionSection: React.FC<{
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
           <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-            <div className="text-[10px] text-white/40">ก้อนใหญ่</div>
-            <div className="text-xl font-extrabold text-white">฿{fmtBaht2(split.grossPool)}</div>
+            <div className="text-[11px] text-white/40">ก้อนใหญ่</div>
+            <div className="text-xl font-semibold text-white">฿{fmtBaht2(split.grossPool)}</div>
           </div>
           <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 p-4">
-            <div className="text-[10px] text-white/40">หลังบ้าน ({split.backOfficePct.toFixed(2)}%)</div>
-            <div className="text-xl font-extrabold text-amber-300">฿{fmtBaht2(split.backOfficeAmount)}</div>
+            <div className="text-[11px] text-white/40">หลังบ้าน ({split.backOfficePct.toFixed(2)}%)</div>
+            <div className="text-xl font-semibold text-amber-300">฿{fmtBaht2(split.backOfficeAmount)}</div>
           </div>
           <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-4">
-            <div className="text-[10px] text-white/40">
+            <div className="text-[11px] text-white/40">
               เซล ({(100 - split.backOfficePct).toFixed(2)}%)
             </div>
-            <div className="text-xl font-extrabold text-emerald-300">฿{fmtBaht2(split.salesPool)}</div>
+            <div className="text-xl font-semibold text-emerald-300">฿{fmtBaht2(split.salesPool)}</div>
           </div>
         </div>
 
@@ -201,25 +201,25 @@ export const CommissionSection: React.FC<{
             <table className="w-full text-left border-collapse text-[11px]">
               <thead>
                 <tr className="bg-[#0c3123] border-b border-emerald-500/20 text-white/90">
-                  <th className="py-2 px-3 font-bold uppercase tracking-wider">ตำแหน่ง</th>
-                  <th className="py-2 px-3 font-bold uppercase tracking-wider text-right">จำนวนคน</th>
-                  <th className="py-2 px-3 font-bold uppercase tracking-wider text-right">% ต่อคน</th>
-                  <th className="py-2 px-3 font-bold uppercase tracking-wider text-right">% รวม</th>
-                  <th className="py-2 px-3 font-bold uppercase tracking-wider text-right">ได้รับ</th>
+                  <th className="py-2 px-3 font-semibold ">ตำแหน่ง</th>
+                  <th className="py-2 px-3 font-semibold text-right">จำนวนคน</th>
+                  <th className="py-2 px-3 font-semibold text-right">% ต่อคน</th>
+                  <th className="py-2 px-3 font-semibold text-right">% รวม</th>
+                  <th className="py-2 px-3 font-semibold text-right">ได้รับ</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-emerald-500/10 bg-[#052b20]/60">
                 {split.backOffice.map((b) => (
                   <tr key={b.position} className="text-white/90">
                     <td className="py-1.5 px-3">
-                      <span className="px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 font-bold">
+                      <span className="px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 font-semibold">
                         {b.position}
                       </span>
                     </td>
                     <td className="py-1.5 px-3 text-right font-semibold">{b.count}</td>
                     <td className="py-1.5 px-3 text-right text-white/50">{b.ratePct.toFixed(2)}%</td>
                     <td className="py-1.5 px-3 text-right text-white/70">{b.totalPct.toFixed(2)}%</td>
-                    <td className="py-1.5 px-3 text-right font-extrabold text-amber-300">
+                    <td className="py-1.5 px-3 text-right font-semibold text-amber-300">
                       {fmtBaht2(b.amount)}
                     </td>
                   </tr>
@@ -238,8 +238,8 @@ export const CommissionSection: React.FC<{
       </div>
 
       {/* ตาราง Scheme อ้างอิง */}
-      <div className="bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
-        <h3 className="text-base font-bold tracking-tight text-white mb-3">
+      <div className="bg-white/10 rounded-2xl border border-white/10 p-6 ">
+        <h3 className="text-base font-semibold tracking-tight text-white mb-3">
           {band.label}
           {newScheme ? <span className="text-emerald-300 text-xs ml-2">· New Scheme (iPad/iPhone)</span> : null}
         </h3>
@@ -247,9 +247,9 @@ export const CommissionSection: React.FC<{
           <table className="w-full text-left border-collapse text-[11px]">
             <thead>
               <tr className="bg-[#0c3123] border-b border-emerald-500/20 text-white/90">
-                <th className="py-2 px-3 font-bold uppercase tracking-wider">% ach step</th>
+                <th className="py-2 px-3 font-semibold ">% ach step</th>
                 {COMMISSION_CATEGORIES.map((c) => (
-                  <th key={c} className="py-2 px-3 font-bold uppercase tracking-wider text-right">
+                  <th key={c} className="py-2 px-3 font-semibold text-right">
                     {SCHEME_LABEL[c]}
                   </th>
                 ))}
@@ -258,7 +258,7 @@ export const CommissionSection: React.FC<{
             <tbody className="divide-y divide-emerald-500/10 bg-[#052b20]/60">
               {COMMISSION_TIERS.map((tier, i) => (
                 <tr key={tier.label} className="text-white/90">
-                  <td className="py-1.5 px-3 font-bold">{tier.label}</td>
+                  <td className="py-1.5 px-3 font-semibold">{tier.label}</td>
                   {COMMISSION_CATEGORIES.map((c) => (
                     <td key={c} className="py-1.5 px-3 text-right">
                       {getRate(band, c, i, newScheme).toFixed(2)}%
@@ -267,7 +267,7 @@ export const CommissionSection: React.FC<{
                 </tr>
               ))}
               <tr className="text-white/40">
-                <td className="py-1.5 px-3 font-bold">ต่ำกว่า 70%</td>
+                <td className="py-1.5 px-3 font-semibold">ต่ำกว่า 70%</td>
                 {COMMISSION_CATEGORIES.map((c) => (
                   <td key={c} className="py-1.5 px-3 text-right">–</td>
                 ))}

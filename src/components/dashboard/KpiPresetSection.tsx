@@ -155,7 +155,7 @@ export default function KpiPresetSection({
           <Sparkles className="w-5 h-5 text-emerald-400" />
         </div>
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-white drop-shadow-md">
+          <h2 className="text-xl font-semibold tracking-tight text-white ">
             KPI Preset
           </h2>
           <p className="text-xs text-white/60 mt-1">
@@ -197,11 +197,11 @@ export default function KpiPresetSection({
       )}
 
       {!salesEmpty && (
-        <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 p-5 shadow-[0_8px_32px_rgba(0,0,0,0.12)] space-y-4">
+        <div className="bg-white/10 rounded-2xl border border-white/10 p-5  space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Sliders className="w-4 h-4 text-emerald-400" />
-              <h3 className="text-base font-bold text-white">ตารางผลลัพธ์</h3>
+              <h3 className="text-base font-semibold text-white">ตารางผลลัพธ์</h3>
             </div>
             <div className="flex gap-1 bg-white/5 rounded-lg p-1 border border-white/10">
               <button
