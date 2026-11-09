@@ -7,6 +7,8 @@ import type {
   CombinedWonderCell,
 } from "../dashboard/HomeDashboardSection";
 import type { DailyReportData } from "../dashboard/DailyBranchReportSection";
+import type { HourlySales } from "../../lib/hourlySales";
+import { HourlySalesSection } from "../dashboard/HourlySalesSection";
 import { Avatar, Bar, Card, Pill, Segmented, fmtPctShort, fmtShort, toneOf } from "./mobileUi";
 
 const isPctCalc = (c?: string) => c === "attach" || c === "bahtRate" || c === "catAttach" || c === "tradeIn";
@@ -29,6 +31,7 @@ export function MobileHome({
   categories,
   combined,
   daily,
+  hourly,
   avatarOf,
   onOpenStaff,
   fullView,
@@ -38,6 +41,7 @@ export function MobileHome({
   categories: CategorySnapshotItem[];
   combined: CombinedOfficerKpiData;
   daily: DailyReportData;
+  hourly?: HourlySales;
   avatarOf: (name: string, staffId?: string) => string | undefined;
   onOpenStaff: (name: string) => void;
   /** ตารางเต็มแบบบนคอม (เปิดด้วยปุ่ม) */
@@ -127,6 +131,8 @@ export function MobileHome({
           })}
         </div>
       ) : null}
+
+      {hourly ? <HourlySalesSection data={hourly} compact /> : null}
 
       {/* รายชื่อพนักงาน */}
       <Card className="!p-3">

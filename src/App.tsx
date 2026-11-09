@@ -194,6 +194,8 @@ import { IphoneModelExcludePicker } from "./components/dashboard/IphoneModelExcl
 import { CategoryFallbackAlert } from "./components/dashboard/CategoryFallbackAlert";
 import { MobileBottomNav } from "./components/dashboard/MobileBottomNav";
 import { MobileHome } from "./components/mobile/MobileHome";
+import { HourlySalesSection } from "./components/dashboard/HourlySalesSection";
+import { buildHourlySales } from "./lib/hourlySales";
 import { MobileStaff } from "./components/mobile/MobileStaff";
 import { useIsMobile } from "./hooks/useIsMobile";
 
@@ -2487,6 +2489,8 @@ function AppInternal({
   });
   const dailyBranchReport = branchReports.daily;
   const monthlyBranchReport = branchReports.monthly;
+  // ช่วงเวลาที่ขายดี — ยอดเฉลี่ยต่อวันของแต่ละชั่วโมง (ทั้งเดือน)
+  const hourlySales = useMemo(() => buildHourlySales(displayUploads.current), [displayUploads.current]);
 
   // เวลาอัปโหลดไฟล์ยอดขาย — ดึงใหม่ทุกครั้งที่ข้อมูลยอดขายเปลี่ยน (อัปไฟล์ใหม่)
   useEffect(() => {
@@ -4032,6 +4036,9 @@ function AppInternal({
                   }}
                   categorySnapshotRef={categorySnapshotRef}
                 />
+                <div className="hidden md:block">
+                  <HourlySalesSection data={hourlySales} />
+                </div>
                 <DailyBranchReportSection data={dailyBranchReport} boost={boostLabel(attachBoost)} uploadedAt={salesUploadedAt} />
                 <DailyBranchReportSection data={monthlyBranchReport} boost={boostLabel(attachBoost)} uploadedAt={salesUploadedAt} range={monthReportRange} onRangeChange={setMonthReportRange} />
     </>
@@ -4372,6 +4379,7 @@ function AppInternal({
                     categories={categorySnapshotData}
                     combined={combinedOfficerKpiData}
                     daily={dailyBranchReport}
+                    hourly={hourlySales}
                     avatarOf={mobileAvatarOf}
                     onOpenStaff={openStaffByName}
                     fullView={homeFullSections}

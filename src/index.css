@@ -310,3 +310,6 @@ html.theme-dark .report-card .bg-indigo-100 { background-color: rgb(99 102 241 /
 html.theme-dark .report-card .text-indigo-800 { color: #a5b4fc; }
 html.theme-dark .report-card .bg-pink-100 { background-color: rgb(236 72 153 / 0.14); }
 html.theme-dark .report-card .text-pink-800 { color: #f9a8d4; }
+
+/* กราฟช่วงเวลาขายดี: แท่งสีกลางให้เห็นในธีมสว่าง */
+html.theme-light .hourly-chart .recharts-rectangle[fill^="rgba(255,255,255"] { fill: rgb(31 30 27 / 0.22); }
