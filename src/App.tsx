@@ -3630,8 +3630,11 @@ function AppInternal({
 
       if (savedBranch) {
         setSelectedBranch(savedBranch);
-        setSelectedBranchLoaded(true);
       }
+      // เครื่องใหม่ (มือถือ/เบราว์เซอร์ที่ไม่เคยเลือกสาขา) ก็ต้องนับว่าโหลดเสร็จ —
+      // ไม่งั้นตัวสลับไปสาขาที่มีข้อมูลอัตโนมัติด้านล่างไม่ทำงาน ค้างที่สาขา
+      // ค่าเริ่มต้นซึ่งไม่มียอด (หน้าโชว์ ฿0 บนมือถือ ทั้งที่คอมเห็นข้อมูล)
+      setSelectedBranchLoaded(true);
 
       if (photos) setStaffPhotos(photos);
       setStaffPhotosLoaded(true);
@@ -3797,12 +3800,13 @@ function AppInternal({
   useEffect(() => {
     if (!selectedBranchLoaded) return;
     if (!uploadedBranches.length) return;
-    const current = (selectedBranch || "").trim().toLowerCase();
-    const isInUploaded = current && uploadedBranches.some(
-      (b) => b.trim().toLowerCase() === current
-        || b.trim().toLowerCase().includes(current)
-        || current.includes(b.trim().toLowerCase()),
-    );
+    // เทียบแบบเดียวกับ filterRowsByBranch (ตัดคำ Studio7/iStudio/รหัส ID ออก)
+    // ไม่งั้น "ID251 : Studio 7-Mega-Bangna" กับ "iStudio Mega Bangna" ไม่ตรงกัน
+    const current = cleanBranchForMatching(selectedBranch);
+    const isInUploaded = Boolean(current) && uploadedBranches.some((b) => {
+      const nb = cleanBranchForMatching(b);
+      return Boolean(nb) && (nb === current || nb.includes(current) || current.includes(nb));
+    });
     if (!isInUploaded) {
       const first = uploadedBranches[0];
       setSelectedBranch(first);
