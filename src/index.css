@@ -439,3 +439,26 @@ html.theme-light.accent-custom option { background-color: var(--surface-root); }
   html.accent-custom .mobile-sticky-col { background-color: var(--surface-sunken); }
   html.accent-custom th.mobile-sticky-col { background-color: var(--surface-raised); }
 }
+
+/* ── ส่วนอื่นของหน้าให้เข้ากับสีพื้นที่เลือก ───────────────────────── */
+/* การ์ดรายงานยอดขาย + Attach (ธีมมืด) */
+html.theme-dark.accent-custom .report-card .bg-slate-50 { background-color: var(--surface-raised); }
+html.theme-dark.accent-custom .report-card .bg-slate-100 { background-color: var(--surface-active); }
+html.theme-dark.accent-custom .report-card .hover\:bg-slate-50:hover { background-color: var(--surface-active); }
+html.theme-dark.accent-custom .report-card input[type="date"] { background-color: var(--surface-root); }
+/* การ์ดรายงาน (ธีมสว่าง) — พื้นขาวอมสี */
+html.theme-light.accent-custom .report-card,
+html.theme-light.accent-custom .report-card .bg-white { background-color: var(--surface-hero); }
+html.theme-light.accent-custom .report-card .bg-slate-50 { background-color: var(--surface-sunken); }
+html.theme-light.accent-custom .report-card .bg-slate-100 { background-color: var(--surface-raised); }
+/* แถว Σ รวมทั้งหมด → สีเน้น แทนเหลืองทอง */
+html.accent-custom .total-row { background-color: var(--accent-soft) !important; border-color: var(--accent-border) !important; }
+html.accent-custom .total-row td .font-mono { color: var(--accent-text); }
+html.accent-custom .total-sticky { background-color: var(--surface-active) !important; box-shadow: inset 4px 0 0 0 var(--accent) !important; }
+html.accent-custom .total-sticky .text-amber-200 { color: var(--accent-text); }
+/* หัวกลุ่ม 7 Wonders / ป้ายสีเหลืองที่ไม่ใช่สัญญาณเตือน */
+html.accent-custom .bg-amber-400\/20 { background-color: var(--accent-soft); }
+/* กล่องลอย (เมนูเลือกพนักงาน/ทูลทิป) */
+html.accent-custom .bg-\[\#0c3123\]\/90 { background-color: var(--surface-raised); }
+/* ขอบบางๆ อมสีพื้น */
+html.theme-dark.accent-custom .border-white\/10 { border-color: color-mix(in srgb, var(--surface-active) 70%, white 8%); }
