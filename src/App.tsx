@@ -4171,14 +4171,14 @@ function AppInternal({
               <button
                 onClick={() => setCurrentView("home")}
                 className={`p-2 rounded-full transition-colors ${currentView === "home" ? "bg-[#0f4430]  text-white" : "text-white/60 hover:text-white"}`}
-                title="Home"
+                title="หน้าหลัก"
               >
                 <Home className="w-5 h-5" />
               </button>
               <button
                 onClick={() => setCurrentView("staff")}
                 className={`p-2 rounded-full transition-colors ${currentView === "staff" ? "bg-[#0f4430]  text-white" : "text-white/60 hover:text-white"}`}
-                title="Staff Profile"
+                title="พนักงาน"
               >
                 <User className="w-5 h-5" />
               </button>
@@ -4187,7 +4187,7 @@ function AppInternal({
                   <button
                     onClick={() => setCurrentView("reports")}
                     className={`p-2 rounded-full transition-colors ${currentView === "reports" ? "bg-[#0f4430]  text-white" : "text-white/60 hover:text-white"}`}
-                    title="Reports"
+                    title="อัปโหลดไฟล์และรายงาน"
                   >
                     <PieChart className="w-5 h-5" />
                   </button>
@@ -4201,7 +4201,7 @@ function AppInternal({
                   <button
                     onClick={() => setCurrentView("kpi_preset")}
                     className={`p-2 rounded-full transition-colors ${currentView === "kpi_preset" ? "bg-[#0f4430]  text-white" : "text-white/60 hover:text-white"}`}
-                    title="KPI Preset"
+                    title="ตั้งค่า KPI (7 Wonders)"
                   >
                     <SlidersHorizontal className="w-5 h-5" />
                   </button>
@@ -4229,7 +4229,7 @@ function AppInternal({
                   <button
                     onClick={() => setCurrentView("settings")}
                     className={`p-2 rounded-full transition-colors ${currentView === "settings" ? "bg-[#0f4430]  text-white" : "text-white/60 hover:text-white"}`}
-                    title="Settings"
+                    title="ตั้งค่า"
                   >
                     <Settings className="w-5 h-5" />
                   </button>

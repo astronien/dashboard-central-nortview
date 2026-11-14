@@ -41,11 +41,11 @@ export const CommissionSection: React.FC<{
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="bg-white/10 rounded-2xl border border-white/10 p-6 ">
+      <div className="bg-white/5 rounded-2xl border border-white/10 p-5 md:p-6 ">
         <div className="flex items-start justify-between gap-4 mb-1">
           <div className="flex items-center gap-2">
             <Wallet className="w-5 h-5 text-emerald-300" />
-            <h3 className="text-lg font-semibold tracking-tight text-white">
+            <h3 className="text-lg font-semibold text-white">
               ค่าคอมมิชชั่น (PIA Individual)
             </h3>
           </div>
@@ -86,7 +86,7 @@ export const CommissionSection: React.FC<{
               onChange={(e) => onNewSchemeChange(e.target.checked)}
               className="accent-emerald-500"
             />
-            <span className="text-white/70">ใช้ New Scheme (iPad / iPhone)</span>
+            <span className="text-white/70">ใช้สูตรใหม่ (iPad / iPhone)</span>
           </label>
         </div>
 
@@ -121,7 +121,7 @@ export const CommissionSection: React.FC<{
                         <th className="py-2 px-3 font-semibold ">หมวด</th>
                         <th className="py-2 px-3 font-semibold text-right">เป้า</th>
                         <th className="py-2 px-3 font-semibold text-right">ยอดขาย</th>
-                        <th className="py-2 px-3 font-semibold text-center">% Ach</th>
+                        <th className="py-2 px-3 font-semibold text-center">ถึงเป้า</th>
                         <th className="py-2 px-3 font-semibold text-center">ขั้น</th>
                         <th className="py-2 px-3 font-semibold text-right">อัตรา</th>
                         <th className="py-2 px-3 font-semibold text-right">ค่าคอม</th>
@@ -166,8 +166,8 @@ export const CommissionSection: React.FC<{
       </div>
 
       {/* การแบ่งก้อน: เซล vs หลังบ้าน */}
-      <div className="bg-white/10 rounded-2xl border border-white/10 p-6 ">
-        <h3 className="text-base font-semibold tracking-tight text-white mb-1">
+      <div className="bg-white/5 rounded-2xl border border-white/10 p-5 md:p-6 ">
+        <h3 className="text-base font-semibold text-white mb-1">
           การแบ่งก้อนค่าคอม — เซล vs หลังบ้าน
         </h3>
         <p className="text-xs text-white/50 mb-4">
@@ -238,16 +238,16 @@ export const CommissionSection: React.FC<{
       </div>
 
       {/* ตาราง Scheme อ้างอิง */}
-      <div className="bg-white/10 rounded-2xl border border-white/10 p-6 ">
-        <h3 className="text-base font-semibold tracking-tight text-white mb-3">
+      <div className="bg-white/5 rounded-2xl border border-white/10 p-5 md:p-6 ">
+        <h3 className="text-base font-semibold text-white mb-3">
           {band.label}
-          {newScheme ? <span className="text-emerald-300 text-xs ml-2">· New Scheme (iPad/iPhone)</span> : null}
+          {newScheme ? <span className="text-emerald-300 text-xs ml-2">· สูตรใหม่ (iPad/iPhone)</span> : null}
         </h3>
         <div className="overflow-x-auto rounded-xl border border-emerald-500/10">
           <table className="w-full text-left border-collapse text-[11px]">
             <thead>
               <tr className="bg-[#0c3123] border-b border-emerald-500/20 text-white/90">
-                <th className="py-2 px-3 font-semibold ">% ach step</th>
+                <th className="py-2 px-3 font-semibold ">ขั้น % ถึงเป้า</th>
                 {COMMISSION_CATEGORIES.map((c) => (
                   <th key={c} className="py-2 px-3 font-semibold text-right">
                     {SCHEME_LABEL[c]}

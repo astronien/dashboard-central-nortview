@@ -155,7 +155,7 @@ export default function KpiPresetSection({
           <Sparkles className="w-5 h-5 text-emerald-400" />
         </div>
         <div>
-          <h2 className="text-xl font-semibold tracking-tight text-white ">
+          <h2 className="text-xl font-semibold text-white ">
             KPI Preset
           </h2>
           <p className="text-xs text-white/60 mt-1">

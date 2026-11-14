@@ -190,14 +190,14 @@ export default function KpiPresetBuilder({
         <div className="grid grid-cols-2 gap-1 bg-white/5 rounded-lg p-1 border border-white/10">
           {(
             [
-              ["attach", "Attach Rate (%)"],
-              ["bahtRate", "Attach Rate (฿) บาทหารบาท"],
+              ["attach", "อัตราแนบ (%)"],
+              ["bahtRate", "อัตราแนบ (฿ ÷ ฿)"],
               ["unit", "แสดงผลทางจำนวน (Unit)"],
               ["baht", "ยอดขายเป็นบาท (Baht)"],
               ["catBaht", "ยอดบาท (CatMaster)"],
               ["catQty", "ยอดจำนวน (CatMaster)"],
               ["catAttach", "ATT CatMaster (จำนวน A ÷ จำนวน B)"],
-              ["tradeIn", "Trade In / iPhone (%)"],
+              ["tradeIn", "Trade In ต่อ iPhone (%)"],
             ] as [PresetCalcType, string][]
           ).map(([key, label], idx) => {
             const isCat = key.startsWith("cat");
@@ -464,7 +464,7 @@ export default function KpiPresetBuilder({
       </div>
 
       <div className="bg-white/5 rounded-lg p-3 border border-white/10">
-        <p className="text-xs text-emerald-400 font-semibold mb-1">Preview:</p>
+        <p className="text-xs text-emerald-400 font-semibold mb-1">ตัวอย่างผลลัพธ์</p>
         {calcType === "attach" ? (
           <>
             <p className="text-sm text-white/80">

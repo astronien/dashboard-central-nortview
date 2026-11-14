@@ -58,14 +58,14 @@ export function TradeInBranchMapping({
   };
 
   return (
-    <div className="bg-white/10 rounded-2xl border border-white/10 p-6 ">
+    <div className="bg-white/5 rounded-2xl border border-white/10 p-5 md:p-6 ">
       <div className="flex items-start justify-between gap-4 mb-4">
         <div className="flex items-center gap-4">
           <div className="p-3 bg-emerald-500/20 rounded-xl text-emerald-400">
             <MapPin className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-xl font-semibold tracking-tight">
+            <h2 className="text-xl font-semibold">
               รหัสสาขา Trade In
             </h2>
             <p className="text-sm text-white/60 mt-1">

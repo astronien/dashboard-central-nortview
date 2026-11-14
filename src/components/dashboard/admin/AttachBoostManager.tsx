@@ -84,7 +84,7 @@ export function AttachBoostManager({
           <Flame className="w-6 h-6" />
         </div>
         <div className="flex-1">
-          <h2 className="text-xl font-semibold tracking-tight flex items-center gap-2">
+          <h2 className="text-xl font-semibold flex items-center gap-2">
             โหมดโฟกัส Attach (ตัวคูณรายตัว)
             {anyBoostOn(boost) ? (
               <span

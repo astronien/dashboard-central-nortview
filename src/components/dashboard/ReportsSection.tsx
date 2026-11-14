@@ -46,12 +46,12 @@ const getDateRangeString = (rows: RawRow[]): string | null => {
 };
 
 const KIND_LABELS: Record<UploadKind, string> = {
-  target: "Target",
-  current: "Current",
-  today: "Today",
-  lastMonth: "Last Month",
-  lastYear: "Last Year",
-  categoryMaster: "Category Master",
+  target: "เป้าหมาย (Target)",
+  current: "ยอดขายเดือนนี้ (Current)",
+  today: "ยอดวันนี้ (Today)",
+  lastMonth: "ยอดเดือนก่อน (Last Month)",
+  lastYear: "ยอดปีก่อน (Last Year)",
+  categoryMaster: "หมวดสินค้า (Category Master)",
 };
 
 const UPLOADABLE_KINDS: UploadKind[] = [
@@ -228,7 +228,7 @@ export function ReportsSection({
               <Upload className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold tracking-tight text-white">
+              <h3 className="text-lg font-semibold text-white">
                 อัปโหลดข้อมูลจากไฟล์ Excel
               </h3>
               <p className="text-xs text-white/60 mt-0.5">
@@ -346,7 +346,7 @@ export function ReportsSection({
             <FileSpreadsheet className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-xl font-semibold tracking-tight">สรุปผลรายงาน</h2>
+            <h2 className="text-xl font-semibold">สรุปผลรายงาน</h2>
             <p className="text-sm text-white/60 mt-1">
               Branch / Category / Officer summary คำนวณจากข้อมูลที่อัปโหลด
             </p>
@@ -397,21 +397,21 @@ export function ReportsSection({
 
       {/* Branch summary table */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white/10 rounded-2xl border border-white/10 p-6 ">
+        <div className="lg:col-span-2 bg-white/5 rounded-2xl border border-white/10 p-5 md:p-6 ">
           <div className="flex items-center justify-between mb-5">
-            <h3 className="text-lg font-semibold tracking-tight">Branch Summary</h3>
-            <span className="text-xs text-white/50">Target, actual, achievement, MoM, YoY</span>
+            <h3 className="text-lg font-semibold">สรุปรายสาขา</h3>
+            <span className="text-xs text-white/50">เป้า ยอดจริง % ถึงเป้า เทียบเดือนก่อนและปีก่อน</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm border-collapse">
               <thead>
                 <tr className="border-b border-white/10 text-white/50">
-                  <th className="py-3 pr-4 font-medium">Branch</th>
-                  <th className="py-3 px-3 font-medium">Target</th>
-                  <th className="py-3 px-3 font-medium">Actual</th>
-                  <th className="py-3 px-3 font-medium">Ach %</th>
-                  <th className="py-3 px-3 font-medium">MoM %</th>
-                  <th className="py-3 px-3 font-medium">YoY %</th>
+                  <th className="py-3 pr-4 font-medium">สาขา</th>
+                  <th className="py-3 px-3 font-medium text-right">เป้า</th>
+                  <th className="py-3 px-3 font-medium text-right">ยอดจริง</th>
+                  <th className="py-3 px-3 font-medium text-right">ถึงเป้า</th>
+                  <th className="py-3 px-3 font-medium text-right">เทียบเดือนก่อน</th>
+                  <th className="py-3 px-3 font-medium text-right">เทียบปีก่อน</th>
                 </tr>
               </thead>
               <tbody>
@@ -432,15 +432,15 @@ export function ReportsSection({
                     return (
                       <tr key={row.label} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                         <td className="py-3 pr-4 font-medium text-white/90">{row.label}</td>
-                        <td className="py-3 px-3 text-white/80">฿{Math.round(row.target).toLocaleString()}</td>
-                        <td className="py-3 px-3 text-white/80">฿{Math.round(row.actual).toLocaleString()}</td>
-                        <td className={`py-3 px-3 font-semibold ${achPercent >= 100 ? "text-emerald-400" : "text-yellow-400"}`}>
+                        <td className="py-3 px-3 text-white/80 text-right tabular-nums">฿{Math.round(row.target).toLocaleString()}</td>
+                        <td className="py-3 px-3 text-white/80 text-right tabular-nums">฿{Math.round(row.actual).toLocaleString()}</td>
+                        <td className={`py-3 px-3 text-right tabular-nums font-semibold ${achPercent >= 100 ? "text-emerald-300" : achPercent >= 80 ? "text-white/80" : "text-rose-300"}`}>
                           {Math.round(achPercent)}%
                         </td>
-                        <td className={`py-3 px-3 font-semibold ${momPercent >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                        <td className={`py-3 px-3 text-right tabular-nums ${momPercent >= 0 ? "text-white/80" : "text-rose-300"}`}>
                           {Math.round(momPercent)}%
                         </td>
-                        <td className={`py-3 px-3 font-semibold ${yoyPercent >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                        <td className={`py-3 px-3 text-right tabular-nums ${yoyPercent >= 0 ? "text-white/80" : "text-rose-300"}`}>
                           {Math.round(yoyPercent)}%
                         </td>
                       </tr>
@@ -452,39 +452,30 @@ export function ReportsSection({
           </div>
         </div>
 
-        <div className="bg-white/10 rounded-2xl border border-white/10 p-6 ">
-          <h3 className="text-lg font-semibold tracking-tight mb-5">Report Logic Rules</h3>
-          <div className="space-y-4 text-sm text-white/80">
-            <div className="rounded-2xl bg-white/5 border border-white/5 p-4">
-              <div className="font-semibold text-white mb-1">Data flow</div>
-              <p>
-                อัปโหลด Excel → แมป header → คำนวณ target / current / last month / last year
-                (วันนี้ใช้ current เป็นตัวแทน)
-              </p>
+        <details className="bg-white/5 rounded-2xl border border-white/10 p-5 self-start">
+          <summary className="cursor-pointer text-[15px] font-semibold text-white">วิธีคำนวณ</summary>
+          <div className="mt-4 space-y-3 text-sm text-white/75">
+            <div>
+              <div className="font-semibold text-white mb-1">ที่มาของข้อมูล</div>
+              <p>อัปโหลด Excel → จับคู่หัวคอลัมน์ → คำนวณเป้า / เดือนนี้ / เดือนก่อน / ปีก่อน (ถ้าไม่มีไฟล์วันนี้ ใช้วันล่าสุดในไฟล์เดือนนี้)</p>
             </div>
-            <div className="rounded-2xl bg-white/5 border border-white/5 p-4">
-              <div className="font-semibold text-white mb-1">Category rule</div>
-              <p>
-                SIM นับจาก Number; หมวดอื่นใช้ total price (ราคาขายตามบิล), ใช้ category
-                master เป็น fallback
-              </p>
+            <div>
+              <div className="font-semibold text-white mb-1">การนับยอด</div>
+              <p>SIM นับเป็นจำนวนชิ้น หมวดอื่นนับจากราคาขายตามบิล หมวดที่ไม่มีใน Category Master จะเดาจากชื่อสินค้า</p>
             </div>
-            <div className="rounded-2xl bg-white/5 border border-white/5 p-4">
-              <div className="font-semibold text-white mb-1">Matching rule</div>
-              <p>
-                ชื่อ officer ถูก clean, normalize, alias-match และเทียบแบบ bidirectional
-                (มี alias เช่น แพวนภา → แพรวนภา)
-              </p>
+            <div>
+              <div className="font-semibold text-white mb-1">การจับคู่ชื่อพนักงาน</div>
+              <p>ตัดคำนำหน้าและช่องว่าง แล้วเทียบชื่อทั้งสองทาง มีชื่อสะกดผิดที่แก้ให้อัตโนมัติ เช่น แพวนภา → แพรวนภา</p>
             </div>
-          </div>
-        </div>
+                    </div>
+        </details>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white/10 rounded-2xl border border-white/10 p-6 ">
+        <div className="bg-white/5 rounded-2xl border border-white/10 p-5 md:p-6 ">
           <div className="flex items-center justify-between mb-5">
-            <h3 className="text-lg font-semibold tracking-tight">Category Summary</h3>
-            <span className="text-xs text-white/50">Main category totals</span>
+            <h3 className="text-lg font-semibold">สรุปรายหมวด</h3>
+            <span className="text-xs text-white/50">ยอดรวมของหมวดหลัก</span>
           </div>
           <div className="space-y-3">
             {parsedReport.categories.length === 0 ? (
@@ -497,11 +488,11 @@ export function ReportsSection({
                 <div key={item.category} className="rounded-2xl bg-white/5 border border-white/5 p-4">
                   <div className="flex items-center justify-between mb-2">
                     <div className="font-medium text-white/90">{item.category}</div>
-                    <div className="text-sm text-white/60">{item.share}% share</div>
+                    <div className="text-sm text-white/60">สัดส่วน {item.share}%</div>
                   </div>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-white/70">Actual ฿{Math.round(item.actual).toLocaleString()}</span>
-                    <span className="text-white/70">Target ฿{Math.round(item.target).toLocaleString()}</span>
+                    <span className="text-white/70">ยอดจริง ฿{Math.round(item.actual).toLocaleString()}</span>
+                    <span className="text-white/70">เป้า ฿{Math.round(item.target).toLocaleString()}</span>
                   </div>
                   <div className="mt-3 h-2 rounded-full bg-white/10 overflow-hidden">
                     <div
@@ -515,20 +506,20 @@ export function ReportsSection({
           </div>
         </div>
 
-        <div className="bg-white/10 rounded-2xl border border-white/10 p-6 ">
+        <div className="bg-white/5 rounded-2xl border border-white/10 p-5 md:p-6 ">
           <div className="flex items-center justify-between mb-5">
-            <h3 className="text-lg font-semibold tracking-tight">Officer Summary</h3>
-            <span className="text-xs text-white/50">Name matching + target alignment</span>
+            <h3 className="text-lg font-semibold">สรุปรายคน</h3>
+            <span className="text-xs text-white/50">ยอดจริงเทียบเป้าของพนักงานแต่ละคน</span>
           </div>
           <div className="overflow-hidden rounded-2xl border border-white/5">
             <table className="w-full text-left text-sm">
               <thead className="bg-white/5">
                 <tr className="text-white/50">
-                  <th className="py-3 px-4 font-medium">Officer</th>
-                  <th className="py-3 px-4 font-medium">Branch</th>
-                  <th className="py-3 px-4 font-medium">Actual</th>
-                  <th className="py-3 px-4 font-medium">Target</th>
-                  <th className="py-3 px-4 font-medium">Rate</th>
+                  <th className="py-3 px-4 font-medium">พนักงาน</th>
+                  <th className="py-3 px-4 font-medium">สาขา</th>
+                  <th className="py-3 px-4 font-medium text-right">ยอดจริง</th>
+                  <th className="py-3 px-4 font-medium text-right">เป้า</th>
+                  <th className="py-3 px-4 font-medium text-right">ถึงเป้า</th>
                 </tr>
               </thead>
               <tbody>
@@ -546,9 +537,9 @@ export function ReportsSection({
                     <tr key={item.name} className="border-t border-white/5 hover:bg-white/5 transition-colors">
                       <td className="py-3 px-4 text-white/90 font-medium">{item.name}</td>
                       <td className="py-3 px-4 text-white/70">{item.branch}</td>
-                      <td className="py-3 px-4 text-white/70">฿{Math.round(item.actual).toLocaleString()}</td>
-                      <td className="py-3 px-4 text-white/70">฿{Math.round(item.target).toLocaleString()}</td>
-                      <td className="py-3 px-4 font-semibold text-emerald-400">{Math.round(item.rate)}%</td>
+                      <td className="py-3 px-4 text-white/70 text-right tabular-nums">฿{Math.round(item.actual).toLocaleString()}</td>
+                      <td className="py-3 px-4 text-white/70 text-right tabular-nums">฿{Math.round(item.target).toLocaleString()}</td>
+                      <td className={`py-3 px-4 text-right tabular-nums font-semibold ${item.rate >= 100 ? "text-emerald-300" : item.rate >= 80 ? "text-white/80" : "text-rose-300"}`}>{Math.round(item.rate)}%</td>
                     </tr>
                   ))
                 )}

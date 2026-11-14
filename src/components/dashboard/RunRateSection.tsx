@@ -152,14 +152,14 @@ function StockUploadPanel({
   };
 
   return (
-    <div className="bg-white/10 rounded-2xl border border-white/10 p-6 ">
+    <div className="bg-white/5 rounded-2xl border border-white/10 p-5 md:p-6 ">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-sky-500/20 rounded-xl border border-sky-500/20">
             <Package className="w-5 h-5 text-sky-400" />
           </div>
           <div>
-            <h2 className="text-base font-semibold tracking-tight text-white">อัปโหลดสต็อกคงเหลือ</h2>
+            <h2 className="text-base font-semibold text-white">อัปโหลดสต็อกคงเหลือ</h2>
             <p className="text-[11px] text-white/50">
               ไฟล์ Excel/CSV ที่มีคอลัมน์ ชื่อ/รหัสสินค้า + จำนวนคงเหลือ — เพื่อคำนวณ "ขายหมดในกี่วัน"
             </p>
@@ -366,14 +366,14 @@ export function RunRateSection({
   return (
     <div className="flex flex-col gap-6">
       {/* Header + สรุป */}
-      <div className="bg-white/10 rounded-2xl border border-white/10 p-6 ">
+      <div className="bg-white/5 rounded-2xl border border-white/10 p-5 md:p-6 ">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-emerald-500/20 rounded-xl border border-emerald-500/20">
               <Gauge className="w-5 h-5 text-emerald-400" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold tracking-tight text-white">Run Rate — ขายได้วันละเท่าไหร่</h2>
+              <h2 className="text-lg font-semibold text-white">Run Rate — ขายได้วันละเท่าไหร่</h2>
               <p className="text-[11px] text-white/50">
                 ดูว่าแต่ละสินค้าขายเร็วแค่ไหน ของพอขายอีกกี่วัน และควรสั่งเพิ่มอะไร · คิดจาก {data.windowLabel}
               </p>
@@ -478,10 +478,10 @@ export function RunRateSection({
       </div>
 
       {tab === "overview" ? (
-        <div className="bg-white/10 rounded-2xl border border-white/10 p-6 ">
+        <div className="bg-white/5 rounded-2xl border border-white/10 p-5 md:p-6 ">
           <div className="flex items-center gap-3 mb-1">
             <Package className="w-5 h-5 text-emerald-400" />
-            <h2 className="text-base font-semibold tracking-tight text-white">ขายได้วันละเท่าไหร่ — รายหมวด</h2>
+            <h2 className="text-base font-semibold text-white">ขายได้วันละเท่าไหร่ — รายหมวด</h2>
           </div>
           <p className="text-[11px] text-white/45 mb-4">
             "วันละ" = ขายเฉลี่ยต่อวัน · "ถึงสิ้นเดือน ≈" = ถ้าขายเท่านี้ต่อไปจะได้ประมาณเท่าไหร่
@@ -510,12 +510,12 @@ export function RunRateSection({
 
       {tab === "fast" ? (
         <>
-          <div className="bg-white/10 rounded-2xl border border-white/10 p-6 ">
+          <div className="bg-white/5 rounded-2xl border border-white/10 p-5 md:p-6 ">
             <div className="flex items-center justify-between gap-3 mb-4">
               <div className="flex items-center gap-3">
                 <Zap className="w-5 h-5 text-amber-400" />
                 <div>
-                  <h2 className="text-base font-semibold tracking-tight text-white">ขายดี — Top {products.length}</h2>
+                  <h2 className="text-base font-semibold text-white">ขายดี — Top {products.length}</h2>
                   <p className="text-[11px] text-white/45">เรียงจากขายได้ต่อวันมากสุด</p>
                 </div>
               </div>
@@ -534,11 +534,11 @@ export function RunRateSection({
             <RunRateTable rows={products} hasStock={hasStock} showSub />
           </div>
           {slow.length > 0 ? (
-            <div className="bg-white/10 rounded-2xl border border-white/10 p-6 ">
+            <div className="bg-white/5 rounded-2xl border border-white/10 p-5 md:p-6 ">
               <div className="flex items-center gap-3 mb-4">
                 <Snail className="w-5 h-5 text-white/60" />
                 <div>
-                  <h2 className="text-base font-semibold tracking-tight text-white">
+                  <h2 className="text-base font-semibold text-white">
                     ขายช้า{catFilter !== "all" ? ` · ${catFilter}` : ""}
                   </h2>
                   <p className="text-[11px] text-white/45">ขายได้น้อยที่สุดต่อวัน — ระวังของค้าง</p>
@@ -556,7 +556,7 @@ export function RunRateSection({
             <div className="flex items-center gap-3">
               <ShoppingCart className="w-5 h-5 text-rose-400" />
               <div>
-                <h2 className="text-base font-semibold tracking-tight text-white">ต้องสั่งเพิ่ม ({reorderList.length})</h2>
+                <h2 className="text-base font-semibold text-white">ต้องสั่งเพิ่ม ({reorderList.length})</h2>
                 <p className="text-[11px] text-white/45">
                   ของจะหมดก่อนของใหม่มาถึง — "ควรสั่ง" = จำนวนที่ทำให้พอขายอีก {targetCover} วัน
                 </p>
@@ -626,12 +626,12 @@ export function RunRateSection({
       ) : null}
 
       {tab === "dead" && hasStock ? (
-        <div className="bg-white/10 rounded-2xl border border-white/10 p-6 ">
+        <div className="bg-white/5 rounded-2xl border border-white/10 p-5 md:p-6 ">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div className="flex items-center gap-3">
               <Snail className="w-5 h-5 text-amber-300" />
               <div>
-                <h2 className="text-base font-semibold tracking-tight text-white">ของค้าง ({deadStock.length})</h2>
+                <h2 className="text-base font-semibold text-white">ของค้าง ({deadStock.length})</h2>
                 <p className="text-[11px] text-white/45">
                   มีของแต่ขายช้ามาก (พอขายเกิน {deadCover} วัน หรือไม่ขายเลย) — พิจารณาจัดโปรระบาย
                 </p>

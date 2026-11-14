@@ -257,14 +257,14 @@ export function AnalysisSection({
   return (
     <div className="flex flex-col gap-6">
       {/* Header + summary */}
-      <div className="bg-white/10 rounded-2xl border border-white/10 p-6 ">
+      <div className="bg-white/5 rounded-2xl border border-white/10 p-5 md:p-6 ">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-emerald-500/20 rounded-xl border border-emerald-500/20">
               <Activity className="w-5 h-5 text-emerald-400" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold tracking-tight text-white">
+              <h2 className="text-lg font-semibold text-white">
                 บทวิเคราะห์รายวัน
               </h2>
               <p className="text-[11px] text-white/50">
@@ -354,7 +354,7 @@ export function AnalysisSection({
               <Sparkles className="w-5 h-5 text-purple-300" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold tracking-tight text-white">
+              <h2 className="text-lg font-semibold text-white">
                 บทวิเคราะห์ (เรียบเรียงด้วย AI)
               </h2>
               <p className="text-[11px] text-white/50">

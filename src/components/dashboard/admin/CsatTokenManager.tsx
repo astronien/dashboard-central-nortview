@@ -93,7 +93,7 @@ export function CsatTokenManager({ updatedBy }: { updatedBy?: string }) {
           <Smile className="w-6 h-6" />
         </div>
         <div>
-          <h2 className="text-xl font-semibold tracking-tight">CSAT Token</h2>
+          <h2 className="text-xl font-semibold">CSAT Token</h2>
           <p className="text-sm text-white/60 mt-1">
             ใช้ดึงคะแนนความพึงพอใจ (COM7 CSAT) — อัปเดตที่นี่เมื่อ token หมดอายุ
           </p>

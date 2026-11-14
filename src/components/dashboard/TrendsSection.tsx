@@ -42,7 +42,7 @@ function ChartCard({
           <Icon className="w-5 h-5 text-emerald-400" />
         </div>
         <div>
-          <h2 className="text-base font-semibold tracking-tight text-white">{title}</h2>
+          <h2 className="text-base font-semibold text-white">{title}</h2>
           <p className="text-[11px] text-white/50">{subtitle}</p>
         </div>
       </div>
@@ -89,14 +89,14 @@ export function TrendsSection({ branch }: { branch: string }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="bg-white/10 rounded-2xl border border-white/10 p-6 ">
+      <div className="bg-white/5 rounded-2xl border border-white/10 p-5 md:p-6 ">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-emerald-500/20 rounded-xl border border-emerald-500/20">
               <TrendingUp className="w-5 h-5 text-emerald-400" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold tracking-tight text-white">
+              <h2 className="text-lg font-semibold text-white">
                 แนวโน้มย้อนหลัง
               </h2>
               <p className="text-[11px] text-white/50">
@@ -275,12 +275,12 @@ function ProgressTracker({ snaps }: { snaps: TrendSnapshot[] }) {
 
   if (withStaff.length < 2) {
     return (
-      <div className="bg-white/10 rounded-2xl border border-white/10 p-6 ">
+      <div className="bg-white/5 rounded-2xl border border-white/10 p-5 md:p-6 ">
         <div className="flex items-center gap-3 mb-2">
           <div className="p-2 bg-sky-500/20 rounded-xl border border-sky-500/20">
             <Users className="w-5 h-5 text-sky-400" />
           </div>
-          <h2 className="text-base font-semibold tracking-tight text-white">
+          <h2 className="text-base font-semibold text-white">
             พัฒนาการรายคน
           </h2>
         </div>
@@ -341,13 +341,13 @@ function ProgressTracker({ snaps }: { snaps: TrendSnapshot[] }) {
   };
 
   return (
-    <div className="bg-white/10 rounded-2xl border border-white/10 p-6 ">
+    <div className="bg-white/5 rounded-2xl border border-white/10 p-5 md:p-6 ">
       <div className="flex items-center gap-3 mb-1">
         <div className="p-2 bg-sky-500/20 rounded-xl border border-sky-500/20">
           <Users className="w-5 h-5 text-sky-400" />
         </div>
         <div>
-          <h2 className="text-base font-semibold tracking-tight text-white">
+          <h2 className="text-base font-semibold text-white">
             พัฒนาการรายคน
           </h2>
           <p className="text-[11px] text-white/50">

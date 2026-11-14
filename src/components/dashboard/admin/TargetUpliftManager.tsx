@@ -72,7 +72,7 @@ export function TargetUpliftManager({
           <TrendingUp className="w-6 h-6" />
         </div>
         <div className="flex-1">
-          <h2 className="text-xl font-semibold tracking-tight">ปรับเป้าเพิ่ม (Stretch Target)</h2>
+          <h2 className="text-xl font-semibold">ปรับเป้าเพิ่ม (Stretch Target)</h2>
           <p className="text-sm text-white/60 mt-1">
             เพิ่มเป้าเป็น % จากเป้าจริงในไฟล์ Target — มีผลทุกหน้า (Home, Staff Profile, Commission ฯลฯ) · ปิดเมื่อไหร่ก็กลับเป็นเป้าจริง
           </p>

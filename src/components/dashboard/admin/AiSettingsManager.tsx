@@ -82,7 +82,7 @@ export function AiSettingsManager({ updatedBy }: { updatedBy?: string }) {
           <Sparkles className="w-6 h-6" />
         </div>
         <div>
-          <h2 className="text-xl font-semibold tracking-tight">AI สำหรับบทวิเคราะห์</h2>
+          <h2 className="text-xl font-semibold">AI สำหรับบทวิเคราะห์</h2>
           <p className="text-sm text-white/60 mt-1">
             เลือกค่าย AI และใส่ API key — ใช้เขียนบทวิเคราะห์รายวันเป็นภาษาธรรมชาติ
           </p>

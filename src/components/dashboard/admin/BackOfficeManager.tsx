@@ -86,7 +86,7 @@ export function BackOfficeManager({
           <Users2 className="w-6 h-6" />
         </div>
         <div className="flex-1">
-          <h2 className="text-xl font-semibold tracking-tight">พนักงานหลังบ้าน (ส่วนแบ่งค่าคอม)</h2>
+          <h2 className="text-xl font-semibold">พนักงานหลังบ้าน (ส่วนแบ่งค่าคอม)</h2>
           <p className="text-sm text-white/60 mt-1">
             กรอกจำนวนคนแต่ละตำแหน่ง — ระบบจะหักส่วนนี้จากก้อนค่าคอมก่อน แล้วที่เหลือแบ่งให้เซล
           </p>

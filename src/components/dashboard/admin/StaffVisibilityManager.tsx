@@ -65,7 +65,7 @@ export function StaffVisibilityManager({
           <Users className="w-6 h-6" />
         </div>
         <div className="flex-1">
-          <h2 className="text-xl font-semibold tracking-tight">แสดงพนักงานในหน้า Staff Profile</h2>
+          <h2 className="text-xl font-semibold">แสดงพนักงานในหน้า Staff Profile</h2>
           <p className="text-sm text-white/60 mt-1">
             ติ๊กออกเพื่อซ่อนคนที่ไม่ใช่ฝ่ายขาย (เช่น ผู้จัดการ/ซัพพอร์ต) — แสดงอยู่ {shownCount}/{staffRoster.length} คน
           </p>
