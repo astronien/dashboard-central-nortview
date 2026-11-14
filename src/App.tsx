@@ -195,6 +195,8 @@ import { CategoryFallbackAlert } from "./components/dashboard/CategoryFallbackAl
 import { MobileBottomNav } from "./components/dashboard/MobileBottomNav";
 import { MobileHome } from "./components/mobile/MobileHome";
 import { HourlySalesSection } from "./components/dashboard/HourlySalesSection";
+import { MissionsSection } from "./components/dashboard/MissionsSection";
+import { buildMissions } from "./lib/missions";
 import { buildHourlySales } from "./lib/hourlySales";
 import { MobileStaff } from "./components/mobile/MobileStaff";
 import { useIsMobile } from "./hooks/useIsMobile";
@@ -4011,6 +4013,14 @@ function AppInternal({
     const pos = sorted.findIndex((o) => o.index === activeOfficerIndex);
     return pos >= 0 ? { pos: pos + 1, of: sorted.length } : undefined;
   })();
+  // ภารกิจวันนี้ รายคน (ไม่รวมคนที่ซ่อนจากหน้า Staff)
+  const missions = buildMissions({
+    combined: combinedOfficerKpiData,
+    daily: dailyBranchReport,
+    currentDay: paceInfo.currentDay,
+    totalDays: paceInfo.totalDays,
+  }).filter((m) => !isStaffHidden({ staffId: m.staffId, name: m.name }));
+  const activeMission = activeOfficer ? missions.find((m) => matchesOfficer(m.name, activeOfficer.name)) : undefined;
   const homeFullSections = (
     <>
       <div className="hidden md:flex items-baseline justify-between gap-4 -mt-2">
@@ -4039,6 +4049,18 @@ function AppInternal({
                     totalDays: paceInfo.totalDays,
                   }}
                   categorySnapshotRef={categorySnapshotRef}
+                  afterStats={
+                    <MissionsSection
+                      missions={missions}
+                      avatarOf={mobileAvatarOf}
+                      onOpenStaff={openStaffByName}
+                      dateLabel={
+                        dailyBranchReport.latestDate
+                          ? `${dailyBranchReport.latestDate.split("-").reverse().join("/")}${dailyBranchReport.lastBillTime ? ` ${dailyBranchReport.lastBillTime} น.` : ""}`
+                          : undefined
+                      }
+                    />
+                  }
                 />
                 <div className="hidden md:block">
                   <HourlySalesSection data={hourlySales} />
@@ -4384,6 +4406,7 @@ function AppInternal({
                     combined={combinedOfficerKpiData}
                     daily={dailyBranchReport}
                     hourly={hourlySales}
+                    missions={missions}
                     avatarOf={mobileAvatarOf}
                     onOpenStaff={openStaffByName}
                     fullView={homeFullSections}
@@ -4419,6 +4442,7 @@ function AppInternal({
                     focusDevice={focusDevice}
                     focusWonder={focusWonder}
                     todayDateLabel={todayStats.dateStr}
+                    mission={activeMission}
                     fullView={staffFullView}
                   />
                 </motion.div>

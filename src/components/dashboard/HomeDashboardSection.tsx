@@ -84,6 +84,7 @@ export function HomeDashboardSection({
   categorySnapshotRef,
   captureRef,
   combinedTableRef,
+  afterStats,
 }: {
   derivedHomeStats: DerivedHomeStat[];
   monthlyPerformance: MonthlyPerformance;
@@ -98,6 +99,8 @@ export function HomeDashboardSection({
   captureRef?: React.RefObject<HTMLDivElement | null>;
   /** Wraps the "ยอดขายตามหมวด + 7 Wonders รายคน" table for its own capture */
   combinedTableRef?: React.RefObject<HTMLDivElement | null>;
+  /** แทรกต่อจากการ์ดสรุป (เช่น ภารกิจวันนี้) — ไม่ใส่ในสำเนาที่ใช้แคปรีพอท */
+  afterStats?: React.ReactNode;
 }) {
   return (
     <>
@@ -119,6 +122,8 @@ export function HomeDashboardSection({
             </div>
           ))}
         </div>
+
+        {afterStats}
 
         {categorySnapshots && categorySnapshots.length > 0 ? (
           <CategorySnapshotSection ref={categorySnapshotRef} items={categorySnapshots} />

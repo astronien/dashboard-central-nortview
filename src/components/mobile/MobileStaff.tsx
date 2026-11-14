@@ -1,6 +1,8 @@
 import React from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, Table2, Target } from "lucide-react";
 import type { CategoryPerformanceRow } from "../../lib/categoryPerformance";
+import { MissionCard } from "../dashboard/MissionsSection";
+import type { Mission } from "../../lib/missions";
 import { Avatar, Bar, Card, Pill, Segmented, fmtPctShort, fmtShort, toneOf } from "./mobileUi";
 
 const isPctCalc = (c?: string) => c === "attach" || c === "bahtRate" || c === "catAttach" || c === "tradeIn";
@@ -29,6 +31,7 @@ export function MobileStaff({
   focusDevice,
   focusWonder,
   todayDateLabel,
+  mission,
   fullView,
 }: {
   /** รายชื่อที่เลื่อนไปมาได้ (index = ตำแหน่งใน parsedReport.officers) */
@@ -47,6 +50,7 @@ export function MobileStaff({
   focusDevice: { label: string; rate: number } | null;
   focusWonder: { label: string; rate: number } | null;
   todayDateLabel?: string;
+  mission?: Mission;
   fullView: React.ReactNode;
 }) {
   const [tab, setTab] = React.useState<Tab>("cat");
@@ -151,7 +155,9 @@ export function MobileStaff({
         </button>
       </div>
 
-      {focusDevice || focusWonder ? (
+      {mission ? <MissionCard m={mission} /> : null}
+
+      {!mission && (focusDevice || focusWonder) ? (
         <div className="flex items-start gap-2 rounded-xl bg-sky-500/10 border border-sky-400/30 px-3 py-2 text-[12px] text-sky-100">
           <Target className="w-4 h-4 shrink-0 mt-0.5 text-sky-300" />
           <span>

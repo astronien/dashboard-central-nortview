@@ -9,6 +9,8 @@ import type {
 import type { DailyReportData } from "../dashboard/DailyBranchReportSection";
 import type { HourlySales } from "../../lib/hourlySales";
 import { HourlySalesSection } from "../dashboard/HourlySalesSection";
+import { MissionCard } from "../dashboard/MissionsSection";
+import type { Mission } from "../../lib/missions";
 import { Avatar, Bar, Card, Pill, Segmented, fmtPctShort, fmtShort, toneOf } from "./mobileUi";
 
 const isPctCalc = (c?: string) => c === "attach" || c === "bahtRate" || c === "catAttach" || c === "tradeIn";
@@ -23,7 +25,7 @@ const fmtDay = (ymd: string) => {
   return `${d}/${m}`;
 };
 
-type Tab = "month" | "today";
+type Tab = "mission" | "month" | "today";
 
 export function MobileHome({
   storeName,
@@ -32,6 +34,7 @@ export function MobileHome({
   combined,
   daily,
   hourly,
+  missions = [],
   avatarOf,
   onOpenStaff,
   fullView,
@@ -42,12 +45,13 @@ export function MobileHome({
   combined: CombinedOfficerKpiData;
   daily: DailyReportData;
   hourly?: HourlySales;
+  missions?: Mission[];
   avatarOf: (name: string, staffId?: string) => string | undefined;
   onOpenStaff: (name: string) => void;
   /** ตารางเต็มแบบบนคอม (เปิดด้วยปุ่ม) */
   fullView: React.ReactNode;
 }) {
-  const [tab, setTab] = React.useState<Tab>("month");
+  const [tab, setTab] = React.useState<Tab>("mission");
   const [open, setOpen] = React.useState<string | null>(null);
   const [showFull, setShowFull] = React.useState(false);
 
@@ -143,10 +147,22 @@ export function MobileHome({
             setOpen(null);
           }}
           options={[
+            { key: "mission", label: "ภารกิจ" },
             { key: "month", label: "เดือนนี้" },
             { key: "today", label: "วันนี้", badge: alertCount },
           ]}
         />
+
+        {tab === "mission" ? (
+          <div className="mt-2 flex flex-col gap-2">
+            {[...missions]
+              .sort((a, b) => (a.paceGap ?? 0) - (b.paceGap ?? 0))
+              .map((m) => (
+                <MissionCard key={m.name} m={m} avatar={avatarOf(m.name, m.staffId)} onOpen={() => onOpenStaff(m.name)} />
+              ))}
+            {!missions.length ? <p className="py-6 text-center text-[13px] text-white/50">ยังไม่มีข้อมูล</p> : null}
+          </div>
+        ) : null}
 
         {tab === "month" ? (
           <ul className="mt-1 divide-y divide-white/10">
