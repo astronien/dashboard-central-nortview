@@ -168,6 +168,9 @@ export function buildCategorySnapshots(params: {
     cover?: number;
     ac?: number;
     ufund?: number;
+    /** SIM: จำนวนซิมทั้งหมดที่ขาย (ทุกบิล) ตามตัวกรองของ preset Sim */
+    sim?: number;
+    simToday?: number;
   };
 }): CategorySnapshotItem[] {
   const { targetRows, currentRows, todayRows = [], lastMonthRows, lastYearRows, targetOverrides = {}, tradeInData, presetCounts } = params;
@@ -243,6 +246,7 @@ export function buildCategorySnapshots(params: {
       actual = sumKpiActualFromRows(currentRows, kpiKey);
       if (label === "COVER+" && presetCounts?.cover != null) actual = presetCounts.cover;
       if (label === "AC+" && presetCounts?.ac != null) actual = presetCounts.ac;
+      if (label === "SIM" && presetCounts?.sim != null) actual = presetCounts.sim;
       if (label === "AC+" || label === "COVER+") {
         // Attach rate จริง = ยอดที่ขายได้จริง ÷ จำนวน iPhone ที่ขายจริง
         measureType = "quantity";
@@ -302,7 +306,9 @@ export function buildCategorySnapshots(params: {
     // "Target per Day" = เป้าต่อวันแบบขั้นบันได (ไล่ 90% ก่อน แล้วค่อย 105%)
     const targetToToday = calcSteppedRequiredPerDay(target, actual, currentDay, totalDays).perDay;
     const today =
-      label === "Trade In" && tradeInData
+      label === "SIM" && presetCounts?.simToday != null
+        ? presetCounts.simToday
+        : label === "Trade In" && tradeInData
         ? Number(tradeInData.today ?? 0)
         : todayRows.length > 0
           ? kpiKey
