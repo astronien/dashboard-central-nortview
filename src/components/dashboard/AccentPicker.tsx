@@ -1,17 +1,18 @@
 import React from "react";
 import { Check, Palette, RotateCcw } from "lucide-react";
-import { ACCENT_PRESETS, secondaryPreview } from "../../lib/accent";
+import { ACCENT_PRESETS, previewColors } from "../../lib/accent";
 
 /** ปุ่มเลือกสีหลักของธีม — สีรองระบบเลือกให้อัตโนมัติ */
 export function AccentPicker({ value, onChange }: { value: string | null; onChange: (hex: string | null) => void }) {
   const [open, setOpen] = React.useState(false);
-  const current = value ?? "#10b981";
+  const current = value ?? "#1b5d44";
+  const pv = previewColors(current);
   return (
     <div className="relative">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        title="เลือกสีหลักของธีม"
+        title="เลือกสีพื้นหลังของธีม"
         className="p-2 rounded-full transition-colors text-white/60 hover:text-white hover:bg-white/10"
       >
         <Palette className="w-5 h-5" />
@@ -20,7 +21,7 @@ export function AccentPicker({ value, onChange }: { value: string | null; onChan
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="absolute right-0 top-full mt-2 z-50 w-64 rounded-2xl border border-white/10 bg-[#0c3123] p-4 flex flex-col gap-3">
-            <div className="text-[13px] font-semibold text-white">สีหลัก</div>
+            <div className="text-[13px] font-semibold text-white">สีพื้นหลัง</div>
             <div className="grid grid-cols-8 gap-1.5">
               {ACCENT_PRESETS.map((c) => (
                 <button
@@ -46,17 +47,17 @@ export function AccentPicker({ value, onChange }: { value: string | null; onChan
               <span className="ml-auto font-mono text-white/50">{current}</span>
             </label>
             <div className="flex items-center gap-2 text-[12px] text-white/60">
-              <span className="w-4 h-4 rounded-full border border-white/20" style={{ background: current }} />
-              สีหลัก
-              <span className="w-4 h-4 rounded-full border border-white/20 ml-3" style={{ background: secondaryPreview(current) }} />
-              สีรอง (อัตโนมัติ)
+              <span className="w-4 h-4 rounded-full border border-white/20" style={{ background: pv.panel }} />
+              พื้น
+              <span className="w-4 h-4 rounded-full border border-white/20 ml-3" style={{ background: pv.accent }} />
+              สีเน้น (อัตโนมัติ)
             </div>
             <button
               type="button"
               onClick={() => onChange(null)}
               className="inline-flex items-center gap-1.5 self-start text-[12px] text-white/60 hover:text-white"
             >
-              <RotateCcw className="w-3.5 h-3.5" /> ใช้สีเริ่มต้น
+              <RotateCcw className="w-3.5 h-3.5" /> ใช้สีเริ่มต้น (เทาถ่าน)
             </button>
           </div>
         </>

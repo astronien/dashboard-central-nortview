@@ -407,3 +407,35 @@ html.accent-custom .report-card .text-emerald-800 { color: var(--accent-text); }
 html.accent-custom .report-card .bg-emerald-50 { background-color: var(--accent-softer); }
 html.accent-custom .report-card .bg-emerald-100 { background-color: var(--accent-soft); }
 html.accent-custom .report-card .border-emerald-200 { border-color: var(--accent-border); }
+
+/* พื้นหลังโดยรวมตามสีที่เลือก — ครอบสีพื้นฝังทุกตัวทั้งสองธีม */
+html.theme-dark.accent-custom .bg-\[\#1c2722\] { background-color: var(--surface-root); }
+html.theme-dark.accent-custom .bg-\[\#0c3123\] { background-color: var(--surface-raised); }
+html.theme-dark.accent-custom .bg-\[\#0c3123\]\/90 { background-color: var(--surface-raised); }
+html.theme-dark.accent-custom .bg-\[\#0a1f17\] { background-color: var(--surface-sunken); }
+html.theme-dark.accent-custom .bg-\[\#052b20\] { background-color: var(--surface-sunken); }
+html.theme-dark.accent-custom .bg-\[\#052b20\]\/60 { background-color: var(--surface-sunken); }
+html.theme-dark.accent-custom .bg-\[\#051710\] { background-color: var(--surface-root); }
+html.theme-dark.accent-custom .bg-\[\#0f4430\] { background-color: var(--surface-active); }
+html.theme-dark.accent-custom .bg-\[\#1b3a2c\] { background-color: var(--surface-raised); }
+html.theme-dark.accent-custom .bg-\[\#0c291d\] { background-color: var(--surface-hero); }
+html.theme-dark.accent-custom .bg-\[\#032e1f\] { background-color: var(--surface-sunken); }
+html.theme-dark.accent-custom .bg-\[\#043d29\] { background-color: var(--surface-raised); }
+html.theme-dark.accent-custom option { background-color: var(--surface-root); }
+html.theme-light.accent-custom .bg-\[\#1c2722\] { background-color: var(--surface-root); }
+html.theme-light.accent-custom .bg-\[\#0c3123\] { background-color: var(--surface-raised); }
+html.theme-light.accent-custom .bg-\[\#0c3123\]\/90 { background-color: var(--surface-raised); }
+html.theme-light.accent-custom .bg-\[\#0a1f17\] { background-color: var(--surface-sunken); }
+html.theme-light.accent-custom .bg-\[\#052b20\] { background-color: var(--surface-sunken); }
+html.theme-light.accent-custom .bg-\[\#052b20\]\/60 { background-color: var(--surface-sunken); }
+html.theme-light.accent-custom .bg-\[\#051710\] { background-color: var(--surface-root); }
+html.theme-light.accent-custom .bg-\[\#0f4430\] { background-color: var(--surface-active); }
+html.theme-light.accent-custom .bg-\[\#1b3a2c\] { background-color: var(--surface-raised); }
+html.theme-light.accent-custom .bg-\[\#0c291d\] { background-color: var(--surface-hero); }
+html.theme-light.accent-custom .bg-\[\#032e1f\] { background-color: var(--surface-sunken); }
+html.theme-light.accent-custom .bg-\[\#043d29\] { background-color: var(--surface-raised); }
+html.theme-light.accent-custom option { background-color: var(--surface-root); }
+@media (max-width: 767px) {
+  html.accent-custom .mobile-sticky-col { background-color: var(--surface-sunken); }
+  html.accent-custom th.mobile-sticky-col { background-color: var(--surface-raised); }
+}
