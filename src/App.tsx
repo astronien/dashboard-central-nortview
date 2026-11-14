@@ -73,6 +73,8 @@ import {
   uploadLineReportImage,
 } from "./lib/lineReport";
 import { applyTheme, findTheme, type ThemeId } from "./lib/themes";
+import { applyAccent } from "./lib/accent";
+import { AccentPicker } from "./components/dashboard/AccentPicker";
 import {
   EMPTY_TARGET_UPLIFT,
   applyTargetUplift,
@@ -1327,6 +1329,23 @@ function AppInternal({
       /* ignore */
     }
   }, [theme]);
+  // สีหลักที่เลือกเอง (null = สีเริ่มต้น) — สีรองระบบคิดให้อัตโนมัติ
+  const [accent, setAccent] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem("accent");
+    } catch {
+      return null;
+    }
+  });
+  useEffect(() => {
+    applyAccent(accent, theme === "dark");
+    try {
+      if (accent) localStorage.setItem("accent", accent);
+      else localStorage.removeItem("accent");
+    } catch {
+      /* ignore */
+    }
+  }, [accent, theme]);
   const [parsedReport, setParsedReport] = useState<ParsedReport>(fallbackReport);
   const [uploadedFiles, setUploadedFiles] = useState<Record<UploadKind, RawRow[]>>({ target: [], current: [], today: [], lastMonth: [], lastYear: [], categoryMaster: [] });
   const [selectedBranch, setSelectedBranch] = useState<string>("Mega Bangna");
@@ -4239,6 +4258,7 @@ function AppInternal({
 
             {/* Screenshot capture button */}
             <div className="pointer-events-auto hidden md:flex items-center gap-2 pl-2 ml-2 border-l border-white/10">
+              <AccentPicker value={accent} onChange={setAccent} />
               <button
                 onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
                 title={theme === "dark" ? "เปลี่ยนเป็นธีมสว่าง" : "เปลี่ยนเป็นธีมมืด"}
