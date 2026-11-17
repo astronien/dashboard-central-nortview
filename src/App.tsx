@@ -158,7 +158,9 @@ import {
 
 import { saveTrendSnapshot } from "./lib/trendsApi";
 
-import { computeRunRate } from "./lib/runRate";
+import { computeRunRate, buildReorderList } from "./lib/runRate";
+import { applyRunRateExclusions, buildUpcomingReorder, loadRunRatePrefs, saveRunRatePrefs, type RunRatePrefs } from "./lib/runRatePrefs";
+import { StockAlertBanner } from "./components/dashboard/StockAlertBanner";
 import { fetchStock, type StockStatus } from "./lib/stockApi";
 
 import { StaffSection } from "./components/dashboard/StaffSection";
@@ -2988,6 +2990,15 @@ function AppInternal({
   }, [loadStock]);
 
   const [runRateWindow, setRunRateWindow] = useState<number>(0); // 0 = MTD, 7 = last 7 days
+  // ตั้งค่า Run Rate ต่อสาขา (หมวด/สินค้าที่ไม่นับ, วันของมาถึง, เตือนล่วงหน้า)
+  const [runRatePrefs, setRunRatePrefs] = useState<RunRatePrefs>(() => loadRunRatePrefs(""));
+  useEffect(() => {
+    setRunRatePrefs(loadRunRatePrefs(selectedBranch));
+  }, [selectedBranch]);
+  const updateRunRatePrefs = (p: RunRatePrefs) => {
+    setRunRatePrefs(p);
+    saveRunRatePrefs(selectedBranch, p);
+  };
   const runRateData = useMemo(
     () =>
       computeRunRate(displayUploads.current, getCategory, {
@@ -3000,6 +3011,17 @@ function AppInternal({
       }),
     [displayUploads.current, getCategory, paceInfo, stockStatus, runRateWindow],
   );
+  const runRateView = useMemo(() => applyRunRateExclusions(runRateData, runRatePrefs), [runRateData, runRatePrefs]);
+  const runRateAllCats = useMemo(() => runRateData.categories.map((c) => c.label), [runRateData]);
+  // แจ้งเตือนสต็อก (หน้าหลัก): ต้องสั่งตอนนี้ + ใกล้ถึงวันต้องสั่ง
+  const stockAlerts = useMemo(() => {
+    const hasStock = runRateView.products.some((p) => p.stock != null);
+    if (!hasStock) return { now: [], soon: [] };
+    return {
+      now: buildReorderList(runRateView.products, runRatePrefs.leadDays, runRatePrefs.targetCover),
+      soon: buildUpcomingReorder(runRateView.products, runRatePrefs),
+    };
+  }, [runRateView, runRatePrefs]);
 
   const salesTrendData = useMemo(() => {
     if (!displayUploads.current.length) {
@@ -4418,6 +4440,14 @@ function AppInternal({
                     </span>
                   </button>
                 ) : null}
+                {!isPia ? (
+                  <StockAlertBanner
+                    now={stockAlerts.now}
+                    soon={stockAlerts.soon}
+                    warnDays={runRatePrefs.warnDays}
+                    onOpen={isMobile ? undefined : () => setCurrentView("runrate")}
+                  />
+                ) : null}
                 {isMobile ? (
                   <MobileHome
                     storeName={parsedStoreHeader.name}
@@ -4551,7 +4581,10 @@ function AppInternal({
                 className="flex flex-col gap-6 w-full h-full relative z-20"
               >
                 <RunRateSection
-                  data={runRateData}
+                  data={runRateView}
+                  prefs={runRatePrefs}
+                  onPrefsChange={updateRunRatePrefs}
+                  allCategories={runRateAllCats}
                   branch={selectedBranch}
                   stockStatus={stockStatus}
                   updatedBy={user?.name ?? user?.username}

@@ -11,7 +11,16 @@ import {
   Loader2,
   ShoppingCart,
   Wallet,
+  EyeOff,
+  Filter,
+  BellRing,
+  RotateCcw,
 } from "lucide-react";
+import {
+  DEFAULT_RUNRATE_PREFS,
+  buildUpcomingReorder,
+  type RunRatePrefs,
+} from "../../lib/runRatePrefs";
 import {
   buildReorderList,
   buildDeadStock,
@@ -43,14 +52,30 @@ function CoverBadge({ coverDays, reorder }: { coverDays?: number | null; reorder
   );
 }
 
+function HideBtn({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title="ไม่นับสินค้านี้ (เอากลับได้ที่ ตัวกรอง)"
+      className="shrink-0 p-1 rounded-md text-white/35 hover:text-white hover:bg-white/10 transition-colors"
+    >
+      <EyeOff className="w-3.5 h-3.5" />
+    </button>
+  );
+}
+
 function RunRateTable({
   rows,
   hasStock,
   showSub,
+  onHide,
 }: {
   rows: RunRateRow[];
   hasStock: boolean;
   showSub?: boolean;
+  /** ปุ่มซ่อน (ไม่นับ) ต่อแถว */
+  onHide?: (label: string) => void;
 }) {
   const maxShare = Math.max(1, ...rows.map((r) => r.sharePct));
   return (
@@ -75,7 +100,10 @@ function RunRateTable({
           {rows.map((r, i) => (
             <tr key={`${r.key}-${i}`} className="border-b border-white/5 hover:bg-white/5 transition-colors">
               <td className="py-2 px-3">
-                <div className="font-medium text-white truncate max-w-[300px]">{r.label}</div>
+                <div className="flex items-center gap-1.5">
+                  <div className="font-medium text-white truncate max-w-[300px]">{r.label}</div>
+                  {onHide ? <HideBtn onClick={() => onHide(r.label)} /> : null}
+                </div>
                 {showSub && r.sub ? <div className="text-[11px] text-white/40">{r.sub}</div> : null}
               </td>
               <td className="py-2 px-3 text-right font-mono text-white/80 tabular-nums">{fmt(r.units)}</td>
@@ -223,7 +251,15 @@ export function RunRateSection({
   onStockSaved,
   windowDays = 0,
   onWindowChange,
+  prefs = DEFAULT_RUNRATE_PREFS,
+  onPrefsChange,
+  allCategories = [],
 }: {
+  /** ตั้งค่า (หมวด/สินค้าที่ไม่นับ, วันของมาถึง ฯลฯ) — data ที่ส่งมาตัดของที่ไม่นับแล้ว */
+  prefs?: RunRatePrefs;
+  onPrefsChange?: (p: RunRatePrefs) => void;
+  /** หมวดทั้งหมดก่อนตัด (ไว้ทำช่องติ๊ก) */
+  allCategories?: string[];
   data?: RunRateResult;
   branch?: string;
   stockStatus?: StockStatus;
@@ -233,9 +269,16 @@ export function RunRateSection({
   onWindowChange?: (d: number) => void;
 }) {
   const [showAllProducts, setShowAllProducts] = React.useState(false);
-  const [leadDays, setLeadDays] = React.useState(14);
-  const [targetCover, setTargetCover] = React.useState(30);
-  const [deadCover, setDeadCover] = React.useState(90);
+  const { leadDays, targetCover, deadCover, warnDays } = prefs;
+  const setPref = (patch: Partial<RunRatePrefs>) => onPrefsChange?.({ ...prefs, ...patch });
+  const setLeadDays = (v: number) => setPref({ leadDays: v });
+  const setTargetCover = (v: number) => setPref({ targetCover: v });
+  const setDeadCover = (v: number) => setPref({ deadCover: v });
+  const hideProduct = onPrefsChange
+    ? (label: string) => setPref({ excludedProducts: Array.from(new Set([...prefs.excludedProducts, label])) })
+    : undefined;
+  const [filterOpen, setFilterOpen] = React.useState(false);
+  const excludedCount = prefs.excludedCats.length + prefs.excludedProducts.length;
   const [catFilter, setCatFilter] = React.useState<string>("all");
   const [tab, setTab] = React.useState<"overview" | "fast" | "reorder" | "dead" | "stock">("overview");
   const productCats = React.useMemo(
@@ -262,6 +305,7 @@ export function RunRateSection({
     ? buildReorderList(data.products, leadDays, targetCover)
     : [];
   const deadStock = hasStock ? buildDeadStock(data.products, deadCover) : [];
+  const upcoming = hasStock ? buildUpcomingReorder(data.products, prefs) : [];
   const hasValue = data.products.some((p) => p.stockValue != null);
   const totalStockValue = data.products.reduce(
     (s, p) => s + (p.stockValue ?? 0),
@@ -316,7 +360,7 @@ export function RunRateSection({
     { id: "fast", label: "ขายดี / ขายช้า" },
     ...(hasStock
       ? [
-          { id: "reorder" as const, label: "ต้องสั่งเพิ่ม", count: reorderList.length, tone: "rose" },
+          { id: "reorder" as const, label: "ต้องสั่งเพิ่ม", count: reorderList.length + upcoming.length, tone: "rose" },
           { id: "dead" as const, label: "ของค้าง", count: deadStock.length, tone: "amber" },
         ]
       : []),
@@ -379,6 +423,19 @@ export function RunRateSection({
               </p>
             </div>
           </div>
+          <div className="flex items-center gap-2 shrink-0">
+          {onPrefsChange ? (
+            <button
+              type="button"
+              onClick={() => setFilterOpen((v) => !v)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[12px] font-semibold transition-colors ${
+                filterOpen || excludedCount ? "bg-white/15 border-white/20 text-white" : "bg-black/20 border-white/15 text-white/70 hover:text-white"
+              }`}
+            >
+              <Filter className="w-3.5 h-3.5" />
+              ตัวกรอง{excludedCount ? ` · ไม่นับ ${excludedCount}` : ""}
+            </button>
+          ) : null}
           <div className="inline-flex rounded-xl border border-white/15 bg-black/20 p-0.5 text-[12px] shrink-0">
             {[
               { d: 0, label: "ทั้งเดือน" },
@@ -395,7 +452,77 @@ export function RunRateSection({
               </button>
             ))}
           </div>
+          </div>
         </div>
+
+        {filterOpen && onPrefsChange ? (
+          <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4 flex flex-col gap-4">
+            <div>
+              <div className="text-[13px] font-semibold text-white mb-1">หมวดที่นับ</div>
+              <p className="text-[12px] text-white/55 mb-2">เอาติ๊กออก = ไม่นับหมวดนั้นในทุกตารางและการแจ้งเตือน</p>
+              <div className="flex flex-wrap gap-2">
+                {allCategories.map((c) => {
+                  const on = !prefs.excludedCats.includes(c);
+                  return (
+                    <label
+                      key={c}
+                      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[12px] cursor-pointer transition-colors ${
+                        on ? "border-white/20 bg-white/10 text-white" : "border-white/10 text-white/45 line-through"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={on}
+                        onChange={() =>
+                          setPref({
+                            excludedCats: on ? [...prefs.excludedCats, c] : prefs.excludedCats.filter((x) => x !== c),
+                          })
+                        }
+                        className="accent-emerald-500"
+                      />
+                      {c}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
+              <div className="text-[13px] font-semibold text-white mb-1">
+                สินค้าที่ไม่นับ ({prefs.excludedProducts.length})
+              </div>
+              {prefs.excludedProducts.length ? (
+                <div className="flex flex-wrap gap-2">
+                  {prefs.excludedProducts.map((p) => (
+                    <span key={p} className="inline-flex items-center gap-1.5 pl-3 pr-1 py-1 rounded-lg border border-white/10 bg-white/5 text-[12px] text-white/80">
+                      <span className="truncate max-w-[260px]">{p}</span>
+                      <button
+                        type="button"
+                        title="นับกลับ"
+                        onClick={() => setPref({ excludedProducts: prefs.excludedProducts.filter((x) => x !== p) })}
+                        className="p-1 rounded-md text-white/50 hover:text-white hover:bg-white/10"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[12px] text-white/55">
+                  กดไอคอน <EyeOff className="inline w-3.5 h-3.5 -mt-0.5" /> หลังชื่อสินค้าในตาราง เพื่อไม่นับสินค้านั้น
+                </p>
+              )}
+            </div>
+            {excludedCount ? (
+              <button
+                type="button"
+                onClick={() => setPref({ excludedCats: [], excludedProducts: [] })}
+                className="self-start inline-flex items-center gap-1.5 text-[12px] text-white/60 hover:text-white"
+              >
+                <RotateCcw className="w-3.5 h-3.5" /> นับทั้งหมดเหมือนเดิม
+              </button>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="mt-5 grid grid-cols-2 lg:grid-cols-4 gap-3">
           <Card
@@ -531,7 +658,7 @@ export function RunRateSection({
                 ) : null}
               </div>
             </div>
-            <RunRateTable rows={products} hasStock={hasStock} showSub />
+            <RunRateTable rows={products} hasStock={hasStock} showSub onHide={hideProduct} />
           </div>
           {slow.length > 0 ? (
             <div className="bg-white/5 rounded-2xl border border-white/10 p-5 md:p-6 ">
@@ -544,7 +671,7 @@ export function RunRateSection({
                   <p className="text-[11px] text-white/45">ขายได้น้อยที่สุดต่อวัน — ระวังของค้าง</p>
                 </div>
               </div>
-              <RunRateTable rows={slow} hasStock={hasStock} showSub />
+              <RunRateTable rows={slow} hasStock={hasStock} showSub onHide={hideProduct} />
             </div>
           ) : null}
         </>
@@ -603,7 +730,10 @@ export function RunRateSection({
                   {reorderList.map((r, i) => (
                     <tr key={`${r.label}-${i}`} className="border-b border-white/5 hover:bg-white/5">
                       <td className="py-2 px-3">
-                        <div className="font-medium text-white truncate max-w-[300px]">{r.label}</div>
+                        <div className="flex items-center gap-1.5">
+                          <div className="font-medium text-white truncate max-w-[300px]">{r.label}</div>
+                          {hideProduct ? <HideBtn onClick={() => hideProduct(r.label)} /> : null}
+                        </div>
                         {r.sub ? <div className="text-[11px] text-white/40">{r.sub}</div> : null}
                       </td>
                       <td className="py-2 px-3 text-right font-mono text-white/80 tabular-nums">{fmt(r.stock)}</td>
@@ -616,6 +746,70 @@ export function RunRateSection({
                           +{fmt(r.suggestQty)}
                         </span>
                       </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      {tab === "reorder" && hasStock ? (
+        <div className="bg-white/5 rounded-2xl border border-white/10 p-5 md:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-3">
+              <BellRing className="w-5 h-5 text-amber-300" />
+              <div>
+                <h2 className="text-base font-semibold text-white">ใกล้ถึงวันต้องสั่ง ({upcoming.length})</h2>
+                <p className="text-[11px] text-white/55">
+                  ยังไม่ต้องสั่งวันนี้ แต่อีกไม่เกิน {warnDays} วันต้องสั่ง ไม่งั้นของใหม่มาไม่ทัน (ของมาถึงใน {leadDays} วัน)
+                </p>
+              </div>
+            </div>
+            <label className="flex items-center gap-1 text-[11px] text-white/60">
+              เตือนล่วงหน้า
+              <input
+                type="number"
+                value={warnDays}
+                onChange={(e) => setPref({ warnDays: Math.max(1, Number(e.target.value) || 1) })}
+                className="w-14 bg-[#051710] border border-white/15 rounded-lg px-2 py-1 text-white text-[11px] text-right"
+              />
+              วัน
+            </label>
+          </div>
+          {upcoming.length === 0 ? (
+            <p className="text-[13px] text-white/60">ไม่มีสินค้าที่ต้องสั่งในอีก {warnDays} วันข้างหน้า</p>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-white/10">
+              <table className="w-full text-left border-collapse text-[12px]">
+                <thead>
+                  <tr className="bg-[#0c3123] border-b border-white/10 text-white/70 text-[11px]">
+                    <th className="py-2.5 px-3 font-semibold min-w-[180px]">สินค้า</th>
+                    <th className="py-2.5 px-3 font-semibold text-right">คงเหลือ</th>
+                    <th className="py-2.5 px-3 font-semibold text-right">ขาย/วัน</th>
+                    <th className="py-2.5 px-3 font-semibold text-right">พอขายอีก</th>
+                    <th className="py-2.5 px-3 font-semibold text-right">ต้องสั่งภายใน</th>
+                    <th className="py-2.5 px-3 font-semibold text-right">ควรสั่ง</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {upcoming.map((r, i) => (
+                    <tr key={`${r.label}-${i}`} className="border-b border-white/5 hover:bg-white/5">
+                      <td className="py-2 px-3">
+                        <div className="flex items-center gap-1.5">
+                          <div className="font-medium text-white truncate max-w-[300px]">{r.label}</div>
+                          {hideProduct ? <HideBtn onClick={() => hideProduct(r.label)} /> : null}
+                        </div>
+                        {r.sub ? <div className="text-[11px] text-white/45">{r.sub}</div> : null}
+                      </td>
+                      <td className="py-2 px-3 text-right font-mono text-white/80 tabular-nums">{fmt(r.stock)}</td>
+                      <td className="py-2 px-3 text-right font-mono text-white/80 tabular-nums">{fmt1(r.unitsPerDay)}</td>
+                      <td className="py-2 px-3 text-right font-mono text-white/80 tabular-nums">{Math.floor(r.coverDays)} วัน</td>
+                      <td className="py-2 px-3 text-right font-semibold text-amber-300 tabular-nums">
+                        {r.orderInDays === 0 ? "พรุ่งนี้" : `${r.orderInDays} วัน`}
+                      </td>
+                      <td className="py-2 px-3 text-right font-mono text-white tabular-nums">+{fmt(r.suggestQty)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -666,7 +860,10 @@ export function RunRateSection({
                   {deadStock.slice(0, 30).map((d, i) => (
                     <tr key={`${d.label}-${i}`} className="border-b border-white/5 hover:bg-white/5">
                       <td className="py-2 px-3">
-                        <div className="font-medium text-white truncate max-w-[300px]">{d.label}</div>
+                        <div className="flex items-center gap-1.5">
+                          <div className="font-medium text-white truncate max-w-[300px]">{d.label}</div>
+                          {hideProduct ? <HideBtn onClick={() => hideProduct(d.label)} /> : null}
+                        </div>
                         {d.sub ? <div className="text-[11px] text-white/40">{d.sub}</div> : null}
                       </td>
                       <td className="py-2 px-3 text-right font-mono text-white/80 tabular-nums">{fmt(d.stock)}</td>
