@@ -254,7 +254,10 @@ export function RunRateSection({
   prefs = DEFAULT_RUNRATE_PREFS,
   onPrefsChange,
   allCategories = [],
+  onSendTelegram,
 }: {
+  /** กดส่งแจ้งเตือนสต็อกเข้า Telegram ตอนนี้ */
+  onSendTelegram?: () => Promise<{ ok: boolean; skipped?: boolean; error?: string }>;
   /** ตั้งค่า (หมวด/สินค้าที่ไม่นับ, วันของมาถึง ฯลฯ) — data ที่ส่งมาตัดของที่ไม่นับแล้ว */
   prefs?: RunRatePrefs;
   onPrefsChange?: (p: RunRatePrefs) => void;
@@ -278,6 +281,13 @@ export function RunRateSection({
     ? (label: string) => setPref({ excludedProducts: Array.from(new Set([...prefs.excludedProducts, label])) })
     : undefined;
   const [filterOpen, setFilterOpen] = React.useState(false);
+  const [tgState, setTgState] = React.useState<{ busy: boolean; msg: string; ok?: boolean }>({ busy: false, msg: "" });
+  const sendTg = async () => {
+    if (!onSendTelegram) return;
+    setTgState({ busy: true, msg: "" });
+    const r = await onSendTelegram();
+    setTgState({ busy: false, ok: r.ok, msg: r.ok ? "ส่งเข้า Telegram แล้ว" : r.error ?? "ส่งไม่สำเร็จ" });
+  };
   const excludedCount = prefs.excludedCats.length + prefs.excludedProducts.length;
   const [catFilter, setCatFilter] = React.useState<string>("all");
   const [tab, setTab] = React.useState<"overview" | "fast" | "reorder" | "dead" | "stock">("overview");
@@ -778,6 +788,33 @@ export function RunRateSection({
               วัน
             </label>
           </div>
+          {onPrefsChange ? (
+            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-[12px]">
+              <label className="inline-flex items-center gap-2 text-white/85 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={prefs.telegramAlert}
+                  onChange={(e) => setPref({ telegramAlert: e.target.checked })}
+                  className="accent-emerald-500"
+                />
+                ส่งแจ้งเตือนเข้า Telegram อัตโนมัติ (วันละครั้ง เมื่อมีรายการต้องสั่ง/ใกล้ต้องสั่ง)
+              </label>
+              {onSendTelegram ? (
+                <button
+                  type="button"
+                  onClick={() => void sendTg()}
+                  disabled={tgState.busy || (!reorderList.length && !upcoming.length)}
+                  className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-sky-400/30 bg-sky-500/10 text-sky-200 font-semibold hover:bg-sky-500/20 disabled:opacity-50"
+                >
+                  {tgState.busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <BellRing className="w-3.5 h-3.5" />}
+                  ส่งเข้า Telegram ตอนนี้
+                </button>
+              ) : null}
+              {tgState.msg ? (
+                <span className={`w-full text-[12px] ${tgState.ok ? "text-emerald-300" : "text-rose-300"}`}>{tgState.msg}</span>
+              ) : null}
+            </div>
+          ) : null}
           {upcoming.length === 0 ? (
             <p className="text-[13px] text-white/60">ไม่มีสินค้าที่ต้องสั่งในอีก {warnDays} วันข้างหน้า</p>
           ) : (

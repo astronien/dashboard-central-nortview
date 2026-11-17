@@ -159,7 +159,7 @@ import {
 import { saveTrendSnapshot } from "./lib/trendsApi";
 
 import { computeRunRate, buildReorderList } from "./lib/runRate";
-import { applyRunRateExclusions, buildUpcomingReorder, loadRunRatePrefs, saveRunRatePrefs, type RunRatePrefs } from "./lib/runRatePrefs";
+import { applyRunRateExclusions, buildStockAlertText, buildUpcomingReorder, fetchRunRatePrefs, loadRunRatePrefs, pushRunRatePrefs, saveRunRatePrefs, sendStockAlertTelegram, type RunRatePrefs } from "./lib/runRatePrefs";
 import { StockAlertBanner } from "./components/dashboard/StockAlertBanner";
 import { fetchStock, type StockStatus } from "./lib/stockApi";
 
@@ -2992,12 +2992,28 @@ function AppInternal({
   const [runRateWindow, setRunRateWindow] = useState<number>(0); // 0 = MTD, 7 = last 7 days
   // ตั้งค่า Run Rate ต่อสาขา (หมวด/สินค้าที่ไม่นับ, วันของมาถึง, เตือนล่วงหน้า)
   const [runRatePrefs, setRunRatePrefs] = useState<RunRatePrefs>(() => loadRunRatePrefs(""));
+  const [runRatePrefsReady, setRunRatePrefsReady] = useState(false);
   useEffect(() => {
+    // ค่าในเครื่องขึ้นก่อน แล้วแทนด้วยค่าที่ server (ใช้ร่วมทุกเครื่อง)
+    setRunRatePrefsReady(false);
     setRunRatePrefs(loadRunRatePrefs(selectedBranch));
+    let cancelled = false;
+    void fetchRunRatePrefs(selectedBranch).then((p) => {
+      if (cancelled) return;
+      if (p) {
+        setRunRatePrefs(p);
+        saveRunRatePrefs(selectedBranch, p);
+      }
+      setRunRatePrefsReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [selectedBranch]);
   const updateRunRatePrefs = (p: RunRatePrefs) => {
     setRunRatePrefs(p);
     saveRunRatePrefs(selectedBranch, p);
+    void pushRunRatePrefs(selectedBranch, p, user?.name ?? user?.username);
   };
   const runRateData = useMemo(
     () =>
@@ -3022,6 +3038,28 @@ function AppInternal({
       soon: buildUpcomingReorder(runRateView.products, runRatePrefs),
     };
   }, [runRateView, runRatePrefs]);
+  // ข้อความแจ้งเตือนสต็อก + ส่งเข้า Telegram อัตโนมัติ (วันละครั้งต่อสาขา, server กันส่งซ้ำ)
+  const bangkokToday = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok" }).format(new Date());
+  const stockAlertText = useMemo(
+    () =>
+      buildStockAlertText({
+        branch: selectedBranch,
+        dateLabel: bangkokToday.split("-").reverse().join("/"),
+        now: stockAlerts.now,
+        soon: stockAlerts.soon,
+        prefs: runRatePrefs,
+      }),
+    [selectedBranch, bangkokToday, stockAlerts, runRatePrefs],
+  );
+  const sendStockAlertNow = (force: boolean) =>
+    sendStockAlertTelegram(stockAlertText, `stock:${selectedBranch}:${bangkokToday}`, force);
+  useEffect(() => {
+    if (isPia || isInitialLoading || !runRatePrefsReady || !runRatePrefs.telegramAlert) return;
+    if (!stockAlerts.now.length && !stockAlerts.soon.length) return;
+    void sendStockAlertNow(false);
+    // ส่งเมื่อมีรายการครั้งแรกของวัน — server เช็กซ้ำให้อีกชั้น
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPia, isInitialLoading, runRatePrefsReady, runRatePrefs.telegramAlert, stockAlerts.now.length, stockAlerts.soon.length, selectedBranch, bangkokToday]);
 
   const salesTrendData = useMemo(() => {
     if (!displayUploads.current.length) {
@@ -4585,6 +4623,7 @@ function AppInternal({
                   prefs={runRatePrefs}
                   onPrefsChange={updateRunRatePrefs}
                   allCategories={runRateAllCats}
+                  onSendTelegram={() => sendStockAlertNow(true)}
                   branch={selectedBranch}
                   stockStatus={stockStatus}
                   updatedBy={user?.name ?? user?.username}

@@ -92,6 +92,39 @@ async function handleBackOffice(req, res) {
 //   PUT  /api/staff-photos?resource=attach-boost   body: { boost }
 const ATTACH_BOOST_KEY = "attach_boost";
 
+/** ตั้งค่าหน้า Run Rate ต่อสาขา (หมวด/สินค้าที่ไม่นับ, วันของมาถึง, เตือนล่วงหน้า) — ใช้ร่วมทุกเครื่อง */
+async function handleRunRatePrefs(req, res) {
+  const { getAppConfig, setAppConfig, initTelegramSchema } = require("./_lib/tursoClient");
+  await initTelegramSchema();
+  const branch = String(req.query?.branch ?? req.body?.branch ?? "").slice(0, 120);
+  const key = `runrate_prefs:${branch || "default"}`;
+  if (req.method === "GET") {
+    try {
+      const cfg = await getAppConfig(key);
+      return res.status(200).json({ ok: true, prefs: cfg && cfg.value ? JSON.parse(cfg.value) : null });
+    } catch {
+      return res.status(200).json({ ok: true, prefs: null });
+    }
+  }
+  if (req.method === "PUT" || req.method === "POST") {
+    const p = req.body?.prefs && typeof req.body.prefs === "object" ? req.body.prefs : {};
+    const num = (v, lo, hi, d) => (Number.isFinite(Number(v)) ? Math.max(lo, Math.min(hi, Number(v))) : d);
+    const strs = (a) => (Array.isArray(a) ? a.map((x) => String(x).slice(0, 200)).slice(0, 500) : []);
+    const clean = {
+      excludedCats: strs(p.excludedCats),
+      excludedProducts: strs(p.excludedProducts),
+      leadDays: num(p.leadDays, 1, 365, 14),
+      targetCover: num(p.targetCover, 1, 365, 30),
+      deadCover: num(p.deadCover, 1, 999, 90),
+      warnDays: num(p.warnDays, 1, 60, 7),
+      telegramAlert: p.telegramAlert !== false,
+    };
+    await setAppConfig(key, JSON.stringify(clean), req.body?.updatedBy ?? null);
+    return res.status(200).json({ ok: true });
+  }
+  return res.status(405).json({ ok: false, error: "Method not allowed" });
+}
+
 async function handleAttachBoost(req, res) {
   const { getAppConfig, setAppConfig, initTelegramSchema } = require("./_lib/tursoClient");
   await initTelegramSchema();
@@ -314,6 +347,14 @@ async function handler(req, res) {
       return await handleAttachBoost(req, res);
     } catch (e) {
       return res.status(200).json({ ok: false, boost: {}, error: e.message });
+    }
+  }
+
+  if (req.query?.resource === "runrate-prefs") {
+    try {
+      return await handleRunRatePrefs(req, res);
+    } catch (e) {
+      return res.status(200).json({ ok: false, prefs: null, error: e.message });
     }
   }
 

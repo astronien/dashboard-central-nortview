@@ -12,14 +12,14 @@
  * No QStash, no external screenshot service — just image forwarding.
  */
 import { sendDocument, sendMessage } from "./_lib/telegramBot.js";
-import { getMostRecentTelegramChatId, initTelegramSchema } from "./_lib/tursoClient.js";
+import { getMostRecentTelegramChatId, initTelegramSchema, getAppConfig, setAppConfig } from "./_lib/tursoClient.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { staffId, images, text } = req.body ?? {};
+  const { staffId, images, text, alertKey, force } = req.body ?? {};
 
   // Ensure telegram_chats table exists
   try { await initTelegramSchema(); } catch (e) {
@@ -32,6 +32,18 @@ export default async function handler(req, res) {
     return res.status(404).json({
       error: "ยังไม่มี Telegram chat ในระบบ — ส่ง /start ไปที่บอทก่อน",
     });
+  }
+
+  // แจ้งเตือนอัตโนมัติ (เช่น สต็อกต้องสั่ง): ส่งแค่วันละครั้งต่อ alertKey
+  // — เปิดเว็บหลายเครื่อง/หลายรอบก็ไม่ส่งซ้ำ (force = กดส่งเองจากหน้าเว็บ)
+  const dedupeKey = typeof alertKey === "string" && alertKey ? `tg_alert:${alertKey.slice(0, 120)}` : "";
+  if (dedupeKey && !force) {
+    try {
+      const prev = await getAppConfig(dedupeKey);
+      if (prev && prev.value === "sent") return res.status(200).json({ ok: true, skipped: true });
+    } catch {
+      /* ไม่มีตาราง/อ่านไม่ได้ → ส่งไปเลย */
+    }
   }
 
   // Text mode: send the daily analysis as chunked messages (Telegram caps
@@ -48,6 +60,13 @@ export default async function handler(req, res) {
       }
       chunks.push(rest);
       for (const c of chunks) await sendMessage(chatId, c);
+      if (dedupeKey) {
+        try {
+          await setAppConfig(dedupeKey, "sent", "auto");
+        } catch {
+          /* ignore */
+        }
+      }
       return res.status(200).json({ ok: true, sent: chunks.length });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
