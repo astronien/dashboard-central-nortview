@@ -3,7 +3,7 @@ import { BellRing, ChevronRight } from "lucide-react";
 import type { ReorderItem } from "../../lib/runRate";
 import type { UpcomingReorder } from "../../lib/runRatePrefs";
 
-/** แจ้งเตือนสต็อกบนหน้าหลัก: ต้องสั่งตอนนี้ + ใกล้ถึงวันต้องสั่ง */
+/** แจ้งเตือนสต็อกบนหน้าหลัก: ใกล้หมด + เฝ้าดู */
 export function StockAlertBanner({
   now,
   soon,
@@ -27,9 +27,9 @@ export function StockAlertBanner({
       <BellRing className="w-5 h-5 text-amber-300 shrink-0 mt-0.5" />
       <div className="min-w-0 flex-1">
         <div className="text-[14px] font-semibold text-white">
-          {now.length ? `ต้องสั่งสินค้าตอนนี้ ${now.length} รายการ` : ""}
+          {now.length ? `สินค้าใกล้หมด ${now.length} รายการ` : ""}
           {now.length && soon.length ? " · " : ""}
-          {soon.length ? `ใกล้ถึงวันต้องสั่ง ${soon.length} รายการ (ภายใน ${warnDays} วัน)` : ""}
+          {soon.length ? `เฝ้าดู ${soon.length} รายการ (จะใกล้หมดใน ${warnDays} วัน)` : ""}
         </div>
         <div className="text-[12px] text-white/65 truncate">
           {names.join(" · ")}

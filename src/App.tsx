@@ -159,7 +159,7 @@ import {
 import { saveTrendSnapshot } from "./lib/trendsApi";
 
 import { computeRunRate, buildReorderList } from "./lib/runRate";
-import { applyRunRateExclusions, buildStockAlertText, buildUpcomingReorder, fetchRunRatePrefs, loadRunRatePrefs, pushRunRatePrefs, saveRunRatePrefs, sendStockAlertTelegram, type RunRatePrefs } from "./lib/runRatePrefs";
+import { applyRunRateExclusions, parseStockDate, buildStockAlertText, buildUpcomingReorder, fetchRunRatePrefs, loadRunRatePrefs, pushRunRatePrefs, saveRunRatePrefs, sendStockAlertTelegram, type RunRatePrefs } from "./lib/runRatePrefs";
 import { StockAlertBanner } from "./components/dashboard/StockAlertBanner";
 import { fetchStock, type StockStatus } from "./lib/stockApi";
 
@@ -3045,11 +3045,12 @@ function AppInternal({
       buildStockAlertText({
         branch: selectedBranch,
         dateLabel: bangkokToday.split("-").reverse().join("/"),
+        stockDate: parseStockDate(stockStatus?.updatedAt),
         now: stockAlerts.now,
         soon: stockAlerts.soon,
         prefs: runRatePrefs,
       }),
-    [selectedBranch, bangkokToday, stockAlerts, runRatePrefs],
+    [selectedBranch, bangkokToday, stockAlerts, runRatePrefs, stockStatus?.updatedAt],
   );
   const sendStockAlertNow = (force: boolean) =>
     sendStockAlertTelegram(stockAlertText, `stock:${selectedBranch}:${bangkokToday}`, force);

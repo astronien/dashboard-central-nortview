@@ -1,19 +1,20 @@
 /**
- * ตั้งค่าของหน้า Run Rate ต่อสาขา (จำไว้ในเครื่อง): หมวด/สินค้าที่ไม่นับ,
- * ของมาถึงในกี่วัน, สั่งให้พอขายกี่วัน, เกณฑ์ของค้าง, เตือนล่วงหน้ากี่วัน
+ * ตั้งค่าของหน้า Run Rate ต่อสาขา: หมวด/สินค้าที่ไม่นับ, เกณฑ์ใกล้หมด,
+ * ควรมีพอขายกี่วัน, เกณฑ์ของค้าง, เฝ้าดูล่วงหน้ากี่วัน
+ * (ร้านสั่งของเองไม่ได้ — คลังจัดสรรตามรันเรท จึงใช้เป็น "ใกล้หมด / ควรได้เพิ่ม")
  */
 import type { ReorderItem, RunRateResult, RunRateRow } from "./runRate";
 
 export type RunRatePrefs = {
   excludedCats: string[];
   excludedProducts: string[];
-  /** ของมาถึงในกี่วันหลังสั่ง */
+  /** ใกล้หมด = พอขายไม่ถึงกี่วัน */
   leadDays: number;
-  /** สั่งให้พอขายกี่วัน */
+  /** ควรมีของพอขายกี่วัน (ใช้คิด "ควรได้เพิ่ม") */
   targetCover: number;
   /** พอขายเกินกี่วัน = ของค้าง */
   deadCover: number;
-  /** เตือนล่วงหน้ากี่วันก่อนถึงวันต้องสั่ง */
+  /** เฝ้าดูล่วงหน้ากี่วันก่อนเข้าโซนใกล้หมด */
   warnDays: number;
   /** ส่งแจ้งเตือนสต็อกเข้า Telegram อัตโนมัติ (วันละครั้ง) */
   telegramAlert: boolean;
@@ -22,8 +23,8 @@ export type RunRatePrefs = {
 export const DEFAULT_RUNRATE_PREFS: RunRatePrefs = {
   excludedCats: [],
   excludedProducts: [],
-  leadDays: 14,
-  targetCover: 30,
+  leadDays: 7,
+  targetCover: 14,
   deadCover: 90,
   warnDays: 7,
   telegramAlert: true,
@@ -128,28 +129,40 @@ const n0 = (n: number) => Math.round(n).toLocaleString();
 export function buildStockAlertText(params: {
   branch: string;
   dateLabel: string;
+  /** วันที่ของไฟล์สต็อก — ใช้คิดวันที่คาดว่าหมด */
+  stockDate?: Date | null;
   now: ReorderItem[];
   soon: UpcomingReorder[];
   prefs: RunRatePrefs;
 }): string {
-  const { branch, dateLabel, now, soon, prefs } = params;
+  const { branch, dateLabel, now, soon, prefs, stockDate } = params;
+  const out = (cover: number) => {
+    if (!stockDate) return `อีก ${Math.floor(cover)} วัน`;
+    const d = new Date(stockDate.getTime() + Math.floor(cover) * 86_400_000);
+    return new Intl.DateTimeFormat("th-TH", { timeZone: "Asia/Bangkok", day: "numeric", month: "short" }).format(d);
+  };
+  const stockLabel = stockDate
+    ? new Intl.DateTimeFormat("th-TH", { timeZone: "Asia/Bangkok", day: "numeric", month: "short" }).format(stockDate)
+    : "";
   const lines: string[] = [`แจ้งเตือนสต็อก · ${branch} · ${dateLabel}`];
   if (now.length) {
-    lines.push("", `ต้องสั่งตอนนี้ (${now.length})`);
+    lines.push("", `ใกล้หมด — พอขายไม่ถึง ${prefs.leadDays} วัน (${now.length})`);
     for (const r of now.slice(0, 30)) {
-      lines.push(`• ${r.label} — เหลือ ${n0(r.stock)} · พอขาย ${Math.floor(r.coverDays)} วัน · ควรสั่ง +${n0(r.suggestQty)}`);
+      lines.push(`• ${r.label} — เหลือ ${n0(r.stock)} · คาดหมด ${out(r.coverDays)} · ควรได้เพิ่ม +${n0(r.suggestQty)}`);
     }
     if (now.length > 30) lines.push(`…และอีก ${now.length - 30} รายการ`);
   }
   if (soon.length) {
-    lines.push("", `ใกล้ถึงวันต้องสั่ง ภายใน ${prefs.warnDays} วัน (${soon.length})`);
+    lines.push("", `เฝ้าดู — จะเข้าโซนใกล้หมดใน ${prefs.warnDays} วัน (${soon.length})`);
     for (const r of soon.slice(0, 30)) {
-      const when = r.orderInDays === 0 ? "พรุ่งนี้" : `ภายใน ${r.orderInDays} วัน`;
-      lines.push(`• ${r.label} — ต้องสั่ง${when} · เหลือ ${n0(r.stock)} · ควรสั่ง +${n0(r.suggestQty)}`);
+      lines.push(`• ${r.label} — เหลือ ${n0(r.stock)} · คาดหมด ${out(r.coverDays)} · ควรได้เพิ่ม +${n0(r.suggestQty)}`);
     }
     if (soon.length > 30) lines.push(`…และอีก ${soon.length - 30} รายการ`);
   }
-  lines.push("", `(ของมาถึงใน ${prefs.leadDays} วัน · สั่งให้พอขาย ${prefs.targetCover} วัน)`);
+  lines.push(
+    "",
+    `(สต็อก ณ ${stockLabel || "ไฟล์ล่าสุด"} · คาดหมดยังไม่นับของที่คลังจะส่งเพิ่ม · ควรได้เพิ่ม = ให้มีพอขาย ${prefs.targetCover} วัน)`,
+  );
   return lines.join("\n");
 }
 
@@ -171,3 +184,10 @@ export async function sendStockAlertTelegram(
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
 }
+
+/** วันที่ของไฟล์สต็อก (updatedAt จาก server เป็นเวลา UTC "YYYY-MM-DD HH:MM:SS") */
+export const parseStockDate = (v?: string | null): Date | null => {
+  if (!v) return null;
+  const d = new Date(/T|Z/.test(v) ? v : `${v.replace(" ", "T")}Z`);
+  return Number.isNaN(d.getTime()) ? null : d;
+};

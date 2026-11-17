@@ -19,6 +19,7 @@ import {
 import {
   DEFAULT_RUNRATE_PREFS,
   buildUpcomingReorder,
+  parseStockDate,
   type RunRatePrefs,
 } from "../../lib/runRatePrefs";
 import {
@@ -31,6 +32,8 @@ import { parseStockExcelFile } from "../../lib/stockUpload";
 import { saveStock, type StockStatus } from "../../lib/stockApi";
 
 const fmt = (n: number) => Math.round(n).toLocaleString();
+const fmtDM = (d: Date) =>
+  new Intl.DateTimeFormat("th-TH", { timeZone: "Asia/Bangkok", day: "numeric", month: "short" }).format(d);
 const fmt1 = (n: number) => n.toFixed(1);
 const fmtBaht = (n: number) => `฿${Math.round(n).toLocaleString()}`;
 
@@ -39,7 +42,7 @@ function CoverBadge({ coverDays, reorder }: { coverDays?: number | null; reorder
   if (coverDays == null) return <span className="text-white/30">—</span>;
   const d = Math.round(coverDays);
   const [cls, label] = reorder
-    ? ["bg-rose-500/20 text-rose-300 border-rose-400/40", "ต้องสั่ง"]
+    ? ["bg-rose-500/20 text-rose-300 border-rose-400/40", "ใกล้หมด"]
     : d <= 30
       ? ["bg-amber-500/20 text-amber-300 border-amber-400/40", "ใกล้หมด"]
       : d >= 90
@@ -282,6 +285,14 @@ export function RunRateSection({
     : undefined;
   const [filterOpen, setFilterOpen] = React.useState(false);
   const [tgState, setTgState] = React.useState<{ busy: boolean; msg: string; ok?: boolean }>({ busy: false, msg: "" });
+  // วันที่คาดว่าหมด = วันที่ของไฟล์สต็อก + พอขายอีกกี่วัน (ไม่นับของที่คลังจะส่งเพิ่ม)
+  const stockBase = parseStockDate(stockStatus?.updatedAt);
+  const stockDateLabel = stockBase ? fmtDM(stockBase) : "วันที่อัปโหลดล่าสุด";
+  const outDate = (cover: number) => {
+    if (!stockBase || !Number.isFinite(cover)) return `อีก ${Math.floor(cover)} วัน`;
+    const d = new Date(stockBase.getTime() + Math.floor(cover) * 86_400_000);
+    return fmtDM(d);
+  };
   const sendTg = async () => {
     if (!onSendTelegram) return;
     setTgState({ busy: true, msg: "" });
@@ -370,7 +381,7 @@ export function RunRateSection({
     { id: "fast", label: "ขายดี / ขายช้า" },
     ...(hasStock
       ? [
-          { id: "reorder" as const, label: "ต้องสั่งเพิ่ม", count: reorderList.length + upcoming.length, tone: "rose" },
+          { id: "reorder" as const, label: "ใกล้หมด", count: reorderList.length + upcoming.length, tone: "rose" },
           { id: "dead" as const, label: "ของค้าง", count: deadStock.length, tone: "amber" },
         ]
       : []),
@@ -429,7 +440,7 @@ export function RunRateSection({
             <div>
               <h2 className="text-lg font-semibold text-white">Run Rate — ขายได้วันละเท่าไหร่</h2>
               <p className="text-[11px] text-white/50">
-                ดูว่าแต่ละสินค้าขายเร็วแค่ไหน ของพอขายอีกกี่วัน และควรสั่งเพิ่มอะไร · คิดจาก {data.windowLabel}
+                ดูว่าแต่ละสินค้าขายเร็วแค่ไหน ของพอขายอีกกี่วัน คาดว่าจะหมดเมื่อไร · คิดจาก {data.windowLabel}
               </p>
             </div>
           </div>
@@ -554,9 +565,9 @@ export function RunRateSection({
             <>
               <Card
                 icon={<ShoppingCart className="w-3.5 h-3.5" />}
-                label="ต้องสั่งเพิ่มด่วน"
+                label="ใกล้หมด"
                 value={`${reorderList.length} รายการ`}
-                hint={`ของจะหมดภายใน ${leadDays} วัน`}
+                hint={`พอขายไม่ถึง ${leadDays} วัน`}
                 tone={reorderList.length ? "rose" : "emerald"}
                 onClick={() => setTab("reorder")}
               />
@@ -577,7 +588,7 @@ export function RunRateSection({
                 <button className="underline font-semibold" onClick={() => setTab("stock")}>
                   อัปโหลดสต็อก
                 </button>{" "}
-                เพื่อดูว่าของพอขายอีกกี่วัน / ต้องสั่งอะไร / อะไรค้าง
+                เพื่อดูว่าของพอขายอีกกี่วัน / อะไรใกล้หมด / อะไรค้าง
               </span>
             </div>
           )}
@@ -693,15 +704,15 @@ export function RunRateSection({
             <div className="flex items-center gap-3">
               <ShoppingCart className="w-5 h-5 text-rose-400" />
               <div>
-                <h2 className="text-base font-semibold text-white">ต้องสั่งเพิ่ม ({reorderList.length})</h2>
+                <h2 className="text-base font-semibold text-white">ใกล้หมด ({reorderList.length})</h2>
                 <p className="text-[11px] text-white/45">
-                  ของจะหมดก่อนของใหม่มาถึง — "ควรสั่ง" = จำนวนที่ทำให้พอขายอีก {targetCover} วัน
+                  พอขายไม่ถึง {leadDays} วัน · "ควรได้เพิ่ม" = จำนวนที่ทำให้มีพอขาย {targetCover} วัน (ใช้ขอคลัง/แจ้งทีมจัดสรร) · สต็อก ณ {stockDateLabel}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-3 text-[11px] text-white/60">
               <label className="flex items-center gap-1">
-                ของมาถึงใน
+                เตือนเมื่อพอขายไม่ถึง
                 <input
                   type="number"
                   value={leadDays}
@@ -711,7 +722,7 @@ export function RunRateSection({
                 วัน
               </label>
               <label className="flex items-center gap-1">
-                สั่งให้พอขาย
+                ควรมีพอขาย
                 <input
                   type="number"
                   value={targetCover}
@@ -723,7 +734,7 @@ export function RunRateSection({
             </div>
           </div>
           {reorderList.length === 0 ? (
-            <p className="text-[13px] text-emerald-300/90">ยังไม่มีอะไรต้องสั่งด่วน — ทุกตัวพอขายเกิน {leadDays} วัน</p>
+            <p className="text-[13px] text-emerald-300/90">ยังไม่มีสินค้าใกล้หมด — ทุกตัวพอขายเกิน {leadDays} วัน</p>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-white/10">
               <table className="w-full text-left border-collapse text-[12px]">
@@ -733,7 +744,8 @@ export function RunRateSection({
                     <th className="py-2.5 px-3 font-semibold text-right">คงเหลือ</th>
                     <th className="py-2.5 px-3 font-semibold text-right">ขาย/วัน</th>
                     <th className="py-2.5 px-3 font-semibold">พอขายอีก</th>
-                    <th className="py-2.5 px-3 font-semibold text-right">ควรสั่ง</th>
+                    <th className="py-2.5 px-3 font-semibold text-right">คาดว่าหมด</th>
+                    <th className="py-2.5 px-3 font-semibold text-right">ควรได้เพิ่ม</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -750,6 +762,9 @@ export function RunRateSection({
                       <td className="py-2 px-3 text-right font-mono text-emerald-300 tabular-nums">{fmt1(r.unitsPerDay)}</td>
                       <td className="py-2 px-3">
                         <CoverBadge coverDays={r.coverDays} reorder />
+                      </td>
+                      <td className="py-2 px-3 text-right font-semibold text-rose-300 tabular-nums whitespace-nowrap">
+                        {outDate(r.coverDays)}
                       </td>
                       <td className="py-2 px-3 text-right">
                         <span className="inline-block rounded-lg bg-rose-500/20 border border-rose-400/40 px-2.5 py-0.5 font-mono font-semibold text-rose-200 tabular-nums">
@@ -771,9 +786,9 @@ export function RunRateSection({
             <div className="flex items-center gap-3">
               <BellRing className="w-5 h-5 text-amber-300" />
               <div>
-                <h2 className="text-base font-semibold text-white">ใกล้ถึงวันต้องสั่ง ({upcoming.length})</h2>
+                <h2 className="text-base font-semibold text-white">เฝ้าดู — จะเข้าโซนใกล้หมดใน {warnDays} วัน ({upcoming.length})</h2>
                 <p className="text-[11px] text-white/55">
-                  ยังไม่ต้องสั่งวันนี้ แต่อีกไม่เกิน {warnDays} วันต้องสั่ง ไม่งั้นของใหม่มาไม่ทัน (ของมาถึงใน {leadDays} วัน)
+                  ยังพอขายเกิน {leadDays} วัน แต่ถ้าคลังไม่ส่งเพิ่ม อีกไม่เกิน {warnDays} วันจะเข้าโซนใกล้หมด
                 </p>
               </div>
             </div>
@@ -797,7 +812,7 @@ export function RunRateSection({
                   onChange={(e) => setPref({ telegramAlert: e.target.checked })}
                   className="accent-emerald-500"
                 />
-                ส่งแจ้งเตือนเข้า Telegram อัตโนมัติ (วันละครั้ง เมื่อมีรายการต้องสั่ง/ใกล้ต้องสั่ง)
+                ส่งแจ้งเตือนเข้า Telegram อัตโนมัติ (วันละครั้ง เมื่อมีสินค้าใกล้หมด/เฝ้าดู)
               </label>
               {onSendTelegram ? (
                 <button
@@ -816,7 +831,7 @@ export function RunRateSection({
             </div>
           ) : null}
           {upcoming.length === 0 ? (
-            <p className="text-[13px] text-white/60">ไม่มีสินค้าที่ต้องสั่งในอีก {warnDays} วันข้างหน้า</p>
+            <p className="text-[13px] text-white/60">ไม่มีสินค้าที่จะเข้าโซนใกล้หมดในอีก {warnDays} วัน</p>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-white/10">
               <table className="w-full text-left border-collapse text-[12px]">
@@ -826,8 +841,8 @@ export function RunRateSection({
                     <th className="py-2.5 px-3 font-semibold text-right">คงเหลือ</th>
                     <th className="py-2.5 px-3 font-semibold text-right">ขาย/วัน</th>
                     <th className="py-2.5 px-3 font-semibold text-right">พอขายอีก</th>
-                    <th className="py-2.5 px-3 font-semibold text-right">ต้องสั่งภายใน</th>
-                    <th className="py-2.5 px-3 font-semibold text-right">ควรสั่ง</th>
+                    <th className="py-2.5 px-3 font-semibold text-right">คาดว่าหมด</th>
+                    <th className="py-2.5 px-3 font-semibold text-right">ควรได้เพิ่ม</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -843,8 +858,8 @@ export function RunRateSection({
                       <td className="py-2 px-3 text-right font-mono text-white/80 tabular-nums">{fmt(r.stock)}</td>
                       <td className="py-2 px-3 text-right font-mono text-white/80 tabular-nums">{fmt1(r.unitsPerDay)}</td>
                       <td className="py-2 px-3 text-right font-mono text-white/80 tabular-nums">{Math.floor(r.coverDays)} วัน</td>
-                      <td className="py-2 px-3 text-right font-semibold text-amber-300 tabular-nums">
-                        {r.orderInDays === 0 ? "พรุ่งนี้" : `${r.orderInDays} วัน`}
+                      <td className="py-2 px-3 text-right font-semibold text-amber-300 tabular-nums whitespace-nowrap">
+                        {outDate(r.coverDays)}
                       </td>
                       <td className="py-2 px-3 text-right font-mono text-white tabular-nums">+{fmt(r.suggestQty)}</td>
                     </tr>
