@@ -161,6 +161,8 @@ import { saveTrendSnapshot } from "./lib/trendsApi";
 import { computeRunRate, buildReorderList } from "./lib/runRate";
 import { applyRunRateExclusions, parseStockDate, buildStockAlertText, buildUpcomingReorder, fetchRunRatePrefs, loadRunRatePrefs, pushRunRatePrefs, saveRunRatePrefs, sendStockAlertTelegram, type RunRatePrefs } from "./lib/runRatePrefs";
 import { StockAlertBanner } from "./components/dashboard/StockAlertBanner";
+import { LostDemandButton } from "./components/dashboard/LostDemandButton";
+import { buildLostDemandText, buildPriceLookup, deleteLostDemand, fetchLostDemand, summarizeLostDemand, type LostDemandRow } from "./lib/lostDemand";
 import { fetchStock, type StockStatus } from "./lib/stockApi";
 
 import { StaffSection } from "./components/dashboard/StaffSection";
@@ -3052,6 +3054,49 @@ function AppInternal({
       }),
     [selectedBranch, bangkokToday, stockAlerts, runRatePrefs, stockStatus?.updatedAt],
   );
+  // ── ลูกค้าถามหาแต่ไม่มีของ (lost demand) ──────────────────────────
+  const [lostRows, setLostRows] = useState<LostDemandRow[]>([]);
+  const [lostReady, setLostReady] = useState(false);
+  const loadLost = React.useCallback(() => {
+    if (!selectedBranch) return;
+    void fetchLostDemand(selectedBranch).then((r) => {
+      setLostRows(r);
+      setLostReady(true);
+    });
+  }, [selectedBranch]);
+  useEffect(() => {
+    setLostReady(false);
+    loadLost();
+  }, [loadLost]);
+  const priceOf = useMemo(() => buildPriceLookup(displayUploads.current), [displayUploads.current]);
+  const productSuggestions = useMemo(() => {
+    const set = new Set<string>();
+    for (const it of stockStatus?.items ?? []) if (it.name) set.add(String(it.name).trim());
+    for (const r of displayUploads.current) {
+      const n = String(r["Product (Name)"] ?? "").trim();
+      if (n) set.add(n);
+    }
+    return Array.from(set).sort();
+  }, [stockStatus, displayUploads.current]);
+  const lostWeek = useMemo(() => summarizeLostDemand(lostRows, 7, priceOf), [lostRows, priceOf]);
+  const sendLostNow = (force: boolean, days = 7) =>
+    sendStockAlertTelegram(
+      buildLostDemandText({ branch: selectedBranch, days, summary: summarizeLostDemand(lostRows, days, priceOf) }),
+      // สรุปสัปดาห์ละครั้ง (key = วันจันทร์ของสัปดาห์)
+      `lost:${selectedBranch}:${(() => {
+        const d = new Date(`${bangkokToday}T00:00:00`);
+        d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+        return d.toISOString().slice(0, 10);
+      })()}`,
+      force,
+    );
+  useEffect(() => {
+    if (isPia || isInitialLoading || !lostReady || !runRatePrefsReady || !runRatePrefs.telegramAlert) return;
+    if (!lostWeek.times) return;
+    void sendLostNow(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPia, isInitialLoading, lostReady, runRatePrefsReady, runRatePrefs.telegramAlert, lostWeek.times, selectedBranch, bangkokToday]);
+
   const sendStockAlertNow = (force: boolean) =>
     sendStockAlertTelegram(stockAlertText, `stock:${selectedBranch}:${bangkokToday}`, force);
   useEffect(() => {
@@ -4479,6 +4524,14 @@ function AppInternal({
                     </span>
                   </button>
                 ) : null}
+                <div className="flex justify-end -mb-2">
+                  <LostDemandButton
+                    branch={selectedBranch}
+                    staff={user?.name ?? user?.username}
+                    suggestions={productSuggestions}
+                    onSaved={loadLost}
+                  />
+                </div>
                 {!isPia ? (
                   <StockAlertBanner
                     now={stockAlerts.now}
@@ -4625,6 +4678,21 @@ function AppInternal({
                   onPrefsChange={updateRunRatePrefs}
                   allCategories={runRateAllCats}
                   onSendTelegram={() => sendStockAlertNow(true)}
+                  lostRows={lostRows}
+                  priceOf={priceOf}
+                  onDeleteLost={async (id) => {
+                    await deleteLostDemand(selectedBranch, id);
+                    loadLost();
+                  }}
+                  onSendLostTelegram={(days) => sendLostNow(true, days)}
+                  lostLogButton={
+                    <LostDemandButton
+                      branch={selectedBranch}
+                      staff={user?.name ?? user?.username}
+                      suggestions={productSuggestions}
+                      onSaved={loadLost}
+                    />
+                  }
                   branch={selectedBranch}
                   stockStatus={stockStatus}
                   updatedBy={user?.name ?? user?.username}

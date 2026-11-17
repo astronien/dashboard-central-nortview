@@ -92,6 +92,49 @@ async function handleBackOffice(req, res) {
 //   PUT  /api/staff-photos?resource=attach-boost   body: { boost }
 const ATTACH_BOOST_KEY = "attach_boost";
 
+/** ลูกค้าถามหาแต่ไม่มีของ (lost demand) — หลักฐานไว้ขอของเพิ่มจากคลัง */
+async function handleLostDemand(req, res) {
+  const { getTursoClient } = require("./_lib/tursoClient");
+  const db = getTursoClient();
+  await db.execute(`CREATE TABLE IF NOT EXISTS lost_demand (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    branch TEXT NOT NULL,
+    product TEXT NOT NULL,
+    qty INTEGER NOT NULL DEFAULT 1,
+    note TEXT,
+    staff TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`);
+  const branch = String(req.query?.branch ?? req.body?.branch ?? "").slice(0, 120);
+  if (req.method === "GET") {
+    const days = Math.max(1, Math.min(120, Number(req.query?.days) || 35));
+    const r = await db.execute({
+      sql: `SELECT id, product, qty, note, staff, created_at FROM lost_demand
+            WHERE branch = ? AND created_at >= datetime('now', ?) ORDER BY created_at DESC LIMIT 2000`,
+      args: [branch, `-${days} days`],
+    });
+    return res.status(200).json({ ok: true, rows: r.rows });
+  }
+  if (req.method === "POST") {
+    const b = req.body ?? {};
+    const product = String(b.product ?? "").trim().slice(0, 200);
+    if (!branch || !product) return res.status(400).json({ ok: false, error: "ต้องระบุสาขาและสินค้า" });
+    const qty = Math.max(1, Math.min(50, Math.round(Number(b.qty) || 1)));
+    await db.execute({
+      sql: "INSERT INTO lost_demand (branch, product, qty, note, staff) VALUES (?, ?, ?, ?, ?)",
+      args: [branch, product, qty, String(b.note ?? "").slice(0, 300) || null, String(b.staff ?? "").slice(0, 80) || null],
+    });
+    return res.status(200).json({ ok: true });
+  }
+  if (req.method === "DELETE") {
+    const id = Number(req.query?.id);
+    if (!Number.isFinite(id)) return res.status(400).json({ ok: false, error: "missing id" });
+    await db.execute({ sql: "DELETE FROM lost_demand WHERE id = ? AND branch = ?", args: [id, branch] });
+    return res.status(200).json({ ok: true });
+  }
+  return res.status(405).json({ ok: false, error: "Method not allowed" });
+}
+
 /** ตั้งค่าหน้า Run Rate ต่อสาขา (หมวด/สินค้าที่ไม่นับ, วันของมาถึง, เตือนล่วงหน้า) — ใช้ร่วมทุกเครื่อง */
 async function handleRunRatePrefs(req, res) {
   const { getAppConfig, setAppConfig, initTelegramSchema } = require("./_lib/tursoClient");
@@ -347,6 +390,14 @@ async function handler(req, res) {
       return await handleAttachBoost(req, res);
     } catch (e) {
       return res.status(200).json({ ok: false, boost: {}, error: e.message });
+    }
+  }
+
+  if (req.query?.resource === "lost-demand") {
+    try {
+      return await handleLostDemand(req, res);
+    } catch (e) {
+      return res.status(200).json({ ok: false, rows: [], error: e.message });
     }
   }
 

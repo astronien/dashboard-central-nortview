@@ -29,6 +29,7 @@ import {
   type RunRateRow,
 } from "../../lib/runRate";
 import { parseStockExcelFile } from "../../lib/stockUpload";
+import { lostDemandDate, summarizeLostDemand, type LostDemandRow } from "../../lib/lostDemand";
 import { saveStock, type StockStatus } from "../../lib/stockApi";
 
 const fmt = (n: number) => Math.round(n).toLocaleString();
@@ -258,7 +259,17 @@ export function RunRateSection({
   onPrefsChange,
   allCategories = [],
   onSendTelegram,
+  lostRows = [],
+  priceOf,
+  onDeleteLost,
+  onSendLostTelegram,
+  lostLogButton,
 }: {
+  lostRows?: LostDemandRow[];
+  priceOf?: (product: string) => number | null;
+  onDeleteLost?: (id: number) => void | Promise<void>;
+  onSendLostTelegram?: (days: number) => Promise<{ ok: boolean; skipped?: boolean; error?: string }>;
+  lostLogButton?: React.ReactNode;
   /** กดส่งแจ้งเตือนสต็อกเข้า Telegram ตอนนี้ */
   onSendTelegram?: () => Promise<{ ok: boolean; skipped?: boolean; error?: string }>;
   /** ตั้งค่า (หมวด/สินค้าที่ไม่นับ, วันของมาถึง ฯลฯ) — data ที่ส่งมาตัดของที่ไม่นับแล้ว */
@@ -301,7 +312,9 @@ export function RunRateSection({
   };
   const excludedCount = prefs.excludedCats.length + prefs.excludedProducts.length;
   const [catFilter, setCatFilter] = React.useState<string>("all");
-  const [tab, setTab] = React.useState<"overview" | "fast" | "reorder" | "dead" | "stock">("overview");
+  const [tab, setTab] = React.useState<"overview" | "fast" | "reorder" | "dead" | "lost" | "stock">("overview");
+  const [lostDays, setLostDays] = React.useState(7);
+  const [lostMsg, setLostMsg] = React.useState<{ ok: boolean; text: string } | null>(null);
   const productCats = React.useMemo(
     () =>
       Array.from(
@@ -385,6 +398,7 @@ export function RunRateSection({
           { id: "dead" as const, label: "ของค้าง", count: deadStock.length, tone: "amber" },
         ]
       : []),
+    { id: "lost", label: "ลูกค้าถามหา", count: summarizeLostDemand(lostRows, 7, priceOf ?? (() => null)).times, tone: "amber" },
     { id: "stock", label: "อัปโหลดสต็อก" },
   ];
 
@@ -941,6 +955,126 @@ export function RunRateSection({
             </div>
           )}
         </div>
+      ) : null}
+
+      {tab === "lost" ? (
+        (() => {
+          const sum = summarizeLostDemand(lostRows, lostDays, priceOf ?? (() => null));
+          const since = Date.now() - lostDays * 86_400_000;
+          const recent = lostRows.filter((r) => lostDemandDate(r.created_at).getTime() >= since).slice(0, 50);
+          const fmtWhen = (v: string) =>
+            new Intl.DateTimeFormat("th-TH", { timeZone: "Asia/Bangkok", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(lostDemandDate(v));
+          return (
+            <div className="bg-white/5 rounded-2xl border border-white/10 p-5 md:p-6 flex flex-col gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-semibold text-white">ลูกค้าถามหาแต่ไม่มีของ</h2>
+                  <p className="text-[12px] text-white/60">
+                    ยอดที่เสียไปเพราะไม่มีของ — ไม่อยู่ในรันเรทที่คลังใช้จัดสรร ใช้เป็นข้อมูลขอเพิ่ม
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {lostLogButton}
+                  <div className="inline-flex rounded-xl border border-white/15 bg-black/20 p-0.5 text-[12px]">
+                    {[7, 30].map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => setLostDays(d)}
+                        className={`px-3 py-1.5 rounded-lg font-semibold transition-colors ${lostDays === d ? "bg-white/15 text-white" : "text-white/60 hover:text-white"}`}
+                      >
+                        {d} วัน
+                      </button>
+                    ))}
+                  </div>
+                  {onSendLostTelegram ? (
+                    <button
+                      type="button"
+                      disabled={!sum.times}
+                      onClick={async () => {
+                        const r = await onSendLostTelegram(lostDays);
+                        setLostMsg({ ok: r.ok, text: r.ok ? "ส่งสรุปเข้า Telegram แล้ว" : r.error ?? "ส่งไม่สำเร็จ" });
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-sky-400/30 bg-sky-500/10 text-sky-200 text-[12px] font-semibold hover:bg-sky-500/20 disabled:opacity-50"
+                    >
+                      <BellRing className="w-3.5 h-3.5" /> ส่งสรุปเข้า Telegram
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+              {lostMsg ? <p className={`text-[12px] ${lostMsg.ok ? "text-emerald-300" : "text-rose-300"}`}>{lostMsg.text}</p> : null}
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="rounded-xl bg-black/20 px-3 py-2">
+                  <div className="text-[12px] text-white/60">ถามหา</div>
+                  <div className="text-xl font-semibold text-white tabular-nums">{sum.times} ครั้ง</div>
+                </div>
+                <div className="rounded-xl bg-black/20 px-3 py-2">
+                  <div className="text-[12px] text-white/60">จำนวน</div>
+                  <div className="text-xl font-semibold text-white tabular-nums">{fmt(sum.totalQty)} ชิ้น</div>
+                </div>
+                <div className="rounded-xl bg-black/20 px-3 py-2">
+                  <div className="text-[12px] text-white/60">ยอดที่เสียไป (ประมาณ)</div>
+                  <div className="text-xl font-semibold text-amber-300 tabular-nums">{sum.totalValue > 0 ? fmtBaht(sum.totalValue) : "—"}</div>
+                </div>
+              </div>
+
+              {sum.rows.length ? (
+                <div className="overflow-x-auto rounded-xl border border-white/10">
+                  <table className="w-full text-left border-collapse text-[12px]">
+                    <thead>
+                      <tr className="bg-[#0c3123] border-b border-white/10 text-white/70 text-[11px]">
+                        <th className="py-2.5 px-3 font-semibold min-w-[200px]">สินค้า</th>
+                        <th className="py-2.5 px-3 font-semibold text-right">ครั้ง</th>
+                        <th className="py-2.5 px-3 font-semibold text-right">ชิ้น</th>
+                        <th className="py-2.5 px-3 font-semibold text-right">ยอดที่เสียไป</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sum.rows.map((r) => (
+                        <tr key={r.product} className="border-b border-white/5">
+                          <td className="py-2 px-3 font-medium text-white">{r.product}</td>
+                          <td className="py-2 px-3 text-right tabular-nums text-white/80">{r.times}</td>
+                          <td className="py-2 px-3 text-right tabular-nums text-white/80">{r.qty}</td>
+                          <td className="py-2 px-3 text-right tabular-nums text-white/80">{r.value != null ? fmtBaht(r.value) : "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-[13px] text-white/60">ยังไม่มีบันทึกใน {lostDays} วันล่าสุด</p>
+              )}
+
+              {recent.length ? (
+                <details className="rounded-xl border border-white/10 bg-black/10 px-3 py-2">
+                  <summary className="cursor-pointer text-[13px] font-semibold text-white/80">รายการที่บันทึก ({recent.length})</summary>
+                  <ul className="mt-2 divide-y divide-white/5">
+                    {recent.map((r) => (
+                      <li key={r.id} className="py-2 flex items-center gap-3 text-[12px]">
+                        <span className="text-white/55 tabular-nums w-[92px] shrink-0">{fmtWhen(r.created_at)}</span>
+                        <span className="flex-1 min-w-0 text-white/85">
+                          {r.product} × {r.qty}
+                          {r.note ? <span className="text-white/55"> · {r.note}</span> : null}
+                          {r.staff ? <span className="text-white/45"> · {r.staff}</span> : null}
+                        </span>
+                        {onDeleteLost ? (
+                          <button
+                            type="button"
+                            onClick={() => void onDeleteLost(r.id)}
+                            className="text-[11px] text-white/50 hover:text-rose-300"
+                          >
+                            ลบ
+                          </button>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              ) : null}
+            </div>
+          );
+        })()
       ) : null}
 
       {tab === "stock" && branch ? (
