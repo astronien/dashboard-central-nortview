@@ -462,3 +462,38 @@ html.accent-custom .bg-amber-400\/20 { background-color: var(--accent-soft); }
 html.accent-custom .bg-\[\#0c3123\]\/90 { background-color: var(--surface-raised); }
 /* ขอบบางๆ อมสีพื้น */
 html.theme-dark.accent-custom .border-white\/10 { border-color: color-mix(in srgb, var(--surface-active) 70%, white 8%); }
+
+/* ตัวหนังสือรอง: เข้มขึ้นให้อ่านง่าย (ทั้งสองธีม) */
+html.theme-dark .text-white\/20 { color: rgb(255 255 255 / 0.42); }
+html.theme-dark .text-white\/25 { color: rgb(255 255 255 / 0.46); }
+html.theme-dark .text-white\/30 { color: rgb(255 255 255 / 0.5); }
+html.theme-dark .text-white\/35 { color: rgb(255 255 255 / 0.55); }
+html.theme-dark .text-white\/40 { color: rgb(255 255 255 / 0.6); }
+html.theme-dark .text-white\/45 { color: rgb(255 255 255 / 0.63); }
+html.theme-dark .text-white\/50 { color: rgb(255 255 255 / 0.67); }
+html.theme-dark .text-white\/55 { color: rgb(255 255 255 / 0.71); }
+html.theme-dark .text-white\/60 { color: rgb(255 255 255 / 0.75); }
+html.theme-dark .text-white\/65 { color: rgb(255 255 255 / 0.78); }
+html.theme-dark .text-white\/70 { color: rgb(255 255 255 / 0.82); }
+html.theme-dark .text-white\/75 { color: rgb(255 255 255 / 0.85); }
+html.theme-dark .text-white\/80 { color: rgb(255 255 255 / 0.88); }
+html.theme-light .text-white\/20 { color: rgb(31 30 27 / 0.45); }
+html.theme-light .text-white\/25 { color: rgb(31 30 27 / 0.5); }
+html.theme-light .text-white\/30 { color: rgb(31 30 27 / 0.54); }
+html.theme-light .text-white\/35 { color: rgb(31 30 27 / 0.58); }
+html.theme-light .text-white\/40 { color: rgb(31 30 27 / 0.62); }
+html.theme-light .text-white\/45 { color: rgb(31 30 27 / 0.65); }
+html.theme-light .text-white\/50 { color: rgb(31 30 27 / 0.68); }
+html.theme-light .text-white\/55 { color: rgb(31 30 27 / 0.72); }
+html.theme-light .text-white\/60 { color: rgb(31 30 27 / 0.76); }
+html.theme-light .text-white\/65 { color: rgb(31 30 27 / 0.79); }
+html.theme-light .text-white\/70 { color: rgb(31 30 27 / 0.84); }
+html.theme-light .text-white\/75 { color: rgb(31 30 27 / 0.86); }
+html.theme-light .text-white\/80 { color: rgb(31 30 27 / 0.88); }
+html.theme-dark .report-card .text-slate-400 { color: rgb(255 255 255 / 0.62); }
+html.theme-dark .report-card .text-slate-300 { color: rgb(255 255 255 / 0.48); }
+html.theme-dark .report-card .text-slate-500 { color: rgb(255 255 255 / 0.68); }
+html.theme-light .report-card .text-slate-400 { color: #57534e; }
+html.theme-light .report-card .text-slate-300 { color: #78716c; }
+/* ป้ายแกนกราฟ */
+html.theme-dark .recharts-cartesian-axis-tick-value { fill: rgb(255 255 255 / 0.65); }

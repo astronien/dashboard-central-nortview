@@ -83,14 +83,14 @@ export function HourlySalesSection({ data, compact = false }: { data: HourlySale
               dataKey="label"
               tickLine={false}
               axisLine={false}
-              tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 11 }}
+              tick={{ fill: "rgba(255,255,255,0.68)", fontSize: 11 }}
               interval={compact ? 1 : 0}
             />
             <YAxis
               tickLine={false}
               axisLine={false}
               width={compact ? 40 : 48}
-              tick={{ fill: "rgba(255,255,255,0.45)", fontSize: 11 }}
+              tick={{ fill: "rgba(255,255,255,0.62)", fontSize: 11 }}
               tickFormatter={(v: number) => (metric === "baht" ? fmtBaht(v) : String(Math.round(v * 10) / 10))}
             />
             <Tooltip
