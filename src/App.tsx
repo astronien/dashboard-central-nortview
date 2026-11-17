@@ -3049,6 +3049,7 @@ function AppInternal({
         branch: selectedBranch,
         dateLabel: bangkokToday.split("-").reverse().join("/"),
         stockDate: parseStockDate(stockStatus?.updatedAt),
+        link: typeof window !== "undefined" ? window.location.origin : undefined,
         now: stockAlerts.now,
         soon: stockAlerts.soon,
         prefs: runRatePrefs,

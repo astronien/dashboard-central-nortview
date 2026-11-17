@@ -134,35 +134,58 @@ export function buildStockAlertText(params: {
   now: ReorderItem[];
   soon: UpcomingReorder[];
   prefs: RunRatePrefs;
+  /** ลิงก์เปิดหน้าเว็บ (ท้ายข้อความ) */
+  link?: string;
+  /** โชว์กี่รายการแรก */
+  top?: number;
 }): string {
-  const { branch, dateLabel, now, soon, prefs, stockDate } = params;
-  const out = (cover: number) => {
-    if (!stockDate) return `อีก ${Math.floor(cover)} วัน`;
-    const d = new Date(stockDate.getTime() + Math.floor(cover) * 86_400_000);
-    return new Intl.DateTimeFormat("th-TH", { timeZone: "Asia/Bangkok", day: "numeric", month: "short" }).format(d);
+  const { branch, dateLabel, now, soon, prefs, stockDate, link, top = 8 } = params;
+  const dm = (d: Date) =>
+    new Intl.DateTimeFormat("th-TH", { timeZone: "Asia/Bangkok", day: "numeric", month: "short" }).format(d);
+  const out = (cover: number) =>
+    stockDate ? dm(new Date(stockDate.getTime() + Math.floor(cover) * 86_400_000)) : `อีก ${Math.floor(cover)} วัน`;
+  // ชื่อสินค้ายาว → ตัดคำซ้ำซ้อน (APPLE, -THA ฯลฯ) และย่อให้อ่านบนมือถือได้
+  const short = (name: string) => {
+    const t = name
+      .replace(/^apple\s+/i, "")
+      .replace(/[-–]\s*(tha|th)\b.*$/i, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    return t.length > 38 ? `${t.slice(0, 37)}…` : t;
   };
-  const stockLabel = stockDate
-    ? new Intl.DateTimeFormat("th-TH", { timeZone: "Asia/Bangkok", day: "numeric", month: "short" }).format(stockDate)
-    : "";
-  const lines: string[] = [`แจ้งเตือนสต็อก · ${branch} · ${dateLabel}`];
-  if (now.length) {
-    lines.push("", `ใกล้หมด — พอขายไม่ถึง ${prefs.leadDays} วัน (${now.length})`);
-    for (const r of now.slice(0, 30)) {
-      lines.push(`• ${r.label} — เหลือ ${n0(r.stock)} · คาดหมด ${out(r.coverDays)} · ควรได้เพิ่ม +${n0(r.suggestQty)}`);
-    }
-    if (now.length > 30) lines.push(`…และอีก ${now.length - 30} รายการ`);
-  }
-  if (soon.length) {
-    lines.push("", `เฝ้าดู — จะเข้าโซนใกล้หมดใน ${prefs.warnDays} วัน (${soon.length})`);
-    for (const r of soon.slice(0, 30)) {
-      lines.push(`• ${r.label} — เหลือ ${n0(r.stock)} · คาดหมด ${out(r.coverDays)} · ควรได้เพิ่ม +${n0(r.suggestQty)}`);
-    }
-    if (soon.length > 30) lines.push(`…และอีก ${soon.length - 30} รายการ`);
-  }
+  const shortBranch = branch.replace(/^ID\d+\s*:\s*/i, "").replace(/studio\s*7-?/i, "").trim() || branch;
+
+  const lines: string[] = [`สต็อก ${shortBranch} · ${dateLabel}`];
   lines.push(
-    "",
-    `(สต็อก ณ ${stockLabel || "ไฟล์ล่าสุด"} · คาดหมดยังไม่นับของที่คลังจะส่งเพิ่ม · ควรได้เพิ่ม = ให้มีพอขาย ${prefs.targetCover} วัน)`,
+    `ใกล้หมด ${now.length} · เฝ้าดู ${soon.length}${stockDate ? ` (สต็อก ณ ${dm(stockDate)})` : ""}`,
   );
+
+  // หมดก่อนสุด N รายการ (รวมทั้งสองกลุ่ม เรียงตามวันที่จะหมด)
+  const all = [
+    ...now.map((r) => ({ label: r.label, stock: r.stock, cover: r.coverDays, sub: r.sub })),
+    ...soon.map((r) => ({ label: r.label, stock: r.stock, cover: r.coverDays, sub: r.sub })),
+  ].sort((a, b) => a.cover - b.cover);
+  if (all.length) {
+    lines.push("", `หมดก่อน ${Math.min(top, all.length)} อันดับแรก`);
+    all.slice(0, top).forEach((r, i) => {
+      lines.push(`${i + 1}. ${short(r.label)}`);
+      lines.push(`   เหลือ ${n0(r.stock)} · หมด ${out(r.cover)}`);
+    });
+  }
+
+  // ที่เหลือ: นับแยกหมวด สั้นๆ บรรทัดเดียว
+  const rest = all.slice(top);
+  if (rest.length) {
+    const byCat = new Map<string, number>();
+    for (const r of rest) byCat.set(r.sub || "อื่นๆ", (byCat.get(r.sub || "อื่นๆ") ?? 0) + 1);
+    const cats = Array.from(byCat.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([c, n]) => `${c} ${n}`)
+      .join(" · ");
+    lines.push("", `อีก ${rest.length} รายการ: ${cats}`);
+  }
+  lines.push("", `ดูทั้งหมดที่หน้า Run Rate${link ? `\n${link}` : ""}`);
+  void prefs;
   return lines.join("\n");
 }
 
