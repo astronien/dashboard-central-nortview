@@ -1305,7 +1305,8 @@ function AppInternal({
   const isMobile = useIsMobile();
   const [currentView, setCurrentView] = useState<
     "home" | "staff" | "settings" | "reports" | "kpi_preset" | "analysis" | "trends" | "runrate" | "commission"
-  >("home");
+  // มือถือเปิดมาที่หน้าพนักงานก่อน (พนักงานดูยอดตัวเองบ่อยกว่า) · คอมเปิดที่หน้าหลัก
+  >(() => (isMobile ? "staff" : "home"));
   useEffect(() => {
     if (currentView === "settings") preloadSettingsSection();
   }, [currentView]);
@@ -4826,8 +4827,8 @@ function AppInternal({
             window.scrollTo({ top: 0 });
           }}
           items={[
-            { view: "home", label: "หน้าหลัก", icon: Home },
             { view: "staff", label: isPia ? "ของฉัน" : "พนักงาน", icon: User },
+            { view: "home", label: "หน้าหลัก", icon: Home },
           ]}
         />
 
