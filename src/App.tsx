@@ -204,6 +204,8 @@ import { HourlySalesSection } from "./components/dashboard/HourlySalesSection";
 import { MissionsSection } from "./components/dashboard/MissionsSection";
 import { buildMissions } from "./lib/missions";
 import { buildHourlySales } from "./lib/hourlySales";
+import { buildDailySales } from "./lib/dailySales";
+import { DailySalesTable } from "./components/dashboard/DailySalesTable";
 import { MobileStaff } from "./components/mobile/MobileStaff";
 import { useIsMobile } from "./hooks/useIsMobile";
 
@@ -2521,6 +2523,8 @@ function AppInternal({
   const monthlyBranchReport = branchReports.monthly;
   // ช่วงเวลาที่ขายดี — ยอดเฉลี่ยต่อวันของแต่ละชั่วโมง (ทั้งเดือน)
   const hourlySales = useMemo(() => buildHourlySales(displayUploads.current), [displayUploads.current]);
+  // ยอดขายรวมรายวัน + ค่าเฉลี่ย ทั้งเดือน
+  const dailySales = useMemo(() => buildDailySales(displayUploads.current), [displayUploads.current]);
 
   // เวลาอัปโหลดไฟล์ยอดขาย — ดึงใหม่ทุกครั้งที่ข้อมูลยอดขายเปลี่ยน (อัปไฟล์ใหม่)
   useEffect(() => {
@@ -4192,6 +4196,12 @@ function AppInternal({
                 <div className="hidden md:block">
                   <HourlySalesSection data={hourlySales} />
                 </div>
+                <div className="hidden md:block">
+                  <DailySalesTable
+                    data={dailySales}
+                    dailyTarget={paceInfo.totalDays ? monthlyPerformance.actualSales.target / paceInfo.totalDays : undefined}
+                  />
+                </div>
                 <DailyBranchReportSection data={dailyBranchReport} boost={boostLabel(attachBoost)} uploadedAt={salesUploadedAt} />
                 <DailyBranchReportSection data={monthlyBranchReport} boost={boostLabel(attachBoost)} uploadedAt={salesUploadedAt} range={monthReportRange} onRangeChange={setMonthReportRange} />
     </>
@@ -4550,6 +4560,8 @@ function AppInternal({
                     combined={combinedOfficerKpiData}
                     daily={dailyBranchReport}
                     hourly={hourlySales}
+                    dailySales={dailySales}
+                    dailyTarget={paceInfo.totalDays ? monthlyPerformance.actualSales.target / paceInfo.totalDays : undefined}
                     missions={missions}
                     avatarOf={mobileAvatarOf}
                     onOpenStaff={openStaffByName}

@@ -9,6 +9,8 @@ import type {
 import type { DailyReportData } from "../dashboard/DailyBranchReportSection";
 import type { HourlySales } from "../../lib/hourlySales";
 import { HourlySalesSection } from "../dashboard/HourlySalesSection";
+import { DailySalesTable } from "../dashboard/DailySalesTable";
+import type { DailySales } from "../../lib/dailySales";
 import { MissionCard } from "../dashboard/MissionsSection";
 import type { Mission } from "../../lib/missions";
 import { Avatar, Bar, Card, Pill, Segmented, fmtPctShort, fmtShort, toneOf } from "./mobileUi";
@@ -34,6 +36,8 @@ export function MobileHome({
   combined,
   daily,
   hourly,
+  dailySales,
+  dailyTarget,
   missions = [],
   avatarOf,
   onOpenStaff,
@@ -45,6 +49,8 @@ export function MobileHome({
   combined: CombinedOfficerKpiData;
   daily: DailyReportData;
   hourly?: HourlySales;
+  dailySales?: DailySales;
+  dailyTarget?: number;
   missions?: Mission[];
   avatarOf: (name: string, staffId?: string) => string | undefined;
   onOpenStaff: (name: string) => void;
@@ -230,6 +236,8 @@ export function MobileHome({
         ) : null}
 
       </Card>
+
+      {dailySales ? <DailySalesTable data={dailySales} dailyTarget={dailyTarget} /> : null}
 
       {/* ตารางเต็มแบบบนคอม */}
       <button
