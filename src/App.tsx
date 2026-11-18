@@ -205,6 +205,7 @@ import { MissionsSection } from "./components/dashboard/MissionsSection";
 import { buildMissions } from "./lib/missions";
 import { buildHourlySales } from "./lib/hourlySales";
 import { buildDailySales } from "./lib/dailySales";
+import { buildDailyInsights } from "./lib/dailyInsights";
 import { DailySalesTable } from "./components/dashboard/DailySalesTable";
 import { MobileStaff } from "./components/mobile/MobileStaff";
 import { useIsMobile } from "./hooks/useIsMobile";
@@ -3060,6 +3061,39 @@ function AppInternal({
       }),
     [selectedBranch, bangkokToday, stockAlerts, runRatePrefs, stockStatus?.updatedAt],
   );
+  // ── วิเคราะห์ยอดรายวัน (ถ่วงวันในสัปดาห์ / คาดจบเดือน / วันผิดปกติ) ──────
+  const lastMonthDaily = useMemo(() => buildDailySales(displayUploads.lastMonth), [displayUploads.lastMonth]);
+  const dailyInsights = useMemo(
+    () =>
+      buildDailyInsights({
+        current: dailySales,
+        lastMonth: lastMonthDaily,
+        target: monthlyPerformance.actualSales.target,
+        totalDays: paceInfo.totalDays,
+        todayYmd: bangkokToday,
+        boost: attachBoost?.from && attachBoost?.to ? { from: attachBoost.from, to: attachBoost.to } : null,
+      }),
+    [dailySales, lastMonthDaily, monthlyPerformance.actualSales.target, paceInfo.totalDays, bangkokToday, attachBoost],
+  );
+  // เตือน Telegram เมื่อ "วันที่ขายจบล่าสุด" ต่ำผิดปกติ (วันละครั้ง)
+  useEffect(() => {
+    if (isPia || isInitialLoading || !runRatePrefsReady || !runRatePrefs.telegramAlert || !dailyInsights) return;
+    const last = dailySales.days.filter((d) => d.ymd !== dailyInsights.partialDay).slice(-1)[0];
+    const bad = last ? dailyInsights.anomalies.find((a) => a.ymd === last.ymd) : undefined;
+    if (!bad) return;
+    const DOWS = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
+    const shortBranch = selectedBranch.replace(/^ID\d+\s*:\s*/i, "").replace(/studio\s*7-?/i, "").trim();
+    const text = [
+      `ยอดต่ำผิดปกติ · ${shortBranch}`,
+      `วัน${DOWS[bad.dow]} ${bad.ymd.split("-").reverse().join("/")}: ฿${Math.round(bad.baht).toLocaleString()}`,
+      `ต่ำกว่าที่ควรเป็นของวัน${DOWS[bad.dow]} (≈฿${Math.round(bad.expected).toLocaleString()}) ${Math.round(bad.dropPct)}%`,
+      "",
+      "ลองเช็ก: คนลา/ขาดกะ · ของขาด (ดูแท็บลูกค้าถามหา) · ระบบ/อัปไฟล์ไม่ครบ · ฝน/เหตุการณ์ในห้าง",
+    ].join("\n");
+    void sendStockAlertTelegram(text, `anomaly:${selectedBranch}:${bad.ymd}`, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPia, isInitialLoading, runRatePrefsReady, runRatePrefs.telegramAlert, dailyInsights, selectedBranch]);
+
   // ── ลูกค้าถามหาแต่ไม่มีของ (lost demand) ──────────────────────────
   const [lostRows, setLostRows] = useState<LostDemandRow[]>([]);
   const [lostReady, setLostReady] = useState(false);
@@ -4150,6 +4184,7 @@ function AppInternal({
     daily: dailyBranchReport,
     currentDay: paceInfo.currentDay,
     totalDays: paceInfo.totalDays,
+    dayFactor: dailyInsights?.todayFactor,
   }).filter((m) => !isStaffHidden({ staffId: m.staffId, name: m.name }));
   const activeMission = activeOfficer ? missions.find((m) => matchesOfficer(m.name, activeOfficer.name)) : undefined;
   const homeFullSections = (
@@ -4200,6 +4235,7 @@ function AppInternal({
                   <DailySalesTable
                     data={dailySales}
                     dailyTarget={paceInfo.totalDays ? monthlyPerformance.actualSales.target / paceInfo.totalDays : undefined}
+                    insights={dailyInsights}
                   />
                 </div>
                 <DailyBranchReportSection data={dailyBranchReport} boost={boostLabel(attachBoost)} uploadedAt={salesUploadedAt} />
@@ -4562,6 +4598,7 @@ function AppInternal({
                     hourly={hourlySales}
                     dailySales={dailySales}
                     dailyTarget={paceInfo.totalDays ? monthlyPerformance.actualSales.target / paceInfo.totalDays : undefined}
+                    dailyInsights={dailyInsights}
                     missions={missions}
                     avatarOf={mobileAvatarOf}
                     onOpenStaff={openStaffByName}

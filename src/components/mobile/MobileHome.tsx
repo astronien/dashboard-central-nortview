@@ -11,6 +11,7 @@ import type { HourlySales } from "../../lib/hourlySales";
 import { HourlySalesSection } from "../dashboard/HourlySalesSection";
 import { DailySalesTable } from "../dashboard/DailySalesTable";
 import type { DailySales } from "../../lib/dailySales";
+import type { DailyInsights } from "../../lib/dailyInsights";
 import { MissionCard } from "../dashboard/MissionsSection";
 import type { Mission } from "../../lib/missions";
 import { Avatar, Bar, Card, Pill, Segmented, fmtPctShort, fmtShort, toneOf } from "./mobileUi";
@@ -38,6 +39,7 @@ export function MobileHome({
   hourly,
   dailySales,
   dailyTarget,
+  dailyInsights,
   missions = [],
   avatarOf,
   onOpenStaff,
@@ -51,6 +53,7 @@ export function MobileHome({
   hourly?: HourlySales;
   dailySales?: DailySales;
   dailyTarget?: number;
+  dailyInsights?: DailyInsights | null;
   missions?: Mission[];
   avatarOf: (name: string, staffId?: string) => string | undefined;
   onOpenStaff: (name: string) => void;
@@ -237,7 +240,7 @@ export function MobileHome({
 
       </Card>
 
-      {dailySales ? <DailySalesTable data={dailySales} dailyTarget={dailyTarget} /> : null}
+      {dailySales ? <DailySalesTable data={dailySales} dailyTarget={dailyTarget} insights={dailyInsights} /> : null}
 
       {/* ตารางเต็มแบบบนคอม */}
       <button

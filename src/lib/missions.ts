@@ -51,8 +51,11 @@ export function buildMissions(params: {
   daily: DailyReportData;
   currentDay: number;
   totalDays: number;
+  /** ตัวคูณของวันนี้ตามวันในสัปดาห์ (เสาร์-อาทิตย์ > 1, วันธรรมดา < 1) */
+  dayFactor?: number;
 }): Mission[] {
   const { combined, daily, currentDay, totalDays } = params;
+  const f = params.dayFactor && Number.isFinite(params.dayFactor) ? params.dayFactor : 1;
   const day = Math.max(1, Math.min(currentDay, totalDays || 1));
   const expectedPct = totalDays ? (day / totalDays) * 100 : 0;
   const daysLeft = Math.max(1, totalDays - day);
@@ -81,7 +84,7 @@ export function buildMissions(params: {
       .map((cat) => ({ cat, c: row.cats[cat] }))
       .filter(({ c }) => c && c.target > 0 && (c.actual / c.target) * 100 < expectedPct)
       .map(({ cat, c }) => {
-        const need = calcSteppedRequiredPerDay(c!.target, c!.actual, day, totalDays).perDay;
+        const need = calcSteppedRequiredPerDay(c!.target, c!.actual, day, totalDays).perDay * f;
         return { cat, need, gap: expectedPct - (c!.actual / c!.target) * 100 };
       })
       .filter((x) => x.need > 0)
@@ -103,7 +106,7 @@ export function buildMissions(params: {
     return {
       name: row.officer.name,
       staffId: row.officer.staffId,
-      needPerDay: stepped.perDay,
+      needPerDay: stepped.perDay * f,
       tierPct: stepped.tierPct,
       todayBaht: dRow?.totalBaht ?? 0,
       monthPct,
