@@ -55,7 +55,6 @@ export function DailySalesTable({
   // เป้าของแต่ละวัน: ถ่วงตามวันในสัปดาห์ (ถ้ามี) ไม่งั้นเท่ากันทุกวัน
   const tgtOf = (ymd: string) => insights?.dayTarget[ymd] ?? dailyTarget ?? 0;
   const hasTarget = (dailyTarget ?? 0) > 0 || Boolean(insights && insights.target > 0);
-  const pct = (n: number | null | undefined) => (n == null ? "—" : `${n >= 0 ? "+" : ""}${Math.round(n)}%`);
 
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 p-4 md:p-5">
@@ -81,58 +80,61 @@ export function DailySalesTable({
       </div>
 
       {insights ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 mb-3">
-          <Tile
-            label={`ต้องทำวันละ (เหลือ ${insights.remainingDays} วัน)`}
-            value={baht(insights.requiredPerDay)}
-            hint={
-              avgRef > 0
-                ? insights.requiredPerDay > avgRef
-                  ? `ต้องเร่งอีก ${Math.round((insights.requiredPerDay / avgRef) * 100 - 100)}%`
-                  : "ทำได้ตามค่าเฉลี่ยก็ถึงเป้า"
-                : undefined
-            }
-            tone={insights.requiredPerDay > avgRef ? "bad" : "good"}
-          />
-          <Tile
-            label="เป้าวันนี้ (ถ่วงตามวัน)"
-            value={baht(insights.todayTarget)}
-            hint={`วันนี้หนัก ×${insights.todayFactor.toFixed(2)} ของวันที่เหลือ`}
-          />
-          <Tile
-            label="คาดจบเดือน (ถ่วงวัน)"
-            value={`${Math.round(insights.forecastPct)}%`}
-            hint={baht(insights.forecast)}
-            tone={insights.forecastPct >= 100 ? "good" : insights.forecastPct >= 90 ? undefined : "bad"}
-          />
-          <Tile label="ถึงเป้าวัน" value={`${insights.hitDays}/${insights.completeDays} วัน`} hint="เทียบเป้าถ่วงวันของแต่ละวัน" />
-          <Tile
-            label="3 วันดีสุด"
-            value={`${Math.round(insights.top3Share)}%`}
-            hint={insights.top3Share >= 35 ? "ยอดพึ่งไม่กี่วันมาก" : "ของยอดทั้งเดือน"}
-            tone={insights.top3Share >= 35 ? "bad" : undefined}
-          />
-          <Tile label="ยอดต่อบิล" value={baht(insights.avgTicket)} hint="เฉลี่ยวันที่จบแล้ว" />
-        </div>
+        (() => {
+          const gap = insights.requiredPerDay - avgRef;
+          const behind = gap > 0;
+          return (
+            <div className="mb-4 flex flex-col gap-3">
+              {/* ประโยคสรุปเดียว อ่านจบรู้เลยว่าต้องทำอะไร */}
+              <div
+                className={`rounded-xl px-4 py-3 text-[14px] leading-relaxed ${
+                  behind ? "bg-rose-500/10 border border-rose-400/25" : "bg-emerald-500/10 border border-emerald-400/25"
+                }`}
+              >
+                {behind ? (
+                  <>
+                    อีก <b>{insights.remainingDays} วัน</b> ต้องขายให้ได้ <b>วันละ {baht(insights.requiredPerDay)}</b> ถึงจะถึงเป้า
+                    <br />
+                    แต่ที่ผ่านมาขายได้เฉลี่ยวันละ {baht(avgRef)} · <b className="text-rose-300">ยังขาดวันละ {baht(gap)}</b>
+                  </>
+                ) : (
+                  <>
+                    ขายได้เฉลี่ยวันละ <b>{baht(avgRef)}</b> ซึ่งมากกว่าที่ต้องทำ ({baht(insights.requiredPerDay)}/วัน) ·{" "}
+                    <b className="text-emerald-300">ถ้าขายแบบนี้ต่อไปจะถึงเป้า</b>
+                  </>
+                )}
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <Tile label="วันนี้ควรได้" value={baht(insights.todayTarget)} hint="ปรับตามว่าเป็นวันอะไร" />
+                <Tile
+                  label="ถ้าขายแบบนี้ จบเดือนได้"
+                  value={`${Math.round(insights.forecastPct)}% ของเป้า`}
+                  tone={insights.forecastPct >= 100 ? "good" : insights.forecastPct >= 90 ? undefined : "bad"}
+                />
+                <Tile label="วันที่ถึงเป้า" value={`${insights.hitDays} จาก ${insights.completeDays} วัน`} />
+              </div>
+            </div>
+          );
+        })()
       ) : null}
 
       {/* กราฟ: แท่ง / จุด · เส้นประ = ค่าเฉลี่ย · เส้นทึบ = เป้าต่อวัน */}
       <div className="flex items-center justify-between gap-2 mb-1">
-        <div className="flex items-center gap-3 text-[11px] text-white/60">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-white/65">
           <span className="inline-flex items-center gap-1.5">
-            <span className="w-4 border-t-2 border-dashed border-white/70" /> เฉลี่ย
+            <span className="w-4 border-t-2 border-dashed border-white/70" /> ค่าเฉลี่ย
           </span>
           {hasTarget ? (
             <span className="inline-flex items-center gap-1.5">
-              <span className="w-4 border-t-2 border-amber-300" /> {insights ? "เป้ารายวัน (ถ่วงวัน)" : "เป้าต่อวัน"}
+              <span className="w-4 border-t-2 border-amber-300" /> เป้าของวันนั้น
             </span>
           ) : null}
           <span className="inline-flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-sm bg-emerald-400" /> สูงกว่าเฉลี่ย
+            <span className="w-2.5 h-2.5 rounded-sm bg-emerald-400" /> ขายดีกว่าปกติ
           </span>
           {anomalySet.size ? (
             <span className="inline-flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-sm bg-rose-400" /> ต่ำผิดปกติ
+              <span className="w-2.5 h-2.5 rounded-sm bg-rose-400" /> น้อยผิดปกติ
             </span>
           ) : null}
         </div>
@@ -282,53 +284,59 @@ export function DailySalesTable({
       </div>
 
       {/* เฉลี่ยตามวันในสัปดาห์ */}
+      <div className="text-[12px] text-white/65 mb-1.5">ขายได้เฉลี่ยแต่ละวันในสัปดาห์ (สีเขียว = วันที่ขายดี)</div>
       <div className="mb-3 grid grid-cols-7 gap-1.5">
         {[1, 2, 3, 4, 5, 6, 0].map((dow) => {
           const v = data.avgByDow[dow];
           const hi = v != null && v >= avgRef;
-          const mom = insights?.momByDow[dow];
           return (
             <div key={dow} className="rounded-lg bg-black/20 px-1.5 py-1.5 text-center min-w-0">
               <div className="text-[11px] text-white/60">{DOW[dow]}</div>
               <div className={`text-[12px] font-semibold tabular-nums truncate ${hi ? "text-emerald-300" : "text-white/80"}`}>
                 {v == null ? "—" : v >= 1_000_000 ? `${(v / 1_000_000).toFixed(2)}M` : `${Math.round(v / 1000)}K`}
               </div>
-              {mom != null ? (
-                <div className={`text-[11px] tabular-nums ${mom >= 0 ? "text-emerald-300" : "text-rose-300"}`} title="เทียบเดือนก่อน วันเดียวกันในสัปดาห์">
-                  {pct(mom)}
-                </div>
-              ) : null}
+
             </div>
           );
         })}
       </div>
 
       {insights ? (
-        <div className="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-[12px] text-white/65">
-          {insights.momAvg != null ? (
-            <span>
-              เทียบเดือนก่อน (เฉลี่ยต่อวัน){" "}
-              <b className={insights.momAvg >= 0 ? "text-emerald-300" : "text-rose-300"}>{pct(insights.momAvg)}</b>
-            </span>
-          ) : null}
-          {insights.paydayLift != null ? (
-            <span>
-              ช่วงเงินเดือนออก (25–5) ขายมากกว่าวันอื่น{" "}
-              <b className={insights.paydayLift >= 0 ? "text-emerald-300" : "text-rose-300"}>{pct(insights.paydayLift)}</b>
-            </span>
-          ) : null}
-          {insights.boostLift != null ? (
-            <span>
-              ช่วงโหมด x2 เทียบนอกช่วง{" "}
-              <b className={insights.boostLift >= 0 ? "text-emerald-300" : "text-rose-300"}>{pct(insights.boostLift)}</b>
-            </span>
-          ) : null}
-          {insights.anomalies.length ? (
-            <span className="text-rose-300">
-              วันที่ต่ำผิดปกติ: {insights.anomalies.map((a) => `${dm(a.ymd)} (${DOW[a.dow]}) −${Math.round(a.dropPct)}%`).join(", ")}
-            </span>
-          ) : null}
-        </div>
+        <details className="mb-3 rounded-xl border border-white/10 bg-black/10 px-3 py-2">
+          <summary className="cursor-pointer select-none text-[13px] font-semibold text-white/80">ดูเพิ่มเติม</summary>
+          <ul className="mt-2 flex flex-col gap-1.5 text-[13px] text-white/80">
+            {insights.anomalies.length ? (
+              <li>
+                <span className="text-rose-300 font-semibold">วันที่ขายได้น้อยผิดปกติ:</span>{" "}
+                {insights.anomalies.map((a) => `${dm(a.ymd)} (${DOW[a.dow]}) น้อยกว่าปกติ ${Math.round(a.dropPct)}%`).join(", ")}
+              </li>
+            ) : null}
+            {insights.momAvg != null ? (
+              <li>
+                เทียบเดือนก่อน: ขายต่อวัน{insights.momAvg >= 0 ? "มากขึ้น" : "น้อยลง"}{" "}
+                <b className={insights.momAvg >= 0 ? "text-emerald-300" : "text-rose-300"}>{Math.abs(Math.round(insights.momAvg))}%</b>
+              </li>
+            ) : null}
+            {insights.paydayLift != null ? (
+              <li>
+                ช่วงเงินเดือนออก (วันที่ 25–5) ขาย{insights.paydayLift >= 0 ? "ดีกว่า" : "น้อยกว่า"}วันอื่น{" "}
+                <b>{Math.abs(Math.round(insights.paydayLift))}%</b>
+              </li>
+            ) : null}
+            {insights.boostLift != null ? (
+              <li>
+                ช่วงเปิดโหมด x2 ขาย{insights.boostLift >= 0 ? "ดีกว่า" : "น้อยกว่า"}ช่วงปกติ <b>{Math.abs(Math.round(insights.boostLift))}%</b>
+              </li>
+            ) : null}
+            <li>
+              ยอด 3 วันที่ดีที่สุดคิดเป็น <b>{Math.round(insights.top3Share)}%</b> ของทั้งเดือน
+              {insights.top3Share >= 35 ? " — ยอดมาจากไม่กี่วัน วันปกติยังขายได้น้อย" : " — ยอดกระจายดี"}
+            </li>
+            <li>
+              ลูกค้าจ่ายเฉลี่ย <b>บิลละ {baht(insights.avgTicket)}</b>
+            </li>
+          </ul>
+        </details>
       ) : null}
 
       <details className="group">
