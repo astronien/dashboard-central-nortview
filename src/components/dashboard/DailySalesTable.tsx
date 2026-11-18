@@ -1,5 +1,17 @@
 import React from "react";
 import { CalendarDays } from "lucide-react";
+import {
+  Bar,
+  CartesianGrid,
+  Cell,
+  ComposedChart,
+  Line,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import type { DailySales } from "../../lib/dailySales";
 
 const DOW = ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."];
@@ -10,7 +22,10 @@ const dm = (ymd: string) => {
 };
 
 /** ยอดขายรวมแต่ละวันของเดือน + ค่าเฉลี่ยต่อวัน (และเฉลี่ยตามวันในสัปดาห์) */
+const short = (v: number) => (v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : `${Math.round(v / 1000)}K`);
+
 export function DailySalesTable({ data, dailyTarget }: { data: DailySales; dailyTarget?: number }) {
+  const [mode, setMode] = React.useState<"bar" | "dot">("bar");
   if (!data.days.length) return null;
   const max = Math.max(...data.days.map((d) => d.baht), 1);
   const best = data.days.reduce((a, b) => (b.baht > a.baht ? b : a));
@@ -41,6 +56,116 @@ export function DailySalesTable({ data, dailyTarget }: { data: DailySales; daily
         </div>
       </div>
 
+      {/* กราฟ: แท่ง / จุด · เส้นประ = ค่าเฉลี่ย · เส้นทึบ = เป้าต่อวัน */}
+      <div className="flex items-center justify-between gap-2 mb-1">
+        <div className="flex items-center gap-3 text-[11px] text-white/60">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="w-4 border-t-2 border-dashed border-white/70" /> เฉลี่ย
+          </span>
+          {hasTarget ? (
+            <span className="inline-flex items-center gap-1.5">
+              <span className="w-4 border-t-2 border-amber-300" /> เป้าต่อวัน
+            </span>
+          ) : null}
+          <span className="inline-flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-sm bg-emerald-400" /> สูงกว่าเฉลี่ย
+          </span>
+        </div>
+        <div className="flex gap-1 p-1 rounded-lg bg-black/20 border border-white/10 text-[12px]">
+          {(
+            [
+              ["bar", "แท่ง"],
+              ["dot", "จุด"],
+            ] as const
+          ).map(([k, l]) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setMode(k)}
+              className={`px-3 py-1 rounded-md font-semibold transition-colors ${mode === k ? "bg-white/15 text-white" : "text-white/60"}`}
+            >
+              {l}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="daily-chart h-[220px] md:h-[260px] mb-3">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart
+            data={data.days.map((d) => ({ ...d, label: dm(d.ymd) }))}
+            margin={{ top: 8, right: 6, bottom: 0, left: -6 }}
+          >
+            <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.08)" />
+            <XAxis
+              dataKey="label"
+              tickLine={false}
+              axisLine={false}
+              tick={{ fill: "rgba(255,255,255,0.65)", fontSize: 11 }}
+              interval="preserveStartEnd"
+              minTickGap={8}
+            />
+            <YAxis
+              tickLine={false}
+              axisLine={false}
+              width={44}
+              tick={{ fill: "rgba(255,255,255,0.6)", fontSize: 11 }}
+              tickFormatter={(v: number) => short(v)}
+            />
+            <Tooltip
+              cursor={{ fill: "rgba(127,127,127,0.12)" }}
+              content={({ active, payload }) => {
+                if (!active || !payload?.length) return null;
+                const d = payload[0].payload as (typeof data.days)[number];
+                const vs = data.avgBaht > 0 ? (d.baht / data.avgBaht) * 100 - 100 : 0;
+                return (
+                  <div className="rounded-lg border border-white/15 bg-[#0c3123] px-3 py-2 text-[12px] text-white">
+                    <div className="font-semibold">
+                      {dm(d.ymd)} ({DOW[d.dow]})
+                    </div>
+                    <div className="tabular-nums">{baht(d.baht)}</div>
+                    <div className={`tabular-nums ${vs >= 0 ? "text-emerald-300" : "text-rose-300"}`}>
+                      {vs >= 0 ? "+" : ""}
+                      {Math.round(vs)}% เทียบเฉลี่ย
+                    </div>
+                    <div className="tabular-nums text-white/70">
+                      {d.bills} บิล · iPhone {d.iphone}
+                    </div>
+                  </div>
+                );
+              }}
+            />
+            {mode === "bar" ? (
+              <Bar dataKey="baht" radius={[3, 3, 0, 0]} isAnimationActive={false}>
+                {data.days.map((d) => (
+                  <Cell key={d.ymd} fill={d.baht >= data.avgBaht ? "#34d399" : "rgba(255,255,255,0.28)"} />
+                ))}
+              </Bar>
+            ) : (
+              <Line
+                dataKey="baht"
+                type="monotone"
+                stroke="rgba(255,255,255,0.35)"
+                strokeWidth={1.5}
+                isAnimationActive={false}
+                dot={(p: { cx?: number; cy?: number; payload?: { baht: number; ymd: string } }) => (
+                  <circle
+                    key={p.payload?.ymd}
+                    cx={p.cx}
+                    cy={p.cy}
+                    r={4}
+                    fill={(p.payload?.baht ?? 0) >= data.avgBaht ? "#34d399" : "rgba(255,255,255,0.55)"}
+                    stroke="none"
+                  />
+                )}
+                activeDot={{ r: 6 }}
+              />
+            )}
+            <ReferenceLine y={data.avgBaht} stroke="rgba(255,255,255,0.75)" strokeDasharray="5 4" />
+            {hasTarget ? <ReferenceLine y={dailyTarget} stroke="#fcd34d" strokeWidth={1.5} /> : null}
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+
       {/* เฉลี่ยตามวันในสัปดาห์ */}
       <div className="mb-3 grid grid-cols-7 gap-1.5">
         {[1, 2, 3, 4, 5, 6, 0].map((dow) => {
@@ -57,6 +182,10 @@ export function DailySalesTable({ data, dailyTarget }: { data: DailySales; daily
         })}
       </div>
 
+      <details className="group">
+      <summary className="cursor-pointer select-none text-[12px] font-semibold text-white/70 hover:text-white mb-2">
+        ดูเป็นตาราง
+      </summary>
       <div className="overflow-x-auto rounded-xl border border-white/10">
         <table className="w-full text-left border-collapse text-[12px]">
           <thead>
@@ -140,6 +269,7 @@ export function DailySalesTable({ data, dailyTarget }: { data: DailySales; daily
           </tfoot>
         </table>
       </div>
+      </details>
     </div>
   );
 }

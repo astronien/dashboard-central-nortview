@@ -497,3 +497,11 @@ html.theme-light .report-card .text-slate-400 { color: #57534e; }
 html.theme-light .report-card .text-slate-300 { color: #78716c; }
 /* ป้ายแกนกราฟ */
 html.theme-dark .recharts-cartesian-axis-tick-value { fill: rgb(255 255 255 / 0.65); }
+
+/* กราฟยอดขายรายวัน: สีที่ฝังใน SVG ให้เห็นในธีมสว่าง */
+html.theme-light .daily-chart .recharts-rectangle[fill^="rgba(255,255,255"],
+html.theme-light .daily-chart circle[fill^="rgba(255,255,255"] { fill: rgb(31 30 27 / 0.3); }
+html.theme-light .daily-chart .recharts-reference-line line[stroke^="rgba(255,255,255"] { stroke: rgb(31 30 27 / 0.6); }
+html.theme-light .daily-chart .recharts-line-curve[stroke^="rgba(255,255,255"] { stroke: rgb(31 30 27 / 0.35); }
+html.accent-custom .daily-chart .recharts-rectangle[fill="#34d399"],
+html.accent-custom .daily-chart circle[fill="#34d399"] { fill: var(--accent); }
