@@ -1,5 +1,19 @@
 import React from "react";
 import { ArrowDownRight, ArrowRight, ArrowUpRight, Loader2 } from "lucide-react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  LabelList,
+  Line,
+  LineChart,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import type { RawRow } from "../../lib/salesAggregations";
 import type { Preset } from "../../lib/presetTypes";
 import { fetchArchiveMonth, monthLabelTh, type ArchiveMonthMeta } from "../../lib/salesArchive";
@@ -46,6 +60,9 @@ export function AttHistoryView({
   const [data, setData] = React.useState<Record<string, MonthAtt>>({});
   const [loading, setLoading] = React.useState("");
   const [person, setPerson] = React.useState<string>("");
+  const [chartMode, setChartMode] = React.useState<"person" | "rank">("person");
+  const [who, setWho] = React.useState<string>(TEAM);
+  const [axisId, setAxisId] = React.useState<string>("");
 
   const salesMonths = months.filter((m) => m.rowCount > 0);
   const presetSig = axes.map((p) => `${p.id}:${p.targetPercent ?? ""}:${JSON.stringify(p.filtersA ?? [])}`).join("|");
@@ -134,9 +151,7 @@ export function AttHistoryView({
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-[13px] text-white/65">
-          ค่าเฉลี่ย = รวมจำนวนที่แนบ ÷ รวมฐาน ของ {used.length} เดือน
-          {used.length ? ` (${monthLabelTh(used[0])} – ${monthLabelTh(used[used.length - 1])})` : ""} · ไม่รวมเดือนนี้ · ไม่คูณโหมด x2 ·
-          สีเทียบเป้าของแต่ละแกน · ลูกศร = เดือนล่าสุดเทียบเดือนก่อนหน้า
+          เฉลี่ย {used.length} เดือนล่าสุด{used.length ? ` (${monthLabelTh(used[0])} – ${monthLabelTh(used[used.length - 1])})` : ""} · ไม่นับเดือนนี้
         </p>
         <div className="flex items-center gap-2">
           {loading ? (
@@ -165,6 +180,169 @@ export function AttHistoryView({
         </div>
       </div>
 
+      {/* ── กราฟ (ดูง่าย) ───────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="inline-flex rounded-xl border border-white/15 bg-black/20 p-0.5 text-[13px]">
+          {(
+            [
+              ["person", "ดูทีละคน"],
+              ["rank", "เทียบทุกคน"],
+            ] as const
+          ).map(([k, l]) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setChartMode(k)}
+              className={`px-3 py-1.5 rounded-lg font-semibold ${chartMode === k ? "bg-white/15 text-white" : "text-white/60 hover:text-white"}`}
+            >
+              {l}
+            </button>
+          ))}
+        </div>
+        {chartMode === "person" ? (
+          <select
+            value={who}
+            onChange={(e) => setWho(e.target.value)}
+            className="bg-[#051710] border border-white/15 rounded-lg px-2 py-1.5 text-white text-[13px]"
+          >
+            <option value={TEAM}>ทั้งทีม</option>
+            {people.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {axes.map((p) => {
+              const on = (axisId || axes[0].id) === p.id;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setAxisId(p.id)}
+                  className={`px-3 py-1.5 rounded-lg border text-[12px] font-semibold ${on ? "bg-white/15 border-white/25 text-white" : "border-white/10 text-white/60 hover:text-white"}`}
+                >
+                  {p.name}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {chartMode === "person" ? (
+        <>
+          <p className="-mt-2 text-[12px] text-white/60">
+            แต่ละกล่อง = 1 แกน · เส้นเขียว = {who === TEAM ? "ทั้งทีม" : who.split(" ")[0]} · เส้นประ = เฉลี่ยทีม · เส้นเหลือง = เป้า
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+            {axes.map((p) => {
+              const series = used.map((m) => ({
+                label: monthLabelTh(m),
+                me: rateOf(cellOf(m, who, p.id)),
+                team: rateOf(cellOf(m, TEAM, p.id)),
+              }));
+              const avg = rateOf(avgOf(who, p.id));
+              const t = p.targetPercent ?? 0;
+              const reach = avg != null && t > 0 ? avg >= t : null;
+              return (
+                <div key={p.id} className="rounded-xl border border-white/10 bg-black/10 p-3">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <div className="text-[13px] font-semibold text-white truncate">{p.name}</div>
+                    <div className="text-right">
+                      <span className={`text-xl font-semibold tabular-nums ${reach == null ? "text-white" : reach ? "text-emerald-300" : "text-rose-300"}`}>
+                        {fmtPct(avg)}
+                      </span>
+                      {t > 0 ? <span className="text-[11px] text-white/55"> / เป้า {t}%</span> : null}
+                    </div>
+                  </div>
+                  <div className="daily-chart h-[120px] mt-1">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={series} margin={{ top: 6, right: 6, bottom: 0, left: -24 }}>
+                        <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.08)" />
+                        <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: "rgba(255,255,255,0.6)", fontSize: 10 }} />
+                        <YAxis tickLine={false} axisLine={false} width={36} tick={{ fill: "rgba(255,255,255,0.55)", fontSize: 10 }} tickFormatter={(v: number) => `${v}%`} />
+                        <Tooltip
+                          content={({ active, payload }) => {
+                            if (!active || !payload?.length) return null;
+                            const d = payload[0].payload as (typeof series)[number];
+                            return (
+                              <div className="rounded-lg border border-white/15 bg-[#0c3123] px-3 py-2 text-[12px] text-white">
+                                <div className="font-semibold">{d.label}</div>
+                                <div>{who === TEAM ? "ทีม" : who.split(" ")[0]} {fmtPct(d.me)}</div>
+                                {who !== TEAM ? <div className="text-white/70">ทีม {fmtPct(d.team)}</div> : null}
+                              </div>
+                            );
+                          }}
+                        />
+                        {t > 0 ? <ReferenceLine y={t} stroke="#fcd34d" strokeWidth={1.5} /> : null}
+                        {who !== TEAM ? (
+                          <Line dataKey="team" stroke="rgba(255,255,255,0.55)" strokeDasharray="4 3" dot={false} isAnimationActive={false} connectNulls />
+                        ) : null}
+                        <Line dataKey="me" stroke="#34d399" strokeWidth={2.5} dot={{ r: 3, fill: "#34d399" }} isAnimationActive={false} connectNulls />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      ) : (
+        (() => {
+          const p = axes.find((x) => x.id === (axisId || axes[0].id)) ?? axes[0];
+          const t = p.targetPercent ?? 0;
+          const team = rateOf(avgOf(TEAM, p.id));
+          const bars = people
+            .map((n) => ({ name: n.split(" ")[0], full: n, v: rateOf(avgOf(n, p.id)), c: avgOf(n, p.id) }))
+            .filter((x) => x.v != null)
+            .sort((a, b) => (b.v ?? 0) - (a.v ?? 0));
+          return (
+            <>
+              <p className="-mt-2 text-[12px] text-white/60">
+                {p.name} เฉลี่ย {used.length} เดือน · แท่งเขียว = ถึงเป้า · เส้นเหลือง = เป้า{t ? ` ${t}%` : ""} · เส้นประ = เฉลี่ยทีม {fmtPct(team)}
+              </p>
+              <div className="daily-chart" style={{ height: `${Math.max(160, bars.length * 34 + 30)}px` }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={bars} layout="vertical" margin={{ top: 4, right: 48, bottom: 4, left: 8 }}>
+                    <CartesianGrid horizontal={false} stroke="rgba(255,255,255,0.08)" />
+                    <XAxis type="number" tickLine={false} axisLine={false} tick={{ fill: "rgba(255,255,255,0.55)", fontSize: 11 }} tickFormatter={(v: number) => `${v}%`} />
+                    <YAxis type="category" dataKey="name" width={90} tickLine={false} axisLine={false} tick={{ fill: "rgba(255,255,255,0.8)", fontSize: 12 }} />
+                    <Tooltip
+                      cursor={{ fill: "rgba(127,127,127,0.12)" }}
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null;
+                        const d = payload[0].payload as (typeof bars)[number];
+                        return (
+                          <div className="rounded-lg border border-white/15 bg-[#0c3123] px-3 py-2 text-[12px] text-white">
+                            <div className="font-semibold">{d.full}</div>
+                            <div>
+                              {fmtPct(d.v)} · แนบ {d.c.a} จาก {d.c.b}
+                            </div>
+                          </div>
+                        );
+                      }}
+                    />
+                    {t > 0 ? <ReferenceLine x={t} stroke="#fcd34d" strokeWidth={1.5} /> : null}
+                    {team != null ? <ReferenceLine x={team} stroke="rgba(255,255,255,0.6)" strokeDasharray="4 3" /> : null}
+                    <Bar dataKey="v" radius={[0, 4, 4, 0]} isAnimationActive={false} barSize={18}>
+                      {bars.map((b) => (
+                        <Cell key={b.full} fill={t > 0 && (b.v ?? 0) >= t ? "#34d399" : "rgba(255,255,255,0.35)"} />
+                      ))}
+                      <LabelList dataKey="v" position="right" formatter={(v: unknown) => fmtPct(Number(v))} fill="rgba(255,255,255,0.85)" fontSize={12} />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </>
+          );
+        })()
+      )}
+
+      <details>
+        <summary className="cursor-pointer select-none text-[13px] font-semibold text-white/70 hover:text-white">ดูเป็นตาราง</summary>
+        <div className="mt-3 flex flex-col gap-5">
       {/* แบบที่ 1: ทุกคน × ทุกแกน */}
       <div className="overflow-x-auto rounded-xl border border-white/10">
         <table className="w-full text-left border-collapse text-[13px]">
@@ -312,6 +490,8 @@ export function AttHistoryView({
           </div>
         </div>
       ) : null}
+        </div>
+      </details>
     </div>
   );
 }
