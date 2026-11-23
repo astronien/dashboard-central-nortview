@@ -42,6 +42,16 @@ module.exports = async function handler(req, res) {
     console.warn("[api/trends] schema init failed:", e.message);
   }
 
+  // คลังยอดขาย/เป้ารายเดือน (รวมไว้ที่ไฟล์นี้ เพื่อไม่ให้เกินจำนวน function ของ Vercel)
+  if (req.query.resource === "archive") {
+    try {
+      const { handleArchive } = require("./_lib/salesArchive");
+      return await handleArchive(req, res);
+    } catch (e) {
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
   // Stock-on-hand map (for Run Rate stock cover). Stored per branch in
   // app_config; folded here to avoid adding a serverless function.
   if (req.query.resource === "stock") {
@@ -138,4 +148,13 @@ module.exports = async function handler(req, res) {
   }
 
   return res.status(405).json({ ok: false, error: "Method not allowed" });
+};
+
+// ชิ้นข้อมูลคลังยอดขายส่งมาทีละไม่เกิน ~1.5MB
+module.exports.config = {
+  api: {
+    bodyParser: {
+      sizeLimit: "4mb",
+    },
+  },
 };

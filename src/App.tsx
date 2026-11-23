@@ -38,6 +38,7 @@ import {
   Sun,
   Moon,
   Gauge,
+  History as HistoryIcon,
 } from "lucide-react";
 import CategoryTreePicker from "./components/CategoryTreePicker";
 
@@ -206,6 +207,7 @@ import { buildMissions } from "./lib/missions";
 import { buildHourlySales } from "./lib/hourlySales";
 import { buildDailySales } from "./lib/dailySales";
 import { buildDailyInsights } from "./lib/dailyInsights";
+import { fetchArchiveList, fetchArchiveMonth, rowsSignature, saveArchiveMonth, saveArchiveTarget, shiftMonth, splitByMonth, summarizeMonth, targetSignature, type ArchiveMonthMeta } from "./lib/salesArchive";
 import { DailySalesTable } from "./components/dashboard/DailySalesTable";
 import { MobileStaff } from "./components/mobile/MobileStaff";
 import { useIsMobile } from "./hooks/useIsMobile";
@@ -245,6 +247,7 @@ const RunRateSection = lazyRetry(() => import("./components/dashboard/RunRateSec
 const ReportsSection = lazyRetry(() => import("./components/dashboard/ReportsSection").then((m) => ({ default: m.ReportsSection })));
 const SettingsSection = lazyRetry(() => import("./components/dashboard/SettingsSection").then((m) => ({ default: m.SettingsSection })));
 const KpiPresetSection = lazyRetry(() => import("./components/dashboard/KpiPresetSection"));
+const HistorySection = lazyRetry(() => import("./components/dashboard/HistorySection").then((m) => ({ default: m.HistorySection })));
 /** โหลดโค้ดหน้าตั้งค่าล่วงหน้าตอนเปิดเมนูตั้งค่า (ระหว่างที่กำลังพิมพ์รหัส) */
 const preloadSettingsSection = () => {
   void import("./components/dashboard/SettingsSection").catch(() => {});
@@ -1307,7 +1310,7 @@ function AppInternal({
   const { user, logout, isPia } = useAuth();
   const isMobile = useIsMobile();
   const [currentView, setCurrentView] = useState<
-    "home" | "staff" | "settings" | "reports" | "kpi_preset" | "analysis" | "trends" | "runrate" | "commission"
+    "home" | "staff" | "settings" | "reports" | "kpi_preset" | "analysis" | "trends" | "runrate" | "commission" | "history"
   // มือถือเปิดมาที่หน้าพนักงานก่อน (พนักงานดูยอดตัวเองบ่อยกว่า) · คอมเปิดที่หน้าหลัก
   >(() => (isMobile ? "staff" : "home"));
   useEffect(() => {
@@ -1456,14 +1459,25 @@ function AppInternal({
 
   // Branch-filtered sales rows (Demo iPhone → หมวด iPhone) BEFORE the model
   // exclusion — the base for the model picker and the "latest day".
+  // เดือนก่อน / ปีก่อน จากคลังรายเดือน (ใช้เมื่อไม่ได้อัปไฟล์ช่องนั้นเอง) — ไม่บันทึกทับช่องอัปโหลด
+  const [archiveFill, setArchiveFill] = useState<{ lastMonth: RawRow[]; lastYear: RawRow[]; lmMonth?: string; lyMonth?: string }>({
+    lastMonth: [],
+    lastYear: [],
+  });
+  const archiveFillRef = useRef(archiveFill);
+  archiveFillRef.current = archiveFill;
   const branchSalesRows = useMemo(
     () => ({
       current: normalizeDemoIphoneRows(filterRowsByBranch(uploadedFiles.current, selectedBranch)),
       today: normalizeDemoIphoneRows(filterRowsByBranch(uploadedFiles.today ?? [], selectedBranch)),
-      lastMonth: normalizeDemoIphoneRows(filterRowsByBranch(uploadedFiles.lastMonth, selectedBranch)),
-      lastYear: normalizeDemoIphoneRows(filterRowsByBranch(uploadedFiles.lastYear, selectedBranch)),
+      lastMonth: normalizeDemoIphoneRows(
+        filterRowsByBranch(uploadedFiles.lastMonth.length ? uploadedFiles.lastMonth : archiveFill.lastMonth, selectedBranch),
+      ),
+      lastYear: normalizeDemoIphoneRows(
+        filterRowsByBranch(uploadedFiles.lastYear.length ? uploadedFiles.lastYear : archiveFill.lastYear, selectedBranch),
+      ),
     }),
-    [uploadedFiles, selectedBranch],
+    [uploadedFiles, selectedBranch, archiveFill],
   );
 
   // หมวดย่อยใหม่ที่ master ยังไม่มี → เดาจาก Sub อื่นใน Category เดียวกัน /
@@ -3061,6 +3075,80 @@ function AppInternal({
       }),
     [selectedBranch, bangkokToday, stockAlerts, runRatePrefs, stockStatus?.updatedAt],
   );
+  // ── คลังยอดขาย/เป้ารายเดือน ───────────────────────────────────────
+  const [archiveList, setArchiveList] = useState<ArchiveMonthMeta[]>([]);
+  const [archiveListReady, setArchiveListReady] = useState(false);
+  const loadArchiveList = React.useCallback(async () => {
+    if (!selectedBranch) return;
+    const list = await fetchArchiveList(selectedBranch);
+    setArchiveList(list);
+    setArchiveListReady(true);
+  }, [selectedBranch]);
+  useEffect(() => {
+    setArchiveListReady(false);
+    setArchiveFill({ lastMonth: [], lastYear: [] });
+    void loadArchiveList();
+  }, [loadArchiveList]);
+
+  // เก็บอัตโนมัติ: ยอดขายเดือนที่อยู่ในไฟล์ Current (ทับทั้งเดือนเมื่อข้อมูลเปลี่ยน) + เป้าของเดือนล่าสุด
+  const archiveSavingRef = useRef(false);
+  useEffect(() => {
+    if (isPia || isInitialLoading || !archiveListReady || archiveSavingRef.current) return;
+    const rows = branchSalesRows.current;
+    if (!rows.length) return;
+    const byMonth = splitByMonth(rows);
+    const metaOf = (m: string) => archiveList.find((x) => x.month === m);
+    const salesTodo = Array.from(byMonth.entries()).filter(([m, r]) => metaOf(m)?.signature !== rowsSignature(r));
+    const latestMonth = Array.from(byMonth.keys()).slice(-1)[0];
+    const targetRows = filterRowsByBranch(uploadedFiles.target, selectedBranch);
+    const targetTodo =
+      latestMonth && targetRows.length && metaOf(latestMonth)?.targetSignature !== targetSignature(targetRows);
+    if (!salesTodo.length && !targetTodo) return;
+    archiveSavingRef.current = true;
+    void (async () => {
+      try {
+        for (const [m, r] of salesTodo) {
+          await saveArchiveMonth({ branch: selectedBranch, month: m, rows: r, summary: summarizeMonth(r, getCategory), source: "auto" });
+        }
+        if (targetTodo && latestMonth) await saveArchiveTarget(selectedBranch, latestMonth, targetRows);
+        await loadArchiveList();
+      } catch (e) {
+        console.warn("[archive] auto-save failed:", e);
+      } finally {
+        archiveSavingRef.current = false;
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPia, isInitialLoading, archiveListReady, branchSalesRows.current, uploadedFiles.target, selectedBranch]);
+
+  // เดือนก่อน / ปีก่อน: ถ้าไม่ได้อัปเอง ดึงจากคลัง
+  useEffect(() => {
+    if (!archiveListReady || !latestDataYmd) return;
+    const cur = latestDataYmd.slice(0, 7);
+    const lm = shiftMonth(cur, -1);
+    const ly = shiftMonth(cur, -12);
+    const has = (m: string) => archiveList.some((x) => x.month === m && x.rowCount > 0);
+    const needLm = !uploadedFiles.lastMonth.length && has(lm) && archiveFill.lmMonth !== lm;
+    const needLy = !uploadedFiles.lastYear.length && has(ly) && archiveFill.lyMonth !== ly;
+    if (!needLm && !needLy) return;
+    let cancelled = false;
+    void (async () => {
+      const [lmRows, lyRows] = await Promise.all([
+        needLm ? fetchArchiveMonth(selectedBranch, lm) : Promise.resolve(archiveFill.lastMonth),
+        needLy ? fetchArchiveMonth(selectedBranch, ly) : Promise.resolve(archiveFill.lastYear),
+      ]);
+      if (cancelled) return;
+      const next = { lastMonth: lmRows, lastYear: lyRows, lmMonth: needLm ? lm : archiveFill.lmMonth, lyMonth: needLy ? ly : archiveFill.lyMonth };
+      archiveFillRef.current = next;
+      setArchiveFill(next);
+      rebuildReport(uploadedFiles, { skipPersist: true });
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [archiveListReady, archiveList, latestDataYmd, uploadedFiles.lastMonth, uploadedFiles.lastYear, selectedBranch]);
+
   // ── วิเคราะห์ยอดรายวัน (ถ่วงวันในสัปดาห์ / คาดจบเดือน / วันผิดปกติ) ──────
   const lastMonthDaily = useMemo(() => buildDailySales(displayUploads.lastMonth), [displayUploads.lastMonth]);
   const dailyInsights = useMemo(
@@ -3381,8 +3469,10 @@ function AppInternal({
     const filteredTarget = applyTargetUplift(filterRowsByBranch(nextUploads.target, selectedBranch), targetUplift);
     const branchCurrent = branchRows(nextUploads.current);
     const branchToday = branchRows(nextUploads.today ?? []);
-    const branchLastMonth = branchRows(nextUploads.lastMonth);
-    const branchLastYear = branchRows(nextUploads.lastYear);
+    const branchLastMonth = branchRows(
+      nextUploads.lastMonth.length ? nextUploads.lastMonth : archiveFillRef.current.lastMonth,
+    );
+    const branchLastYear = branchRows(nextUploads.lastYear.length ? nextUploads.lastYear : archiveFillRef.current.lastYear);
     const fallbackMasterRows = buildFallbackMasterRows(
       findUnmappedCategoryPairs(
         { current: branchCurrent, others: [branchToday, branchLastMonth, branchLastYear] },
@@ -4400,6 +4490,13 @@ function AppInternal({
                     <Gauge className="w-5 h-5" />
                   </button>
                   <button
+                    onClick={() => setCurrentView("history")}
+                    className={`p-2 rounded-full transition-colors ${currentView === "history" ? "bg-[#0f4430]  text-white" : "text-white/60 hover:text-white"}`}
+                    title="ประวัติรายเดือน"
+                  >
+                    <HistoryIcon className="w-5 h-5" />
+                  </button>
+                  <button
                     onClick={() => setCurrentView("settings")}
                     className={`p-2 rounded-full transition-colors ${currentView === "settings" ? "bg-[#0f4430]  text-white" : "text-white/60 hover:text-white"}`}
                     title="ตั้งค่า"
@@ -4711,6 +4808,24 @@ function AppInternal({
                     }
                   }}
                   storeTargetTotal={storeTargetTotal}
+                />
+              </motion.div>
+            )}
+            {!isPia && currentView === "history" && (
+              <motion.div
+                key="history"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}
+                className="flex flex-col gap-6 w-full h-full relative z-20"
+              >
+                <HistorySection
+                  branch={selectedBranch}
+                  months={archiveList}
+                  getCategory={getCategory}
+                  onArchiveChanged={loadArchiveList}
+                  currentMonth={latestDataYmd ? latestDataYmd.slice(0, 7) : undefined}
                 />
               </motion.div>
             )}
