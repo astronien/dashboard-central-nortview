@@ -4847,6 +4847,9 @@ function AppInternal({
                   getCategory={getCategory}
                   onArchiveChanged={loadArchiveList}
                   currentMonth={latestDataYmd ? latestDataYmd.slice(0, 7) : undefined}
+                  presets={kpiPresets}
+                  categoryMaster={displayUploads.categoryMaster}
+                  staffOrder={parsedReport.officers.filter((o) => !isStaffHidden(o)).map((o) => o.name)}
                 />
               </motion.div>
             )}

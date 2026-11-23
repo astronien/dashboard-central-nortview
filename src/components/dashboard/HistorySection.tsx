@@ -13,6 +13,8 @@ import {
   YAxis,
 } from "recharts";
 import type { RawRow } from "../../lib/salesAggregations";
+import type { Preset } from "../../lib/presetTypes";
+import { AttHistoryView } from "./AttHistoryView";
 import { parseSalesExcelFile } from "../../lib/salesUpload";
 import { filterRowsByBranch } from "../../lib/matchHelpers";
 import {
@@ -32,7 +34,7 @@ const targetOf = (m: ArchiveMonthMeta) => {
   return Number.isFinite(t) && t > 0 ? t : null;
 };
 
-type View = "total" | "category" | "staff";
+type View = "total" | "category" | "staff" | "att";
 
 export function HistorySection({
   branch,
@@ -41,7 +43,13 @@ export function HistorySection({
   getCategory,
   onArchiveChanged,
   currentMonth,
+  presets = [],
+  categoryMaster = [],
+  staffOrder = [],
 }: {
+  presets?: Preset[];
+  categoryMaster?: RawRow[];
+  staffOrder?: string[];
   branch: string;
   /** คีย์คลัง (รหัสสาขา) — ใช้ตอนบันทึก */
   archiveKey: string;
@@ -122,6 +130,7 @@ export function HistorySection({
                   ["total", "ทั้งร้าน"],
                   ["category", "รายหมวด"],
                   ["staff", "รายคน"],
+                  ["att", "ATT รายคน"],
                 ] as Array<[View, string]>
               ).map(([k, l]) => (
                 <button
@@ -137,7 +146,7 @@ export function HistorySection({
                 </button>
               ))}
             </div>
-            {view !== "total" ? (
+            {view === "category" || view === "staff" ? (
               <select
                 value={pickNow}
                 onChange={(e) => setPick(e.target.value)}
@@ -153,7 +162,16 @@ export function HistorySection({
           </div>
         </div>
 
-        {rows.length ? (
+        {view === "att" ? (
+          <AttHistoryView
+            archiveKey={archiveKey}
+            months={months}
+            presets={presets}
+            categoryMaster={categoryMaster}
+            currentMonth={currentMonth}
+            staffOrder={staffOrder}
+          />
+        ) : rows.length ? (
           <>
             <div className="daily-chart h-[280px]">
               <ResponsiveContainer width="100%" height="100%">
