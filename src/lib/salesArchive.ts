@@ -225,3 +225,31 @@ export const monthLabelTh = (ym: string) => {
   const [y, m] = ym.split("-").map(Number);
   return new Intl.DateTimeFormat("th-TH", { month: "short", year: "2-digit" }).format(new Date(y, m - 1, 1));
 };
+
+// ── ผลคำนวณที่เก็บไว้ที่ server (คิดครั้งเดียว ใช้ซ้ำทุกเครื่อง) ─────────
+export async function fetchArchiveCalc<T>(branch: string, kind: string): Promise<Record<string, { sig: string; data: T }>> {
+  try {
+    const r = await fetch(`${API}&action=calc&kind=${encodeURIComponent(kind)}&branch=${encodeURIComponent(keyOf(branch))}`, {
+      cache: "no-store",
+    });
+    const j = (await r.json()) as { ok?: boolean; items?: Record<string, { sig: string; data: T }> };
+    return j?.items ?? {};
+  } catch {
+    return {};
+  }
+}
+
+export async function saveArchiveCalc(branch: string, kind: string, month: string, sig: string, data: unknown): Promise<void> {
+  try {
+    await post({ action: "calc", branch: keyOf(branch), kind, month, sig, data });
+  } catch {
+    /* เก็บไม่ได้ก็แค่คิดใหม่ครั้งหน้า */
+  }
+}
+
+/** hash สั้นๆ ของข้อความ (ใช้ทำลายเซ็น) */
+export function hashText(s: string): string {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
+}

@@ -16,7 +16,7 @@ import {
 } from "recharts";
 import type { RawRow } from "../../lib/salesAggregations";
 import type { Preset } from "../../lib/presetTypes";
-import { fetchArchiveMonth, monthLabelTh, type ArchiveMonthMeta } from "../../lib/salesArchive";
+import { fetchArchiveCalc, fetchArchiveMonth, hashText, monthLabelTh, saveArchiveCalc, type ArchiveMonthMeta } from "../../lib/salesArchive";
 import {
   TEAM,
   attAxes,
@@ -67,34 +67,56 @@ export function AttHistoryView({
   const salesMonths = months.filter((m) => m.rowCount > 0);
   const presetSig = axes.map((p) => `${p.id}:${p.targetPercent ?? ""}:${JSON.stringify(p.filtersA ?? [])}`).join("|");
 
-  // โหลด + คำนวณทีละเดือน (เดือนที่คิดแล้วไม่คิดซ้ำ)
+  // ลายเซ็นของ "วิธีคิด" = เกณฑ์ preset + Category Master — เปลี่ยนเมื่อไรค่อยคิดใหม่
+  const methodSig = React.useMemo(
+    () => hashText(presetSig) + "." + hashText(JSON.stringify(categoryMaster.map((r) => [r["Cat & Sub Cat"], r["CAT Daily"]]))),
+    [presetSig, categoryMaster],
+  );
+
+  // คิดครั้งเดียวแล้วเก็บไว้ที่ server — เปิดใหม่/เครื่องอื่นใช้ผลเดิม
+  // คิดใหม่เฉพาะเดือนที่ข้อมูลเปลี่ยน (เช่น เดือนนี้) หรือเมื่อแก้ KPI Preset / Category Master
   React.useEffect(() => {
     let cancelled = false;
     void (async () => {
+      setLoading("กำลังโหลด…");
+      const saved = await fetchArchiveCalc<MonthAtt>(archiveKey, "att");
+      if (cancelled) return;
       const next: Record<string, MonthAtt> = {};
-      for (let i = 0; i < salesMonths.length; i++) {
-        const m = salesMonths[i];
-        const key = `${archiveKey}|${m.month}|${m.signature}|${presetSig}`;
-        let v = cache.get(key);
-        if (!v) {
-          setLoading(`กำลังคำนวณ ${monthLabelTh(m.month)} (${i + 1}/${salesMonths.length})`);
-          const rows = await fetchArchiveMonth(archiveKey, m.month);
-          if (cancelled) return;
-          v = computeMonthAtt(rows, axes, categoryMaster);
-          cache.set(key, v);
+      const todo = salesMonths.filter((m) => {
+        const sig = `${m.signature}|${methodSig}`;
+        const mem = cache.get(`${archiveKey}|${m.month}|${sig}`);
+        if (mem) {
+          next[m.month] = mem;
+          return false;
         }
+        const sv = saved[m.month];
+        if (sv && sv.sig === sig && sv.data) {
+          next[m.month] = sv.data;
+          cache.set(`${archiveKey}|${m.month}|${sig}`, sv.data);
+          return false;
+        }
+        return true;
+      });
+      setData({ ...next });
+      for (let i = 0; i < todo.length; i++) {
+        const m = todo[i];
+        const sig = `${m.signature}|${methodSig}`;
+        setLoading(`กำลังคำนวณ ${monthLabelTh(m.month)} (${i + 1}/${todo.length})`);
+        const rows = await fetchArchiveMonth(archiveKey, m.month);
+        if (cancelled) return;
+        const v = computeMonthAtt(rows, axes, categoryMaster);
+        cache.set(`${archiveKey}|${m.month}|${sig}`, v);
         next[m.month] = v;
+        setData({ ...next });
+        void saveArchiveCalc(archiveKey, "att", m.month, sig, v);
       }
-      if (!cancelled) {
-        setData(next);
-        setLoading("");
-      }
+      if (!cancelled) setLoading("");
     })();
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [archiveKey, salesMonths.map((m) => `${m.month}:${m.signature}`).join(","), presetSig, categoryMaster.length]);
+  }, [archiveKey, salesMonths.map((m) => `${m.month}:${m.signature}`).join(","), methodSig]);
 
   const done = salesMonths.map((m) => m.month).filter((m) => m !== currentMonth && data[m]);
   const used = range ? done.slice(-range) : done;

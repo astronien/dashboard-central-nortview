@@ -28,6 +28,11 @@ async function ensureSchema(db) {
         signature TEXT, summary_json TEXT, source TEXT,
         updated_at TEXT NOT NULL DEFAULT (datetime('now')),
         PRIMARY KEY (branch, month))`,
+      `CREATE TABLE IF NOT EXISTS archive_calc_cache (
+        branch TEXT NOT NULL, kind TEXT NOT NULL, month TEXT NOT NULL,
+        sig TEXT NOT NULL, data_json TEXT NOT NULL,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        PRIMARY KEY (branch, kind, month))`,
       `CREATE TABLE IF NOT EXISTS target_archive (
         branch TEXT NOT NULL, month TEXT NOT NULL,
         rows_json TEXT NOT NULL, signature TEXT,
@@ -102,6 +107,17 @@ async function handleArchive(req, res) {
       }));
       return res.status(200).json({ ok: true, months });
     }
+    // ผลคำนวณที่เก็บไว้ (เช่น ATT รายคน) — ทุกเดือนในครั้งเดียว
+    if (action === "calc") {
+      const kind = String(q.kind ?? "").slice(0, 40);
+      const r = await db.execute({
+        sql: "SELECT month, sig, data_json FROM archive_calc_cache WHERE branch = ? AND kind = ?",
+        args: [branch, kind],
+      });
+      const items = {};
+      for (const x of r.rows) items[x.month] = { sig: x.sig, data: safeJson(x.data_json) };
+      return res.status(200).json({ ok: true, items });
+    }
     if (!okMonth(month)) return res.status(400).json({ ok: false, error: "Bad month" });
     if (action === "month") {
       for (const k of keys) {
@@ -134,6 +150,17 @@ async function handleArchive(req, res) {
 
   if (req.method === "POST") {
     if (!okMonth(month)) return res.status(400).json({ ok: false, error: "Bad month" });
+    if (action === "calc") {
+      const kind = String(b.kind ?? "").slice(0, 40);
+      const sig = String(b.sig ?? "").slice(0, 300);
+      if (!kind || !sig) return res.status(400).json({ ok: false, error: "Missing kind/sig" });
+      await db.execute({
+        sql: `INSERT INTO archive_calc_cache (branch, kind, month, sig, data_json, updated_at) VALUES (?, ?, ?, ?, ?, datetime('now'))
+              ON CONFLICT(branch, kind, month) DO UPDATE SET sig = excluded.sig, data_json = excluded.data_json, updated_at = datetime('now')`,
+        args: [branch, kind, month, sig, JSON.stringify(b.data ?? null)],
+      });
+      return res.status(200).json({ ok: true });
+    }
     if (action === "begin") {
       await db.execute({ sql: "DELETE FROM sales_archive WHERE branch = ? AND month = ?", args: [branch, month] });
       return res.status(200).json({ ok: true });
