@@ -37,6 +37,29 @@ export type ArchiveMonthMeta = {
 
 export const archiveBranchKey = (branch: string) => cleanBranchForMatching(branch) || "default";
 
+/**
+ * คีย์คลังของสาขา — ใช้ "รหัสสาขา" เป็นหลัก (เหมือนกันทุกเครื่อง แม้ชื่อสาขาที่เลือกจะเขียนต่างกัน
+ * เช่น "Studio 7-Central-NorthVille" กับ "Studio7-Central Northville-Nonthaburi")
+ * แล้วต่อด้วยคีย์ชื่อแบบเก่า เพื่ออ่านข้อมูลที่เคยเก็บไว้ก่อนหน้า
+ */
+export function buildArchiveKey(selectedBranch: string, hints: Array<string | number | null | undefined> = []): string {
+  const texts = [selectedBranch, ...hints.map((h) => String(h ?? ""))].filter(Boolean);
+  let id = "";
+  for (const t of texts) {
+    const m = /\bID\s*:?\s*(\d{3,})/i.exec(t) ?? (/^\d{3,}$/.test(t.trim()) ? [t, t.trim()] : null);
+    if (m) {
+      id = m[1];
+      break;
+    }
+  }
+  const names = texts.map((t) => cleanBranchForMatching(t)).filter((x) => x && !/^\d+$/.test(x));
+  const keys = [id ? `id:${id}` : "", ...names].filter(Boolean);
+  return Array.from(new Set(keys)).join("|") || "default";
+}
+
+/** รับได้ทั้งชื่อสาขา หรือคีย์ที่สร้างจาก buildArchiveKey แล้ว */
+const keyOf = (b: string) => (b.includes("|") || b.startsWith("id:") ? b : archiveBranchKey(b));
+
 const num = (v: unknown) => Number(String(v ?? "").replace(/[^\d.-]/g, "")) || 0;
 const bahtOf = (r: RawRow) => num(r["ราคาจำหน่าย"] ?? r["ราคาขายตามบิล"] ?? r["Total Price"] ?? r.totalPrice);
 
@@ -124,7 +147,7 @@ export async function saveArchiveMonth(params: {
   onProgress?: (done: number, total: number) => void;
 }): Promise<void> {
   const { branch, month, rows, summary, source, onProgress } = params;
-  const key = archiveBranchKey(branch);
+  const key = keyOf(branch);
   // แบ่งชิ้นตามขนาด JSON (~1.2MB ต่อชิ้น)
   const chunks: RawRow[][] = [];
   let cur: RawRow[] = [];
@@ -159,12 +182,12 @@ export async function saveArchiveMonth(params: {
 }
 
 export async function saveArchiveTarget(branch: string, month: string, rows: RawRow[]): Promise<void> {
-  await post({ action: "target", branch: archiveBranchKey(branch), month, rows, signature: targetSignature(rows) });
+  await post({ action: "target", branch: keyOf(branch), month, rows, signature: targetSignature(rows) });
 }
 
 export async function fetchArchiveList(branch: string): Promise<ArchiveMonthMeta[]> {
   try {
-    const r = await fetch(`${API}&action=list&branch=${encodeURIComponent(archiveBranchKey(branch))}`);
+    const r = await fetch(`${API}&action=list&branch=${encodeURIComponent(keyOf(branch))}`, { cache: "no-store" });
     const j = (await r.json()) as { ok?: boolean; months?: ArchiveMonthMeta[] };
     return Array.isArray(j?.months) ? j.months : [];
   } catch {
@@ -174,7 +197,7 @@ export async function fetchArchiveList(branch: string): Promise<ArchiveMonthMeta
 
 export async function fetchArchiveMonth(branch: string, month: string): Promise<RawRow[]> {
   try {
-    const r = await fetch(`${API}&action=month&branch=${encodeURIComponent(archiveBranchKey(branch))}&month=${month}`);
+    const r = await fetch(`${API}&action=month&branch=${encodeURIComponent(keyOf(branch))}&month=${month}`, { cache: "no-store" });
     const j = (await r.json()) as { ok?: boolean; rows?: RawRow[] };
     return Array.isArray(j?.rows) ? j.rows : [];
   } catch {
@@ -184,7 +207,7 @@ export async function fetchArchiveMonth(branch: string, month: string): Promise<
 
 export async function fetchArchiveTarget(branch: string, month: string): Promise<RawRow[]> {
   try {
-    const r = await fetch(`${API}&action=target&branch=${encodeURIComponent(archiveBranchKey(branch))}&month=${month}`);
+    const r = await fetch(`${API}&action=target&branch=${encodeURIComponent(keyOf(branch))}&month=${month}`, { cache: "no-store" });
     const j = (await r.json()) as { ok?: boolean; rows?: RawRow[] };
     return Array.isArray(j?.rows) ? j.rows : [];
   } catch {

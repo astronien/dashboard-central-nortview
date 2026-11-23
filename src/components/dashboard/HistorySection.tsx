@@ -36,12 +36,15 @@ type View = "total" | "category" | "staff";
 
 export function HistorySection({
   branch,
+  archiveKey,
   months,
   getCategory,
   onArchiveChanged,
   currentMonth,
 }: {
   branch: string;
+  /** คีย์คลัง (รหัสสาขา) — ใช้ตอนบันทึก */
+  archiveKey: string;
   months: ArchiveMonthMeta[];
   getCategory: (r: RawRow) => string;
   onArchiveChanged: () => void | Promise<void>;
@@ -244,7 +247,7 @@ export function HistorySection({
         )}
       </div>
 
-      <BackfillPanel branch={branch} months={months} getCategory={getCategory} onDone={onArchiveChanged} currentMonth={currentMonth} />
+      <BackfillPanel branch={branch} archiveKey={archiveKey} months={months} getCategory={getCategory} onDone={onArchiveChanged} currentMonth={currentMonth} />
     </div>
   );
 }
@@ -252,12 +255,14 @@ export function HistorySection({
 /** อัปไฟล์ย้อนหลัง (หลายเดือนในไฟล์เดียว) → แยกเดือน → ตรวจ → บันทึกลงคลัง */
 function BackfillPanel({
   branch,
+  archiveKey,
   months,
   getCategory,
   onDone,
   currentMonth,
 }: {
   branch: string;
+  archiveKey: string;
   months: ArchiveMonthMeta[];
   getCategory: (r: RawRow) => string;
   onDone: () => void | Promise<void>;
@@ -306,7 +311,7 @@ function BackfillPanel({
       for (let i = 0; i < todo.length; i++) {
         const p = todo[i];
         await saveArchiveMonth({
-          branch,
+          branch: archiveKey,
           month: p.month,
           rows: p.rows,
           summary: summarizeMonth(p.rows, getCategory),

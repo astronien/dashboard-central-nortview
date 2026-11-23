@@ -48,26 +48,48 @@ async function handleArchive(req, res) {
   const q = req.query ?? {};
   const b = req.body ?? {};
   const action = String(q.action ?? b.action ?? "");
-  const branch = String(q.branch ?? b.branch ?? "").trim();
+  // branch = "คีย์หลัก|คีย์เก่า1|คีย์เก่า2" — อ่านรวมทุกคีย์ (ข้อมูลที่เคยเก็บด้วยชื่อสาขาแบบอื่น) · เขียนที่คีย์หลัก
+  const keys = String(q.branch ?? b.branch ?? "")
+    .split("|")
+    .map((x) => x.trim())
+    .filter(okBranch)
+    .slice(0, 5);
+  const branch = keys[0] || "";
   const month = String(q.month ?? b.month ?? "").trim();
   if (!okBranch(branch)) return res.status(400).json({ ok: false, error: "Missing branch" });
+  res.setHeader("Cache-Control", "no-store");
+  const inList = keys.map(() => "?").join(",");
 
   if (req.method === "GET") {
     if (action === "list") {
-      const r = await db.execute({
-        sql: `SELECT m.month, m.row_count, m.total_baht, m.signature, m.summary_json, m.source, m.updated_at,
-                     t.signature AS target_signature, t.updated_at AS target_updated_at
-              FROM sales_archive_meta m
-              LEFT JOIN target_archive t ON t.branch = m.branch AND t.month = m.month
-              WHERE m.branch = ?
-              UNION
-              SELECT t.month, 0, 0, NULL, NULL, NULL, NULL, t.signature, t.updated_at
-              FROM target_archive t
-              WHERE t.branch = ? AND NOT EXISTS (SELECT 1 FROM sales_archive_meta m2 WHERE m2.branch = t.branch AND m2.month = t.month)
-              ORDER BY 1`,
-        args: [branch, branch],
+      const sm = await db.execute({
+        sql: `SELECT branch, month, row_count, total_baht, signature, summary_json, source, updated_at
+              FROM sales_archive_meta WHERE branch IN (${inList})`,
+        args: keys,
       });
-      const months = r.rows.map((x) => ({
+      const tm = await db.execute({
+        sql: `SELECT branch, month, signature, updated_at FROM target_archive WHERE branch IN (${inList})`,
+        args: keys,
+      });
+      // เดือนเดียวกันหลายคีย์ → เอาคีย์ที่มาก่อน (คีย์หลัก)
+      const rank = (k) => keys.indexOf(String(k));
+      const byMonth = new Map();
+      for (const x of sm.rows) {
+        const cur = byMonth.get(x.month);
+        if (!cur || rank(x.branch) < rank(cur.branch)) byMonth.set(x.month, { ...x });
+      }
+      const tByMonth = new Map();
+      for (const x of tm.rows) {
+        const cur = tByMonth.get(x.month);
+        if (!cur || rank(x.branch) < rank(cur.branch)) tByMonth.set(x.month, x);
+      }
+      for (const [m, t] of tByMonth) {
+        if (!byMonth.has(m)) byMonth.set(m, { month: m, row_count: 0, total_baht: 0 });
+        byMonth.get(m).target_signature = t.signature;
+        byMonth.get(m).target_updated_at = t.updated_at;
+      }
+      const rowsAll = Array.from(byMonth.values()).sort((a, c) => String(a.month).localeCompare(String(c.month)));
+      const months = rowsAll.map((x) => ({
         month: x.month,
         rowCount: Number(x.row_count) || 0,
         totalBaht: Number(x.total_baht) || 0,
@@ -82,24 +104,30 @@ async function handleArchive(req, res) {
     }
     if (!okMonth(month)) return res.status(400).json({ ok: false, error: "Bad month" });
     if (action === "month") {
-      const r = await db.execute({
-        sql: "SELECT rows_json FROM sales_archive WHERE branch = ? AND month = ? ORDER BY chunk",
-        args: [branch, month],
-      });
-      const rows = [];
-      for (const x of r.rows) {
-        const part = safeJson(x.rows_json);
-        if (Array.isArray(part)) rows.push(...part);
+      for (const k of keys) {
+        const r = await db.execute({
+          sql: "SELECT rows_json FROM sales_archive WHERE branch = ? AND month = ? ORDER BY chunk",
+          args: [k, month],
+        });
+        const rows = [];
+        for (const x of r.rows) {
+          const part = safeJson(x.rows_json);
+          if (Array.isArray(part)) rows.push(...part);
+        }
+        if (rows.length) return res.status(200).json({ ok: true, rows });
       }
-      return res.status(200).json({ ok: true, rows });
+      return res.status(200).json({ ok: true, rows: [] });
     }
     if (action === "target") {
-      const r = await db.execute({
-        sql: "SELECT rows_json FROM target_archive WHERE branch = ? AND month = ?",
-        args: [branch, month],
-      });
-      const rows = r.rows[0] ? safeJson(r.rows[0].rows_json) : [];
-      return res.status(200).json({ ok: true, rows: Array.isArray(rows) ? rows : [] });
+      for (const k of keys) {
+        const r = await db.execute({
+          sql: "SELECT rows_json FROM target_archive WHERE branch = ? AND month = ?",
+          args: [k, month],
+        });
+        const rows = r.rows[0] ? safeJson(r.rows[0].rows_json) : [];
+        if (Array.isArray(rows) && rows.length) return res.status(200).json({ ok: true, rows });
+      }
+      return res.status(200).json({ ok: true, rows: [] });
     }
     return res.status(400).json({ ok: false, error: "Unknown action" });
   }

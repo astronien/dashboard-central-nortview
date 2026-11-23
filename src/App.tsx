@@ -207,7 +207,7 @@ import { buildMissions } from "./lib/missions";
 import { buildHourlySales } from "./lib/hourlySales";
 import { buildDailySales } from "./lib/dailySales";
 import { buildDailyInsights } from "./lib/dailyInsights";
-import { fetchArchiveList, fetchArchiveMonth, rowsSignature, saveArchiveMonth, saveArchiveTarget, shiftMonth, splitByMonth, summarizeMonth, targetSignature, type ArchiveMonthMeta } from "./lib/salesArchive";
+import { buildArchiveKey, fetchArchiveList, fetchArchiveMonth, rowsSignature, saveArchiveMonth, saveArchiveTarget, shiftMonth, splitByMonth, summarizeMonth, targetSignature, type ArchiveMonthMeta } from "./lib/salesArchive";
 import { DailySalesTable } from "./components/dashboard/DailySalesTable";
 import { MobileStaff } from "./components/mobile/MobileStaff";
 import { useIsMobile } from "./hooks/useIsMobile";
@@ -3076,18 +3076,38 @@ function AppInternal({
     [selectedBranch, bangkokToday, stockAlerts, runRatePrefs, stockStatus?.updatedAt],
   );
   // ── คลังยอดขาย/เป้ารายเดือน ───────────────────────────────────────
+  // คีย์คลัง = รหัสสาขา (เหมือนกันทุกเครื่อง) + ชื่อแบบเก่า (อ่านข้อมูลที่เคยเก็บ)
+  const archiveKey = useMemo(
+    () =>
+      buildArchiveKey(selectedBranch, [
+        csatData?.branch?.refId,
+        String(branchSalesRows.current[0]?.["Branch (Name)"] ?? ""),
+        String(filterRowsByBranch(uploadedFiles.target, selectedBranch)[0]?.["BRANCH NAME"] ?? ""),
+      ]),
+    [selectedBranch, csatData?.branch?.refId, branchSalesRows.current, uploadedFiles.target],
+  );
   const [archiveList, setArchiveList] = useState<ArchiveMonthMeta[]>([]);
   const [archiveListReady, setArchiveListReady] = useState(false);
   const loadArchiveList = React.useCallback(async () => {
     if (!selectedBranch) return;
-    const list = await fetchArchiveList(selectedBranch);
+    const list = await fetchArchiveList(archiveKey);
     setArchiveList(list);
     setArchiveListReady(true);
-  }, [selectedBranch]);
+  }, [selectedBranch, archiveKey]);
   useEffect(() => {
     setArchiveListReady(false);
     setArchiveFill({ lastMonth: [], lastYear: [] });
     void loadArchiveList();
+  }, [loadArchiveList]);
+
+  // เปิดหน้าประวัติ / กลับมาที่แท็บ → ดึงรายการคลังใหม่ (เห็นที่เครื่องอื่นอัปไว้)
+  useEffect(() => {
+    if (currentView === "history") void loadArchiveList();
+  }, [currentView, loadArchiveList]);
+  useEffect(() => {
+    const onFocus = () => void loadArchiveList();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
   }, [loadArchiveList]);
 
   // เก็บอัตโนมัติ: ยอดขายเดือนที่อยู่ในไฟล์ Current (ทับทั้งเดือนเมื่อข้อมูลเปลี่ยน) + เป้าของเดือนล่าสุด
@@ -3108,9 +3128,9 @@ function AppInternal({
     void (async () => {
       try {
         for (const [m, r] of salesTodo) {
-          await saveArchiveMonth({ branch: selectedBranch, month: m, rows: r, summary: summarizeMonth(r, getCategory), source: "auto" });
+          await saveArchiveMonth({ branch: archiveKey, month: m, rows: r, summary: summarizeMonth(r, getCategory), source: "auto" });
         }
-        if (targetTodo && latestMonth) await saveArchiveTarget(selectedBranch, latestMonth, targetRows);
+        if (targetTodo && latestMonth) await saveArchiveTarget(archiveKey, latestMonth, targetRows);
         await loadArchiveList();
       } catch (e) {
         console.warn("[archive] auto-save failed:", e);
@@ -3119,7 +3139,7 @@ function AppInternal({
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPia, isInitialLoading, archiveListReady, branchSalesRows.current, uploadedFiles.target, selectedBranch]);
+  }, [isPia, isInitialLoading, archiveListReady, branchSalesRows.current, uploadedFiles.target, selectedBranch, archiveKey]);
 
   // เดือนก่อน / ปีก่อน: ถ้าไม่ได้อัปเอง ดึงจากคลัง
   useEffect(() => {
@@ -3134,8 +3154,8 @@ function AppInternal({
     let cancelled = false;
     void (async () => {
       const [lmRows, lyRows] = await Promise.all([
-        needLm ? fetchArchiveMonth(selectedBranch, lm) : Promise.resolve(archiveFill.lastMonth),
-        needLy ? fetchArchiveMonth(selectedBranch, ly) : Promise.resolve(archiveFill.lastYear),
+        needLm ? fetchArchiveMonth(archiveKey, lm) : Promise.resolve(archiveFill.lastMonth),
+        needLy ? fetchArchiveMonth(archiveKey, ly) : Promise.resolve(archiveFill.lastYear),
       ]);
       if (cancelled) return;
       const next = { lastMonth: lmRows, lastYear: lyRows, lmMonth: needLm ? lm : archiveFill.lmMonth, lyMonth: needLy ? ly : archiveFill.lyMonth };
@@ -4822,6 +4842,7 @@ function AppInternal({
               >
                 <HistorySection
                   branch={selectedBranch}
+                  archiveKey={archiveKey}
                   months={archiveList}
                   getCategory={getCategory}
                   onArchiveChanged={loadArchiveList}
