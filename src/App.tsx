@@ -4921,6 +4921,8 @@ function AppInternal({
                   presets={kpiPresets}
                   categoryMaster={displayUploads.categoryMaster}
                   staffOrder={parsedReport.officers.filter((o) => !isStaffHidden(o)).map((o) => o.name)}
+                  currentTarget={monthlyPerformance.actualSales.target}
+                  currentActual={monthlyPerformance.actualSales.actual}
                 />
               </motion.div>
             )}

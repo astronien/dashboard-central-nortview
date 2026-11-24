@@ -16,6 +16,7 @@ import type { RawRow } from "../../lib/salesAggregations";
 import type { Preset } from "../../lib/presetTypes";
 import { AttHistoryView } from "./AttHistoryView";
 import { CatHistoryView } from "./CatHistoryView";
+import { HistorySummaryCards, ProductivityView, RankView, StaffProfileView } from "./HistoryInsights";
 import { parseSalesExcelFile } from "../../lib/salesUpload";
 import { filterRowsByBranch } from "../../lib/matchHelpers";
 import {
@@ -35,7 +36,7 @@ const targetOf = (m: ArchiveMonthMeta) => {
   return Number.isFinite(t) && t > 0 ? t : null;
 };
 
-type View = "total" | "category" | "staff" | "cat" | "att";
+type View = "total" | "category" | "staff" | "person" | "rank" | "prod" | "cat" | "att";
 
 export function HistorySection({
   branch,
@@ -47,7 +48,11 @@ export function HistorySection({
   presets = [],
   categoryMaster = [],
   staffOrder = [],
+  currentTarget,
+  currentActual,
 }: {
+  currentTarget?: number;
+  currentActual?: number;
   presets?: Preset[];
   categoryMaster?: RawRow[];
   staffOrder?: string[];
@@ -113,6 +118,16 @@ export function HistorySection({
 
   return (
     <div className="flex flex-col gap-6">
+      <HistorySummaryCards
+        archiveKey={archiveKey}
+        months={months}
+        presets={presets}
+        categoryMaster={categoryMaster}
+        currentMonth={currentMonth}
+        staffOrder={staffOrder}
+        currentTarget={currentTarget}
+        currentActual={currentActual}
+      />
       <div className="bg-white/5 rounded-2xl border border-white/10 p-5 md:p-6">
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-4">
           <div>
@@ -131,6 +146,9 @@ export function HistorySection({
                   ["total", "ทั้งร้าน"],
                   ["category", "รายหมวด"],
                   ["staff", "รายคน"],
+                  ["person", "การ์ดรายคน"],
+                  ["rank", "อันดับ"],
+                  ["prod", "ยอดต่อวันทำงาน"],
                   ["cat", "หมวดหลักรายคน"],
                   ["att", "ATT รายคน"],
                 ] as Array<[View, string]>
@@ -164,7 +182,20 @@ export function HistorySection({
           </div>
         </div>
 
-        {view === "cat" ? (
+        {view === "person" ? (
+          <StaffProfileView
+            archiveKey={archiveKey}
+            months={months}
+            presets={presets}
+            categoryMaster={categoryMaster}
+            currentMonth={currentMonth}
+            staffOrder={staffOrder}
+          />
+        ) : view === "rank" ? (
+          <RankView months={months} currentMonth={currentMonth} staffOrder={staffOrder} />
+        ) : view === "prod" ? (
+          <ProductivityView archiveKey={archiveKey} months={months} currentMonth={currentMonth} staffOrder={staffOrder} />
+        ) : view === "cat" ? (
           <CatHistoryView
             archiveKey={archiveKey}
             months={months}
