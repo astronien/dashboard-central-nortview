@@ -2522,8 +2522,10 @@ function AppInternal({
   // ตาราง "รายงานยอดขาย + Attach" — คำนวณ 2 ชุด: วันล่าสุด / ทั้งเดือนล่าสุด
   // ช่วงวันของตาราง "รายงานยอดขาย + Attach รายเดือน" (null = ทั้งเดือน)
   const [monthReportRange, setMonthReportRange] = useState<ReportRange>(null);
+  // รายงานรายเดือน: เดือนที่เลือกดู (null = เดือนล่าสุด)
+  const [reportMonth, setReportMonth] = useState<string | null>(null);
   const branchReports = useBranchReports({
-    monthRange: monthReportRange,
+    monthRange: reportMonth ? null : monthReportRange,
     displayUploads,
     parsedReport,
     kpiPresets,
@@ -2535,7 +2537,37 @@ function AppInternal({
     billDayKey,
   });
   const dailyBranchReport = branchReports.daily;
-  const monthlyBranchReport = branchReports.monthly;
+
+  // ── รายงานรายเดือน: เลือกดูเดือนเก่าจากคลังได้ (null = เดือนล่าสุด) ─────
+  const [reportMonthRows, setReportMonthRows] = useState<RawRow[]>([]);
+  const [reportMonthLoading, setReportMonthLoading] = useState(false);
+  const pastRowsAll = useMemo(
+    () => (reportMonth ? normalizeDemoIphoneRows(filterRowsByBranch(reportMonthRows, selectedBranch)) : []),
+    [reportMonth, reportMonthRows, selectedBranch],
+  );
+  const pastRows = useMemo(
+    () => (excludingIphoneModels ? pastRowsAll.filter((r) => !isExcludedIphoneDeviceRow(r, excludedIphoneModelSet)) : pastRowsAll),
+    [pastRowsAll, excludingIphoneModels, excludedIphoneModelSet],
+  );
+  const pastBills = useMemo(
+    () => (pastRows.length ? parseBills(enrichSalesRowsWithCatDaily(pastRows, catDailyLookupShared)) : []),
+    [pastRows, catDailyLookupShared],
+  );
+  const pastDisplayUploads = useMemo(() => ({ ...displayUploads, current: pastRows }), [displayUploads, pastRows]);
+  const pastReports = useBranchReports({
+    monthRange: reportMonth ? monthReportRange : null,
+    displayUploads: pastDisplayUploads,
+    // เดือนเก่า: รายชื่อพนักงานเอาจากบิลของเดือนนั้น (คนที่ลาออกไปแล้วก็ยังขึ้น)
+    parsedReport: { officers: [] },
+    kpiPresets,
+    currentRowsAllModels: pastRowsAll,
+    excludedIphoneModelSet,
+    excludingIphoneModels,
+    attachBoost,
+    currentBillsShared: pastBills,
+    billDayKey,
+  });
+  const monthlyBranchReport = reportMonth && pastRows.length ? pastReports.monthly : branchReports.monthly;
   // ช่วงเวลาที่ขายดี — ยอดเฉลี่ยต่อวันของแต่ละชั่วโมง (ทั้งเดือน)
   const hourlySales = useMemo(() => buildHourlySales(displayUploads.current), [displayUploads.current]);
   // ยอดขายรวมรายวัน + ค่าเฉลี่ย ทั้งเดือน
@@ -3099,6 +3131,32 @@ function AppInternal({
     setArchiveFill({ lastMonth: [], lastYear: [] });
     void loadArchiveList();
   }, [loadArchiveList]);
+
+  // รายงานรายเดือน: โหลดข้อมูลเดือนที่เลือกจากคลัง
+  useEffect(() => {
+    if (!reportMonth) {
+      setReportMonthRows([]);
+      return;
+    }
+    let cancelled = false;
+    setReportMonthLoading(true);
+    void fetchArchiveMonth(archiveKey, reportMonth).then((rows) => {
+      if (cancelled) return;
+      setReportMonthRows(rows);
+      setReportMonthLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [reportMonth, archiveKey]);
+  const reportMonthOptions = useMemo(() => {
+    const cur = latestDataYmd ? latestDataYmd.slice(0, 7) : "";
+    return archiveList
+      .filter((m) => m.rowCount > 0 && m.month !== cur)
+      .map((m) => m.month)
+      .sort()
+      .reverse();
+  }, [archiveList, latestDataYmd]);
 
   // เปิดหน้าประวัติ / กลับมาที่แท็บ → ดึงรายการคลังใหม่ (เห็นที่เครื่องอื่นอัปไว้)
   useEffect(() => {
@@ -4349,7 +4407,20 @@ function AppInternal({
                   />
                 </div>
                 <DailyBranchReportSection data={dailyBranchReport} boost={boostLabel(attachBoost)} uploadedAt={salesUploadedAt} />
-                <DailyBranchReportSection data={monthlyBranchReport} boost={boostLabel(attachBoost)} uploadedAt={salesUploadedAt} range={monthReportRange} onRangeChange={setMonthReportRange} />
+                <DailyBranchReportSection
+                  data={monthlyBranchReport}
+                  boost={reportMonth ? undefined : boostLabel(attachBoost)}
+                  uploadedAt={reportMonth ? undefined : salesUploadedAt}
+                  range={monthReportRange}
+                  onRangeChange={setMonthReportRange}
+                  monthOptions={reportMonthOptions}
+                  selectedMonth={reportMonth}
+                  monthLoading={reportMonthLoading}
+                  onMonthChange={(m) => {
+                    setMonthReportRange(null);
+                    setReportMonth(m);
+                  }}
+                />
     </>
   );
   const staffFullView = (

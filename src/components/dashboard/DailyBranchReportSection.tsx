@@ -111,13 +111,26 @@ export const DailyBranchReportSection: React.FC<{
   /** ตารางรายเดือน: ช่วงวันที่เลือก + ตัวเปลี่ยน (ไม่ส่ง = ไม่มีตัวเลือก) */
   range?: ReportRange;
   onRangeChange?: (r: ReportRange) => void;
+  /** เดือนในคลังที่เลือกดูได้ (YYYY-MM, ใหม่ → เก่า) */
+  monthOptions?: string[];
+  selectedMonth?: string | null;
+  monthLoading?: boolean;
+  onMonthChange?: (m: string | null) => void;
 }> = ({
   data,
   boost,
   uploadedAt,
   range,
   onRangeChange,
+  monthOptions = [],
+  selectedMonth = null,
+  monthLoading = false,
+  onMonthChange,
 }) => {
+  const monthName = (ym: string) => {
+    const [y, m] = ym.split("-").map(Number);
+    return new Intl.DateTimeFormat("th-TH", { month: "long", year: "numeric" }).format(new Date(y, m - 1, 1));
+  };
   const isMonthly = Boolean(data.monthFrom);
   // Column order (preset ids) — user can drag the group headers to reorder.
   // Persisted per browser so the layout sticks between visits.
@@ -188,7 +201,9 @@ export const DailyBranchReportSection: React.FC<{
           {isMonthly
             ? data.rangeActive
               ? `รายงานยอดขาย + Attach ช่วง ${fmtDay(data.rangeFrom ?? "")} – ${fmtDay(data.rangeTo ?? "")}`
-              : "รายงานยอดขาย + Attach รายเดือน (เดือนล่าสุด)"
+              : selectedMonth
+                ? `รายงานยอดขาย + Attach เดือน${monthName(selectedMonth)}`
+                : "รายงานยอดขาย + Attach รายเดือน (เดือนล่าสุด)"
             : "รายงานยอดขาย + Attach รายวัน (วันล่าสุด)"}
         </h3>
         {boost ? (
@@ -216,6 +231,29 @@ export const DailyBranchReportSection: React.FC<{
           </span>
         ) : null}
       </div>
+      {isMonthly && onMonthChange && monthOptions.length ? (
+        <div className="mb-2 flex flex-wrap items-center gap-2 text-[12px] text-slate-600">
+          <span>เดือน</span>
+          <select
+            value={selectedMonth ?? ""}
+            onChange={(e) => onMonthChange(e.target.value || null)}
+            className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[13px] text-slate-800"
+          >
+            <option value="">เดือนล่าสุด</option>
+            {monthOptions.map((m) => (
+              <option key={m} value={m}>
+                {monthName(m)}
+              </option>
+            ))}
+          </select>
+          {monthLoading ? <span className="text-slate-400">กำลังโหลด…</span> : null}
+          {selectedMonth ? (
+            <button type="button" onClick={() => onMonthChange(null)} className="text-slate-500 underline hover:text-slate-700">
+              กลับไปเดือนล่าสุด
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       {isMonthly && onRangeChange && data.dataTo ? (
         <RangePicker data={data} range={range ?? null} onChange={onRangeChange} />
       ) : null}
