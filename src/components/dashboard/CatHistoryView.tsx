@@ -26,7 +26,12 @@ import {
 import { CAT_TEAM, MAIN_CATS, computeMonthCat, findCatStaffKey, type MonthCat } from "../../lib/catHistory";
 
 const cache = new Map<string, MonthCat>();
-const short = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : `${Math.round(n / 1000)}K`);
+const short = (n: number) =>
+  n >= 1_000_000
+    ? `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`
+    : n >= 1_000
+      ? `${Math.round(n / 1000)}K`
+      : `${Math.round(n)}`;
 const baht = (n: number) => `฿${Math.round(n).toLocaleString()}`;
 
 /**
@@ -241,10 +246,18 @@ export function CatHistoryView({
                   </div>
                   <div className="daily-chart h-[120px] mt-1">
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={series} margin={{ top: 6, right: 6, bottom: 0, left: -18 }}>
+                      <LineChart data={series} margin={{ top: 8, right: 10, bottom: 0, left: 0 }}>
                         <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.08)" />
-                        <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: "rgba(255,255,255,0.6)", fontSize: 10 }} />
-                        <YAxis tickLine={false} axisLine={false} width={40} tick={{ fill: "rgba(255,255,255,0.55)", fontSize: 10 }} tickFormatter={(v: number) => short(v)} />
+                        <XAxis dataKey="label" tickLine={false} axisLine={false} padding={{ left: 10, right: 10 }} tick={{ fill: "rgba(255,255,255,0.6)", fontSize: 10 }} />
+                        <YAxis
+                          tickLine={false}
+                          axisLine={false}
+                          width={48}
+                          tickCount={4}
+                          domain={[0, "auto"]}
+                          tick={{ fill: "rgba(255,255,255,0.6)", fontSize: 10 }}
+                          tickFormatter={(v: number) => (v === 0 ? "0" : short(v))}
+                        />
                         <Tooltip
                           content={({ active, payload }) => {
                             if (!active || !payload?.length) return null;

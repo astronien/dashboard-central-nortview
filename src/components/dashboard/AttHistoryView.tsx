@@ -281,10 +281,18 @@ export function AttHistoryView({
                   </div>
                   <div className="daily-chart h-[120px] mt-1">
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={series} margin={{ top: 6, right: 6, bottom: 0, left: -24 }}>
+                      <LineChart data={series} margin={{ top: 8, right: 10, bottom: 0, left: 0 }}>
                         <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.08)" />
-                        <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: "rgba(255,255,255,0.6)", fontSize: 10 }} />
-                        <YAxis tickLine={false} axisLine={false} width={36} tick={{ fill: "rgba(255,255,255,0.55)", fontSize: 10 }} tickFormatter={(v: number) => `${v}%`} />
+                        <XAxis dataKey="label" tickLine={false} axisLine={false} padding={{ left: 10, right: 10 }} tick={{ fill: "rgba(255,255,255,0.6)", fontSize: 10 }} />
+                        <YAxis
+                          tickLine={false}
+                          axisLine={false}
+                          width={44}
+                          tickCount={4}
+                          domain={[0, "auto"]}
+                          tick={{ fill: "rgba(255,255,255,0.6)", fontSize: 10 }}
+                          tickFormatter={(v: number) => `${Math.round(v)}%`}
+                        />
                         <Tooltip
                           content={({ active, payload }) => {
                             if (!active || !payload?.length) return null;
