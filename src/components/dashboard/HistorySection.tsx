@@ -15,6 +15,7 @@ import {
 import type { RawRow } from "../../lib/salesAggregations";
 import type { Preset } from "../../lib/presetTypes";
 import { AttHistoryView } from "./AttHistoryView";
+import { CatHistoryView } from "./CatHistoryView";
 import { parseSalesExcelFile } from "../../lib/salesUpload";
 import { filterRowsByBranch } from "../../lib/matchHelpers";
 import {
@@ -34,7 +35,7 @@ const targetOf = (m: ArchiveMonthMeta) => {
   return Number.isFinite(t) && t > 0 ? t : null;
 };
 
-type View = "total" | "category" | "staff" | "att";
+type View = "total" | "category" | "staff" | "cat" | "att";
 
 export function HistorySection({
   branch,
@@ -130,6 +131,7 @@ export function HistorySection({
                   ["total", "ทั้งร้าน"],
                   ["category", "รายหมวด"],
                   ["staff", "รายคน"],
+                  ["cat", "หมวดหลักรายคน"],
                   ["att", "ATT รายคน"],
                 ] as Array<[View, string]>
               ).map(([k, l]) => (
@@ -162,7 +164,15 @@ export function HistorySection({
           </div>
         </div>
 
-        {view === "att" ? (
+        {view === "cat" ? (
+          <CatHistoryView
+            archiveKey={archiveKey}
+            months={months}
+            categoryMaster={categoryMaster}
+            currentMonth={currentMonth}
+            staffOrder={staffOrder}
+          />
+        ) : view === "att" ? (
           <AttHistoryView
             archiveKey={archiveKey}
             months={months}
